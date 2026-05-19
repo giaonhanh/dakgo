@@ -16,9 +16,9 @@ const SEARCH_H   = 56
 const GEOCODE_MS = 600
 const SEARCH_MS  = 500
 
-const DARK_TILE      = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-const SAT_TILE       = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-const SAT_LABEL_TILE = "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
+const DARK_TILE      = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
+const SAT_TILE       = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{x}/{y}"
+const SAT_LABEL_TILE = "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -457,67 +457,55 @@ export default function AddressPickerClient({
 
       {/* ── Search Bar ─────────────────────────────────────────────────── */}
       <div style={{
-        position: "absolute", top: 0, left: 0, right: 0, height: SEARCH_H, zIndex: 30,
+        position: "absolute", top: 0, left: 0, right: 0, zIndex: 30,
         background: "rgba(10,7,4,0.94)",
         backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
         borderBottom: "1px solid rgba(255,215,0,0.15)",
-        display: "flex", alignItems: "center", padding: "0 12px", gap: 10,
+        paddingTop: "env(safe-area-inset-top, 0px)",
       }}>
-        {onClose ? (
-          <button type="button" onClick={onClose} style={{
-            background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)",
-            cursor: "pointer", width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="rgba(255,215,0,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        ) : (
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="7" stroke="rgba(255,215,0,0.6)" strokeWidth="2" />
-            <path d="M16.5 16.5l4 4" stroke="rgba(255,215,0,0.6)" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
-        )}
-        <input
-          ref={searchInputRef}
-          id="address-search" name="address-search"
-          type="text" value={searchText}
-          onChange={e => { setSearchText(e.target.value); scheduleSearch(e.target.value) }}
-          onFocus={() => searchText.length >= 3 && setShowSuggest(suggestions.length > 0)}
-          onBlur={() => setTimeout(() => setShowSuggest(false), 200)}
-          placeholder="Tìm thôn, xã, đường, địa điểm..."
-          style={{
-            flex: 1, background: "transparent", border: "none", outline: "none",
-            color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", fontWeight: 500,
-            caretColor: "#FFD700",
-          }}
-        />
-        {searching ? <Spinner /> : searchText ? (
-          <button type="button"
-            onMouseDown={e => { e.preventDefault(); setSearchText(""); setSuggestions([]); setShowSuggest(false) }}
-            style={{
-              background: "rgba(255,255,255,0.08)", border: "none", cursor: "pointer",
-              width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
-              color: "rgba(255,255,255,0.5)", fontSize: 11,
+        <div style={{ height: SEARCH_H, display: "flex", alignItems: "center", padding: "0 12px", gap: 10 }}>
+          {onClose ? (
+            <button type="button" onClick={onClose} style={{
+              background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)",
+              cursor: "pointer", width: 34, height: 34, borderRadius: 10, flexShrink: 0,
               display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-          >✕</button>
-        ) : (
-          <button type="button" onClick={handleGPS} style={{
-            background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)",
-            cursor: "pointer", width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            {locating ? <Spinner size={14} /> : (
+            }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="3" fill="#FFD700" />
-                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#FFD700" strokeWidth="2" strokeLinecap="round" />
-                <circle cx="12" cy="12" r="7" stroke="#FFD700" strokeWidth="1.5" opacity="0.4" />
+                <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="rgba(255,215,0,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-            )}
-          </button>
-        )}
+            </button>
+          ) : (
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <circle cx="11" cy="11" r="7" stroke="rgba(255,215,0,0.6)" strokeWidth="2" />
+              <path d="M16.5 16.5l4 4" stroke="rgba(255,215,0,0.6)" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          )}
+          <input
+            ref={searchInputRef}
+            id="address-search" name="address-search"
+            type="text" value={searchText}
+            onChange={e => { setSearchText(e.target.value); scheduleSearch(e.target.value) }}
+            onFocus={() => searchText.length >= 3 && setShowSuggest(suggestions.length > 0)}
+            onBlur={() => setTimeout(() => setShowSuggest(false), 200)}
+            placeholder="Tìm thôn, xã, đường, địa điểm..."
+            style={{
+              flex: 1, background: "transparent", border: "none", outline: "none",
+              color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", fontWeight: 500,
+              caretColor: "#FFD700",
+            }}
+          />
+          {searching ? <Spinner /> : searchText ? (
+            <button type="button"
+              onMouseDown={e => { e.preventDefault(); setSearchText(""); setSuggestions([]); setShowSuggest(false) }}
+              style={{
+                background: "rgba(255,255,255,0.08)", border: "none", cursor: "pointer",
+                width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+                color: "rgba(255,255,255,0.5)", fontSize: 11,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >✕</button>
+          ) : null}
+        </div>
       </div>
 
       {/* ── Suggestions Dropdown ────────────────────────────────────────── */}
@@ -527,7 +515,7 @@ export default function AddressPickerClient({
             initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.15 }}
             style={{
-              position: "absolute", top: SEARCH_H, left: 0, right: 0, zIndex: 29,
+              position: "absolute", top: `calc(${SEARCH_H}px + env(safe-area-inset-top, 0px))`, left: 0, right: 0, zIndex: 29,
               background: "rgba(12,8,4,0.98)", backdropFilter: "blur(20px)",
               borderBottom: "1px solid rgba(255,215,0,0.12)",
               boxShadow: "0 8px 32px rgba(0,0,0,0.8)", overflow: "hidden",
@@ -563,7 +551,7 @@ export default function AddressPickerClient({
 
       {/* ── Map Container ───────────────────────────────────────────────── */}
       <div style={{
-        position: "absolute", top: SEARCH_H, bottom: PANEL_H, left: 0, right: 0, zIndex: 1,
+        position: "absolute", top: `calc(${SEARCH_H}px + env(safe-area-inset-top, 0px))`, bottom: PANEL_H, left: 0, right: 0, zIndex: 1,
       }}>
         {/* Skeleton che phần map trắng trong lúc tiles chưa load */}
         {!tilesReady && (
@@ -592,14 +580,11 @@ export default function AddressPickerClient({
         >
           {mapStyle === "satellite" ? (
             <>
-              <TileLayer key="sat-base" url={SAT_TILE} maxZoom={19}
-                keepBuffer={1} updateWhenIdle updateWhenZooming={false} />
-              <TileLayer key="sat-labels" url={SAT_LABEL_TILE} maxZoom={19}
-                keepBuffer={1} updateWhenIdle updateWhenZooming={false} />
+              <TileLayer key="sat-base" url={SAT_TILE} maxZoom={19} keepBuffer={4} />
+              <TileLayer key="sat-labels" url={SAT_LABEL_TILE} maxZoom={19} keepBuffer={4} />
             </>
           ) : (
-            <TileLayer key="dark" url={DARK_TILE} maxZoom={19}
-              keepBuffer={1} updateWhenIdle updateWhenZooming={false} />
+            <TileLayer key="dark" url={DARK_TILE} maxZoom={19} keepBuffer={4} />
           )}
           <MapEvents onMoveStart={handleMoveStart} onMoveEnd={handleMoveEnd} />
           <FlyTo target={flyTarget} />
@@ -608,30 +593,47 @@ export default function AddressPickerClient({
         </MapContainer>
       </div>
 
-      {/* ── Map Style Toggle ─────────────────────────────────────────────── */}
-      <button
-        type="button"
-        onClick={() => setMapStyle(s => s === "dark" ? "satellite" : "dark")}
-        style={{
-          position: "absolute",
-          top: SEARCH_H + 10, right: 12,
-          zIndex: 15, width: 40, height: 40,
-          borderRadius: 10, border: "1px solid rgba(255,255,255,0.15)",
+      {/* ── Map Controls — góc phải dưới bản đồ ───────────────────────── */}
+      <div style={{
+        position: "absolute", right: 12, bottom: PANEL_H + 12, zIndex: 15,
+        display: "flex", flexDirection: "column", gap: 8,
+      }}>
+        <button type="button" onClick={handleGPS} style={{
+          width: 40, height: 40, borderRadius: 10,
+          border: "1px solid rgba(255,215,0,0.35)",
           background: "rgba(10,7,4,0.88)",
           backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-          cursor: "pointer", fontSize: 18,
+          cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
           boxShadow: "0 2px 12px rgba(0,0,0,0.5)",
-          transition: "border-color .2s",
-        }}
-        title={mapStyle === "dark" ? "Chuyển vệ tinh" : "Chuyển bản đồ"}
-      >
-        {mapStyle === "dark" ? "🛰️" : "🗺️"}
-      </button>
+        }}>
+          {locating ? <Spinner size={14} /> : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="3" fill="#FFD700" />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#FFD700" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="12" cy="12" r="7" stroke="#FFD700" strokeWidth="1.5" opacity="0.4" />
+            </svg>
+          )}
+        </button>
+        <button type="button"
+          onClick={() => setMapStyle(s => s === "dark" ? "satellite" : "dark")}
+          style={{
+            width: 40, height: 40, borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.15)",
+            background: "rgba(10,7,4,0.88)",
+            backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+            cursor: "pointer", fontSize: 18,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.5)",
+          }}
+        >
+          {mapStyle === "dark" ? "🛰️" : "🗺️"}
+        </button>
+      </div>
 
       {/* ── Center Pin Overlay ──────────────────────────────────────────── */}
       <div style={{
-        position: "absolute", top: SEARCH_H, bottom: PANEL_H, left: 0, right: 0,
+        position: "absolute", top: `calc(${SEARCH_H}px + env(safe-area-inset-top, 0px))`, bottom: PANEL_H, left: 0, right: 0,
         zIndex: 10, pointerEvents: "none",
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
