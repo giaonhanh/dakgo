@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import React, { useState, useEffect, useRef, useCallback } from "react"
+import React, { useState, useEffect, useRef, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -85,7 +85,7 @@ const DEFAULT_FILTER: FilterState = {
   sort: "relevant", only_open: false, max_delivery: null, min_rating: null, has_promo: false,
 }
 
-export default function SearchPage() {
+function SearchContent() {
   const router        = useRouter()
   const params        = useSearchParams()
   const inputRef      = useRef<HTMLInputElement>(null)
@@ -456,6 +456,14 @@ export default function SearchPage() {
         )}
       </AnimatePresence>
     </>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense>
+      <SearchContent />
+    </Suspense>
   )
 }
 
