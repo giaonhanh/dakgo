@@ -259,20 +259,6 @@ export default function HomePage() {
         fontFamily:"'Lexend',sans-serif",
       }}>
 
-        {/* ── STICKY STATUS BAR ── */}
-        <div style={{
-          height:32, flexShrink:0, display:"flex", alignItems:"center",
-          justifyContent:"space-between", padding:"0 18px", background:"#080806",
-          position:"relative", zIndex:60,
-        }}>
-          <span style={{ color:"#FF8C00", fontSize:11, fontWeight:600 }}>9:41</span>
-          <div style={{ width:76, height:14, background:"#080806", borderRadius:7,
-            border:"1px solid rgba(255,255,255,0.08)",
-            position:"absolute", left:"50%", transform:"translateX(-50%)" }} />
-          <div style={{ display:"flex", gap:4, color:"#FF8C00", fontSize:9 }}>
-            <span>▲▲▲</span><span>WiFi</span><span>▪</span>
-          </div>
-        </div>
 
         {/* ── SCROLLABLE BODY ── */}
         <div style={{ flex:1, overflowY:"auto", overflowX:"hidden",
