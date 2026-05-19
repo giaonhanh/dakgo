@@ -8,6 +8,7 @@ const SELF_NAV_PATHS = [
   '/tracking', '/shop', '/search', '/cart', '/orders', '/profile',
   '/addresses', '/wallet', '/vouchers', '/loyalty', '/notifications', '/errand',
   '/checkout', '/order-success', '/review',
+  '/bestsellers', '/promo-items', '/nearby-shops',
 ]
 
 export default function CustomerLayout({ children }: { children: React.ReactNode }) {

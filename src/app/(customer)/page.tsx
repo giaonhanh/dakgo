@@ -730,7 +730,7 @@ export default function HomePage() {
           {/* ──────────────────────────────────────
               S9 — NearbyShops
           ────────────────────────────────────── */}
-          <SectionHeader title="📍 Quán gần bạn" more="Xem tất cả →" href="/search?filter=nearby" />
+          <SectionHeader title="📍 Quán gần bạn" more="Xem tất cả →" href="/nearby-shops" />
           <div style={{ padding:"0 16px", display:"flex", flexDirection:"column",
             gap:9, marginBottom:14 }}>
             {NEARBY_SHOPS.map(s => (

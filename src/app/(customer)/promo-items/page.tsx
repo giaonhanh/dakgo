@@ -23,7 +23,7 @@ export default function PromoItemsPage() {
       minHeight:"100dvh", background:"#080806",
       fontFamily:"'Lexend',sans-serif",
       paddingTop:"env(safe-area-inset-top, 0px)",
-      paddingBottom:"calc(80px + env(safe-area-inset-bottom, 0px))",
+      paddingBottom:"calc(24px + env(safe-area-inset-bottom, 0px))",
     }}>
       {/* Header */}
       <div style={{
