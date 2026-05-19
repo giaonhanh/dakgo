@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
@@ -35,7 +35,7 @@ const ORDERS: Order[] = [
     ],
     subtotal: 135000, deliveryFee: 15000, discount: 0,
     nightFee: 5000, weatherFee: "Mưa lớn",
-    createdAt: "14/05 · 22:05", address: "147 Trần Phú, Phước An",
+    createdAt: "19/05 · 22:05", address: "147 Trần Phú, Phước An",
     note: "Để trước cổng, gọi trước 2 phút",
     driver: { name: "Trần Văn Bình", plate: "47B-22341", phone: "0901234567", rating: 4.9, eta: 3 },
     payMethod: "Tiền mặt",
@@ -55,7 +55,7 @@ const ORDERS: Order[] = [
       },
     ],
     subtotal: 121000, deliveryFee: 8000, discount: 0, nightFee: 5000,
-    createdAt: "14/05 · 21:50", address: "147 Trần Phú, Phước An",
+    createdAt: "19/05 · 21:50", address: "147 Trần Phú, Phước An",
     payMethod: "Ví GiaoNhanh",
   },
   {
@@ -66,7 +66,7 @@ const ORDERS: Order[] = [
       { emoji: "🍲", name: "Canh chua cá",   qty: 1, price: 25000 },
     ],
     subtotal: 65000, deliveryFee: 8000, discount: 0,
-    createdAt: "13/05 · 12:05", address: "147 Trần Phú, Phước An",
+    createdAt: "19/05 · 12:05", address: "147 Trần Phú, Phước An",
     driver: { name: "Nguyễn Thị Lan", plate: "47B-33412", phone: "0912345678", rating: 4.8, eta: 0 },
     payMethod: "VietQR", rating: 5,
   },
@@ -97,6 +97,7 @@ const TABS = [
   { key: "active",    label: "Đang giao"  },
   { key: "completed", label: "Hoàn thành" },
   { key: "cancelled", label: "Đã hủy"     },
+  { key: "history",   label: "🕐 Lịch sử"  },
 ]
 
 const CANCEL_REASONS = [
@@ -177,6 +178,35 @@ export default function OrdersPage() {
 
   const fireToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2400) }
 
+  // ── Today filter: đơn hôm nay + đơn đang active bất kể ngày ────────────
+  const TODAY_STR = (() => {
+    const d = new Date()
+    return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`
+  })()
+  const ACTIVE_ST: Status[] = ["delivering","preparing","pending","accepted"]
+  const todayOrders = ORDERS.filter(o =>
+    ACTIVE_ST.includes(o.status) || o.createdAt.startsWith(TODAY_STR)
+  )
+  const historyOrders = ORDERS.filter(o =>
+    !ACTIVE_ST.includes(o.status) && !o.createdAt.startsWith(TODAY_STR)
+  )
+
+  // ── Swipe navigation: phải→trang chủ, trái→giỏ hàng ───────────────────
+  const swipeX = useRef(0)
+  const swipeY = useRef(0)
+  const onSwipeStart = (e: React.TouchEvent) => {
+    swipeX.current = e.touches[0].clientX
+    swipeY.current = e.touches[0].clientY
+  }
+  const onSwipeEnd = (e: React.TouchEvent) => {
+    const dx = e.changedTouches[0].clientX - swipeX.current
+    const dy = e.changedTouches[0].clientY - swipeY.current
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx > 0) router.push("/")
+      else router.push("/cart")
+    }
+  }
+
   // Đơn hàng đang mở cancel sheet
   const cancelOrder = ORDERS.find(o => o.id === showCancel)
   // Chỉ "pending" mới được tự huỷ — "accepted" trở đi chỉ Admin được huỷ
@@ -210,18 +240,23 @@ export default function OrdersPage() {
   }
 
   const filtered = ORDERS.filter(o => {
+    if (activeTab === "history")
+      return !ACTIVE_ST.includes(o.status) && !o.createdAt.startsWith(TODAY_STR)
+    const visibleToday = ACTIVE_ST.includes(o.status) || o.createdAt.startsWith(TODAY_STR)
+    if (!visibleToday) return false
     if (activeTab === "all")       return true
-    if (activeTab === "active")    return ["delivering","preparing","pending"].includes(o.status)
+    if (activeTab === "active")    return ACTIVE_ST.includes(o.status)
     if (activeTab === "completed") return o.status === "completed"
     if (activeTab === "cancelled") return o.status === "cancelled"
     return true
   })
 
   const tabCount = (k: string) => {
-    if (k === "all")       return ORDERS.length
-    if (k === "active")    return ORDERS.filter(o => ["delivering","preparing","pending"].includes(o.status)).length
-    if (k === "completed") return ORDERS.filter(o => o.status === "completed").length
-    if (k === "cancelled") return ORDERS.filter(o => o.status === "cancelled").length
+    if (k === "history")   return historyOrders.length
+    if (k === "all")       return todayOrders.length
+    if (k === "active")    return todayOrders.filter(o => ACTIVE_ST.includes(o.status)).length
+    if (k === "completed") return todayOrders.filter(o => o.status === "completed").length
+    if (k === "cancelled") return todayOrders.filter(o => o.status === "cancelled").length
     return 0
   }
 
@@ -425,12 +460,17 @@ export default function OrdersPage() {
       </AnimatePresence>
 
       {/* ── ROOT — zIndex 60 để che FloatingBottomMenu (z-50) của layout ── */}
-      <div style={{ position: "fixed", inset: 0, background: "#080806", zIndex: 60,
-        display: "flex", flexDirection: "column", fontFamily: "'Lexend',sans-serif" }}>
+      <div
+        onTouchStart={onSwipeStart}
+        onTouchEnd={onSwipeEnd}
+        style={{ position: "fixed", inset: 0, background: "#080806", zIndex: 60,
+          display: "flex", flexDirection: "column", fontFamily: "'Lexend',sans-serif" }}>
 
         {/* Header */}
         <div style={{ background: "rgba(8,8,6,0.96)", backdropFilter: "blur(16px)",
-          borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "44px 16px 12px", flexShrink: 0, zIndex: 40 }}>
+          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          padding: "calc(env(safe-area-inset-top,0px) + 12px) 16px 12px",
+          flexShrink: 0, zIndex: 40 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
             <button onClick={() => router.back()}
               style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0,
@@ -439,7 +479,9 @@ export default function OrdersPage() {
                 fontSize: 14, color: "#f8f0e0", cursor: "pointer" }}>←</button>
             <div style={{ flex: 1 }}>
               <div style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 700 }}>Đơn hàng của tôi</div>
-              <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>{ORDERS.length} đơn hàng</div>
+              <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>
+              {todayOrders.length} đơn hôm nay{historyOrders.length > 0 ? ` · ${historyOrders.length} trong lịch sử` : ""}
+            </div>
             </div>
             <button onClick={() => router.push("/search?orders=1")}
               style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0,
@@ -478,8 +520,18 @@ export default function OrdersPage() {
           WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
           {filtered.length === 0 ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 200, gap: 10 }}>
-              <span style={{ fontSize: 40 }}>😭</span>
-              <div style={{ color: "#6a5a40", fontSize: 12 }}>Không có đơn hàng nào</div>
+              <span style={{ fontSize: 40 }}>{activeTab === "history" ? "📋" : "😭"}</span>
+              <div style={{ color: "#6a5a40", fontSize: 12 }}>
+                {activeTab === "history" ? "Chưa có đơn hàng trong lịch sử" : "Không có đơn hàng nào"}
+              </div>
+              {activeTab === "history" && (
+                <button onClick={() => setActiveTab("all")}
+                  style={{ background: "rgba(255,107,0,0.1)", border: "1px solid rgba(255,107,0,0.25)",
+                    borderRadius: 10, padding: "6px 14px", color: "#FF8C00", fontSize: 10,
+                    fontFamily: "Lexend", cursor: "pointer" }}>
+                  Xem đơn hôm nay
+                </button>
+              )}
             </div>
           ) : (
             filtered.map((order, idx) => {
@@ -820,6 +872,22 @@ export default function OrdersPage() {
                 </motion.div>
               )
             })
+          )}
+
+          {/* Banner lịch sử đơn cũ */}
+          {activeTab !== "history" && historyOrders.length > 0 && (
+            <div onClick={() => setActiveTab("history")}
+              style={{ margin: "6px 0 0", padding: "11px 14px", borderRadius: 12, cursor: "pointer",
+                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+                display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ color: "#b0956a", fontSize: 10, fontWeight: 600 }}>🕐 Lịch sử đơn hàng</div>
+                <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 2 }}>
+                  {historyOrders.length} đơn hàng từ các ngày trước
+                </div>
+              </div>
+              <span style={{ color: "#6a5a40", fontSize: 16, lineHeight: 1 }}>›</span>
+            </div>
           )}
         </div>
 
