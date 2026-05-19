@@ -64,10 +64,10 @@ const PROMOS = [
 ]
 
 const NEARBY_SHOPS = [
-  { id:1, emoji:"🍜", name:"Quán Bún Bò Huế Ngon", tags:["🔥 Bán chạy","Bún · Phở"],    star:4.9, km:0.8, eta:20, disc:25, freeShip:true  },
   { id:2, emoji:"🥤", name:"Trà Sữa Ding Tea PA",   tags:["Đồ uống","Trà sữa"],          star:4.8, km:0.5, eta:10, disc:20, freeShip:true  },
-  { id:3, emoji:"🍱", name:"Cơm Nhà Bếp Phước An",  tags:["Cơm hộp","Bình dân"],         star:4.7, km:1.2, eta:25, disc:0,  freeShip:false },
   { id:4, emoji:"🍗", name:"Gà Vàng Phước An",       tags:["🆕 Mới","Gà rán"],            star:4.6, km:0.6, eta:15, disc:30, freeShip:true  },
+  { id:1, emoji:"🍜", name:"Quán Bún Bò Huế Ngon", tags:["🔥 Bán chạy","Bún · Phở"],    star:4.9, km:0.8, eta:20, disc:25, freeShip:true  },
+  { id:3, emoji:"🍱", name:"Cơm Nhà Bếp Phước An",  tags:["Cơm hộp","Bình dân"],         star:4.7, km:1.2, eta:25, disc:0,  freeShip:false },
 ]
 
 const BEST_SELLERS = [
@@ -88,6 +88,23 @@ const REORDERS = [
 // ─── Helpers ────────────────────────────────────────────────
 const fmt  = (n: number) => n.toLocaleString("vi-VN") + "đ"
 const RANK_ICON = ["🥇","🥈","🥉"]
+
+const VM_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
+
+function getWeatherTip(code: number, temp: number, hour: number): string {
+  if (code >= 95) return "⛈️ Bão giông đang đến! Ở nhà an toàn, order ngay về thôi!"
+  if (code >= 80) return "🌧️ Đang có mưa rào — đặt đồ ăn giao về, khỏi ướt!"
+  if (code >= 51) return "☔ Trời mưa rồi, đừng ra ngoài — order về nhà ấm cúng hơn!"
+  if (code >= 45) return "🌫️ Sương mù dày, hạn chế di chuyển — đặt về nhà nhé!"
+  if (temp >= 35) return `🌡️ Nóng ${Math.round(temp)}°C rồi! Sinh tố, nước ép lạnh giải nhiệt ngay!`
+  if (temp >= 30) return `☀️ Trời ${Math.round(temp)}°C — trà đá, trà sữa đá cho mát nhé!`
+  if (temp <= 20) return `🧥 Mát ${Math.round(temp)}°C — bún bò, phở nóng hợp thời tiết lắm!`
+  if (hour < 10) return "☕ Sáng mát, uống cà phê hay ăn bánh mì nóng nhé!"
+  if (hour < 12) return "⏰ Gần trưa rồi, đặt cơm trước để không chờ lâu!"
+  if (hour < 14) return "🍱 Giờ cơm trưa — đặt ngay kẻo hết suất nhé!"
+  if (hour < 18) return "🥤 Chiều mát, uống gì cho tỉnh người đi nào!"
+  return "🌙 Tối rồi, bún bò hay cháo ăn là ngon nhất!"
+}
 
 // ─── Sub-components ─────────────────────────────────────────
 
@@ -134,8 +151,37 @@ export default function HomePage() {
   const [countdown,     setCountdown]     = useState({ h:2, m:15, s:0 })
   const [activeTab,     setActiveTab]     = useState("home")
   const [conflictItem,  setConflictItem]  = useState<PendingItem | null>(null)
+  const [location,      setLocation]      = useState("Phước An, Krông Pắc")
+  const [weatherTip,    setWeatherTip]    = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const cartIconRef  = useRef<HTMLDivElement>(null)
+
+  // GPS location + weather
+  useEffect(() => {
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const res  = await fetch(`https://maps.vietmap.vn/api/reverse/v3?apikey=${VM_KEY}&lat=${coords.latitude}&lng=${coords.longitude}`)
+          const list = await res.json() as Array<{ ward?: string; district?: string; display?: string }>
+          const d = list[0]
+          if (d) {
+            const parts = [d.ward, d.district].filter(Boolean)
+            setLocation(parts.length > 0 ? parts.join(", ") : (d.display ?? "Phước An, Krông Pắc"))
+          }
+        } catch {}
+        try {
+          const wRes  = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,weather_code`)
+          const wData = await wRes.json() as { current?: { temperature_2m: number; weather_code: number } }
+          const code  = wData.current?.weather_code ?? 0
+          const temp  = wData.current?.temperature_2m ?? 28
+          setWeatherTip(getWeatherTip(code, temp, new Date().getHours()))
+        } catch {}
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 8000 },
+    )
+  }, [])
 
   // Banner auto-slide
   useEffect(() => {
@@ -262,6 +308,7 @@ export default function HomePage() {
 
         {/* ── SCROLLABLE BODY ── */}
         <div style={{ flex:1, overflowY:"auto", overflowX:"hidden",
+          paddingTop:"env(safe-area-inset-top, 0px)",
           paddingBottom:80, WebkitOverflowScrolling:"touch" } as React.CSSProperties}>
 
           {/* ──────────────────────────────────────
@@ -286,7 +333,7 @@ export default function HomePage() {
               <div>
                 <div style={{ color:"#6a5a40", fontSize:9 }}>Vị trí của bạn</div>
                 <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:600 }}>
-                  Phước An, Krông Pắc ▾
+                  {location} ▾
                 </div>
               </div>
             </div>
@@ -331,7 +378,7 @@ export default function HomePage() {
                 background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
                 WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
                 backgroundClip:"text",
-              }}>muốn ăn gì?</span>
+              }}>muốn đặt gì?</span>
             </div>
             {/* AI tip card */}
             <div style={{
@@ -342,7 +389,8 @@ export default function HomePage() {
             }}>
               <span style={{ fontSize:14 }}>🤖</span>
               <div style={{ color:"#b464ff", fontSize:9, lineHeight:1.4, flex:1 }}>
-                <strong style={{ color:"#c87aff" }}>Gợi ý AI:</strong> {aiTip()}
+                <strong style={{ color:"#c87aff" }}>Gợi ý AI:</strong>{" "}
+                {weatherTip ?? aiTip()}
               </div>
               <span style={{ color:"rgba(180,100,255,0.5)", fontSize:12 }}>›</span>
             </div>
@@ -621,7 +669,7 @@ export default function HomePage() {
           {/* ──────────────────────────────────────
               S8 — PromoSection
           ────────────────────────────────────── */}
-          <SectionHeader title="🔥 Khuyến mãi hôm nay" more="Xem tất cả →" href="/vouchers" />
+          <SectionHeader title="🔥 Khuyến mãi hôm nay" more="Xem tất cả →" href="/promo-items" />
           <HScroll>
             {PROMOS.map(p => (
               <div key={p.id} className="promo-card" style={{
@@ -751,7 +799,7 @@ export default function HomePage() {
           {/* ──────────────────────────────────────
               S10 — BestSellers
           ────────────────────────────────────── */}
-          <SectionHeader title="🏆 Bán chạy tuần này" more="Xem tất cả →" href="/search?sort=popular" />
+          <SectionHeader title="🏆 Bán chạy tuần này" more="Xem tất cả →" href="/bestsellers" />
           <HScroll>
             {BEST_SELLERS.map(b => (
               <div key={b.rank} style={{
@@ -784,8 +832,11 @@ export default function HomePage() {
                     whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                     {b.shop}
                   </div>
+                  <div style={{ color:"#3ecf6e", fontSize:7.5, fontWeight:600, marginTop:3 }}>
+                    🔥 {b.sold.toLocaleString("vi-VN")} đã bán tuần này
+                  </div>
                   <div style={{ display:"flex", justifyContent:"space-between",
-                    alignItems:"center", marginTop:5 }}>
+                    alignItems:"center", marginTop:4 }}>
                     <div style={{
                       background:"linear-gradient(135deg,#FF6B00,#FFB347)",
                       WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",

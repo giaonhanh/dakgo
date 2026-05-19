@@ -91,9 +91,22 @@ const TABS = [
   { key:"system", label:"Hệ thống",   icon:"⚙️" },
 ]
 
+const LS_KEY = "gn-read-notifs"
+
+function loadReadIds(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(LS_KEY) ?? "[]") as string[]) }
+  catch { return new Set() }
+}
+function saveReadIds(ids: Set<string>) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify([...ids])) } catch {}
+}
+
 // ─── Main ──────────────────────────────────────────────────
 export default function NotificationsPage() {
-  const [notifs,    setNotifs]    = useState<Notif[]>(INITIAL)
+  const [notifs,    setNotifs]    = useState<Notif[]>(() => {
+    const readIds = loadReadIds()
+    return INITIAL.map(n => ({ ...n, isRead: readIds.has(n.id) || n.isRead }))
+  })
   const [activeTab, setActiveTab] = useState("all")
 
   const unreadCount = notifs.filter(n => !n.isRead).length
@@ -108,10 +121,18 @@ export default function NotificationsPage() {
       : notifs.filter(n => n.type === key && !n.isRead).length
 
   const markRead = (id: string) =>
-    setNotifs(prev => prev.map(n => n.id === id ? { ...n, isRead:true } : n))
+    setNotifs(prev => {
+      const next = prev.map(n => n.id === id ? { ...n, isRead:true } : n)
+      saveReadIds(new Set(next.filter(n => n.isRead).map(n => n.id)))
+      return next
+    })
 
   const markAllRead = () =>
-    setNotifs(prev => prev.map(n => ({ ...n, isRead:true })))
+    setNotifs(prev => {
+      const next = prev.map(n => ({ ...n, isRead:true }))
+      saveReadIds(new Set(next.map(n => n.id)))
+      return next
+    })
 
   const deleteNotif = (id: string) =>
     setNotifs(prev => prev.filter(n => n.id !== id))
@@ -132,7 +153,7 @@ export default function NotificationsPage() {
         {/* Header */}
         <div style={{ background:"rgba(8,8,6,0.96)",backdropFilter:"blur(16px)",
           borderBottom:"1px solid rgba(255,255,255,0.07)",
-          padding:"44px 16px 10px",flexShrink:0,zIndex:40 }}>
+          padding:"calc(env(safe-area-inset-top, 0px) + 12px) 16px 10px",flexShrink:0,zIndex:40 }}>
           <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:12 }}>
             <a href="/" style={{ width:32,height:32,borderRadius:9,textDecoration:"none",
               background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",
