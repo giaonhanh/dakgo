@@ -115,15 +115,16 @@ function VietQRSheet({
   const handleOpenBank = () => {
     if (!localBankCode) { setBankErr(true); setTimeout(() => setBankErr(false), 2500); return }
     if (localBankCode === "momo") {
-      window.open("https://nhantien.momo.vn", "_blank")
+      window.location.href = "momo://app"
+      setTimeout(() => window.open("https://nhantien.momo.vn", "_blank"), 500)
       return
     }
     if (payosData) {
-      // Deep link PayOS checkout
-      window.open(payosData.checkoutUrl, "_blank")
+      // VietQR deep link trực tiếp vào app ngân hàng — dùng tài khoản PayOS thật
+      window.location.href = `https://dl.vietqr.io/pay?bank=${payosData.bin}&account=${payosData.accountNumber}&amount=${total}&memo=${encodeURIComponent(content)}`
       return
     }
-    window.open(`https://dl.vietqr.io/pay?bank=${localBankCode}&amount=${total}&memo=${encodeURIComponent(content)}`, "_blank")
+    window.location.href = `https://dl.vietqr.io/pay?bank=${localBankCode}&amount=${total}&memo=${encodeURIComponent(content)}`
   }
 
   return (
