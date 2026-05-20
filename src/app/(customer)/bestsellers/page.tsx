@@ -4,16 +4,16 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 
 const BEST_SELLERS = [
-  { rank:1,  emoji:"🍜", name:"Bún bò đặc biệt",     shop:"Bún Bò Huế Ngon", price:45000, sold:890,  km:0.8 },
-  { rank:2,  emoji:"🥤", name:"Trà sữa trân châu",   shop:"Ding Tea",        price:35000, sold:742,  km:0.5 },
-  { rank:3,  emoji:"🍗", name:"Gà rán giòn cay",     shop:"Gà Vàng PA",      price:38000, sold:601,  km:0.6 },
-  { rank:4,  emoji:"🦑", name:"Chả chiên giòn",       shop:"Bún Bò Huế Ngon",price:15000, sold:488,  km:0.8 },
-  { rank:5,  emoji:"🍔", name:"Burger phô mai",       shop:"Burger House",    price:45000, sold:321,  km:2.1 },
-  { rank:6,  emoji:"🍱", name:"Cơm văn phòng",        shop:"Cơm Nhà Bếp",    price:35000, sold:298,  km:1.2 },
-  { rank:7,  emoji:"🥗", name:"Salad rau củ",         shop:"Healthy Bowl",    price:28000, sold:215,  km:1.8 },
-  { rank:8,  emoji:"🍕", name:"Pizza mini 4 vị",      shop:"Pizza House PA",  price:55000, sold:187,  km:3.0 },
-  { rank:9,  emoji:"🍦", name:"Kem tươi Ý",           shop:"Ice Cream PA",    price:22000, sold:164,  km:0.9 },
-  { rank:10, emoji:"☕", name:"Cà phê sữa đá",        shop:"Cà Phê Phước An", price:18000, sold:143,  km:0.4 },
+  { rank:1,  shopId:"bun-bo-hue-ngon",  emoji:"🍜", name:"Bún bò đặc biệt",   shop:"Bún Bò Huế Ngon", price:45000, sold:890, km:0.8 },
+  { rank:2,  shopId:"ding-tea",         emoji:"🥤", name:"Trà sữa trân châu", shop:"Ding Tea",        price:35000, sold:742, km:0.5 },
+  { rank:3,  shopId:"ga-vang-pa",       emoji:"🍗", name:"Gà rán giòn cay",   shop:"Gà Vàng PA",      price:38000, sold:601, km:0.6 },
+  { rank:4,  shopId:"bun-bo-hue-ngon",  emoji:"🦑", name:"Chả chiên giòn",    shop:"Bún Bò Huế Ngon", price:15000, sold:488, km:0.8 },
+  { rank:5,  shopId:"burger-house",     emoji:"🍔", name:"Burger phô mai",    shop:"Burger House",    price:45000, sold:321, km:2.1 },
+  { rank:6,  shopId:"com-nha-bep",      emoji:"🍱", name:"Cơm văn phòng",     shop:"Cơm Nhà Bếp",    price:35000, sold:298, km:1.2 },
+  { rank:7,  shopId:"healthy-bowl",     emoji:"🥗", name:"Salad rau củ",      shop:"Healthy Bowl",    price:28000, sold:215, km:1.8 },
+  { rank:8,  shopId:"pizza-house-pa",   emoji:"🍕", name:"Pizza mini 4 vị",   shop:"Pizza House PA",  price:55000, sold:187, km:3.0 },
+  { rank:9,  shopId:"ice-cream-pa",     emoji:"🍦", name:"Kem tươi Ý",        shop:"Ice Cream PA",    price:22000, sold:164, km:0.9 },
+  { rank:10, shopId:"ca-phe-phuoc-an",  emoji:"☕", name:"Cà phê sữa đá",    shop:"Cà Phê Phước An", price:18000, sold:143, km:0.4 },
 ]
 
 const RANK_ICON = ["🥇","🥈","🥉"]
@@ -54,14 +54,14 @@ export default function BestsellersPage() {
             key={b.rank}
             initial={{ opacity:0, y:12 }}
             animate={{ opacity:1, y:0 }}
-            transition={{ delay: idx * 0.04 }}
+            transition={{ delay: Math.min(idx * 0.04, 0.15) }}
             style={{
               background:"rgba(255,255,255,0.05)",
               border:"1px solid rgba(255,255,255,0.08)",
               borderRadius:16, padding:"12px 14px",
               display:"flex", alignItems:"center", gap:13, cursor:"pointer",
             }}
-            onClick={() => router.push(`/shop/${b.rank}`)}
+            onClick={() => router.push(`/shop/${b.shopId}`)}
           >
             {/* Rank badge */}
             <div style={{

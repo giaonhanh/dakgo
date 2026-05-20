@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
@@ -93,10 +93,10 @@ const ORDERS: Order[] = [
 ]
 
 const TABS = [
-  { key: "all",       label: "Tất cả"     },
-  { key: "active",    label: "Đang giao"  },
-  { key: "completed", label: "Hoàn thành" },
-  { key: "cancelled", label: "Đã hủy"     },
+  { key: "all",       label: "Hôm nay"     },
+  { key: "active",    label: "Đang xử lý"  },
+  { key: "completed", label: "Hoàn thành"  },
+  { key: "cancelled", label: "Đã hủy"      },
   { key: "history",   label: "🕐 Lịch sử"  },
 ]
 
@@ -192,27 +192,39 @@ export default function OrdersPage() {
   )
 
   // ── Swipe navigation: phải→trang chủ, trái→giỏ hàng ───────────────────
-  const swipeX = useRef(0)
-  const swipeY = useRef(0)
-  const onSwipeStart = (e: React.TouchEvent) => {
-    swipeX.current = e.touches[0].clientX
-    swipeY.current = e.touches[0].clientY
-  }
-  const onSwipeEnd = (e: React.TouchEvent) => {
-    const dx = e.changedTouches[0].clientX - swipeX.current
-    const dy = e.changedTouches[0].clientY - swipeY.current
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
-      if (dx > 0) router.push("/")
-      else router.push("/cart")
+  const rootRef = useRef<HTMLDivElement>(null)
+  const swipeX  = useRef(0)
+  const swipeY  = useRef(0)
+
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const onStart = (e: TouchEvent) => {
+      swipeX.current = e.touches[0].clientX
+      swipeY.current = e.touches[0].clientY
     }
-  }
+    const onEnd = (e: TouchEvent) => {
+      const dx = e.changedTouches[0].clientX - swipeX.current
+      const dy = e.changedTouches[0].clientY - swipeY.current
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 0) router.push("/")
+        else router.push("/cart")
+      }
+    }
+    el.addEventListener("touchstart", onStart, { passive: true })
+    el.addEventListener("touchend",   onEnd,   { passive: true })
+    return () => {
+      el.removeEventListener("touchstart", onStart)
+      el.removeEventListener("touchend",   onEnd)
+    }
+  }, [router])
 
   // Đơn hàng đang mở cancel sheet
   const cancelOrder = ORDERS.find(o => o.id === showCancel)
   // Chỉ "pending" mới được tự huỷ — "accepted" trở đi chỉ Admin được huỷ
   const canSelfCancel = cancelOrder?.status === "pending"
   // Nếu dùng ví GiaoNhanh → sẽ được hoàn tiền khi huỷ
-  const willRefundWallet = cancelOrder?.payMethod === "Ví GiaoNhanh"
+  const willRefundWallet = cancelOrder?.payMethod === "wallet" || cancelOrder?.payMethod === "Xu Giao Nhanh"
 
   const handleConfirmCancel = () => {
     if (!cancelRsn) return
@@ -232,7 +244,7 @@ export default function OrdersPage() {
         name: item.name,
         price: item.price,
         shop: order.shopName,
-        shopId: order.id,
+        shopId: order.shopName.toLowerCase().replace(/\s+/g, "-"), // dùng slug tạm cho đến khi có shopId thật từ DB
       })
     })
     fireToast("Đã thêm vào giỏ hàng!")
@@ -240,14 +252,17 @@ export default function OrdersPage() {
   }
 
   const filtered = ORDERS.filter(o => {
+    // Tab lịch sử: đơn cũ hơn hôm nay, không còn active
     if (activeTab === "history")
       return !ACTIVE_ST.includes(o.status) && !o.createdAt.startsWith(TODAY_STR)
+    // Tab đã hủy: hiện tất cả đơn hủy (không giới hạn ngày)
+    if (activeTab === "cancelled") return o.status === "cancelled"
+    // Các tab còn lại chỉ hiện đơn hôm nay + active
     const visibleToday = ACTIVE_ST.includes(o.status) || o.createdAt.startsWith(TODAY_STR)
     if (!visibleToday) return false
     if (activeTab === "all")       return true
     if (activeTab === "active")    return ACTIVE_ST.includes(o.status)
     if (activeTab === "completed") return o.status === "completed"
-    if (activeTab === "cancelled") return o.status === "cancelled"
     return true
   })
 
@@ -256,7 +271,7 @@ export default function OrdersPage() {
     if (k === "all")       return todayOrders.length
     if (k === "active")    return todayOrders.filter(o => ACTIVE_ST.includes(o.status)).length
     if (k === "completed") return todayOrders.filter(o => o.status === "completed").length
-    if (k === "cancelled") return todayOrders.filter(o => o.status === "cancelled").length
+    if (k === "cancelled") return ORDERS.filter(o => o.status === "cancelled").length
     return 0
   }
 
@@ -461,8 +476,7 @@ export default function OrdersPage() {
 
       {/* ── ROOT — zIndex 60 để che FloatingBottomMenu (z-50) của layout ── */}
       <div
-        onTouchStart={onSwipeStart}
-        onTouchEnd={onSwipeEnd}
+        ref={rootRef}
         style={{ position: "fixed", inset: 0, background: "#080806", zIndex: 60,
           display: "flex", flexDirection: "column", fontFamily: "'Lexend',sans-serif" }}>
 
@@ -546,7 +560,7 @@ export default function OrdersPage() {
               return (
                 <motion.div key={order.id}
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.04 }}
+                  transition={{ delay: Math.min(idx * 0.04, 0.15) }}
                   style={{ marginBottom: 10, opacity: isCancelled ? 0.82 : 1 }}>
                   <div style={{ background: isActive ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)",
                     backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",

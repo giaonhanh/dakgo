@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useCartStore } from "@/store/cartStore"
@@ -21,8 +21,8 @@ const SAVED_ADDRESSES: AddrOption[] = [
 ]
 
 const PAYMENT_METHODS = [
-  { id: "cash",   label: "Tiền mặt", icon: "💵", desc: "Trả tiền mặt khi nhận hàng"                        },
-  { id: "vietqr", label: "VietQR",   icon: "📲", desc: "Chuyển khoản ngân hàng · MoMo · Ví điện tử" },
+  { id: "cash",   label: "Tiền mặt",      icon: "💵", desc: "Trả tiền mặt khi nhận hàng"                  },
+  { id: "vietqr", label: "VietQR / MoMo", icon: "📲", desc: "Chuyển khoản ngân hàng · MoMo · Ví điện tử" },
 ]
 
 interface BankInfo { code: string; name: string; short: string; featured: boolean; isMomo?: boolean }
@@ -84,6 +84,9 @@ const MOCK_DRIVER_BANK = {
   accountName:   "TRAN VAN BINH",
 }
 
+const MOCK_XU_BALANCE = 185000  // xu (1 xu = 1đ) — thay bằng query Supabase wallets
+const APP_COMMISSION  = 0.15    // 15% — từ shops.commission_rate
+
 type Payment = "cash" | "vietqr"
 const fmt = formatPrice
 
@@ -104,13 +107,22 @@ function VietQRSheet({
 }) {
   const [localBankCode, setLocalBankCode] = useState<string | null>(null)
   const [bankErr,       setBankErr]       = useState(false)
+  const [qrLoaded,      setQrLoaded]      = useState(false)
+  const [qrTimeout,     setQrTimeout]     = useState(false)
   const myBank  = localBankCode ? (BANK_APPS.find(b => b.code === localBankCode) ?? null) : null
   const content = `GN${orderCode}`
 
-  // QR từ PayOS (render qua api.qrserver.com) hoặc fallback tĩnh
   const qrImageUrl = payosData
     ? `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(payosData.qrCode)}&size=200x200&color=000000&bgcolor=ffffff`
     : null
+
+  // Timeout 5s nếu QR chưa tải xong — hiện hướng dẫn chuyển khoản thủ công
+  useEffect(() => {
+    if (!qrImageUrl || qrLoaded) return
+    setQrTimeout(false)
+    const t = setTimeout(() => setQrTimeout(true), 5000)
+    return () => clearTimeout(t)
+  }, [qrImageUrl, qrLoaded])
 
   const handleOpenBank = () => {
     if (!localBankCode) { setBankErr(true); setTimeout(() => setBankErr(false), 2500); return }
@@ -185,16 +197,20 @@ function VietQRSheet({
                   alignItems: "center", justifyContent: "center", color: "#999", fontSize: 12 }}>
                   Đang tạo QR...
                 </div>
-              ) : qrImageUrl ? (
+              ) : qrImageUrl && !qrTimeout ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={qrImageUrl} alt="PayOS QR" width={180} height={180}
-                  style={{ display: "block", borderRadius: 8 }} />
+                  style={{ display: "block", borderRadius: 8 }}
+                  onLoad={() => setQrLoaded(true)}
+                  onError={() => setQrTimeout(true)} />
               ) : (
                 <div style={{ width: 180, height: 180, borderRadius: 8,
                   background: "#f5f5f5", display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center", color: "#999", fontSize: 11, gap: 8 }}>
-                  <span style={{ fontSize: 32 }}>⚠️</span>
-                  <span>Không thể tạo QR</span>
+                  alignItems: "center", justifyContent: "center",
+                  color: "#666", fontSize: 10, gap: 6, padding: 12, textAlign: "center" }}>
+                  <span style={{ fontSize: 28 }}>📋</span>
+                  <span style={{ fontWeight: 700, fontSize: 11 }}>QR tải chậm</span>
+                  <span>Dùng thông tin chuyển khoản bên dưới để thanh toán thủ công</span>
                 </div>
               )}
             </div>
@@ -271,7 +287,7 @@ function VietQRSheet({
                 ) : (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={`https://img.vietqr.io/image/${myBank.code}/logo.png`}
-                    alt={myBank.name} width={28} height={28}
+                    alt={myBank.name} width={28} height={28} loading="lazy"
                     style={{ borderRadius: 8, objectFit: "cover", flexShrink: 0, position: "relative" }}
                     onError={e => { e.currentTarget.style.display = "none" }} />
                 )}
@@ -507,7 +523,7 @@ function BankDropdown({
           ) : (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={`https://img.vietqr.io/image/${bank.code}/logo.png`}
-              alt={bank.name} width={32} height={32}
+              alt={bank.name} width={32} height={32} loading="lazy"
               style={{ borderRadius: 8, objectFit: "cover", flexShrink: 0 }}
               onError={e => { e.currentTarget.style.display = "none" }} />
           )
@@ -532,8 +548,8 @@ function BankDropdown({
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }}
+            initial={{ maxHeight: 0, opacity: 0 }} animate={{ maxHeight: 600, opacity: 1 }}
+            exit={{ maxHeight: 0, opacity: 0 }} transition={{ duration: 0.18, ease: "easeOut" }}
             style={{
               overflow: "hidden", position: "relative", zIndex: 10,
               borderRadius: "0 0 12px 12px",
@@ -602,7 +618,7 @@ function BankRow({ bank, selected, onSelect }: { bank: BankInfo; selected: strin
       ) : (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img src={`https://img.vietqr.io/image/${bank.code}/logo.png`}
-          alt={bank.name} width={28} height={28}
+          alt={bank.name} width={28} height={28} loading="lazy"
           style={{ borderRadius: 7, objectFit: "cover", flexShrink: 0 }}
           onError={e => { e.currentTarget.style.display = "none" }} />
       )}
@@ -842,7 +858,7 @@ function TimeScheduleSheet({
   })()
   const hasError = conflicts.some(c => c.level === "error")
 
-  const minStart = `${pad(Math.max(nowDate.getHours(), shopOpenH))}:${pad(nowDate.getMinutes())}`
+  const minStart = fromMins(Math.max(nowMins + 30, shopOpenH * 60))
   const maxStart = fromMins(shopCloseH * 60 - 30)
   const maxEnd   = fromMins(Math.min(startMins + 60, shopCloseH * 60))
 
@@ -1088,6 +1104,7 @@ export default function CheckoutPage() {
   const [showMapPicker,    setShowMapPicker]    = useState(false)
   const [showVietQR,       setShowVietQR]       = useState(false)
   const [payosData,        setPayosData]        = useState<PayOSData | null>(null)
+  const [useXu,            setUseXu]            = useState(false)
   const [payosLoading,     setPayosLoading]     = useState(false)
   const [mapAddress,       setMapAddress]       = useState<{ address: string } | null>(null)
   const [showAddressSheet, setShowAddressSheet] = useState(false)
@@ -1153,8 +1170,11 @@ export default function CheckoutPage() {
 
   const applyVoucher = () => applyVoucherCode(voucherInput)
 
+  const payosAbortRef = useRef<AbortController | null>(null)
+
   const handleOrder = async () => {
     if (cartItems.length === 0) { fireToast("Giỏ hàng trống!"); return }
+    if (!deliveryNow && !scheduledTime) { fireToast("Vui lòng chọn giờ giao hàng"); return }
     setLoading(true)
     try {
       await new Promise(r => setTimeout(r, 1600))
@@ -1166,9 +1186,17 @@ export default function CheckoutPage() {
     }
   }
 
-  const handlePaymentSelect = async (id: Payment) => {
-    setPayment(id)
-    if (id !== "vietqr") return
+  const handlePaymentSelect = (id: string) => {
+    setPayment(id as Payment)
+    // PayOS chỉ gọi khi user nhấn CTA — không auto-open ở đây
+  }
+
+  const openVietQR = async () => {
+    // Hủy request cũ nếu đang chạy
+    payosAbortRef.current?.abort()
+    const ac = new AbortController()
+    payosAbortRef.current = ac
+
     setShowVietQR(true)
     setPayosData(null)
     setPayosLoading(true)
@@ -1178,27 +1206,31 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderCode,
-          amount:      total,
+          amount:      remaining,   // dùng remaining sau khi trừ xu
           description: `GN${orderCode}`,
         }),
+        signal: ac.signal,
       })
       const data = await res.json() as PayOSData & { error?: string }
       if (data.error) throw new Error(data.error)
       setPayosData(data)
-    } catch {
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return
       fireToast("Không thể tạo QR, vui lòng thử lại")
     } finally {
       setPayosLoading(false)
     }
   }
 
-  const ctaBlocked = loading || (!deliveryNow && !scheduledTime)
+  const xuUsed      = useXu ? Math.min(MOCK_XU_BALANCE, total) : 0
+  const remaining   = total - xuUsed
+  const ctaBlocked  = loading || (!deliveryNow && !scheduledTime)
 
   return (
     <>
       <style>{`
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        html,body{background:#080806;font-family:'Lexend',sans-serif;height:100%;overflow:hidden}
+        html,body{background:#080806;font-family:'Lexend',sans-serif;height:100%}
         ::-webkit-scrollbar{display:none}
         @keyframes ckShim{0%{left:-60%}100%{left:120%}}
         @keyframes ckSpin{to{transform:rotate(360deg)}}
@@ -1260,7 +1292,7 @@ export default function CheckoutPage() {
       {/* VietQR Sheet */}
       <AnimatePresence>
         {showVietQR && (
-          <VietQRSheet total={total} orderCode={orderCode}
+          <VietQRSheet total={remaining} orderCode={orderCode}
             payosData={payosData} payosLoading={payosLoading}
             onClose={() => setShowVietQR(false)}
             onConfirm={handleOrder} confirming={loading}
@@ -1384,8 +1416,9 @@ export default function CheckoutPage() {
 
             <AnimatePresence>
               {!deliveryNow && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }} style={{ overflow: "hidden" }}>
+                <motion.div initial={{ maxHeight: 0, opacity: 0 }} animate={{ maxHeight: 500, opacity: 1 }}
+                  exit={{ maxHeight: 0, opacity: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}
+                  style={{ overflow: "hidden" }}>
                   <div style={{ marginTop: 12 }}>
 
                     {/* App đã đóng */}
@@ -1499,7 +1532,87 @@ export default function CheckoutPage() {
             </AnimatePresence>
           </SectionCard>
 
-          {/* 3. Phương thức thanh toán */}
+          {/* 3. Xu Giao Nhanh — quyết định trước, rồi mới chọn hình thức trả phần còn lại */}
+          <SectionCard title="Xu Giao Nhanh" icon="🪙">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                  background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+                }}>🪙</div>
+                <div>
+                  <div style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600 }}>Dùng xu để giảm tiền</div>
+                  <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 2 }}>
+                    Số dư:{" "}
+                    <span style={{
+                      background: "linear-gradient(90deg,#FFD700,#FFB347)",
+                      WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                      backgroundClip: "text", fontWeight: 700,
+                    } as React.CSSProperties}>
+                      {MOCK_XU_BALANCE.toLocaleString("vi-VN")} xu
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button type="button" onClick={() => setUseXu(v => !v)} style={{
+                width: 46, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
+                background: useXu ? "linear-gradient(90deg,#FF6B00,#FF8C00)" : "rgba(255,255,255,0.1)",
+                position: "relative", flexShrink: 0, transition: "background 0.2s",
+              }}>
+                <div style={{
+                  position: "absolute", top: 3, width: 20, height: 20, borderRadius: 10,
+                  background: "#fff", transition: "left 0.2s",
+                  left: useXu ? 23 : 3,
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.35)",
+                }} />
+              </button>
+            </div>
+
+            <AnimatePresence>
+              {useXu && (
+                <motion.div key="xu-detail"
+                  initial={{ opacity: 0, maxHeight: 0 }} animate={{ opacity: 1, maxHeight: 260 }}
+                  exit={{ opacity: 0, maxHeight: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}
+                  style={{ overflow: "hidden", marginTop: 10 }}>
+                  <div style={{
+                    background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.18)",
+                    borderRadius: 11, padding: "11px 13px",
+                  }}>
+                    {[
+                      { label: "Xu sử dụng",         val: `${xuUsed.toLocaleString("vi-VN")} xu`,                      color: "#FFD700" },
+                      { label: "Còn phải trả",        val: remaining > 0 ? fmt(remaining) : "Miễn phí 🎉",             color: remaining > 0 ? "#f8f0e0" : "#3ecf6e" },
+                      { label: "Xu còn lại trong ví", val: `${(MOCK_XU_BALANCE - xuUsed).toLocaleString("vi-VN")} xu`, color: "#b0956a" },
+                    ].map(r => (
+                      <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
+                        <span style={{ color: "#6a5a40", fontSize: 11 }}>{r.label}</span>
+                        <span style={{ color: r.color, fontSize: 11, fontWeight: 700 }}>{r.val}</span>
+                      </div>
+                    ))}
+                    {MOCK_XU_BALANCE < total && (
+                      <div style={{ marginTop: 8, padding: "6px 9px", borderRadius: 8,
+                        background: "rgba(245,197,66,0.07)", border: "1px solid rgba(245,197,66,0.2)" }}>
+                        <span style={{ color: "#f5c542", fontSize: 11 }}>
+                          ⚠️ Dùng hết {xuUsed.toLocaleString("vi-VN")} xu, còn {fmt(remaining)} trả bằng {payment === "vietqr" ? "QR" : "tiền mặt"}
+                        </span>
+                      </div>
+                    )}
+                    {remaining === 0 && (
+                      <div style={{ marginTop: 8, padding: "6px 9px", borderRadius: 8,
+                        background: "rgba(62,207,110,0.07)", border: "1px solid rgba(62,207,110,0.18)",
+                        display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 11 }}>⚡</span>
+                        <span style={{ color: "#3ecf6e", fontSize: 11 }}>Đủ xu — đặt hàng không cần trả thêm</span>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </SectionCard>
+
+          {/* 3.5 Phương thức thanh toán phần còn lại */}
+          {remaining > 0 && (
           <SectionCard title="Phương thức thanh toán" icon="💳">
             {PAYMENT_METHODS.map(pm => (
               <RadioRow key={pm.id} active={payment === pm.id as Payment}
@@ -1507,23 +1620,24 @@ export default function CheckoutPage() {
                 <span style={{ fontSize: 18, flexShrink: 0 }}>{pm.icon}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600 }}>{pm.label}</div>
-                  <div style={{ color: "#6a5a40", fontSize: 8.5 }}>{pm.desc}</div>
+                  <div style={{ color: "#6a5a40", fontSize: 11 }}>{pm.desc}</div>
                 </div>
                 {payment === pm.id && <span style={{ color: "#3ecf6e", fontSize: 13, flexShrink: 0 }}>✓</span>}
               </RadioRow>
             ))}
             <AnimatePresence>
-              {payment === "vietqr" && (
+              {payment === "vietqr" && remaining > 0 && (
                 <motion.div key="vietqr-extra"
-                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }} style={{ overflow: "hidden", marginTop: 4 }}>
-                  <button type="button" onClick={() => setShowVietQR(true)} style={{
+                  initial={{ opacity: 0, maxHeight: 0 }} animate={{ opacity: 1, maxHeight: 120 }}
+                  exit={{ opacity: 0, maxHeight: 0 }} transition={{ duration: 0.18, ease: "easeOut" }}
+                  style={{ overflow: "hidden", marginTop: 4 }}>
+                  <button type="button" onClick={openVietQR} style={{
                     width: "100%", padding: "9px 12px", borderRadius: 10, cursor: "pointer",
                     background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.2)",
                     display: "flex", alignItems: "center", gap: 8,
                   }}>
                     <span style={{ fontSize: 16 }}>📲</span>
-                    <span style={{ color: "rgba(255,215,0,0.85)", fontSize: 10.5, fontWeight: 600, fontFamily: "Lexend" }}>
+                    <span style={{ color: "rgba(255,215,0,0.85)", fontSize: 11, fontWeight: 600, fontFamily: "Lexend" }}>
                       Mở trang thanh toán VietQR
                     </span>
                     <span style={{ marginLeft: "auto", color: "rgba(255,215,0,0.5)", fontSize: 14 }}>›</span>
@@ -1532,6 +1646,7 @@ export default function CheckoutPage() {
               )}
             </AnimatePresence>
           </SectionCard>
+          )}
 
           {/* 4. Voucher */}
           <SectionCard title="Mã giảm giá" icon="🏷️">
@@ -1662,6 +1777,10 @@ export default function CheckoutPage() {
                   label: appliedVouchers.length > 1 ? `Giảm giá (${appliedVouchers.length} voucher)` : "Giảm giá",
                   val: `-${fmt(discount)}`, color: "#3ecf6e",
                 }] : []),
+                ...(useXu && xuUsed > 0 ? [{
+                  label: "🪙 Xu Giao Nhanh",
+                  val: `-${xuUsed.toLocaleString("vi-VN")} xu`, color: "#FFD700",
+                }] : []),
               ].map(row => (
                 <div key={row.label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
                   <span style={{ color: "#6a5a40", fontSize: 10 }}>{row.label}</span>
@@ -1672,12 +1791,18 @@ export default function CheckoutPage() {
                 display: "flex", justifyContent: "space-between", padding: "10px 0 0",
                 marginTop: 6, borderTop: "1px solid rgba(255,255,255,0.08)",
               }}>
-                <span style={{ color: "#f8f0e0", fontSize: 13, fontWeight: 700 }}>Tổng cộng</span>
+                <span style={{ color: "#f8f0e0", fontSize: 13, fontWeight: 700 }}>
+                  {useXu && remaining < total ? "Còn phải trả" : "Tổng cộng"}
+                </span>
                 <span style={{
-                  background: "linear-gradient(90deg,#FF6B00,#FFB347)",
+                  background: remaining === 0
+                    ? "linear-gradient(90deg,#3ecf6e,#2db55d)"
+                    : "linear-gradient(90deg,#FF6B00,#FFB347)",
                   WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
                   backgroundClip: "text", fontSize: 16, fontWeight: 800,
-                } as React.CSSProperties}>{fmt(total)}</span>
+                } as React.CSSProperties}>
+                  {remaining === 0 ? "Miễn phí 🎉" : fmt(remaining)}
+                </span>
               </div>
             </div>
           </SectionCard>
@@ -1691,7 +1816,7 @@ export default function CheckoutPage() {
           padding: "12px 14px 28px", zIndex: 50,
         }}>
           <button type="button"
-            onClick={payment === "vietqr" ? () => setShowVietQR(true) : handleOrder}
+            onClick={payment === "vietqr" && remaining > 0 ? openVietQR : handleOrder}
             disabled={ctaBlocked}
             style={{
               width: "100%", height: 52, borderRadius: 14, border: "none",
@@ -1729,11 +1854,15 @@ export default function CheckoutPage() {
             ) : (
               <>
                 <span style={{ fontSize: 18, position: "relative", zIndex: 1 }}>
-                  {payment === "vietqr" ? "📲" : "🛵"}
+                  {remaining === 0 ? "🪙" : payment === "vietqr" ? "📲" : "🛵"}
                 </span>
                 <span style={{ position: "relative", zIndex: 1 }}>
-                  {payment === "vietqr"
-                    ? `Thanh toán QR · ${fmt(total)}`
+                  {remaining === 0
+                    ? `Đặt hàng bằng xu · Miễn phí`
+                    : payment === "vietqr"
+                    ? `Thanh toán QR · ${fmt(remaining)}`
+                    : useXu
+                    ? `Đặt hàng · ${fmt(remaining)} + ${xuUsed.toLocaleString("vi-VN")} xu`
                     : `Đặt hàng ngay · ${fmt(total)}`}
                 </span>
               </>

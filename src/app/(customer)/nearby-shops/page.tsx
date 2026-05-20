@@ -80,13 +80,15 @@ export default function NearbyShopsPage() {
   const router = useRouter()
   const [activeFilter, setActiveFilter] = useState("Tất cả")
 
-  const filtered = ALL_SHOPS.filter(s => {
-    if (activeFilter === "Đang mở")         return s.isOpen
-    if (activeFilter === "Đồ ăn")           return !["Đồ uống","Cà phê","Kem"].includes(s.category)
-    if (activeFilter === "Đồ uống")         return ["Đồ uống","Cà phê","Kem"].includes(s.category)
-    if (activeFilter === "Đang khuyến mãi") return s.disc > 0
-    return true // "Tất cả" và "Gần nhất" — đã sắp theo km nên không cần sort thêm
-  })
+  const filtered = (() => {
+    let list = [...ALL_SHOPS]
+    if (activeFilter === "Đang mở")         return list.filter(s => s.isOpen)
+    if (activeFilter === "Gần nhất")        return list.filter(s => s.isOpen).sort((a, b) => a.km - b.km)
+    if (activeFilter === "Đồ ăn")           return list.filter(s => !["Đồ uống","Cà phê","Kem"].includes(s.category))
+    if (activeFilter === "Đồ uống")         return list.filter(s => ["Đồ uống","Cà phê","Kem"].includes(s.category))
+    if (activeFilter === "Đang khuyến mãi") return list.filter(s => s.disc > 0)
+    return list // "Tất cả" — đã sắp theo km nên không cần sort thêm
+  })()
 
   return (
     <div style={{
@@ -146,7 +148,7 @@ export default function NearbyShopsPage() {
       </div>
 
       {/* Count */}
-      <div style={{ padding:"0 16px 8px", color:"#6a5a40", fontSize:9 }}>
+      <div style={{ padding:"0 16px 8px", color:"#6a5a40", fontSize:11 }}>
         {filtered.length} quán{activeFilter !== "Tất cả" ? ` · ${activeFilter.toLowerCase()}` : ""}
       </div>
 
@@ -162,7 +164,7 @@ export default function NearbyShopsPage() {
             key={s.id}
             initial={{ opacity:0, y:12 }}
             animate={{ opacity:1, y:0 }}
-            transition={{ delay: idx * 0.04 }}
+            transition={{ delay: Math.min(idx * 0.04, 0.15) }}
           >
             <a href={`/shop/${s.id}`} style={{ textDecoration:"none" }}>
               <div style={{
@@ -184,22 +186,45 @@ export default function NearbyShopsPage() {
                   {!s.isOpen && (
                     <div style={{
                       position:"absolute", inset:0, borderRadius:14,
-                      background:"rgba(8,8,6,0.55)",
+                      background:"rgba(8,8,6,0.65)",
                       display:"flex", alignItems:"center", justifyContent:"center",
                     }}>
-                      <span style={{ color:"#6a5a40", fontSize:8, fontWeight:700 }}>Đóng</span>
+                      <span style={{
+                        color:"#ff6060", fontSize:9, fontWeight:800,
+                        background:"rgba(255,64,64,0.18)", padding:"2px 6px",
+                        borderRadius:5, border:"1px solid rgba(255,64,64,0.3)",
+                      }}>Đóng</span>
                     </div>
                   )}
                 </div>
 
                 {/* Info */}
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{
-                    color:"#f8f0e0", fontSize:12, fontWeight:700,
-                    whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
-                  }}>{s.name}</div>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:1 }}>
+                    <div style={{
+                      color:"#f8f0e0", fontSize:12, fontWeight:700,
+                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
+                      flex:1, minWidth:0,
+                    }}>{s.name}</div>
+                    {/* Status dot */}
+                    <div style={{
+                      flexShrink:0, display:"flex", alignItems:"center", gap:3,
+                      background: s.isOpen ? "rgba(62,207,110,0.12)" : "rgba(255,64,64,0.1)",
+                      border: `1px solid ${s.isOpen ? "rgba(62,207,110,0.3)" : "rgba(255,64,64,0.25)"}`,
+                      borderRadius:5, padding:"1px 6px",
+                    }}>
+                      <div style={{
+                        width:5, height:5, borderRadius:"50%",
+                        background: s.isOpen ? "#3ecf6e" : "#ff6060",
+                        boxShadow: s.isOpen ? "0 0 4px #3ecf6e" : "none",
+                      }} />
+                      <span style={{ color: s.isOpen ? "#3ecf6e" : "#ff6060", fontSize:9, fontWeight:700 }}>
+                        {s.isOpen ? "Mở" : "Đóng"}
+                      </span>
+                    </div>
+                  </div>
 
-                  <div style={{ color:"#6a5a40", fontSize:8.5, marginTop:2,
+                  <div style={{ color:"#6a5a40", fontSize:9, marginTop:2,
                     whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                     {s.desc}
                   </div>
@@ -217,18 +242,18 @@ export default function NearbyShopsPage() {
                         color:      t.startsWith("🔥") ? "#ff6060"
                                   : t.startsWith("🆕") ? "#3ecf6e"
                                   :                      "#6a5a40",
-                        fontSize:7.5, borderRadius:5, padding:"2px 6px",
+                        fontSize:9, borderRadius:5, padding:"2px 6px",
                       }}>{t}</span>
                     ))}
                   </div>
 
                   {/* Star · km · eta */}
                   <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:5 }}>
-                    <span style={{ color:"#FFB347", fontSize:9 }}>★ {s.star}</span>
+                    <span style={{ color:"#FFB347", fontSize:11 }}>★ {s.star}</span>
                     <span style={{ color:"#4a5040" }}>·</span>
-                    <span style={{ color:"#b0956a", fontSize:9 }}>📍 {s.km}km</span>
+                    <span style={{ color:"#b0956a", fontSize:11 }}>📍 {s.km}km</span>
                     <span style={{ color:"#4a5040" }}>·</span>
-                    <span style={{ color:"#b0956a", fontSize:9 }}>⏱ {s.eta}–{s.eta+10} phút</span>
+                    <span style={{ color:"#b0956a", fontSize:11 }}>⏱ {s.eta}–{s.eta+10} phút</span>
                   </div>
                 </div>
 
@@ -238,12 +263,12 @@ export default function NearbyShopsPage() {
                     <div style={{
                       background:"rgba(255,64,64,0.12)", border:"1px solid rgba(255,64,64,0.3)",
                       borderRadius:6, padding:"2px 7px",
-                      color:"#ff6060", fontSize:8, fontWeight:700,
+                      color:"#ff6060", fontSize:9, fontWeight:700,
                     }}>-{s.disc}%</div>
                   )}
                   <div style={{
                     color: s.freeShip ? "#3ecf6e" : "#6a5a40",
-                    fontSize:8, fontWeight: s.freeShip ? 600 : 400,
+                    fontSize:9, fontWeight: s.freeShip ? 600 : 400,
                   }}>
                     {s.freeShip ? "Free ship" : "Ship 8k"}
                   </div>

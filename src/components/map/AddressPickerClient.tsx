@@ -16,9 +16,9 @@ const SEARCH_H   = 56
 const GEOCODE_MS = 600
 const SEARCH_MS  = 500
 
-const DARK_TILE      = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
+const DARK_TILE      = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 const SAT_TILE       = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{x}/{y}"
-const SAT_LABEL_TILE = "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png"
+const SAT_LABEL_TILE = "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -572,7 +572,7 @@ export default function AddressPickerClient({
         <MapContainer
           center={[initLat, initLng]}
           zoom={13}
-          style={{ width: "100%", height: "100%", opacity: tilesReady ? 1 : 0, transition: "opacity 0.4s ease" }}
+          style={{ width: "100%", height: "100%", opacity: 1, transition: "opacity 0.4s ease" }}
           zoomControl={false}
           attributionControl={false}
           maxZoom={19}
