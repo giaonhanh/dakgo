@@ -23,22 +23,24 @@ interface DocItem {
   status:  DocStatus
 }
 
-// giấy tờ xe máy: CMND 2 mặt + bằng lái + ảnh chân dung
+// giấy tờ xe máy: CMND 2 mặt + bằng lái 2 mặt + selfie (upload theo thứ tự)
 const MOTO_DOCS = [
-  { key:"id_front", label:"CMND/CCCD mặt trước",    hint:"Rõ 4 góc, không bị chói sáng" },
-  { key:"id_back",  label:"CMND/CCCD mặt sau",      hint:"Rõ 4 góc, không bị chói sáng" },
-  { key:"license",  label:"Bằng lái xe (hạng A1/A2)", hint:"Còn hạn, chụp rõ thông tin" },
-  { key:"portrait", label:"Ảnh chân dung",            hint:"Nhìn thẳng, rõ mặt, nền sáng" },
+  { key:"id_front",      label:"CMND/CCCD mặt trước",           hint:"Rõ 4 góc, không bị chói sáng" },
+  { key:"id_back",       label:"CMND/CCCD mặt sau",             hint:"Rõ 4 góc, không bị chói sáng" },
+  { key:"license_front", label:"Bằng lái xe mặt trước (A1/A2)", hint:"Còn hạn, chụp rõ thông tin" },
+  { key:"license_back",  label:"Bằng lái xe mặt sau (A1/A2)",  hint:"Chụp rõ toàn bộ mặt sau bằng lái" },
+  { key:"portrait",      label:"Ảnh selfie khuôn mặt",          hint:"Nhìn thẳng, rõ mặt, nền sáng, không đeo kính" },
 ]
 
-// giấy tờ taxi: CMND 2 mặt + bằng lái B2 + đăng ký xe + bảo hiểm + ảnh chân dung
+// giấy tờ taxi: CMND 2 mặt + bằng lái B2 2 mặt + cà vẹt xe + bảo hiểm + selfie (upload theo thứ tự)
 const TAXI_DOCS = [
-  { key:"id_front",  label:"CMND/CCCD mặt trước",    hint:"Rõ 4 góc, không bị chói sáng" },
-  { key:"id_back",   label:"CMND/CCCD mặt sau",      hint:"Rõ 4 góc, không bị chói sáng" },
-  { key:"license",   label:"Bằng lái xe (hạng B2)",   hint:"Còn hạn, chụp rõ thông tin" },
-  { key:"reg",       label:"Đăng ký xe ô tô",         hint:"Còn hiệu lực, đúng tên chủ xe" },
-  { key:"insurance", label:"Bảo hiểm xe ô tô",        hint:"Còn hiệu lực" },
-  { key:"portrait",  label:"Ảnh chân dung",            hint:"Nhìn thẳng, rõ mặt, nền sáng" },
+  { key:"id_front",      label:"CMND/CCCD mặt trước",             hint:"Rõ 4 góc, không bị chói sáng" },
+  { key:"id_back",       label:"CMND/CCCD mặt sau",               hint:"Rõ 4 góc, không bị chói sáng" },
+  { key:"license_front", label:"Bằng lái xe mặt trước (B2)",      hint:"Còn hạn, chụp rõ thông tin" },
+  { key:"license_back",  label:"Bằng lái xe mặt sau (B2)",       hint:"Chụp rõ toàn bộ mặt sau bằng lái" },
+  { key:"reg",           label:"Cà vẹt xe / Đăng ký xe ô tô",    hint:"Còn hiệu lực, đúng tên chủ xe" },
+  { key:"insurance",     label:"Bảo hiểm xe ô tô",                hint:"Còn hiệu lực, chụp rõ số hợp đồng" },
+  { key:"portrait",      label:"Ảnh selfie khuôn mặt",            hint:"Nhìn thẳng, rõ mặt, nền sáng, không đeo kính" },
 ]
 
 // ─── Small helpers ─────────────────────────────────────────
@@ -338,7 +340,7 @@ export default function DriverRegisterPage() {
             {step===3&&(
               <motion.div key="s3" initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-20}} transition={{duration:.22}}>
                 {/* Progress */}
-                <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:13,padding:"11px 14px",marginBottom:14 }}>
+                <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:13,padding:"11px 14px",marginBottom:10 }}>
                   <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7 }}>
                     <span style={{ color:"#b0956a",fontSize:10,fontWeight:600 }}>Tiến độ upload giấy tờ</span>
                     <span style={{ color:allDone?"#3ecf6e":"#FF8C00",fontSize:10,fontWeight:700 }}>{doneCount}/{docList.length}</span>
@@ -346,54 +348,103 @@ export default function DriverRegisterPage() {
                   <ProgBar pct={(doneCount/docList.length)*100} color={allDone?"#3ecf6e":"#FF6B00"} />
                 </div>
 
-                <SLabel>Upload giấy tờ bắt buộc</SLabel>
+                {/* Step hint */}
+                {!allDone&&(()=>{
+                  const activeDocIdx = docList.findIndex(d=>{ const dc=docs[d.key]; return !dc||dc.status!=="done" })
+                  const activeDoc = docList[activeDocIdx]
+                  return activeDoc ? (
+                    <div style={{ background:"rgba(255,107,0,0.07)",border:"1px solid rgba(255,107,0,0.2)",
+                      borderRadius:10,padding:"8px 12px",marginBottom:10,display:"flex",gap:8,alignItems:"center" }}>
+                      <span style={{ fontSize:13,flexShrink:0 }}>📌</span>
+                      <div>
+                        <div style={{ color:"#FF8C00",fontSize:9.5,fontWeight:700 }}>
+                          Bước {activeDocIdx+1}/{docList.length}: {activeDoc.label}
+                        </div>
+                        <div style={{ color:"#b0956a",fontSize:8.5,marginTop:1 }}>
+                          Hoàn thành bước này để mở khóa bước tiếp theo
+                        </div>
+                      </div>
+                    </div>
+                  ) : null
+                })()}
 
-                {docList.map(d=>{
+                <SLabel>Upload giấy tờ bắt buộc (theo thứ tự)</SLabel>
+
+                {docList.map((d,idx)=>{
                   const doc = docs[d.key] ?? { ...d, progress:0, status:"idle" as DocStatus }
+                  const activeDocIdx = docList.findIndex(dd=>{ const dc=docs[dd.key]; return !dc||dc.status!=="done" })
+                  const isDone    = doc.status==="done"
+                  const isCurrent = idx===activeDocIdx
+                  const isLocked  = activeDocIdx>=0 && idx>activeDocIdx
                   return (
                     <div key={d.key} style={{
-                      background:doc.status==="done"?"rgba(62,207,110,0.06)":doc.status==="uploading"?"rgba(255,107,0,0.06)":"rgba(255,255,255,0.04)",
-                      border:`1px solid ${doc.status==="done"?"rgba(62,207,110,0.25)":doc.status==="uploading"?"rgba(255,107,0,0.2)":"rgba(255,255,255,0.08)"}`,
-                      borderRadius:13,padding:"11px 13px",marginBottom:8 }}>
+                      background: isDone?"rgba(62,207,110,0.06)":isCurrent?"rgba(255,107,0,0.06)":"rgba(255,255,255,0.04)",
+                      border:`1px solid ${isDone?"rgba(62,207,110,0.25)":isCurrent?"rgba(255,107,0,0.2)":"rgba(255,255,255,0.07)"}`,
+                      borderRadius:13,padding:"11px 13px",marginBottom:8,
+                      opacity:isLocked?0.4:1,
+                      transition:"opacity .2s",
+                    }}>
                       <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+                        {/* Status icon */}
                         <div style={{ width:36,height:36,borderRadius:10,flexShrink:0,
-                          background:doc.status==="done"?"rgba(62,207,110,0.15)":doc.status==="uploading"?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.05)",
-                          border:`1px solid ${doc.status==="done"?"rgba(62,207,110,0.3)":doc.status==="uploading"?"rgba(255,107,0,0.25)":"rgba(255,255,255,0.07)"}`,
+                          background: isDone?"rgba(62,207,110,0.15)":isCurrent?"rgba(255,107,0,0.12)":isLocked?"rgba(255,255,255,0.03)":"rgba(255,255,255,0.05)",
+                          border:`1px solid ${isDone?"rgba(62,207,110,0.3)":isCurrent?"rgba(255,107,0,0.25)":"rgba(255,255,255,0.07)"}`,
                           display:"flex",alignItems:"center",justifyContent:"center",fontSize:18 }}>
-                          {doc.status==="done"?"✅":doc.status==="uploading"?"⬆️":"📎"}
+                          {isDone?"✅":doc.status==="uploading"?"⬆️":isLocked?"🔒":"📎"}
                         </div>
+                        {/* Info */}
                         <div style={{ flex:1,minWidth:0 }}>
-                          <div style={{ fontSize:11,fontWeight:600,marginBottom:2,
-                            color:doc.status==="done"?"#3ecf6e":doc.status==="uploading"?"#FF8C00":"#f8f0e0" }}>
-                            {d.label}
+                          <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:2 }}>
+                            <div style={{ fontSize:11,fontWeight:600,
+                              color:isDone?"#3ecf6e":isCurrent?"#FF8C00":isLocked?"rgba(255,255,255,0.25)":"#f8f0e0" }}>
+                              {d.label}
+                            </div>
+                            {isCurrent&&!isDone&&(
+                              <div style={{ background:"rgba(255,107,0,0.15)",border:"1px solid rgba(255,107,0,0.3)",
+                                borderRadius:5,padding:"1px 6px",color:"#FF8C00",fontSize:7,fontWeight:700 }}>
+                                ← HIỆN TẠI
+                              </div>
+                            )}
                           </div>
-                          <div style={{ color:"#6a5a40",fontSize:8.5 }}>{d.hint}</div>
+                          <div style={{ color:isLocked?"rgba(255,255,255,0.2)":"#6a5a40",fontSize:8.5 }}>{d.hint}</div>
                           {doc.status==="uploading"&&(
                             <div style={{ marginTop:5,height:2,background:"rgba(255,255,255,0.07)",borderRadius:1,overflow:"hidden" }}>
                               <motion.div animate={{ width:`${doc.progress}%` }}
                                 style={{ height:"100%",background:"#FF8C00",borderRadius:1 }} />
                             </div>
                           )}
-                        </div>
-                        <div>
-                          {(doc.status==="idle"||doc.status==="error")&&(
-                            <button onClick={()=>fileRefs.current[d.key]?.click()}
-                              style={{ padding:"6px 12px",borderRadius:8,border:"none",
-                                background:"rgba(255,107,0,0.1)",borderWidth:1,borderStyle:"solid",
-                                borderColor:"rgba(255,107,0,0.25)",
-                                color:"#FF8C00",fontSize:9.5,fontWeight:600,fontFamily:"Lexend",cursor:"pointer" }}>
-                              📷 Chọn
-                            </button>
+                          {/* Preview thumbnail */}
+                          {isDone&&doc.preview&&(
+                            <div style={{ marginTop:5,width:40,height:28,borderRadius:5,overflow:"hidden",border:"1px solid rgba(62,207,110,0.3)" }}>
+                              <img src={doc.preview} alt="" style={{ width:"100%",height:"100%",objectFit:"cover" }} />
+                            </div>
                           )}
-                          {doc.status==="done"&&(
+                        </div>
+                        {/* Action button */}
+                        <div style={{ flexShrink:0 }}>
+                          {isLocked&&(
+                            <div style={{ padding:"5px 10px",borderRadius:8,background:"rgba(255,255,255,0.03)",
+                              border:"1px solid rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.2)",fontSize:9 }}>
+                              🔒 Khóa
+                            </div>
+                          )}
+                          {!isLocked&&(isDone?(
                             <button onClick={()=>fileRefs.current[d.key]?.click()}
                               style={{ padding:"5px 10px",borderRadius:8,border:"none",
                                 background:"rgba(255,255,255,0.05)",borderWidth:1,borderStyle:"solid",
                                 borderColor:"rgba(255,255,255,0.08)",
                                 color:"#6a5a40",fontSize:8.5,fontFamily:"Lexend",cursor:"pointer" }}>
-                              Đổi
+                              Đổi ảnh
                             </button>
-                          )}
+                          ):(
+                            <button onClick={()=>fileRefs.current[d.key]?.click()}
+                              style={{ padding:"6px 12px",borderRadius:8,border:"none",
+                                background:"rgba(255,107,0,0.1)",borderWidth:1,borderStyle:"solid",
+                                borderColor:"rgba(255,107,0,0.25)",
+                                color:"#FF8C00",fontSize:9.5,fontWeight:600,fontFamily:"Lexend",cursor:"pointer" }}>
+                              📷 Chọn ảnh
+                            </button>
+                          ))}
                         </div>
                       </div>
                       <input ref={el=>{ fileRefs.current[d.key]=el }} type="file" accept="image/*"

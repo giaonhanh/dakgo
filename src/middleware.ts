@@ -28,11 +28,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL("/", request.url));
       return response; // cho qua
     }
-    // Không có cookie → nếu không ở login, redirect login
-    if (!pathname.startsWith("/login")) {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-    return response;
+    // Không có dev_role cookie → fall through để kiểm tra Supabase session thật
   }
   // ── END DEV BYPASS ──
 

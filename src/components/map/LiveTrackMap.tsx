@@ -5,6 +5,7 @@
 // Import dynamic (no SSR) từ tracking page
 
 import { useEffect, useRef } from "react"
+import "leaflet/dist/leaflet.css"
 
 interface LiveTrackMapProps {
   driverLat:  number
@@ -36,19 +37,6 @@ export default function LiveTrackMap({
       const L = (await import("leaflet")).default
       LRef.current = L
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (L.Icon.Default.prototype as any)._getIconUrl
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-        iconUrl:       "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-        shadowUrl:     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-      })
-      if (!document.getElementById("leaflet-css")) {
-        const link = document.createElement("link")
-        link.id = "leaflet-css"; link.rel = "stylesheet"
-        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        document.head.appendChild(link)
-      }
       if (mapRef.current) return
 
       const midLat = (driverLat + destLat) / 2

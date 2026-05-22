@@ -3,10 +3,8 @@
 import { useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import dynamic from "next/dynamic"
+import AddressPicker from "@/components/map/AddressPicker"
 import type { AddressPickerResult } from "@/types"
-
-const AddressPicker = dynamic(() => import("@/components/map/AddressPicker"), { ssr: false })
 
 type BuyItem = { id: number; name: string; qty: number; price: string }
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"

@@ -9,6 +9,8 @@ const SELF_NAV_PATHS = [
   '/addresses', '/wallet', '/vouchers', '/loyalty', '/notifications', '/errand',
   '/checkout', '/order-success', '/review',
   '/bestsellers', '/promo-items', '/nearby-shops',
+  '/mua-ho', '/giao-ho', '/xe-om', '/taxi', '/ride',
+  '/danh-muc', '/favorites',
 ]
 
 export default function CustomerLayout({ children }: { children: React.ReactNode }) {

@@ -11,7 +11,7 @@ import type { AddressPickerResult } from "@/types"
 // Tọa độ trung tâm Thị Trấn Phước An, Huyện Krông Pắc, Đắk Lắk
 const DEFAULT_LAT = 12.7107
 const DEFAULT_LNG = 108.3034
-const PANEL_H    = 196
+const PANEL_H    = 216
 const SEARCH_H   = 56
 const GEOCODE_MS = 600
 const SEARCH_MS  = 500
@@ -694,7 +694,7 @@ export default function AddressPickerClient({
         borderRadius: "18px 18px 0 0",
         boxShadow: "0 -8px 48px rgba(0,0,0,0.7)",
         display: "flex", flexDirection: "column",
-        padding: "0 16px 20px", gap: 9,
+        padding: "0 16px calc(env(safe-area-inset-bottom,0px) + 16px)", gap: 9,
       } as React.CSSProperties}>
         <div style={{
           alignSelf: "center", marginTop: 10, flexShrink: 0,

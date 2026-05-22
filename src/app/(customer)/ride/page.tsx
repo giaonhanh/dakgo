@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ChevronRight } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import AddressPicker from "@/components/map/AddressPicker";
 import type { AddressPickerResult } from "@/types";
@@ -20,9 +20,12 @@ function estimateKm(dest: string): number {
   return parseFloat(((seed % 60 + 10) / 10).toFixed(1))
 }
 
-export default function RidePage() {
+function RideContent() {
   const router = useRouter();
-  const [service,     setService]     = useState("xe-om");
+  const params = useSearchParams();
+  const [service,     setService]     = useState(
+    params.get("type") === "taxi" ? "taxi" : "xe-om"
+  );
   const [pickup,      setPickup]      = useState("Phước An, Krông Pắc");
   const [dest,        setDest]        = useState("");
   const [loading,     setLoading]     = useState(false);
@@ -66,21 +69,26 @@ export default function RidePage() {
         )}
       </AnimatePresence>
       <header
-        className="fixed top-0 inset-x-0 z-40 flex items-center gap-3 px-4 h-14"
+        className="fixed top-0 inset-x-0 z-40 flex items-center gap-3 px-4"
         style={{
+          paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)",
+          paddingBottom: 12,
           background: "rgba(8,8,6,0.96)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           borderBottom: "1px solid rgba(255,107,0,0.08)",
         }}
       >
-        <button onClick={() => router.back()} className="p-1.5">
+        <button onClick={() => router.back()}
+          style={{ width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center",
+            background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}>
           <ArrowLeft size={20} style={{ color: "var(--acc)" }} />
         </button>
         <h1 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Đặt xe</h1>
       </header>
 
-      <main className="max-w-md mx-auto pt-14 px-4 space-y-4">
+      <main className="max-w-md mx-auto px-4 space-y-4"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 68px)" }}>
         {/* Route preview / prompt */}
         {(pickupCoord || destCoord) ? (
           <motion.div
@@ -171,9 +179,9 @@ export default function RidePage() {
             />
             <button
               onClick={() => setMapMode("pickup")}
-              style={{ width: 30, height: 30, borderRadius: 8, border: "none", cursor: "pointer",
+              style={{ width: 44, height: 44, borderRadius: 10, border: "none", cursor: "pointer",
                 background: "rgba(62,207,110,0.12)", flexShrink: 0,
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
               📍
             </button>
           </div>
@@ -189,9 +197,9 @@ export default function RidePage() {
             />
             <button
               onClick={() => setMapMode("dest")}
-              style={{ width: 30, height: 30, borderRadius: 8, border: "none", cursor: "pointer",
+              style={{ width: 44, height: 44, borderRadius: 10, border: "none", cursor: "pointer",
                 background: "rgba(255,107,0,0.12)", flexShrink: 0,
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
               🗺️
             </button>
           </div>
@@ -262,4 +270,12 @@ export default function RidePage() {
       )}
     </>
   );
+}
+
+export default function RidePage() {
+  return (
+    <Suspense>
+      <RideContent />
+    </Suspense>
+  )
 }

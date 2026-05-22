@@ -497,11 +497,6 @@ export default function OrdersPage() {
               {todayOrders.length} đơn hôm nay{historyOrders.length > 0 ? ` · ${historyOrders.length} trong lịch sử` : ""}
             </div>
             </div>
-            <button onClick={() => router.push("/search?orders=1")}
-              style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-                background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 14, color: "#f8f0e0", cursor: "pointer" }}>🔍</button>
           </div>
 
           {/* Tabs */}

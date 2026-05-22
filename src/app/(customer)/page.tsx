@@ -38,12 +38,12 @@ const ALL_VOUCHERS = [
 ]
 
 const MEAL_TIMES = [
-  { icon:"☀️",  label:"Buổi Sáng", value:"morning"  },
-  { icon:"🌤️", label:"Buổi Trưa", value:"lunch"    },
-  { icon:"🌙",  label:"Buổi Tối",  value:"dinner"   },
-  { icon:"🥤",  label:"Nước",      value:"drinks"   },
-  { icon:"🍺",  label:"Món Nhậu",  value:"drinking" },
-  { icon:"🍿",  label:"Ăn Vặt",   value:"snack"    },
+  { icon:"☀️",  label:"Buổi sáng",  value:"buoi-sang"  },
+  { icon:"🌤️", label:"Buổi trưa",  value:"buoi-trua"  },
+  { icon:"🌙",  label:"Buổi tối",   value:"buoi-toi"   },
+  { icon:"🧋",  label:"Nước uống",  value:"nuoc-uong"  },
+  { icon:"🍺",  label:"Món nhậu",   value:"mon-nhau"   },
+  { icon:"🍿",  label:"Ăn vặt",    value:"an-vat"     },
 ]
 
 function getDefaultMealTime() {
@@ -82,6 +82,16 @@ const REORDERS = [
   { id:1, emoji:"🍜", name:"Bún bò đặc biệt x2", shop:"Bún Bò Huế Ngon", price:90 },
   { id:2, emoji:"🥤", name:"Trà sữa size L x1",   shop:"Ding Tea",        price:35 },
   { id:3, emoji:"🛵", name:"Xe ôm · Chợ → Nhà",    shop:"3.2km · 25.000đ", price:25 },
+]
+
+// Cửa hàng yêu thích — sắp xếp từ mới nhất đến cũ nhất
+// Để ẩn section: đặt FAVE_SHOPS = []
+const FAVE_SHOPS = [
+  { id:1, emoji:"🍜", name:"Quán Bún Bò Huế Ngon", tags:["Bún·Phở","🔥 Bán chạy"], star:4.9, km:0.8, eta:20, disc:25, freeShip:true  },
+  { id:2, emoji:"🥤", name:"Trà Sữa Ding Tea PA",   tags:["Đồ uống","Giảm 20%"],    star:4.8, km:0.5, eta:10, disc:20, freeShip:true  },
+  { id:4, emoji:"🍗", name:"Gà Vàng Phước An",       tags:["Gà rán","🆕 Mới"],       star:4.6, km:0.6, eta:15, disc:30, freeShip:true  },
+  { id:3, emoji:"🍱", name:"Cơm Nhà Bếp Phước An",   tags:["Cơm hộp","Bình dân"],    star:4.7, km:1.2, eta:25, disc:0,  freeShip:false },
+  { id:5, emoji:"🍔", name:"Burger House PA",         tags:["Burger","Fast food"],    star:4.5, km:2.1, eta:30, disc:10, freeShip:false },
 ]
 
 
@@ -539,10 +549,10 @@ export default function HomePage() {
             gap:7, padding:"0 16px", marginBottom:14,
           }}>
             {[
-              { icon:"📦", label:"Giao hộ",  href:"/errand?type=deliver", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00", badge:"" },
-              { icon:"🛒", label:"Mua hộ",   href:"/errand?type=buy",     bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e", badge:"HOT" },
-              { icon:"🛵", label:"Xe ôm",    href:"/ride?type=moto",      bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5", badge:"" },
-              { icon:"🚗", label:"Taxi",     href:"/ride?type=taxi",      bg:"rgba(180,100,255,0.10)",ic:"#b464ff", badge:"" },
+              { icon:"📦", label:"Giao hộ",  href:"/giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00", badge:"" },
+              { icon:"🛒", label:"Mua hộ",   href:"/mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e", badge:"HOT" },
+              { icon:"🛵", label:"Xe ôm",    href:"/xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5", badge:"" },
+              { icon:"🚗", label:"Taxi",     href:"/taxi",    bg:"rgba(180,100,255,0.10)",ic:"#b464ff", badge:"" },
             ].map((s,i) => (
               <a key={i} href={s.href} style={{ textDecoration:"none" }}>
                 <div className="svc-card" style={{
@@ -576,101 +586,189 @@ export default function HomePage() {
               S6 — Voucher (khám phá tất cả)
           ────────────────────────────────────── */}
           <SectionHeader title="🎟️ Voucher" more="Xem tất cả →" href="/vouchers" />
-          <HScroll>
-            {ALL_VOUCHERS.map(v => {
-              const saved = savedVoucherIds.includes(v.id)
-              return (
-                <div key={v.id} style={{
-                  minWidth:162, flexShrink:0,
-                  background: v.type === "shop" ? "rgba(74,143,245,0.07)" : "rgba(255,107,0,0.07)",
-                  backdropFilter:"blur(10px)",
-                  border: `1px solid ${v.type === "shop" ? "rgba(74,143,245,0.22)" : "rgba(255,107,0,0.2)"}`,
-                  borderRadius:12, padding:"9px 11px",
-                  display:"flex", flexDirection:"column", gap:7,
-                  position:"relative", overflow:"hidden",
-                }}>
-                  <div style={{ position:"absolute", top:0, left:"-80%", width:"40%", height:"100%",
-                    background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)",
-                    animation:"shimmer 3s infinite" }} />
-                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    <div style={{ width:32, height:32, borderRadius:9,
-                      background: v.type === "shop" ? "rgba(74,143,245,0.12)" : "rgba(255,107,0,0.12)",
-                      border: `1px solid ${v.type === "shop" ? "rgba(74,143,245,0.25)" : "rgba(255,107,0,0.25)"}`,
-                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
-                      {v.icon}
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ color: v.type === "shop" ? "#4a8ff5" : "#FF8C00", fontSize:12, fontWeight:700 }}>{v.value}</div>
-                      <div style={{ color:"#b0956a", fontSize:8, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.label}</div>
-                    </div>
-                  </div>
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                    <div style={{ fontSize:7.5,
-                      color: v.urgent ? "#ff4040" : "rgba(255,107,0,0.45)",
-                      fontWeight: v.urgent ? 700 : 400 }}>
-                      {v.urgent ? "⏰ " : ""}{v.expiry}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSavedVoucherIds(prev =>
-                        saved ? prev.filter(x => x !== v.id) : [...prev, v.id]
-                      )}
-                      style={{
-                        height:20, padding:"0 7px", borderRadius:6, border:"none",
-                        cursor:"pointer", fontSize:8, fontWeight:700, fontFamily:"Lexend",
-                        background: saved ? "rgba(62,207,110,0.15)" : "rgba(255,107,0,0.15)",
-                        color: saved ? "#3ecf6e" : "#FF8C00",
-                        transition:"all .2s",
-                      }}>
-                      {saved ? "✓ Đã lưu" : "🔖 Lưu"}
-                    </button>
-                  </div>
+          {ALL_VOUCHERS.length === 0 ? (
+            <div style={{ margin:"0 16px 14px",
+              background:"rgba(255,107,0,0.04)",
+              border:"1.5px dashed rgba(255,107,0,0.2)",
+              borderRadius:16, padding:"20px 16px",
+              display:"flex", flexDirection:"column", alignItems:"center", gap:10,
+            }}>
+              <div style={{ position:"relative" }}>
+                <div style={{ fontSize:44, lineHeight:1,
+                  filter:"drop-shadow(0 0 12px rgba(255,179,71,0.3))" }}>🎟️</div>
+                <motion.div
+                  animate={{ scale:[1,1.15,1], opacity:[0.5,1,0.5] }}
+                  transition={{ duration:2.5, repeat:Infinity, ease:"easeInOut" }}
+                  style={{ position:"absolute", inset:-8, borderRadius:"50%",
+                    background:"radial-gradient(circle,rgba(255,179,71,0.12) 0%,transparent 70%)" }} />
+              </div>
+              <div style={{ textAlign:"center" }}>
+                <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700, marginBottom:5 }}>
+                  Chưa có voucher nào
                 </div>
-              )
-            })}
-          </HScroll>
+                <div style={{ color:"#6a5a40", fontSize:10, lineHeight:1.7 }}>
+                  Đặt đơn đầu tiên để nhận ngay<br/>
+                  <span style={{ color:"#FFB347", fontWeight:600 }}>ưu đãi hấp dẫn từ Giao Nhanh!</span>
+                </div>
+              </div>
+              <a href="/nearby-shops" style={{ textDecoration:"none" }}>
+                <div style={{ background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.25)",
+                  borderRadius:10, padding:"7px 18px",
+                  color:"#FF8C00", fontSize:10, fontWeight:700 }}>
+                  Khám phá quán ngay →
+                </div>
+              </a>
+            </div>
+          ) : (
+            <HScroll>
+              {ALL_VOUCHERS.map(v => {
+                const saved = savedVoucherIds.includes(v.id)
+                return (
+                  <div key={v.id} style={{
+                    minWidth:162, flexShrink:0,
+                    background: v.type === "shop" ? "rgba(74,143,245,0.07)" : "rgba(255,107,0,0.07)",
+                    backdropFilter:"blur(10px)",
+                    border: `1px solid ${v.type === "shop" ? "rgba(74,143,245,0.22)" : "rgba(255,107,0,0.2)"}`,
+                    borderRadius:12, padding:"9px 11px",
+                    display:"flex", flexDirection:"column", gap:7,
+                    position:"relative", overflow:"hidden",
+                  }}>
+                    <div style={{ position:"absolute", top:0, left:"-80%", width:"40%", height:"100%",
+                      background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)",
+                      animation:"shimmer 3s infinite" }} />
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <div style={{ width:32, height:32, borderRadius:9,
+                        background: v.type === "shop" ? "rgba(74,143,245,0.12)" : "rgba(255,107,0,0.12)",
+                        border: `1px solid ${v.type === "shop" ? "rgba(74,143,245,0.25)" : "rgba(255,107,0,0.25)"}`,
+                        display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
+                        {v.icon}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ color: v.type === "shop" ? "#4a8ff5" : "#FF8C00", fontSize:12, fontWeight:700 }}>{v.value}</div>
+                        <div style={{ color:"#b0956a", fontSize:8, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.label}</div>
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                      <div style={{ fontSize:7.5,
+                        color: v.urgent ? "#ff4040" : "rgba(255,107,0,0.45)",
+                        fontWeight: v.urgent ? 700 : 400 }}>
+                        {v.urgent ? "⏰ " : ""}{v.expiry}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSavedVoucherIds(prev =>
+                          saved ? prev.filter(x => x !== v.id) : [...prev, v.id]
+                        )}
+                        style={{
+                          height:20, padding:"0 7px", borderRadius:6, border:"none",
+                          cursor:"pointer", fontSize:8, fontWeight:700, fontFamily:"Lexend",
+                          background: saved ? "rgba(62,207,110,0.15)" : "rgba(255,107,0,0.15)",
+                          color: saved ? "#3ecf6e" : "#FF8C00",
+                          transition:"all .2s",
+                        }}>
+                        {saved ? "✓ Đã lưu" : "🔖 Lưu"}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </HScroll>
+          )}
 
           {/* ──────────────────────────────────────
-              S7 — MealTimeFilter
+              S7 — Danh mục (navigate to /danh-muc/{value})
           ────────────────────────────────────── */}
-          <SectionHeader title="Bạn muốn ăn gì?" />
-          <HScroll>
-            {MEAL_TIMES.map((m,i) => {
-              const active = activeMealTime === i
-              return (
-                <div key={i} onClick={() => setActiveMealTime(i)}
-                  style={{
-                    display:"flex", flexDirection:"column", alignItems:"center",
-                    gap:5, flexShrink:0, cursor:"pointer",
-                  }}>
-                  <div style={{
-                    width:54, height:54, borderRadius:16,
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    fontSize:24,
-                    background: active ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.05)",
-                    border: active ? "1.5px solid rgba(255,107,0,0.45)" : "1px solid rgba(255,255,255,0.08)",
-                    boxShadow: active ? "0 0 12px rgba(255,107,0,0.22)" : "none",
-                    transition:"all .2s",
-                  }}>
-                    {m.icon}
-                  </div>
-                  <div style={{
-                    fontSize:8, fontWeight: active ? 700 : 400,
-                    color: active ? "#FF8C00" : "#6a5a40",
-                    whiteSpace:"nowrap",
-                  }}>
-                    {m.label}
-                  </div>
+          <SectionHeader title="Danh mục" />
+          <div style={{
+            display:"grid", gridTemplateColumns:"repeat(3,1fr)",
+            gap:8, padding:"0 16px", marginBottom:14,
+          }}>
+            {MEAL_TIMES.map((m,i) => (
+              <motion.button key={i}
+                initial={{ opacity:0, scale:.9 }} animate={{ opacity:1, scale:1 }}
+                transition={{ delay: i * 0.05 }}
+                whileTap={{ scale:.94 }}
+                onClick={() => router.push(`/danh-muc/${m.value}`)}
+                style={{
+                  background:"rgba(255,255,255,0.05)",
+                  border:"1px solid rgba(255,255,255,0.08)",
+                  borderRadius:14, padding:"12px 8px",
+                  display:"flex", flexDirection:"column", alignItems:"center", gap:6,
+                  cursor:"pointer", transition:"all .2s",
+                }}>
+                <div style={{
+                  width:46, height:46, borderRadius:13,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:22,
+                  background:"rgba(255,107,0,0.08)",
+                  border:"1px solid rgba(255,107,0,0.18)",
+                }}>
+                  {m.icon}
                 </div>
-              )
-            })}
-          </HScroll>
+                <div style={{
+                  fontSize:9.5, fontWeight:600, color:"#b0956a",
+                  textAlign:"center", whiteSpace:"nowrap",
+                }}>
+                  {m.label}
+                </div>
+              </motion.button>
+            ))}
+          </div>
 
           {/* ──────────────────────────────────────
               S8 — PromoSection
           ────────────────────────────────────── */}
           <SectionHeader title="🔥 Khuyến mãi hôm nay" more="Xem tất cả →" href="/promo-items" />
-          <HScroll>
+          {PROMOS.length === 0 ? (
+            <div style={{ margin:"0 16px 14px",
+              background:"linear-gradient(135deg,rgba(255,107,0,0.05),rgba(255,64,64,0.04))",
+              border:"1.5px dashed rgba(255,107,0,0.18)",
+              borderRadius:16, padding:"18px 16px",
+              display:"flex", alignItems:"center", gap:16, position:"relative", overflow:"hidden",
+            }}>
+              {/* Glow background */}
+              <div style={{ position:"absolute", right:-20, top:-20, width:100, height:100,
+                background:"radial-gradient(circle,rgba(255,107,0,0.08) 0%,transparent 70%)",
+                pointerEvents:"none" }} />
+              {/* Illustration */}
+              <div style={{ flexShrink:0, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+                <motion.div
+                  animate={{ y:[0,-4,0] }}
+                  transition={{ duration:3, repeat:Infinity, ease:"easeInOut" }}
+                  style={{ fontSize:46, lineHeight:1,
+                    filter:"drop-shadow(0 4px 10px rgba(255,107,0,0.25))" }}>
+                  🍽️
+                </motion.div>
+                <div style={{ display:"flex", gap:3 }}>
+                  {[0,1,2].map(i=>(
+                    <motion.div key={i}
+                      animate={{ opacity:[0.3,1,0.3] }}
+                      transition={{ duration:1.5, repeat:Infinity, delay: i*0.4 }}
+                      style={{ width:4, height:4, borderRadius:"50%", background:"rgba(255,107,0,0.4)" }} />
+                  ))}
+                </div>
+              </div>
+              {/* Text */}
+              <div style={{ flex:1 }}>
+                <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700, marginBottom:5, lineHeight:1.4 }}>
+                  Hôm nay chưa có<br/>khuyến mãi
+                </div>
+                <div style={{ color:"#6a5a40", fontSize:9, lineHeight:1.7, marginBottom:8 }}>
+                  Các quán đang chuẩn bị deal xịn —
+                  <span style={{ color:"#FFB347", fontWeight:600 }}> ghé lại sau nhé!</span>
+                </div>
+                <a href="/nearby-shops" style={{ textDecoration:"none" }}>
+                  <div style={{ display:"inline-block",
+                    background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.25)",
+                    borderRadius:8, padding:"5px 13px",
+                    color:"#FF8C00", fontSize:9, fontWeight:700 }}>
+                    Xem menu các quán →
+                  </div>
+                </a>
+              </div>
+            </div>
+          ) : (
+            <HScroll>
             {PROMOS.map(p => (
               <div key={p.id} className="promo-card" style={{
                 minWidth:120, flexShrink:0,
@@ -725,7 +823,8 @@ export default function HomePage() {
                 </div>
               </div>
             ))}
-          </HScroll>
+            </HScroll>
+          )}
 
           {/* ──────────────────────────────────────
               S9 — NearbyShops
@@ -857,6 +956,79 @@ export default function HomePage() {
           </HScroll>
 
           {/* S11 — LoyaltyPoints removed: điểm chỉ hiển thị trong Profile cá nhân */}
+
+          {/* ──────────────────────────────────────
+              S11 — Cửa hàng yêu thích (ẩn nếu chưa có)
+          ────────────────────────────────────── */}
+          {FAVE_SHOPS.length > 0 && (
+            <>
+              <SectionHeader title="❤️ Cửa hàng yêu thích" more="Xem tất cả →" href="/favorites" />
+              <div style={{ padding:"0 16px", display:"flex", flexDirection:"column", gap:8, marginBottom:14 }}>
+                {FAVE_SHOPS.slice(0,5).map((s,i) => (
+                  <motion.a key={s.id} href={`/shop/${s.id}`}
+                    initial={{ opacity:0, x:-12 }} animate={{ opacity:1, x:0 }}
+                    transition={{ delay: i * 0.06 }}
+                    style={{ textDecoration:"none" }}>
+                    <div style={{
+                      background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
+                      border:"1px solid rgba(255,107,0,0.12)",
+                      borderRadius:14, padding:"10px 11px",
+                      display:"flex", alignItems:"center", gap:10,
+                      position:"relative", overflow:"hidden",
+                    }}>
+                      {/* Heart badge */}
+                      <div style={{ position:"absolute", top:7, right:10,
+                        width:20, height:20, borderRadius:"50%",
+                        background:"rgba(255,64,64,0.12)", border:"1px solid rgba(255,64,64,0.25)",
+                        display:"flex", alignItems:"center", justifyContent:"center", fontSize:10 }}>❤️</div>
+                      {/* Shop logo */}
+                      <div style={{ width:50, height:50, borderRadius:12, flexShrink:0,
+                        background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.18)",
+                        display:"flex", alignItems:"center", justifyContent:"center", fontSize:25 }}>
+                        {s.emoji}
+                      </div>
+                      {/* Info */}
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ color:"#f8f0e0", fontSize:11.5, fontWeight:600,
+                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", paddingRight:24 }}>
+                          {s.name}
+                        </div>
+                        <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
+                          {s.tags.map(t => (
+                            <span key={t} style={{
+                              background: t.startsWith("🔥") ? "rgba(255,64,64,0.1)" :
+                                          t.startsWith("🆕") ? "rgba(62,207,110,0.08)" :
+                                                               "rgba(255,255,255,0.04)",
+                              border: t.startsWith("🔥") ? "1px solid rgba(255,64,64,0.2)" :
+                                      t.startsWith("🆕") ? "1px solid rgba(62,207,110,0.2)" :
+                                                           "1px solid rgba(255,255,255,0.06)",
+                              color: t.startsWith("🔥") ? "#ff6060" :
+                                     t.startsWith("🆕") ? "#3ecf6e" : "#6a5a40",
+                              fontSize:7.5, borderRadius:5, padding:"2px 6px",
+                            }}>{t}</span>
+                          ))}
+                        </div>
+                        <div style={{ display:"flex", alignItems:"center", gap:7, marginTop:5 }}>
+                          <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
+                          <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.star}</span>
+                          <span style={{ color:"#4a5040", fontSize:9 }}>·</span>
+                          <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.km}km</span>
+                          <span style={{ color:"#4a5040", fontSize:9 }}>·</span>
+                          <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.eta}–{s.eta+10} phút</span>
+                          {s.freeShip && (
+                            <>
+                              <span style={{ color:"#4a5040", fontSize:9 }}>·</span>
+                              <span style={{ color:"#3ecf6e", fontSize:8, fontWeight:600 }}>Free ship</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.a>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* ──────────────────────────────────────
               S12 — ReorderSection
