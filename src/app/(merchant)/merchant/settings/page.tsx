@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
 /* ── helpers ── */
@@ -88,48 +88,6 @@ function PwSheet({ onClose }: { onClose: () => void }) {
   )
 }
 
-/* ── bank sheet ── */
-function BankSheet({ onClose }: { onClose: () => void }) {
-  const BANKS = ["Vietcombank", "BIDV", "Agribank", "Techcombank", "MB Bank", "VPBank", "ACB", "VietinBank"]
-  const [bank, setBank] = useState("Vietcombank")
-  const [acct, setAcct] = useState(""); const [name, setName] = useState(""); const [branch, setBranch] = useState("")
-  return (
-    <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 26, stiffness: 280 }}
-      style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-      <div style={{ background: "#0e0b07", borderTop: "1px solid rgba(255,107,0,0.3)", borderRadius: "22px 22px 0 0", padding: "20px 20px calc(env(safe-area-inset-bottom) + 20px)", maxHeight: "88dvh", overflowY: "auto" }}>
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 18 }}>
-          <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🏦 Tài khoản nhận tiền</div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
-        </div>
-        <div style={{ background: "rgba(62,207,110,0.07)", border: "1px solid rgba(62,207,110,0.2)", borderRadius: 12, padding: "10px 14px", marginBottom: 16 }}>
-          <div style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>💰 Lịch thanh toán</div>
-          <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.6 }}>Doanh thu sau khấu trừ hoa hồng <strong style={{ color: "#f8f0e0" }}>15%</strong> được chuyển mỗi <strong style={{ color: "#f8f0e0" }}>thứ 2</strong> hàng tuần. Số tiền tối thiểu để rút: <strong style={{ color: "#f8f0e0" }}>100.000đ</strong>.</div>
-        </div>
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 8 }}>Chọn ngân hàng</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-            {BANKS.map(b => (
-              <button key={b} onClick={() => setBank(b)} style={{ padding: "6px 12px", borderRadius: 9, background: bank === b ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.05)", border: `1px solid ${bank === b ? "rgba(255,107,0,0.35)" : "rgba(255,255,255,0.08)"}`, color: bank === b ? "#FF8C00" : "#6a5a40", fontSize: 10, fontWeight: bank === b ? 700 : 400, cursor: "pointer", fontFamily: "Lexend" }}>{b}</button>
-            ))}
-          </div>
-        </div>
-        {[
-          { label: "Số tài khoản", value: acct, set: setAcct, ph: "VD: 1234567890", type: "number" },
-          { label: "Tên chủ tài khoản", value: name, set: setName, ph: "Viết hoa không dấu, VD: TRAN THI ANH" },
-          { label: "Chi nhánh (tùy chọn)", value: branch, set: setBranch, ph: "VD: Buôn Ma Thuột" },
-        ].map(f => (
-          <div key={f.label} style={{ marginBottom: 12 }}>
-            <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 6 }}>{f.label}</div>
-            <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.ph} type={f.type || "text"}
-              style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend" }} />
-          </div>
-        ))}
-        <button onClick={onClose} style={{ width: "100%", height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend", marginTop: 8 }}>✓ Lưu tài khoản ngân hàng</button>
-      </div>
-    </motion.div>
-  )
-}
-
 /* ── hours sheet ── */
 function HoursSheet({ onClose }: { onClose: () => void }) {
   const DAYS = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"]
@@ -199,7 +157,6 @@ export default function MerchantSettingsPage() {
 
   /* sheets */
   const [showPw,    setShowPw]    = useState(false)
-  const [showBank,  setShowBank]  = useState(false)
   const [showHours, setShowHours] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
   const [toast, setToast]           = useState("")
@@ -333,13 +290,80 @@ export default function MerchantSettingsPage() {
             </Row>
           </Section>
 
-          {/* banking */}
-          <Section title="Thanh toán & Ngân hàng">
-            <Row icon="🏦" label="Tài khoản ngân hàng" sub="Vietcombank · Chưa liên kết" onClick={() => setShowBank(true)} arrow>
-              <span style={{ background: "rgba(255,64,64,0.1)", border: "1px solid rgba(255,64,64,0.2)", borderRadius: 5, padding: "2px 7px", color: "#ff4040", fontSize: 8, fontWeight: 700 }}>Chưa liên kết</span>
-            </Row>
-            <Row icon="💸" label="Lịch sử thanh toán" sub="Xem doanh thu đã nhận" onClick={() => { window.location.href = "/merchant/revenue" }} arrow last />
-          </Section>
+          {/* cash model info */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ color: "#6a5a40", fontSize: 9, fontWeight: 700, letterSpacing: ".5px", textTransform: "uppercase", paddingLeft: 4, marginBottom: 8 }}>Cơ chế thu tiền</div>
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, overflow: "hidden" }}>
+
+              {/* flow steps */}
+              <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700, marginBottom: 12 }}>💵 Luồng tiền — Tiền mặt</div>
+                {[
+                  { step: "1", icon: "🛒", color: "#4a8ff5", label: "Khách đặt đơn",          sub: "Khách chọn thanh toán tiền mặt khi nhận hàng"                },
+                  { step: "2", icon: "✅", color: "#FFB347", label: "Quán xác nhận & chuẩn bị", sub: "Chuẩn bị đơn sau khi xác nhận"                              },
+                  { step: "3", icon: "🛵", color: "#FF8C00", label: "Tài xế đến lấy hàng",     sub: "Tài xế trả tiền mặt (đã trừ hoa hồng 15%) cho quán"          },
+                  { step: "4", icon: "📦", color: "#3ecf6e", label: "Tài xế giao khách",        sub: "Khách trả toàn bộ tiền mặt cho tài xế (gồm phí giao hàng)"  },
+                ].map((s, i, arr) => (
+                  <div key={s.step} style={{ display: "flex", gap: 12, paddingBottom: i < arr.length - 1 ? 12 : 0 }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: `rgba(${s.color === "#4a8ff5" ? "74,143,245" : s.color === "#FFB347" ? "255,179,71" : s.color === "#FF8C00" ? "255,140,0" : "62,207,110"},0.15)`, border: `1.5px solid ${s.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{s.icon}</div>
+                      {i < arr.length - 1 && <div style={{ width: 1.5, flex: 1, background: "rgba(255,255,255,0.07)", marginTop: 4, minHeight: 16 }} />}
+                    </div>
+                    <div style={{ paddingBottom: i < arr.length - 1 ? 0 : 0 }}>
+                      <div style={{ color: s.color, fontSize: 11, fontWeight: 700 }}>Bước {s.step}: {s.label}</div>
+                      <div style={{ color: "#6a5a40", fontSize: 9.5, marginTop: 2, lineHeight: 1.5 }}>{s.sub}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* example calc */}
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ color: "#b0956a", fontSize: 10, fontWeight: 700, marginBottom: 10 }}>📊 Ví dụ: Đơn 100.000đ — không có voucher</div>
+                {[
+                  { label: "Tiền hàng (khách trả)",   value: "100.000đ", color: "#f8f0e0",  bold: false },
+                  { label: "Hoa hồng Giao Nhanh 15%", value: "−15.000đ", color: "#ff4040",  bold: false },
+                  { label: "✓ Quán thực nhận",         value: "85.000đ",  color: "#3ecf6e",  bold: true  },
+                  { label: "Phí giao hàng (tài xế giữ)", value: "+15.000đ–18.000đ", color: "#6a5a40", bold: false },
+                ].map((r, i) => (
+                  <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderTop: i === 2 ? "1px solid rgba(62,207,110,0.25)" : i === 3 ? "1px solid rgba(255,255,255,0.05)" : "none", marginTop: i === 2 ? 4 : 0 }}>
+                    <span style={{ color: r.bold ? "#3ecf6e" : "#6a5a40", fontSize: r.bold ? 12 : 10, fontWeight: r.bold ? 800 : 400 }}>{r.label}</span>
+                    <span style={{ color: r.color, fontSize: r.bold ? 14 : 11, fontWeight: r.bold ? 800 : 600 }}>{r.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* voucher note */}
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ color: "#b0956a", fontSize: 10, fontWeight: 700, marginBottom: 10 }}>🎟 Ví dụ: Đơn 100.000đ — có voucher 10.000đ</div>
+                {[
+                  { label: "Tiền hàng",               value: "100.000đ", color: "#f8f0e0",  bold: false },
+                  { label: "Hoa hồng 15%",            value: "−15.000đ", color: "#ff4040",  bold: false },
+                  { label: "Voucher giảm giá",         value: "−10.000đ", color: "#FFB347",  bold: false },
+                  { label: "✓ Quán thực nhận",         value: "75.000đ",  color: "#3ecf6e",  bold: true  },
+                ].map((r, i) => (
+                  <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderTop: i === 3 ? "1px solid rgba(62,207,110,0.25)" : "none", marginTop: i === 3 ? 4 : 0 }}>
+                    <span style={{ color: r.bold ? "#3ecf6e" : "#6a5a40", fontSize: r.bold ? 12 : 10, fontWeight: r.bold ? 800 : 400 }}>{r.label}</span>
+                    <span style={{ color: r.color, fontSize: r.bold ? 14 : 11, fontWeight: r.bold ? 800 : 600 }}>{r.value}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(255,179,71,0.06)", border: "1px solid rgba(255,179,71,0.15)" }}>
+                  <div style={{ color: "#6a5a40", fontSize: 9, lineHeight: 1.5 }}>⚠️ Voucher do <strong style={{ color: "#FFB347" }}>quán tạo ra</strong> sẽ bị trừ vào doanh thu của quán. Voucher do Giao Nhanh tài trợ sẽ không trừ.</div>
+                </div>
+              </div>
+
+              {/* revenue link */}
+              <div onClick={() => { window.location.href = "/merchant/revenue" }}
+                style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(62,207,110,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📈</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: "#f8f0e0", fontSize: 13, fontWeight: 600 }}>Xem báo cáo doanh thu</div>
+                  <div style={{ color: "#6a5a40", fontSize: 10 }}>Chi tiết từng đơn: thực nhận, hoa hồng, voucher</div>
+                </div>
+                <div style={{ color: "#6a5a40", fontSize: 16 }}>›</div>
+              </div>
+            </div>
+          </div>
 
           {/* security */}
           <Section title="Bảo mật">
@@ -374,7 +398,6 @@ export default function MerchantSettingsPage() {
       {/* sheets */}
       <AnimatePresence>
         {showPw    && <PwSheet    onClose={() => setShowPw(false)}    />}
-        {showBank  && <BankSheet  onClose={() => setShowBank(false)}  />}
         {showHours && <HoursSheet onClose={() => setShowHours(false)} />}
       </AnimatePresence>
 

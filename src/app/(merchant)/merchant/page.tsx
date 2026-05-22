@@ -17,6 +17,8 @@ interface MOrder {
   items: string
   itemList: { name: string; qty: number; price: number }[]
   total: number
+  subtotal: number
+  discountAmount: number
   payMethod: PayMethod
   status: OrderStatus
   time: string
@@ -88,7 +90,7 @@ export default function MerchantDashboard() {
     const { data: rows } = await supabase
       .from("orders")
       .select(`
-        id, status, total_amount, payment_method, note, created_at, customer_id,
+        id, status, total_amount, subtotal, discount_amount, payment_method, note, created_at, customer_id,
         order_items(name, price, quantity)
       `)
       .eq("shop_id", sid)
@@ -125,6 +127,8 @@ export default function MerchantDashboard() {
         items: itemStr || "—",
         itemList: items.map(i => ({ name: i.name, qty: i.quantity, price: i.price })),
         total: o.total_amount,
+        subtotal: o.subtotal ?? o.total_amount,
+        discountAmount: o.discount_amount ?? 0,
         payMethod: pm === "wallet" ? "wallet" : pm === "vietqr" ? "vietqr" : "cash",
         status: (o.status === "delivered" ? "ready" : o.status) as OrderStatus,
         time: fmtTime(o.created_at),
@@ -391,17 +395,40 @@ export default function MerchantDashboard() {
                             )}
                           </div>
 
-                          {order.status === "pending" && (
-                            <div style={{ padding: "7px 10px", borderRadius: 9, marginBottom: 10,
-                              background: order.payMethod === "wallet" ? "rgba(74,143,245,0.06)" : "rgba(255,255,255,0.02)",
-                              border: `1px solid ${order.payMethod === "wallet" ? "rgba(74,143,245,0.2)" : "rgba(255,255,255,0.05)"}` }}>
-                              <div style={{ color: order.payMethod === "wallet" ? "#4a8ff5" : "#6a5a40", fontSize: 9, lineHeight: 1.6 }}>
-                                {order.payMethod === "wallet"
-                                  ? `💙 Nếu từ chối → hoàn ${fmt(order.total)} về ví khách tự động`
-                                  : "💵 Tiền mặt — từ chối không cần hoàn tiền"}
+                          {/* ── Money breakdown ── */}
+                          {(() => {
+                            const commission    = Math.round(order.subtotal * 0.15)
+                            const netReceive    = order.subtotal - commission - order.discountAmount
+                            return (
+                              <div style={{ background:"rgba(0,0,0,0.25)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, padding:"10px 12px", marginBottom:10 }}>
+                                {/* rows */}
+                                {[
+                                  { label:"Tiền hàng",       value: order.subtotal,          color:"#f8f0e0", prefix:"" },
+                                  { label:"Hoa hồng app 15%", value: commission,              color:"#ff4040", prefix:"−" },
+                                  ...(order.discountAmount > 0
+                                    ? [{ label:"Voucher giảm giá", value: order.discountAmount, color:"#FFB347", prefix:"−" }]
+                                    : []),
+                                ].map(r => (
+                                  <div key={r.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"3px 0", borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
+                                    <span style={{ color:"#6a5a40", fontSize:10 }}>{r.label}</span>
+                                    <span style={{ color:r.color, fontSize:10, fontWeight:600 }}>{r.prefix}{fmt(r.value)}</span>
+                                  </div>
+                                ))}
+                                {/* net receive */}
+                                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:8, paddingTop:6, borderTop:"1px solid rgba(62,207,110,0.25)" }}>
+                                  <div>
+                                    <div style={{ color:"#3ecf6e", fontSize:11, fontWeight:800 }}>✓ Thực nhận từ tài xế</div>
+                                    <div style={{ color:"#6a5a40", fontSize:8, marginTop:1 }}>
+                                      Tài xế trả bạn khi lấy hàng · {order.payMethod === "wallet" ? "💙 Đã thu qua ví" : "💵 Tiền mặt"}
+                                    </div>
+                                  </div>
+                                  <div style={{ textAlign:"right" }}>
+                                    <div style={{ color:"#3ecf6e", fontSize:16, fontWeight:800 }}>{fmt(netReceive)}</div>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )
+                          })()}
 
                           <div style={{ display: "flex", gap: 7 }}>
                             {order.status === "pending" && (
