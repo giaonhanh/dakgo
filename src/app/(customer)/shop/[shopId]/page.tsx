@@ -7,6 +7,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useParams, useRouter } from "next/navigation"
 import { useCartStore } from "@/store/cartStore"
+import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ────────────────────────────────────────────────
 interface Product {
@@ -16,57 +17,22 @@ interface Product {
   desc:      string
   price:     number
   origPrice: number | null
-  emoji:     string
+  imageUrl:  string | null
   sold:      number
   hot?:      boolean
 }
 
-
-// ─── Mock data (thay bằng fetch Supabase theo shopId) ─────
-const SHOP = {
-  name:        "Bún Bò Huế Ngon",
-  category:    "Bún · Phở",
-  address:     "147 Trần Phú, Phước An",
-  rating:      4.8,
-  totalReviews:234,
-  distance:    "0.9km",
-  eta:         "15–20 phút",
-  isOpen:      true,
-  deliveryFee: 15000,
-  minOrder:    30000,
-  prepTime:    "10–15 phút",
-  coverGrad:   "linear-gradient(135deg,#1a0800 0%,#2d1200 50%,#0d0600 100%)",
-  logoEmoji:   "🍜",
-  tags:        ["Giao nhanh","Chứng nhận sạch","Mở cửa đến 21h"],
+interface ShopInfo {
+  name:         string
+  description:  string | null
+  address:      string
+  rating:       number | null
+  rating_count: number | null
+  is_open:      boolean
+  avatar_url:   string | null
+  cover_url:    string | null
+  phone:        string | null
 }
-
-const CATEGORIES = [
-  { id:"featured", label:"Nổi bật",  emoji:"⭐" },
-  { id:"bun",      label:"Bún",      emoji:"🍜" },
-  { id:"com",      label:"Cơm",      emoji:"🍱" },
-  { id:"drinks",   label:"Đồ uống",  emoji:"🥤" },
-  { id:"extra",    label:"Thêm vào", emoji:"🍡" },
-]
-
-const PRODUCTS: Product[] = [
-  // Featured
-  { id:"p1", category:"featured", name:"Bún bò đặc biệt",   desc:"Bắp bò, chả, giò heo, rau sống, ớt tươi",  price:65000, origPrice:80000, emoji:"🍜", sold:142, hot:true },
-  { id:"p2", category:"featured", name:"Combo đôi tiết kiệm",desc:"2 tô bún thường + 2 ly trà đá",              price:80000, origPrice:100000,emoji:"🎁", sold:89,  hot:false },
-  // Bún
-  { id:"p3", category:"bun", name:"Bún bò thường",      desc:"Bắp bò, bún tươi, rau sống",              price:45000, origPrice:null,  emoji:"🍜", sold:203 },
-  { id:"p4", category:"bun", name:"Bún bò đặc biệt",    desc:"Bắp bò, chả, giò heo, rau sống",          price:65000, origPrice:80000, emoji:"🍜", sold:142 },
-  { id:"p5", category:"bun", name:"Bún giò heo",        desc:"Giò heo, bún tươi, rau, nước dùng đặc biệt",price:55000,origPrice:null,  emoji:"🦴", sold:78  },
-  { id:"p6", category:"bun", name:"Bún riêu cua",       desc:"Cua đồng, đậu phụ, cà chua, mắm ruốc",    price:50000, origPrice:null,  emoji:"🦀", sold:56  },
-  // Cơm
-  { id:"p7", category:"com", name:"Cơm sườn nướng",     desc:"Sườn nướng mật ong, cơm trắng, dưa cải",  price:55000, origPrice:null,  emoji:"🍗", sold:134 },
-  { id:"p8", category:"com", name:"Cơm gà chiên giòn",  desc:"Gà chiên giòn, rau luộc, nước chấm",      price:50000, origPrice:null,  emoji:"🍳", sold:98  },
-  // Drinks
-  { id:"p9",  category:"drinks", name:"Trà đá truyền thống", desc:"Trà xanh ướp hoa lài, đá",            price:10000, origPrice:null, emoji:"🧊", sold:312 },
-  { id:"p10", category:"drinks", name:"Nước mía tươi",       desc:"Nước mía ép tươi, đá vụn, chanh",     price:15000, origPrice:null, emoji:"🥤", sold:187 },
-  // Extra
-  { id:"p11", category:"extra", name:"Chả chiên giòn",   desc:"3 miếng chả cá chiên vàng, tương ớt",    price:25000, origPrice:null, emoji:"🍡", sold:234 },
-  { id:"p12", category:"extra", name:"Huyết vịt luộc",   desc:"Huyết non, hành lá, gừng",                price:15000, origPrice:null, emoji:"🫙", sold:145 },
-]
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
@@ -127,9 +93,13 @@ function ProductCard({
         <div style={{ width:82, height:82, borderRadius:12,
           background:"rgba(255,255,255,0.05)",
           border:"1px solid rgba(255,255,255,0.08)",
+          overflow:"hidden",
           display:"flex", alignItems:"center", justifyContent:"center",
           fontSize:36 }}>
-          {product.emoji}
+          {product.imageUrl
+            ? <img src={product.imageUrl} alt={product.name}
+                style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+            : "🍽️"}
         </div>
         {discount && (
           <div style={{ position:"absolute", top:-4, left:-4,
@@ -206,16 +176,21 @@ function ProductCard({
 export default function ShopPage() {
   const router   = useRouter()
   const params   = useParams()
-  const shopId   = (params?.shopId as string) ?? "shop1"
-  const addItem      = useCartStore(s => s.addItem)
-  const clearAndAdd  = useCartStore(s => s.clearAndAdd)
-  const storeShopId  = useCartStore(s => s.shopId)
+  const shopId   = (params?.shopId as string) ?? ""
+  const supabase = createClient()
+  const addItem       = useCartStore(s => s.addItem)
+  const clearAndAdd   = useCartStore(s => s.clearAndAdd)
+  const storeShopId   = useCartStore(s => s.shopId)
   const storeShopName = useCartStore(s => s.items[0]?.shop ?? "")
-  const totalItems   = useCartStore(s => s.totalQty())
-  const totalPrice   = useCartStore(s => s.totalPrice())
+  const totalItems    = useCartStore(s => s.totalQty())
+  const totalPrice    = useCartStore(s => s.totalPrice())
 
   type PendingItem = { id:string; name:string; price:number; shop:string; shopId:string }
-  const [activeTab,     setActiveTab]     = useState("featured")
+  const [shop,          setShop]          = useState<ShopInfo | null>(null)
+  const [products,      setProducts]      = useState<Product[]>([])
+  const [categories,    setCategories]    = useState<{id:string; label:string}[]>([])
+  const [loading,       setLoading]       = useState(true)
+  const [activeTab,     setActiveTab]     = useState("")
   const [scrolled,      setScrolled]      = useState(false)
   const [toast,         setToast]         = useState("")
   const [favoured,      setFavoured]      = useState(false)
@@ -225,6 +200,48 @@ export default function ShopPage() {
   const cartBadgeRef = useRef<HTMLElement | null>(null)
   const sectionRefs  = useRef<Record<string, HTMLDivElement | null>>({})
   const tabsRef      = useRef<HTMLDivElement>(null)
+
+  // Fetch shop + products from Supabase
+  useEffect(() => {
+    if (!shopId) return
+    async function load() {
+      // Shop info
+      const { data: shopData } = await supabase
+        .from("shops")
+        .select("name,description,address,rating,rating_count,is_open,avatar_url,cover_url,phone")
+        .eq("id", shopId)
+        .single()
+      if (shopData) setShop(shopData as ShopInfo)
+
+      // Products
+      const { data: prodData } = await supabase
+        .from("products")
+        .select("id,name,description,price,category,is_available,sold_count,image_url")
+        .eq("shop_id", shopId)
+        .eq("is_available", true)
+        .order("sort_order", { ascending: true })
+
+      const mapped: Product[] = (prodData ?? []).map((p: {id:string;name:string;description:string|null;price:number;category:string|null;sold_count:number;image_url:string|null}) => ({
+        id: p.id, name: p.name, desc: p.description ?? "",
+        price: p.price, origPrice: null,
+        category: p.category ?? "Thực đơn",
+        imageUrl: p.image_url,
+        sold: p.sold_count, hot: p.sold_count > 50,
+      }))
+      setProducts(mapped)
+
+      // Derive categories from products
+      const catMap = new Map<string, string>()
+      mapped.forEach(p => { if (!catMap.has(p.category)) catMap.set(p.category, p.category) })
+      const cats = [{ id:"__all__", label:"Tất cả" }, ...Array.from(catMap.entries()).map(([id, label]) => ({ id, label }))]
+      setCategories(cats)
+      setActiveTab(cats[0]?.id ?? "")
+
+      setLoading(false)
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopId])
 
   // Scroll header detection
   useEffect(() => {
@@ -241,7 +258,7 @@ export default function ShopPage() {
 
   // Add to cart — kiểm tra conflict shop khác
   const handleAdd = useCallback((product: Product, btn: HTMLElement) => {
-    const newItem = { id: product.id, name: product.name, price: product.price, shop: SHOP.name, shopId }
+    const newItem = { id: product.id, name: product.name, price: product.price, shop: shop?.name ?? "", shopId }
     if (storeShopId && storeShopId !== shopId) {
       setConflictItem(newItem)
       return
@@ -249,7 +266,7 @@ export default function ShopPage() {
     spawnParticle(btn, cartBadgeRef.current)
     addItem(newItem)
     fireToast(`Đã thêm ${product.name}`)
-  }, [addItem, shopId, storeShopId])
+  }, [addItem, shopId, storeShopId, shop])
 
   const confirmReplace = () => {
     if (!conflictItem) return
@@ -263,13 +280,13 @@ export default function ShopPage() {
     setActiveTab(id)
     const el = sectionRefs.current[id]
     if (el && containerRef.current) {
-      const top = el.offsetTop - 120 // header + tabs height
+      const top = el.offsetTop - 120
       containerRef.current.scrollTo({ top, behavior:"smooth" })
     }
   }
 
   const productsByCategory = (catId: string) =>
-    PRODUCTS.filter(p => p.category === catId)
+    catId === "__all__" ? products : products.filter(p => p.category === catId)
 
   return (
     <>
@@ -324,9 +341,9 @@ export default function ShopPage() {
                   exit={{opacity:0,y:4}} style={{ flex:1, minWidth:0 }}>
                   <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700,
                     overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                    {SHOP.name}
+                    {shop?.name ?? ""}
                   </div>
-                  <div style={{ color:"#6a5a40", fontSize:8.5 }}>{SHOP.category}</div>
+                  <div style={{ color:"#6a5a40", fontSize:8.5 }}>{shop?.description ?? ""}</div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -361,158 +378,141 @@ export default function ShopPage() {
             paddingBottom: totalItems > 0 ? 144 : 88,
             WebkitOverflowScrolling:"touch" } as React.CSSProperties}>
 
+          {/* Loading state */}
+          {loading && (
+            <div style={{ height:200, display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <div style={{ color:"#6a5a40", fontSize:12 }}>Đang tải...</div>
+            </div>
+          )}
+
           {/* Hero */}
           <div style={{ height:200, position:"relative", overflow:"hidden",
-            background:SHOP.coverGrad }}>
-            {/* Decorative glow */}
+            background: shop?.cover_url
+              ? `url(${shop.cover_url}) center/cover`
+              : "linear-gradient(135deg,#1a0800 0%,#2d1500 50%,#0d0600 100%)" }}>
             <div style={{ position:"absolute", top:-40, right:-40, width:180, height:180,
               background:"radial-gradient(circle,rgba(255,107,0,0.2) 0%,transparent 65%)" }} />
             <div style={{ position:"absolute", bottom:-30, left:-30, width:120, height:120,
               background:"radial-gradient(circle,rgba(255,179,71,0.15) 0%,transparent 65%)" }} />
-            {/* Big emoji bg */}
-            <div style={{ position:"absolute", right:24, top:"50%",
-              transform:"translateY(-50%)", fontSize:80, opacity:.15 }}>
-              {SHOP.logoEmoji}
-            </div>
-            {/* Gradient overlay */}
+            {!shop?.cover_url && (
+              <div style={{ position:"absolute", right:24, top:"50%",
+                transform:"translateY(-50%)", fontSize:80, opacity:.15 }}>🏪</div>
+            )}
             <div style={{ position:"absolute", inset:0,
               background:"linear-gradient(to top,rgba(8,8,6,0.85) 0%,transparent 60%)" }} />
-            {/* Open badge */}
-            <div style={{ position:"absolute", top:92, right:16,
-              display:"flex", alignItems:"center", gap:5,
-              background: SHOP.isOpen
-                ? "rgba(62,207,110,0.15)" : "rgba(255,64,64,0.15)",
-              border:`1px solid ${SHOP.isOpen
-                ? "rgba(62,207,110,0.35)" : "rgba(255,64,64,0.35)"}`,
-              borderRadius:8, padding:"4px 10px",
-              backdropFilter:"blur(8px)" }}>
-              <div style={{ width:6, height:6, borderRadius:"50%",
-                background: SHOP.isOpen ? "#3ecf6e" : "#ff4040",
-                animation:"shopPulse 1.5s infinite" }} />
-              <span style={{ color: SHOP.isOpen ? "#3ecf6e" : "#ff4040",
-                fontSize:9.5, fontWeight:600 }}>
-                {SHOP.isOpen ? "Đang mở cửa" : "Đã đóng cửa"}
-              </span>
-            </div>
+            {shop && (
+              <div style={{ position:"absolute", top:92, right:16,
+                display:"flex", alignItems:"center", gap:5,
+                background: shop.is_open ? "rgba(62,207,110,0.15)" : "rgba(255,64,64,0.15)",
+                border:`1px solid ${shop.is_open ? "rgba(62,207,110,0.35)" : "rgba(255,64,64,0.35)"}`,
+                borderRadius:8, padding:"4px 10px", backdropFilter:"blur(8px)" }}>
+                <div style={{ width:6, height:6, borderRadius:"50%",
+                  background: shop.is_open ? "#3ecf6e" : "#ff4040",
+                  animation:"shopPulse 1.5s infinite" }} />
+                <span style={{ color: shop.is_open ? "#3ecf6e" : "#ff4040", fontSize:9.5, fontWeight:600 }}>
+                  {shop.is_open ? "Đang mở cửa" : "Đã đóng cửa"}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Shop info card */}
-          <div style={{ padding:"0 14px" }}>
-            <div style={{ background:"rgba(255,255,255,0.04)",
-              border:"1px solid rgba(255,255,255,0.08)",
-              borderRadius:16, padding:"14px", marginTop:-24,
-              position:"relative", zIndex:10 }}>
-
-              {/* Name + category */}
-              <div style={{ marginBottom:10 }}>
-                <div style={{ color:"#f8f0e0", fontSize:17, fontWeight:800,
-                  marginBottom:4 }}>
-                  {SHOP.name}
+          {shop && (
+            <div style={{ padding:"0 14px" }}>
+              <div style={{ background:"rgba(255,255,255,0.04)",
+                border:"1px solid rgba(255,255,255,0.08)",
+                borderRadius:16, padding:"14px", marginTop:-24,
+                position:"relative", zIndex:10 }}>
+                <div style={{ marginBottom:10 }}>
+                  <div style={{ color:"#f8f0e0", fontSize:17, fontWeight:800, marginBottom:4 }}>
+                    {shop.name}
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+                    {shop.description && (
+                      <span style={{ color:"#6a5a40", fontSize:9 }}>{shop.description}</span>
+                    )}
+                    <span style={{ color:"#6a5a40", fontSize:8.5 }}>· {shop.address.split(",")[0]}</span>
+                  </div>
                 </div>
-                <div style={{ display:"flex", alignItems:"center", gap:6,
-                  flexWrap:"wrap" }}>
-                  <span style={{ background:"rgba(255,107,0,0.1)",
-                    border:"1px solid rgba(255,107,0,0.2)",
-                    color:"#FF8C00", fontSize:9, fontWeight:600,
-                    padding:"2px 8px", borderRadius:5 }}>
-                    {SHOP.category}
-                  </span>
-                  {SHOP.tags.map(t => (
-                    <span key={t} style={{ color:"#6a5a40", fontSize:8.5 }}>· {t}</span>
+                <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+                  {[
+                    { icon:"⭐", val: shop.rating?.toFixed(1) ?? "Mới", sub:`(${shop.rating_count ?? 0} đánh giá)` },
+                    { icon:"📍", val: shop.address.split(",").slice(-1)[0]?.trim() ?? "Phước An", sub:"địa chỉ" },
+                    { icon:"⏱️", val:"15–25 phút", sub:"giao hàng" },
+                  ].map(s => (
+                    <div key={s.icon} style={{ flex:1, textAlign:"center",
+                      background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)",
+                      borderRadius:10, padding:"7px 4px" }}>
+                      <div style={{ fontSize:15, marginBottom:2 }}>{s.icon}</div>
+                      <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:700 }}>{s.val}</div>
+                      <div style={{ color:"#6a5a40", fontSize:8 }}>{s.sub}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:"flex", gap:8 }}>
+                  {[
+                    { label:"Phí ship", val:fmt(15000), color:"#FF8C00" },
+                    { label:"Đơn tối thiểu", val:fmt(30000), color:"#b0956a" },
+                    { label:"Chuẩn bị", val:"10–15 phút", color:"#b0956a" },
+                  ].map(d => (
+                    <div key={d.label} style={{ flex:1, textAlign:"center" }}>
+                      <div style={{ color:d.color, fontSize:11, fontWeight:700 }}>{d.val}</div>
+                      <div style={{ color:"#6a5a40", fontSize:8 }}>{d.label}</div>
+                    </div>
                   ))}
                 </div>
               </div>
-
-              {/* Stats row */}
-              <div style={{ display:"flex", gap:8, marginBottom:12 }}>
-                {[
-                  { icon:"⭐", val:`${SHOP.rating}`, sub:`(${SHOP.totalReviews})` },
-                  { icon:"📍", val:SHOP.distance,    sub:"từ bạn" },
-                  { icon:"⏱️", val:SHOP.eta,         sub:"giao hàng" },
-                ].map(s => (
-                  <div key={s.icon} style={{ flex:1, textAlign:"center",
-                    background:"rgba(255,255,255,0.03)",
-                    border:"1px solid rgba(255,255,255,0.06)",
-                    borderRadius:10, padding:"7px 4px" }}>
-                    <div style={{ fontSize:15, marginBottom:2 }}>{s.icon}</div>
-                    <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:700 }}>{s.val}</div>
-                    <div style={{ color:"#6a5a40", fontSize:8 }}>{s.sub}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Delivery info */}
-              <div style={{ display:"flex", gap:8 }}>
-                {[
-                  { label:"Phí ship", val:fmt(SHOP.deliveryFee), color:"#FF8C00" },
-                  { label:"Đơn tối thiểu", val:fmt(SHOP.minOrder), color:"#b0956a" },
-                  { label:"Chuẩn bị", val:SHOP.prepTime, color:"#b0956a" },
-                ].map(d => (
-                  <div key={d.label} style={{ flex:1, textAlign:"center" }}>
-                    <div style={{ color:d.color, fontSize:11, fontWeight:700 }}>{d.val}</div>
-                    <div style={{ color:"#6a5a40", fontSize:8 }}>{d.label}</div>
-                  </div>
-                ))}
-              </div>
             </div>
-          </div>
+          )}
 
           {/* ── Category tabs (sticky) ── */}
-          <div ref={tabsRef} style={{ position:"sticky", top:72, zIndex:30,
-            background:"rgba(8,8,6,0.95)", backdropFilter:"blur(12px)",
-            borderBottom:"1px solid rgba(255,255,255,0.06)",
-            padding:"10px 14px 10px", marginTop:12 }}>
-            <div style={{ display:"flex", gap:6, overflowX:"auto",
-              scrollbarWidth:"none" } as React.CSSProperties}>
-              {CATEGORIES.map(cat => {
-                const active = activeTab === cat.id
-                const catUnread = productsByCategory(cat.id).length
-                return (
-                  <button key={cat.id}
-                    onClick={() => scrollToSection(cat.id)}
-                    style={{ display:"flex", alignItems:"center", gap:4,
-                      flexShrink:0, padding:"5px 12px", borderRadius:20,
-                      border:"none",
-                      background: active
-                        ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.04)",
-                      outline:`${active ? 1.5 : 1}px solid ${active
-                        ? "rgba(255,107,0,0.4)" : "rgba(255,255,255,0.08)"}`,
-                      color: active ? "#FF8C00" : "#6a5a40",
-                      fontSize:10, fontWeight: active ? 600 : 400,
-                      cursor:"pointer", fontFamily:"Lexend",
-                      transition:"all .2s" }}>
-                    <span>{cat.emoji}</span>
-                    <span>{cat.label}</span>
-                    <span style={{ color:"#6a5a40", fontSize:8.5 }}>({catUnread})</span>
-                  </button>
-                )
-              })}
+          {categories.length > 0 && (
+            <div ref={tabsRef} style={{ position:"sticky", top:72, zIndex:30,
+              background:"rgba(8,8,6,0.95)", backdropFilter:"blur(12px)",
+              borderBottom:"1px solid rgba(255,255,255,0.06)",
+              padding:"10px 14px 10px", marginTop:12 }}>
+              <div style={{ display:"flex", gap:6, overflowX:"auto",
+                scrollbarWidth:"none" } as React.CSSProperties}>
+                {categories.map(cat => {
+                  const active = activeTab === cat.id
+                  const cnt = productsByCategory(cat.id).length
+                  return (
+                    <button key={cat.id}
+                      onClick={() => scrollToSection(cat.id)}
+                      style={{ display:"flex", alignItems:"center", gap:4,
+                        flexShrink:0, padding:"5px 12px", borderRadius:20, border:"none",
+                        background: active ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.04)",
+                        outline:`${active ? 1.5 : 1}px solid ${active ? "rgba(255,107,0,0.4)" : "rgba(255,255,255,0.08)"}`,
+                        color: active ? "#FF8C00" : "#6a5a40",
+                        fontSize:10, fontWeight: active ? 600 : 400,
+                        cursor:"pointer", fontFamily:"Lexend", transition:"all .2s" }}>
+                      <span>{cat.label}</span>
+                      <span style={{ color:"#6a5a40", fontSize:8.5 }}>({cnt})</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* ── Product sections ── */}
           <div style={{ padding:"4px 14px 0" }}>
-            {CATEGORIES.map(cat => {
+            {products.length === 0 && !loading && (
+              <div style={{ textAlign:"center", padding:"40px 0", color:"#6a5a40", fontSize:12 }}>
+                Quán chưa có sản phẩm nào
+              </div>
+            )}
+            {categories.map(cat => {
               const items = productsByCategory(cat.id)
               if (!items.length) return null
               return (
                 <div key={cat.id}
                   ref={el => { sectionRefs.current[cat.id] = el }}>
-                  {/* Section header */}
-                  <div style={{ display:"flex", alignItems:"center", gap:8,
-                    padding:"16px 0 4px" }}>
-                    <span style={{ fontSize:16 }}>{cat.emoji}</span>
-                    <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700 }}>
-                      {cat.label}
-                    </div>
-                    <div style={{ flex:1, height:1,
-                      background:"rgba(255,255,255,0.06)" }} />
-                    <span style={{ color:"#6a5a40", fontSize:9 }}>
-                      {items.length} món
-                    </span>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, padding:"16px 0 4px" }}>
+                    <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700 }}>{cat.label}</div>
+                    <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.06)" }} />
+                    <span style={{ color:"#6a5a40", fontSize:9 }}>{items.length} món</span>
                   </div>
-
-                  {/* Products */}
                   {items.map(product => (
                     <ProductCard
                       key={product.id}

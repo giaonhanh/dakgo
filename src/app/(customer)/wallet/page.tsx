@@ -1,10 +1,9 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-
-const BALANCE     = 185000
-const USER_EARNED = 1840
+import { createClient } from "@/lib/supabase/client"
 
 const TIERS_DATA = [
   { id:"bronze",   name:"Đồng",     icon:"🥉", min:0,     max:999      },
@@ -12,13 +11,32 @@ const TIERS_DATA = [
   { id:"gold",     name:"Vàng",     icon:"🥇", min:5000,  max:19999    },
   { id:"platinum", name:"Bạch Kim", icon:"💎", min:20000, max:Infinity },
 ]
-const CUR_IDX  = Math.max(0, TIERS_DATA.findIndex(t => USER_EARNED >= t.min && USER_EARNED <= t.max))
-const CUR_TIER = TIERS_DATA[CUR_IDX]
-const NXT_TIER = TIERS_DATA[CUR_IDX + 1] ?? null
-const TIER_PCT = NXT_TIER ? Math.round((USER_EARNED - CUR_TIER.min) / (NXT_TIER.min - CUR_TIER.min) * 100) : 100
 
 export default function WalletPage() {
   const router = useRouter()
+  const supabase = createClient()
+  const [balance,     setBalance]     = useState(0)
+  const [userEarned,  setUserEarned]  = useState(0)
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: wallet } = await supabase
+        .from("wallets").select("balance").eq("user_id", user.id).eq("type", "customer").maybeSingle()
+      if (wallet) setBalance(wallet.balance)
+      const { data: pts } = await supabase
+        .from("loyalty_points").select("total_points").eq("user_id", user.id).maybeSingle()
+      if (pts) setUserEarned(pts.total_points)
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const CUR_IDX  = Math.max(0, TIERS_DATA.findIndex(t => userEarned >= t.min && userEarned <= t.max))
+  const CUR_TIER = TIERS_DATA[CUR_IDX]
+  const NXT_TIER = TIERS_DATA[CUR_IDX + 1] ?? null
+  const TIER_PCT = NXT_TIER ? Math.round((userEarned - CUR_TIER.min) / (NXT_TIER.min - CUR_TIER.min) * 100) : 100
 
   return (
     <>
@@ -74,12 +92,12 @@ export default function WalletPage() {
                 <span style={{ fontSize:36, fontWeight:800, lineHeight:1,
                   background:"linear-gradient(135deg,#b464ff,#d484ff,#e8a4ff)",
                   WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text" }}>
-                  {BALANCE.toLocaleString("vi-VN")}
+                  {balance.toLocaleString("vi-VN")}
                 </span>
                 <span style={{ color:"#b464ff", fontSize:17, fontWeight:600 }}>xu</span>
               </div>
               <div style={{ color:"rgba(180,100,255,0.4)", fontSize:9, marginBottom:14 }}>
-                = {BALANCE.toLocaleString("vi-VN")}đ · dùng thanh toán đơn hàng
+                = {balance.toLocaleString("vi-VN")}đ · dùng thanh toán đơn hàng
               </div>
 
               <div style={{ display:"flex", alignItems:"center", gap:7 }}>
@@ -127,7 +145,7 @@ export default function WalletPage() {
                 <span style={{ fontSize:36, fontWeight:800, lineHeight:1,
                   background:"linear-gradient(135deg,#F5C542,#FFB347,#FF8C00)",
                   WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text" }}>
-                  {USER_EARNED.toLocaleString("vi-VN")}
+                  {userEarned.toLocaleString("vi-VN")}
                 </span>
                 <span style={{ color:"#F5C542", fontSize:17, fontWeight:600 }}>điểm</span>
               </div>
@@ -140,7 +158,7 @@ export default function WalletPage() {
                 <span style={{ color:"#F5C542", fontSize:10, fontWeight:700 }}>{CUR_TIER.name} Member</span>
                 {NXT_TIER && (
                   <span style={{ color:"rgba(245,197,66,0.4)", fontSize:8.5, marginLeft:2 }}>
-                    · còn {(NXT_TIER.min - USER_EARNED).toLocaleString()} điểm → {NXT_TIER.name}
+                    · còn {(NXT_TIER.min - userEarned).toLocaleString()} điểm → {NXT_TIER.name}
                   </span>
                 )}
                 <span style={{ marginLeft:"auto", color:"rgba(245,197,66,0.45)", fontSize:9 }}>

@@ -1,13 +1,14 @@
-﻿"use client"
+"use client"
 
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
 import { useCartStore } from "@/store/cartStore"
+import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ───────────────────────────────────────────────
-type Status = "delivering" | "preparing" | "pending" | "accepted" | "completed" | "cancelled"
+type Status = "delivering" | "preparing" | "pending" | "accepted" | "ready" | "completed" | "cancelled"
 
 interface Topping { name: string; price: number }
 interface Item {
@@ -15,7 +16,7 @@ interface Item {
   size?: string; sugar?: string; ice?: string; toppings?: Topping[]
 }
 interface Order {
-  id: string; shopName: string; shopEmoji: string; shopColor: string
+  id: string; shopId: string; shopName: string; shopEmoji: string; shopColor: string
   status: Status; items: Item[]
   subtotal: number; deliveryFee: number; discount: number
   nightFee?: number; weatherFee?: string
@@ -24,74 +25,7 @@ interface Order {
   payMethod: string; rating?: number; cancelReason?: string
 }
 
-// ─── Data ────────────────────────────────────────────────
-const ORDERS: Order[] = [
-  {
-    id: "GN2851", shopName: "Bún Bò Huế Ngon", shopEmoji: "🍜", shopColor: "#FF8C00",
-    status: "delivering",
-    items: [
-      { emoji: "🍜", name: "Bún bò đặc biệt", qty: 2, price: 45000 },
-      { emoji: "🌭", name: "Chả chiên giòn",  qty: 3, price: 15000 },
-    ],
-    subtotal: 135000, deliveryFee: 15000, discount: 0,
-    nightFee: 5000, weatherFee: "Mưa lớn",
-    createdAt: "19/05 · 22:05", address: "147 Trần Phú, Phước An",
-    note: "Để trước cổng, gọi trước 2 phút",
-    driver: { name: "Trần Văn Bình", plate: "47B-22341", phone: "0901234567", rating: 4.9, eta: 3 },
-    payMethod: "Tiền mặt",
-  },
-  {
-    id: "GN2849", shopName: "Trà Sữa Ding Tea", shopEmoji: "🧋", shopColor: "#4a8ff5",
-    status: "preparing",
-    items: [
-      {
-        emoji: "🧋", name: "Trà sữa trân châu", qty: 2, price: 35000,
-        size: "Size L", sugar: "70% đường", ice: "Ít đá",
-        toppings: [{ name: "Thạch cà phê", price: 5000 }, { name: "Pudding trứng", price: 8000 }],
-      },
-      {
-        emoji: "🍵", name: "Matcha đá xay", qty: 1, price: 38000,
-        size: "Size M", sugar: "100% đường", ice: "Bình thường",
-      },
-    ],
-    subtotal: 121000, deliveryFee: 8000, discount: 0, nightFee: 5000,
-    createdAt: "19/05 · 21:50", address: "147 Trần Phú, Phước An",
-    payMethod: "Ví GiaoNhanh",
-  },
-  {
-    id: "GN2840", shopName: "Cơm Nhà Bếp", shopEmoji: "🍱", shopColor: "#3ecf6e",
-    status: "completed",
-    items: [
-      { emoji: "🍱", name: "Cơm sườn trứng", qty: 1, price: 40000 },
-      { emoji: "🍲", name: "Canh chua cá",   qty: 1, price: 25000 },
-    ],
-    subtotal: 65000, deliveryFee: 8000, discount: 0,
-    createdAt: "19/05 · 12:05", address: "147 Trần Phú, Phước An",
-    driver: { name: "Nguyễn Thị Lan", plate: "47B-33412", phone: "0912345678", rating: 4.8, eta: 0 },
-    payMethod: "VietQR", rating: 5,
-  },
-  {
-    id: "GN2835", shopName: "Gà Vàng Phước An", shopEmoji: "🍗", shopColor: "#FFB347",
-    status: "completed",
-    items: [
-      { emoji: "🍗", name: "Gà rán giòn cay 3 miếng", qty: 1, price: 55000 },
-      { emoji: "🍟", name: "Khoai tây chiên",          qty: 1, price: 20000 },
-    ],
-    subtotal: 75000, deliveryFee: 0, discount: 10000,
-    createdAt: "12/05 · 19:42", address: "147 Trần Phú, Phước An",
-    driver: { name: "Lê Văn Dũng", plate: "47B-44512", phone: "0923456789", rating: 4.7, eta: 0 },
-    payMethod: "Tiền mặt",
-  },
-  {
-    id: "GN2820", shopName: "Burger House PA", shopEmoji: "🍔", shopColor: "#ff6060",
-    status: "cancelled",
-    items: [{ emoji: "🍔", name: "Burger phô mai đặc biệt", qty: 1, price: 55000 }],
-    subtotal: 55000, deliveryFee: 8000, discount: 0,
-    createdAt: "11/05 · 14:20", address: "147 Trần Phú, Phước An",
-    payMethod: "Tiền mặt", cancelReason: "Tài xế đến lâu quá",
-  },
-]
-
+// ─── UI Config (không phải data) ────────────────────────
 const TABS = [
   { key: "all",       label: "Hôm nay"     },
   { key: "active",    label: "Đang xử lý"  },
@@ -110,6 +44,7 @@ const STATUS_CFG: Record<Status, { label: string; c: string; bg: string; bd: str
   preparing:  { label: "Đang chuẩn bị", c: "#4a8ff5", bg: "rgba(74,143,245,0.12)",  bd: "rgba(74,143,245,0.3)",  dot: true  },
   accepted:   { label: "Đã xác nhận",   c: "#3ecf6e", bg: "rgba(62,207,110,0.10)",  bd: "rgba(62,207,110,0.28)", dot: true  },
   pending:    { label: "Chờ xác nhận",  c: "#b464ff", bg: "rgba(180,100,255,0.12)", bd: "rgba(180,100,255,0.3)", dot: false },
+  ready:      { label: "Sẵn sàng giao", c: "#FFB347", bg: "rgba(255,179,71,0.12)",  bd: "rgba(255,179,71,0.3)",  dot: true  },
   completed:  { label: "Hoàn thành",    c: "#3ecf6e", bg: "rgba(62,207,110,0.08)",  bd: "rgba(62,207,110,0.25)", dot: false },
   cancelled:  { label: "Đã hủy",        c: "#ff4040", bg: "rgba(255,64,64,0.08)",   bd: "rgba(255,64,64,0.22)",  dot: false },
 }
@@ -117,6 +52,46 @@ const STATUS_CFG: Record<Status, { label: string; c: string; bg: string; bd: str
 // ─── Helpers ─────────────────────────────────────────────
 const calcTotal = (o: Order) =>
   o.subtotal + o.deliveryFee - o.discount + (o.nightFee ?? 0) + (o.weatherFee ? 8000 : 0)
+
+const SHOP_COLORS = ["#FF8C00","#4a8ff5","#3ecf6e","#FFB347","#b464ff","#ff6060"]
+function shopColor(idx: number) { return SHOP_COLORS[idx % SHOP_COLORS.length] }
+
+function categoryToEmoji(cat: string | null): string {
+  if (!cat) return "🍽️"
+  const c = cat.toLowerCase()
+  if (c.includes("bun") || c.includes("phở") || c.includes("mì")) return "🍜"
+  if (c.includes("trà") || c.includes("tra") || c.includes("drink")) return "🧋"
+  if (c.includes("gà") || c.includes("ga")) return "🍗"
+  if (c.includes("cơm") || c.includes("com")) return "🍱"
+  if (c.includes("burger") || c.includes("fast")) return "🍔"
+  if (c.includes("cafe") || c.includes("cà phê")) return "☕"
+  if (c.includes("bánh") || c.includes("cake")) return "🍰"
+  if (c.includes("pizza")) return "🍕"
+  return "🍽️"
+}
+
+function fmtPayMethod(pm: string): string {
+  const map: Record<string, string> = {
+    cash: "Tiền mặt", vietqr: "VietQR",
+    momo: "MoMo", zalopay: "ZaloPay", wallet: "Ví GiaoNhanh",
+  }
+  return map[pm] ?? pm
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso)
+  return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")} · ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`
+}
+
+function fmtDateKey(iso: string): string {
+  const d = new Date(iso)
+  return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`
+}
+
+function mapStatus(s: string): Status {
+  if (s === "delivered") return "completed"
+  return s as Status
+}
 
 // ─── Sub-components ──────────────────────────────────────
 function StatusBadge({ status }: { status: Status }) {
@@ -160,14 +135,17 @@ function InfoBox({ rows }: { rows: { icon: string; key: string; val: string }[] 
   )
 }
 
-const ADMIN_PHONE = "0901999888" // SĐT quản trị viên
+const ADMIN_PHONE = "0901999888"
 
 // ─── Main ─────────────────────────────────────────────────
 export default function OrdersPage() {
+  const supabase = createClient()
   const router = useRouter()
   const { addItem, clearCart } = useCartStore()
+  const [orders,       setOrders]       = useState<Order[]>([])
+  const [loading,      setLoading]      = useState(true)
   const [activeTab,    setActiveTab]    = useState("all")
-  const [expanded,     setExpanded]     = useState<string | null>("GN2851")
+  const [expanded,     setExpanded]     = useState<string | null>(null)
   const [showCancel,   setShowCancel]   = useState<string | null>(null)
   const [showReview,   setShowReview]   = useState<string | null>(null)
   const [cancelRsn,    setCancelRsn]    = useState("")
@@ -178,20 +156,110 @@ export default function OrdersPage() {
 
   const fireToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2400) }
 
-  // ── Today filter: đơn hôm nay + đơn đang active bất kể ngày ────────────
+  // ── Fetch orders from Supabase ──────────────────────────
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoading(false); return }
+
+      const { data: rows } = await supabase
+        .from("orders")
+        .select(`
+          id, status, delivery_address, note, subtotal, delivery_fee, discount_amount,
+          payment_method, cancel_reason, created_at, driver_id, shop_id,
+          shops(id, name, category),
+          order_items(id, name, price, quantity, note),
+          drivers(id, license_plate, rating_avg)
+        `)
+        .eq("customer_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50)
+
+      if (!rows) { setLoading(false); return }
+
+      // Fetch driver profiles for orders that have a driver
+      const driverIds = rows
+        .filter(o => o.driver_id)
+        .map(o => o.driver_id as string)
+      let driverProfiles: { id: string; full_name: string | null; phone: string }[] = []
+      if (driverIds.length > 0) {
+        const { data: dp } = await supabase
+          .from("profiles")
+          .select("id, full_name, phone")
+          .in("id", driverIds)
+        driverProfiles = (dp ?? []) as typeof driverProfiles
+      }
+
+      // Fetch reviews for completed orders
+      const completedIds = rows
+        .filter(o => o.status === "delivered" || o.status === "completed")
+        .map(o => o.id)
+      let reviewMap: Record<string, number> = {}
+      if (completedIds.length > 0) {
+        const { data: rv } = await supabase
+          .from("reviews")
+          .select("order_id, food_rating")
+          .in("order_id", completedIds)
+        ;(rv ?? []).forEach((r: { order_id: string; food_rating: number | null }) => {
+          if (r.food_rating) reviewMap[r.order_id] = r.food_rating
+        })
+      }
+
+      const mapped: Order[] = rows.map((o, idx) => {
+        const shop = Array.isArray(o.shops) ? o.shops[0] : o.shops
+        const driverRow = Array.isArray(o.drivers) ? o.drivers[0] : o.drivers
+        const driverProfile = driverProfiles.find(p => p.id === o.driver_id)
+        const items = (o.order_items ?? []) as { id: string; name: string; price: number; quantity: number; note: string | null }[]
+
+        return {
+          id: o.id,
+          shopId: o.shop_id ?? "",
+          shopName: shop?.name ?? "Cửa hàng",
+          shopEmoji: categoryToEmoji(shop?.category ?? null),
+          shopColor: shopColor(idx),
+          status: mapStatus(o.status),
+          items: items.map(i => ({
+            emoji: "🍽️",
+            name: i.name,
+            qty: i.quantity,
+            price: i.price,
+          })),
+          subtotal: o.subtotal,
+          deliveryFee: o.delivery_fee,
+          discount: o.discount_amount ?? 0,
+          createdAt: fmtDate(o.created_at),
+          address: o.delivery_address,
+          note: o.note ?? undefined,
+          driver: driverRow ? {
+            name: driverProfile?.full_name ?? "Tài xế",
+            plate: driverRow.license_plate ?? "",
+            phone: driverProfile?.phone ?? "",
+            rating: Number(driverRow.rating_avg ?? 5),
+            eta: 0,
+          } : undefined,
+          payMethod: fmtPayMethod(o.payment_method),
+          rating: reviewMap[o.id] ?? undefined,
+          cancelReason: o.cancel_reason ?? undefined,
+        }
+      })
+
+      setOrders(mapped)
+      setLoading(false)
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Today filter ────────────────────────────────────────
   const TODAY_STR = (() => {
     const d = new Date()
     return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`
   })()
-  const ACTIVE_ST: Status[] = ["delivering","preparing","pending","accepted"]
-  const todayOrders = ORDERS.filter(o =>
-    ACTIVE_ST.includes(o.status) || o.createdAt.startsWith(TODAY_STR)
-  )
-  const historyOrders = ORDERS.filter(o =>
-    !ACTIVE_ST.includes(o.status) && !o.createdAt.startsWith(TODAY_STR)
-  )
+  const ACTIVE_ST: Status[] = ["delivering","preparing","pending","accepted","ready"]
+  const todayOrders   = orders.filter(o => ACTIVE_ST.includes(o.status) || o.createdAt.startsWith(TODAY_STR))
+  const historyOrders = orders.filter(o => !ACTIVE_ST.includes(o.status) && !o.createdAt.startsWith(TODAY_STR))
 
-  // ── Swipe navigation: phải→trang chủ, trái→giỏ hàng ───────────────────
+  // ── Swipe navigation ────────────────────────────────────
   const rootRef = useRef<HTMLDivElement>(null)
   const swipeX  = useRef(0)
   const swipeY  = useRef(0)
@@ -219,12 +287,9 @@ export default function OrdersPage() {
     }
   }, [router])
 
-  // Đơn hàng đang mở cancel sheet
-  const cancelOrder = ORDERS.find(o => o.id === showCancel)
-  // Chỉ "pending" mới được tự huỷ — "accepted" trở đi chỉ Admin được huỷ
-  const canSelfCancel = cancelOrder?.status === "pending"
-  // Nếu dùng ví GiaoNhanh → sẽ được hoàn tiền khi huỷ
-  const willRefundWallet = cancelOrder?.payMethod === "wallet" || cancelOrder?.payMethod === "Xu Giao Nhanh"
+  const cancelOrder    = orders.find(o => o.id === showCancel)
+  const canSelfCancel  = cancelOrder?.status === "pending"
+  const willRefundWallet = cancelOrder?.payMethod === "Ví GiaoNhanh"
 
   const handleConfirmCancel = () => {
     if (!cancelRsn) return
@@ -244,20 +309,17 @@ export default function OrdersPage() {
         name: item.name,
         price: item.price,
         shop: order.shopName,
-        shopId: order.shopName.toLowerCase().replace(/\s+/g, "-"), // dùng slug tạm cho đến khi có shopId thật từ DB
+        shopId: order.shopId,
       })
     })
     fireToast("Đã thêm vào giỏ hàng!")
     setTimeout(() => router.push("/cart"), 1200)
   }
 
-  const filtered = ORDERS.filter(o => {
-    // Tab lịch sử: đơn cũ hơn hôm nay, không còn active
+  const filtered = orders.filter(o => {
     if (activeTab === "history")
       return !ACTIVE_ST.includes(o.status) && !o.createdAt.startsWith(TODAY_STR)
-    // Tab đã hủy: hiện tất cả đơn hủy (không giới hạn ngày)
     if (activeTab === "cancelled") return o.status === "cancelled"
-    // Các tab còn lại chỉ hiện đơn hôm nay + active
     const visibleToday = ACTIVE_ST.includes(o.status) || o.createdAt.startsWith(TODAY_STR)
     if (!visibleToday) return false
     if (activeTab === "all")       return true
@@ -271,7 +333,7 @@ export default function OrdersPage() {
     if (k === "all")       return todayOrders.length
     if (k === "active")    return todayOrders.filter(o => ACTIVE_ST.includes(o.status)).length
     if (k === "completed") return todayOrders.filter(o => o.status === "completed").length
-    if (k === "cancelled") return ORDERS.filter(o => o.status === "cancelled").length
+    if (k === "cancelled") return orders.filter(o => o.status === "cancelled").length
     return 0
   }
 
@@ -318,11 +380,10 @@ export default function OrdersPage() {
               <div style={{ width: 36, height: 4, background: "rgba(255,255,255,0.12)", borderRadius: 2, margin: "0 auto 18px" }} />
 
               {canSelfCancel ? (
-                /* ── Khách tự huỷ (status = pending) ── */
                 <>
-                  <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Hủy đơn #{showCancel}</div>
-
-                  {/* Thông tin hoàn tiền */}
+                  <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+                    Hủy đơn #{showCancel?.slice(0,8).toUpperCase()}
+                  </div>
                   <div style={{ background: willRefundWallet ? "rgba(62,207,110,0.07)" : "rgba(255,255,255,0.03)",
                     border: `1px solid ${willRefundWallet ? "rgba(62,207,110,0.2)" : "rgba(255,255,255,0.06)"}`,
                     borderRadius: 10, padding: "9px 12px", marginBottom: 14,
@@ -339,7 +400,6 @@ export default function OrdersPage() {
                       </div>
                     </div>
                   </div>
-
                   <div style={{ color: "#b0956a", fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 9 }}>Lý do hủy</div>
                   {CANCEL_REASONS.map(r => (
                     <div key={r} onClick={() => setCancelRsn(r)}
@@ -365,32 +425,27 @@ export default function OrdersPage() {
                   </button>
                 </>
               ) : (
-                /* ── Đã quán xác nhận — chỉ Admin được huỷ ── */
                 <>
                   <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Không thể tự hủy đơn</div>
                   <div style={{ background: "rgba(255,64,64,0.07)", border: "1px solid rgba(255,64,64,0.2)",
                     borderRadius: 11, padding: "12px 13px", marginBottom: 16 }}>
                     <div style={{ color: "#ff6060", fontSize: 11, fontWeight: 600, marginBottom: 4 }}>
-                      ⚠️ Quán đã xác nhận đơn #{showCancel}
+                      ⚠️ Quán đã xác nhận đơn #{showCancel?.slice(0,8).toUpperCase()}
                     </div>
                     <div style={{ color: "#6a5a40", fontSize: 9.5, lineHeight: 1.6 }}>
                       Sau khi quán xác nhận, chỉ quản trị viên mới có quyền hủy đơn.
-                      Vui lòng liên hệ admin để được hỗ trợ.
                     </div>
                   </div>
-
-                  {/* Thông tin hoàn tiền nếu Admin huỷ */}
                   <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
                     borderRadius: 10, padding: "9px 12px", marginBottom: 16,
                     display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 14 }}>ℹ️</span>
                     <div style={{ color: "#6a5a40", fontSize: 9, lineHeight: 1.6 }}>
                       {willRefundWallet
-                        ? "Nếu admin chấp thuận huỷ, tiền sẽ được hoàn về ví GiaoNhanh của bạn."
-                        : "Đơn tiền mặt: nếu admin chấp thuận huỷ, chưa có giao dịch nào phát sinh."}
+                        ? "Nếu admin chấp thuận huỷ, tiền sẽ được hoàn về ví GiaoNhanh."
+                        : "Đơn tiền mặt: nếu admin chấp thuận huỷ, chưa có giao dịch phát sinh."}
                     </div>
                   </div>
-
                   <a href={`tel:${ADMIN_PHONE}`}
                     style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                       width: "100%", height: 50, borderRadius: 12, textDecoration: "none",
@@ -428,7 +483,9 @@ export default function OrdersPage() {
                 background: "#0e0c09", border: "1px solid rgba(255,107,0,0.15)",
                 borderRadius: "20px 20px 0 0", padding: "20px 18px 36px" }}>
               <div style={{ width: 36, height: 4, background: "rgba(255,255,255,0.12)", borderRadius: 2, margin: "0 auto 18px" }} />
-              <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Đánh giá đơn #{showReview}</div>
+              <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700, marginBottom: 14 }}>
+                Đánh giá đơn #{showReview?.slice(0,8).toUpperCase()}
+              </div>
               {([
                 { label: "🍽️ Chất lượng món",  star: foodStar,   set: setFoodStar   },
                 { label: "🚵 Tài xế giao hàng", star: driverStar, set: setDriverStar },
@@ -474,9 +531,7 @@ export default function OrdersPage() {
         )}
       </AnimatePresence>
 
-      {/* ── ROOT — zIndex 60 để che FloatingBottomMenu (z-50) của layout ── */}
-      <div
-        ref={rootRef}
+      <div ref={rootRef}
         style={{ position: "fixed", inset: 0, background: "#080806", zIndex: 60,
           display: "flex", flexDirection: "column", fontFamily: "'Lexend',sans-serif" }}>
 
@@ -494,8 +549,8 @@ export default function OrdersPage() {
             <div style={{ flex: 1 }}>
               <div style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 700 }}>Đơn hàng của tôi</div>
               <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>
-              {todayOrders.length} đơn hôm nay{historyOrders.length > 0 ? ` · ${historyOrders.length} trong lịch sử` : ""}
-            </div>
+                {loading ? "Đang tải..." : `${todayOrders.length} đơn hôm nay${historyOrders.length > 0 ? ` · ${historyOrders.length} trong lịch sử` : ""}`}
+              </div>
             </div>
           </div>
 
@@ -527,7 +582,12 @@ export default function OrdersPage() {
         {/* List */}
         <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px 88px",
           WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
-          {filtered.length === 0 ? (
+
+          {loading ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200 }}>
+              <div style={{ color: "#6a5a40", fontSize: 12 }}>Đang tải đơn hàng...</div>
+            </div>
+          ) : filtered.length === 0 ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 200, gap: 10 }}>
               <span style={{ fontSize: 40 }}>{activeTab === "history" ? "📋" : "😭"}</span>
               <div style={{ color: "#6a5a40", fontSize: 12 }}>
@@ -547,7 +607,7 @@ export default function OrdersPage() {
               const cfg        = STATUS_CFG[order.status]
               const isOpen     = expanded === order.id
               const total      = calcTotal(order)
-              const isActive   = ["delivering","preparing","pending"].includes(order.status)
+              const isActive   = ["delivering","preparing","pending","ready"].includes(order.status)
               const isCompleted  = order.status === "completed"
               const isCancelled  = order.status === "cancelled"
               const itemPreview  = order.items.map(i => `${i.emoji} ${i.name} ×${i.qty}`).join(" · ")
@@ -562,11 +622,10 @@ export default function OrdersPage() {
                     border: `1px solid ${isActive ? cfg.bd : "rgba(255,255,255,0.08)"}`,
                     borderRadius: 16, overflow: "hidden" }}>
 
-                    {/* ── Card header ── */}
+                    {/* Card header */}
                     <div onClick={() => setExpanded(p => p === order.id ? null : order.id)}
                       style={{ padding: "12px 13px", cursor: "pointer" }}>
 
-                      {/* Shop row */}
                       <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
                         <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                           background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)",
@@ -578,19 +637,19 @@ export default function OrdersPage() {
                             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {order.shopName}
                           </div>
-                          <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 1 }}>#{order.id} · {order.createdAt}</div>
+                          <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 1 }}>
+                            #{order.id.slice(0,8).toUpperCase()} · {order.createdAt}
+                          </div>
                         </div>
                         <StatusBadge status={order.status} />
                       </div>
 
-                      {/* Items preview */}
                       <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
                         borderRadius: 8, padding: "5px 9px", color: "#b0956a", fontSize: 9, marginBottom: 7,
                         whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {itemPreview}
                       </div>
 
-                      {/* Rating */}
                       {isCompleted && order.rating && (
                         <div style={{ display: "flex", alignItems: "center", gap: 3, marginBottom: 7,
                           padding: "5px 8px", background: "rgba(255,179,71,0.06)",
@@ -600,7 +659,6 @@ export default function OrdersPage() {
                         </div>
                       )}
 
-                      {/* Cancel reason */}
                       {isCancelled && order.cancelReason && (
                         <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 7,
                           padding: "5px 9px", background: "rgba(255,64,64,0.05)",
@@ -610,7 +668,6 @@ export default function OrdersPage() {
                         </div>
                       )}
 
-                      {/* Total row */}
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <div>
                           <span style={{ color: "#6a5a40", fontSize: 9 }}>Tổng thanh toán: </span>
@@ -626,7 +683,7 @@ export default function OrdersPage() {
                       </div>
                     </div>
 
-                    {/* ── Expanded ── */}
+                    {/* Expanded */}
                     <AnimatePresence>
                       {isOpen && (
                         <motion.div key="detail" initial={{ height: 0, opacity: 0 }}
@@ -634,7 +691,6 @@ export default function OrdersPage() {
                           transition={{ duration: 0.25 }} style={{ overflow: "hidden" }}>
                           <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "12px 13px" }}>
 
-                            {/* Live tracking */}
                             {order.status === "delivering" && order.driver && (
                               <button onClick={() => router.push(`/tracking/${order.id}`)}
                                 style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", marginBottom: 10 }}>
@@ -647,9 +703,7 @@ export default function OrdersPage() {
                                   <div style={{ flex: 1, position: "relative", zIndex: 1 }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                                       <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#3ecf6e", animation: "oPulse 1.5s infinite" }} />
-                                      <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>
-                                        Tài xế đang đến · Còn {order.driver.eta} phút
-                                      </span>
+                                      <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>Tài xế đang đến</span>
                                     </div>
                                     <div style={{ color: "#f8f0e0", fontSize: 10, fontWeight: 600, marginTop: 2 }}>
                                       {order.driver.name} · {order.driver.plate}
@@ -663,7 +717,6 @@ export default function OrdersPage() {
                               </button>
                             )}
 
-                            {/* Preparing notice */}
                             {order.status === "preparing" && (
                               <div style={{ background: "rgba(74,143,245,0.07)", border: "1px solid rgba(74,143,245,0.2)",
                                 borderRadius: 11, padding: "9px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
@@ -675,55 +728,28 @@ export default function OrdersPage() {
                               </div>
                             )}
 
-                            {/* Items */}
                             <SLabel>Chi tiết đơn hàng</SLabel>
                             <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
                               borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
-                              {order.items.map((item, i) => {
-                                const toppingTotal = item.toppings?.reduce((s, t) => s + t.price, 0) ?? 0
-                                return (
-                                  <div key={i} style={{ padding: "8px 10px",
-                                    borderBottom: i < order.items.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                                      <div style={{ display: "flex", gap: 6, flex: 1 }}>
-                                        <span style={{ fontSize: 13, flexShrink: 0 }}>{item.emoji}</span>
-                                        <div style={{ flex: 1 }}>
-                                          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                            <span style={{ color: "#b0956a", fontSize: 10 }}>{item.name}</span>
-                                            <span style={{ color: "#6a5a40", fontSize: 9 }}>×{item.qty}</span>
-                                          </div>
-                                          {(item.size || item.sugar || item.ice) && (
-                                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
-                                              {[item.size, item.sugar, item.ice].filter(Boolean).map((v, j) => (
-                                                <span key={j} style={{ background: "rgba(255,255,255,0.04)",
-                                                  border: "1px solid rgba(255,255,255,0.07)",
-                                                  borderRadius: 5, padding: "1px 6px", color: "#6a5a40", fontSize: 8 }}>{v}</span>
-                                              ))}
-                                            </div>
-                                          )}
-                                          {item.toppings && item.toppings.length > 0 && (
-                                            <div style={{ marginTop: 5, paddingLeft: 8, borderLeft: "2px solid rgba(255,255,255,0.08)" }}>
-                                              <div style={{ color: "#6a5a40", fontSize: 8, marginBottom: 3, fontWeight: 600 }}>Topping thêm:</div>
-                                              {item.toppings.map((t, j) => (
-                                                <div key={j} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0" }}>
-                                                  <span style={{ color: "#6a5a40", fontSize: 8.5 }}>+ {t.name} ×1</span>
-                                                  <span style={{ color: "#6a5a40", fontSize: 8.5 }}>+{formatPrice(t.price)}</span>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          )}
-                                        </div>
+                              {order.items.map((item, i) => (
+                                <div key={i} style={{ padding: "8px 10px",
+                                  borderBottom: i < order.items.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <div style={{ display: "flex", gap: 6 }}>
+                                      <span style={{ fontSize: 13 }}>{item.emoji}</span>
+                                      <div>
+                                        <span style={{ color: "#b0956a", fontSize: 10 }}>{item.name}</span>
+                                        <span style={{ color: "#6a5a40", fontSize: 9, marginLeft: 5 }}>×{item.qty}</span>
                                       </div>
-                                      <span style={{ color: "#f8f0e0", fontSize: 10, fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>
-                                        {formatPrice((item.price + toppingTotal) * item.qty)}
-                                      </span>
                                     </div>
+                                    <span style={{ color: "#f8f0e0", fontSize: 10, fontWeight: 600 }}>
+                                      {formatPrice(item.price * item.qty)}
+                                    </span>
                                   </div>
-                                )
-                              })}
+                                </div>
+                              ))}
                             </div>
 
-                            {/* Price breakdown */}
                             <SLabel>Chi tiết thanh toán</SLabel>
                             <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
                               borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
@@ -738,26 +764,6 @@ export default function OrdersPage() {
                                   <span style={{ color: r.c, fontSize: 9 }}>{r.val < 0 ? "-" : ""}{formatPrice(Math.abs(r.val))}</span>
                                 </div>
                               ))}
-
-                              {order.nightFee && (
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0" }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                    <span style={{ fontSize: 11 }}>🌙</span>
-                                    <span style={{ color: "#b464ff", fontSize: 9 }}>Phụ phí đêm khuya</span>
-                                  </div>
-                                  <span style={{ color: "#b464ff", fontSize: 9, fontWeight: 600 }}>+{formatPrice(order.nightFee)}</span>
-                                </div>
-                              )}
-                              {order.weatherFee && (
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0" }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                    <span style={{ fontSize: 11 }}>⛈️</span>
-                                    <span style={{ color: "#4a8ff5", fontSize: 9 }}>Phụ phí thời tiết ({order.weatherFee})</span>
-                                  </div>
-                                  <span style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 600 }}>+8.000đ</span>
-                                </div>
-                              )}
-
                               <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "6px 0" }} />
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <span style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600 }}>Tổng cộng</span>
@@ -765,36 +771,19 @@ export default function OrdersPage() {
                                   WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
                                   backgroundClip: "text", fontSize: 14, fontWeight: 700 }}>{formatPrice(total)}</span>
                               </div>
-
-                              {(order.nightFee || order.weatherFee) && (
-                                <div style={{ marginTop: 7, background: "rgba(255,255,255,0.02)",
-                                  border: "1px solid rgba(255,255,255,0.05)", borderRadius: 7,
-                                  padding: "6px 9px", color: "#6a5a40", fontSize: 8, lineHeight: 1.6 }}>
-                                  ℹ️ Đơn có phụ phí do{" "}
-                                  {[
-                                    order.nightFee ? "đặt sau 22:00" : null,
-                                    order.weatherFee ? `thời tiết ${order.weatherFee.toLowerCase()}` : null,
-                                  ].filter(Boolean).join(" và ")}.
-                                  Phụ phí được hoàn lại nếu hủy đơn.
-                                </div>
-                              )}
                             </div>
 
-                            {/* Delivery info */}
                             <SLabel>Thông tin giao hàng</SLabel>
                             <InfoBox rows={[
                               { icon: "📍", key: "Địa chỉ",    val: order.address   },
-                              ...(order.note         ? [{ icon: "📝", key: "Ghi chú",     val: order.note!         }] : []),
+                              ...(order.note   ? [{ icon: "📝", key: "Ghi chú",     val: order.note! }] : []),
                               { icon: "💳", key: "Thanh toán", val: order.payMethod },
-                              ...(order.driver       ? [{ icon: "🛵", key: "Tài xế",
+                              ...(order.driver ? [{ icon: "🛵", key: "Tài xế",
                                 val: `${order.driver.name} · ${order.driver.plate} ⭐${order.driver.rating}` }] : []),
-                              ...(order.cancelReason ? [{ icon: "✕",  key: "Lý do hủy",  val: order.cancelReason  }] : []),
+                              ...(order.cancelReason ? [{ icon: "✕", key: "Lý do hủy", val: order.cancelReason }] : []),
                             ]} />
 
-                            {/* Actions */}
                             <div style={{ display: "flex", gap: 7, marginTop: 10 }}>
-
-                              {/* Theo dõi bản đồ */}
                               {order.status === "delivering" && (
                                 <button onClick={() => router.push(`/tracking/${order.id}`)}
                                   style={{ flex: 1, height: 36, borderRadius: 9, border: "none",
@@ -805,9 +794,7 @@ export default function OrdersPage() {
                                   🗺️ Theo dõi đơn
                                 </button>
                               )}
-
-                              {/* Gọi tài xế */}
-                              {(order.status === "delivering" || order.status === "preparing") && order.driver && (
+                              {(order.status === "delivering" || order.status === "preparing") && order.driver?.phone && (
                                 <a href={`tel:${order.driver.phone}`}
                                   style={{ width: 36, height: 36, borderRadius: 9,
                                     border: "1px solid rgba(62,207,110,0.3)",
@@ -815,8 +802,6 @@ export default function OrdersPage() {
                                     display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15,
                                     textDecoration: "none" }}>📞</a>
                               )}
-
-                              {/* Huỷ đơn — chỉ pending (chờ quán xác nhận) */}
                               {order.status === "pending" && (
                                 <button onClick={() => setShowCancel(order.id)}
                                   style={{ flex: 1, height: 36, borderRadius: 9,
@@ -826,8 +811,6 @@ export default function OrdersPage() {
                                   ✕ Hủy đơn
                                 </button>
                               )}
-
-                              {/* Đã xác nhận trở đi — chỉ liên hệ Admin, không tự huỷ được */}
                               {(order.status === "accepted" || order.status === "preparing") && (
                                 <button onClick={() => setShowCancel(order.id)}
                                   style={{ flex: 1, height: 36, borderRadius: 9,
@@ -883,7 +866,6 @@ export default function OrdersPage() {
             })
           )}
 
-          {/* Banner lịch sử đơn cũ */}
           {activeTab !== "history" && historyOrders.length > 0 && (
             <div onClick={() => setActiveTab("history")}
               style={{ margin: "6px 0 0", padding: "11px 14px", borderRadius: 12, cursor: "pointer",
@@ -900,7 +882,7 @@ export default function OrdersPage() {
           )}
         </div>
 
-        {/* ── Bottom Nav — 4 tabs theo mockup ── */}
+        {/* Bottom Nav */}
         <div style={{ position: "absolute", bottom:"max(16px,env(safe-area-inset-bottom))",left:14, right: 14, height: 56,
           background: "rgba(8,8,6,0.92)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
           border: "1px solid rgba(255,107,0,0.2)", borderRadius: 9999,

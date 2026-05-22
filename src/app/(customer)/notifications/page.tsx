@@ -4,8 +4,9 @@
 // Trung tâm thông báo — đầy đủ tính năng
 // Tab lọc · Mark read · Tap → đúng route · Badge unread · Real-time
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ────────────────────────────────────────────────
 type NotifType = "order" | "promo" | "system" | "driver"
@@ -23,66 +24,25 @@ interface Notif {
   iconColor: string
 }
 
-// ─── Mock data ─────────────────────────────────────────────
-const INITIAL: Notif[] = [
-  {
-    id:"n1", type:"driver",
-    title:"Tài xế đang đến!",
-    body:"Trần Văn Bình cách bạn ~500m, còn khoảng 3 phút",
-    href:"/tracking/GN2851", isRead:false, time:"2 phút trước",
-    icon:"🛵", iconBg:"rgba(255,107,0,0.12)", iconColor:"#FF8C00",
-  },
-  {
-    id:"n2", type:"order",
-    title:"Đơn hàng đã được xác nhận",
-    body:"Bún Bò Huế Ngon đã nhận đơn #GN2851 và đang chuẩn bị",
-    href:"/orders", isRead:false, time:"15 phút trước",
-    icon:"✅", iconBg:"rgba(62,207,110,0.12)", iconColor:"#3ecf6e",
-  },
-  {
-    id:"n3", type:"promo",
-    title:"⚡ Flash Sale — Còn 2 giờ!",
-    body:"Trà sữa Ding Tea chỉ 15.000đ. Giảm 57%, miễn phí ship",
-    href:"/promo", isRead:false, time:"1 giờ trước",
-    icon:"🏷️", iconBg:"rgba(255,107,0,0.12)", iconColor:"#FF8C00",
-  },
-  {
-    id:"n4", type:"order",
-    title:"Đơn hàng hoàn thành",
-    body:"Đơn #GN2840 từ Cơm Nhà Bếp đã giao thành công. Hãy đánh giá!",
-    href:"/orders", isRead:true, time:"Hôm qua",
-    icon:"⭐", iconBg:"rgba(255,179,71,0.12)", iconColor:"#FFB347",
-  },
-  {
-    id:"n5", type:"promo",
-    title:"Voucher sắp hết hạn",
-    body:"Mã WELCOME25 giảm 25% hết hạn hôm nay lúc 23:59",
-    href:"/vouchers", isRead:true, time:"Hôm qua",
-    icon:"🎟️", iconBg:"rgba(255,107,0,0.10)", iconColor:"#FF8C00",
-  },
-  {
-    id:"n6", type:"system",
-    title:"Điểm tích lũy cộng thêm",
-    body:"Bạn vừa nhận được 135 điểm từ đơn #GN2851. Tổng: 1.840 điểm",
-    href:"/loyalty", isRead:true, time:"2 ngày trước",
-    icon:"💎", iconBg:"rgba(180,100,255,0.12)", iconColor:"#b464ff",
-  },
-  {
-    id:"n7", type:"system",
-    title:"Cập nhật ứng dụng",
-    body:"Phiên bản 1.1.0 có sẵn với nhiều cải tiến tốc độ và sửa lỗi",
-    href:"/", isRead:true, time:"3 ngày trước",
-    icon:"📱", iconBg:"rgba(74,143,245,0.12)", iconColor:"#4a8ff5",
-  },
-  {
-    id:"n8", type:"driver",
-    title:"Đánh giá tài xế",
-    body:"Bạn chưa đánh giá cho Nguyễn Thị Lan — đơn #GN2840",
-    href:"/review/GN2840", isRead:true, time:"3 ngày trước",
-    icon:"🛵", iconBg:"rgba(62,207,110,0.10)", iconColor:"#3ecf6e",
-  },
-]
+// ─── Helpers ──────────────────────────────────────────────
+function getNotifMeta(type: string): { icon: string; iconBg: string; iconColor: string; href: string } {
+  switch (type) {
+    case "order":  return { icon:"📦", iconBg:"rgba(62,207,110,0.12)",   iconColor:"#3ecf6e", href:"/orders"       }
+    case "promo":  return { icon:"🏷️", iconBg:"rgba(255,107,0,0.12)",   iconColor:"#FF8C00", href:"/promo-items"  }
+    case "ride":   return { icon:"🛵", iconBg:"rgba(255,107,0,0.12)",   iconColor:"#FF8C00", href:"/orders"       }
+    case "driver": return { icon:"🛵", iconBg:"rgba(62,207,110,0.12)",   iconColor:"#3ecf6e", href:"/orders"       }
+    default:       return { icon:"🔔", iconBg:"rgba(74,143,245,0.12)",   iconColor:"#4a8ff5", href:"/"             }
+  }
+}
 
+function timeAgo(dateStr: string): string {
+  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
+  if (diff < 60)   return "Vừa xong"
+  if (diff < 3600) return `${Math.floor(diff/60)} phút trước`
+  if (diff < 86400) return `${Math.floor(diff/3600)} giờ trước`
+  if (diff < 172800) return "Hôm qua"
+  return `${Math.floor(diff/86400)} ngày trước`
+}
 const TABS = [
   { key:"all",    label:"Tất cả",     icon:"🔔" },
   { key:"order",  label:"Đơn hàng",   icon:"📦" },
@@ -91,23 +51,38 @@ const TABS = [
   { key:"system", label:"Hệ thống",   icon:"⚙️" },
 ]
 
-const LS_KEY = "gn-read-notifs"
-
-function loadReadIds(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem(LS_KEY) ?? "[]") as string[]) }
-  catch { return new Set() }
-}
-function saveReadIds(ids: Set<string>) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify([...ids])) } catch {}
-}
-
 // ─── Main ──────────────────────────────────────────────────
 export default function NotificationsPage() {
-  const [notifs,    setNotifs]    = useState<Notif[]>(() => {
-    const readIds = loadReadIds()
-    return INITIAL.map(n => ({ ...n, isRead: readIds.has(n.id) || n.isRead }))
-  })
+  const supabase = createClient()
+  const [notifs,    setNotifs]    = useState<Notif[]>([])
   const [activeTab, setActiveTab] = useState("all")
+  const [loading,   setLoading]   = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoading(false); return }
+      const { data } = await supabase
+        .from("notifications")
+        .select("id,type,title,body,is_read,created_at,data")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50)
+      const mapped: Notif[] = (data ?? []).map((n: {id:string;type:string;title:string;body:string;is_read:boolean;created_at:string;data:Record<string,unknown>|null}) => {
+        const meta = getNotifMeta(n.type)
+        const href = (n.data?.order_id ? `/tracking/${n.data.order_id}` : null) ?? meta.href
+        return {
+          id: n.id, type: n.type as NotifType, title: n.title, body: n.body,
+          href, isRead: n.is_read, time: timeAgo(n.created_at),
+          icon: meta.icon, iconBg: meta.iconBg, iconColor: meta.iconColor,
+        }
+      })
+      setNotifs(mapped)
+      setLoading(false)
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const unreadCount = notifs.filter(n => !n.isRead).length
 
@@ -120,22 +95,23 @@ export default function NotificationsPage() {
       ? notifs.filter(n => !n.isRead).length
       : notifs.filter(n => n.type === key && !n.isRead).length
 
-  const markRead = (id: string) =>
-    setNotifs(prev => {
-      const next = prev.map(n => n.id === id ? { ...n, isRead:true } : n)
-      saveReadIds(new Set(next.filter(n => n.isRead).map(n => n.id)))
-      return next
-    })
+  const markRead = async (id: string) => {
+    setNotifs(prev => prev.map(n => n.id === id ? { ...n, isRead:true } : n))
+    await supabase.from("notifications").update({ is_read: true }).eq("id", id)
+  }
 
-  const markAllRead = () =>
-    setNotifs(prev => {
-      const next = prev.map(n => ({ ...n, isRead:true }))
-      saveReadIds(new Set(next.map(n => n.id)))
-      return next
-    })
+  const markAllRead = async () => {
+    setNotifs(prev => prev.map(n => ({ ...n, isRead:true })))
+    const ids = notifs.filter(n => !n.isRead).map(n => n.id)
+    if (ids.length > 0) {
+      await supabase.from("notifications").update({ is_read: true }).in("id", ids)
+    }
+  }
 
-  const deleteNotif = (id: string) =>
+  const deleteNotif = async (id: string) => {
     setNotifs(prev => prev.filter(n => n.id !== id))
+    await supabase.from("notifications").delete().eq("id", id)
+  }
 
   return (
     <>
@@ -210,11 +186,15 @@ export default function NotificationsPage() {
         <div style={{ flex:1,overflowY:"auto",padding:"10px 14px 88px",
           WebkitOverflowScrolling:"touch" } as React.CSSProperties}>
 
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"center",height:220 }}>
+              <div style={{ color:"#6a5a40",fontSize:11 }}>Đang tải...</div>
+            </div>
+          ) : filtered.length === 0 ? (
             <div style={{ display:"flex",flexDirection:"column",
               alignItems:"center",justifyContent:"center",height:220,gap:10 }}>
               <span style={{ fontSize:40 }}>🔕</span>
-              <div style={{ color:"#6a5a40",fontSize:12 }}>Không có thông báo</div>
+              <div style={{ color:"#6a5a40",fontSize:12 }}>Chưa có thông báo nào</div>
             </div>
           ) : (
             <AnimatePresence>

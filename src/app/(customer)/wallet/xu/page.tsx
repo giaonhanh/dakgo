@@ -1,40 +1,39 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { createClient } from "@/lib/supabase/client"
 
-type TxType = "payment" | "topup" | "refund" | "reward" | "minigame" | "withdrawal"
+type TxType = "payment" | "topup" | "refund" | "reward" | "commission" | "withdrawal"
 interface XuTx {
   id: string; type: TxType; label: string
-  amount: number; balance: number; time: string; ref?: string
+  amount: number; balance: number; time: string
 }
 
-const BALANCE      = 185000
 const TOPUP_AMOUNTS = [50000, 100000, 200000, 500000]
 const fmt = (n: number) => Math.abs(n).toLocaleString("vi-VN")
 
-const TX_CFG: Record<TxType, { icon:string; color:string; bg:string; label:string }> = {
+const TX_CFG: Record<string, { icon:string; color:string; bg:string; label:string }> = {
   payment:    { icon:"🛒", color:"#ff6060", bg:"rgba(255,64,64,0.1)",    label:"Thanh toán" },
   topup:      { icon:"💳", color:"#b464ff", bg:"rgba(180,100,255,0.12)", label:"Nạp xu"     },
   refund:     { icon:"↩️", color:"#4a8ff5", bg:"rgba(74,143,245,0.1)",  label:"Hoàn xu"    },
-  reward:     { icon:"🎁", color:"#FFB347", bg:"rgba(255,179,71,0.12)",  label:"Admin cộng" },
-  minigame:   { icon:"🎮", color:"#3ecf6e", bg:"rgba(62,207,110,0.1)",  label:"Mini game"  },
+  commission: { icon:"🎁", color:"#FFB347", bg:"rgba(255,179,71,0.12)",  label:"Hoa hồng"   },
   withdrawal: { icon:"🏦", color:"#9080b0", bg:"rgba(144,128,176,0.1)", label:"Rút xu"     },
 }
 
-const TXS: XuTx[] = [
-  { id:"tx9", type:"reward",     label:"Admin cộng xu — Sinh nhật",     amount:20000,   balance:185000, time:"Hôm nay · 09:00" },
-  { id:"tx8", type:"payment",    label:"Thanh toán đơn #GN2851",        amount:-135000, balance:165000, time:"Hôm nay · 22:05",     ref:"GN2851" },
-  { id:"tx7", type:"topup",      label:"Nạp xu VietQR",                 amount:200000,  balance:300000, time:"Hôm nay · 20:00" },
-  { id:"tx6", type:"payment",    label:"Thanh toán đơn #GN2849",        amount:-108000, balance:100000, time:"Hôm qua · 21:50",     ref:"GN2849" },
-  { id:"tx5", type:"refund",     label:"Hoàn xu đơn #GN2820",          amount:63000,   balance:208000, time:"Hôm qua · 16:30",     ref:"GN2820" },
-  { id:"tx4", type:"minigame",   label:"Mini game Tháng 5 — Top 3",     amount:50000,   balance:145000, time:"2 ngày trước · 18:00" },
-  { id:"tx3", type:"payment",    label:"Thanh toán đơn #GN2840",        amount:-73000,  balance:95000,  time:"3 ngày trước · 12:05", ref:"GN2840" },
-  { id:"tx2", type:"topup",      label:"Nạp xu VietQR",                 amount:100000,  balance:168000, time:"4 ngày trước · 09:00" },
-  { id:"tx1", type:"withdrawal", label:"Rút về Vietcombank",            amount:-50000,  balance:68000,  time:"1 tuần trước" },
-]
+function timeAgo(dateStr: string): string {
+  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
+  const d = new Date(dateStr)
+  const hhmm = d.toLocaleTimeString("vi-VN", { hour:"2-digit", minute:"2-digit" })
+  if (diff < 86400)  return `Hôm nay · ${hhmm}`
+  if (diff < 172800) return `Hôm qua · ${hhmm}`
+  return `${Math.floor(diff/86400)} ngày trước`
+}
 
 export default function XuPage() {
+  const supabase = createClient()
+  const [balance,        setBalance]        = useState(0)
+  const [txs,            setTxs]            = useState<XuTx[]>([])
   const [showTopup,      setShowTopup]      = useState(false)
   const [showWithdraw,   setShowWithdraw]   = useState(false)
   const [showQR,         setShowQR]         = useState(false)
@@ -45,10 +44,35 @@ export default function XuPage() {
   const [filterType,     setFilterType]     = useState<TxType|"all">("all")
   const [toast,          setToast]          = useState("")
 
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: wallet } = await supabase
+        .from("wallets").select("id,balance").eq("user_id", user.id).eq("type", "customer").maybeSingle()
+      if (wallet) {
+        setBalance(wallet.balance)
+        const { data: txData } = await supabase
+          .from("transactions")
+          .select("id,type,amount,balance_after,note,created_at")
+          .eq("wallet_id", wallet.id)
+          .order("created_at", { ascending: false })
+          .limit(30)
+        setTxs((txData ?? []).map((t: {id:string;type:string;amount:number;balance_after:number;note:string|null;created_at:string}) => ({
+          id: t.id, type: t.type as TxType,
+          label: t.note ?? TX_CFG[t.type]?.label ?? t.type,
+          amount: t.amount, balance: t.balance_after, time: timeAgo(t.created_at),
+        })))
+      }
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2400) }
   const finalTopup = customAmount ? parseInt(customAmount.replace(/\D/g,"")) || 0 : topupAmount
   const vietQRUrl  = `https://img.vietqr.io/image/BIDV-1234567890-qr_only.png?amount=${finalTopup}&addInfo=NAP%20XU%20GIAONHANH`
-  const filtered   = TXS.filter(t => filterType === "all" || t.type === filterType)
+  const filtered   = txs.filter(t => filterType === "all" || t.type === filterType)
 
   return (
     <>
@@ -200,8 +224,8 @@ export default function XuPage() {
                 display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <span style={{ color:"#6a5a40", fontSize:10 }}>Xu khả dụng</span>
                 <div style={{ textAlign:"right" }}>
-                  <span style={{ color:"#b464ff", fontSize:14, fontWeight:700 }}>{fmt(BALANCE)} xu</span>
-                  <div style={{ color:"rgba(180,100,255,0.45)", fontSize:9 }}>= {fmt(BALANCE)}đ</div>
+                  <span style={{ color:"#b464ff", fontSize:14, fontWeight:700 }}>{fmt(balance)} xu</span>
+                  <div style={{ color:"rgba(180,100,255,0.45)", fontSize:9 }}>= {fmt(balance)}đ</div>
                 </div>
               </div>
               <FInput label="Số tài khoản ngân hàng" value={withdrawBank}
@@ -217,7 +241,7 @@ export default function XuPage() {
                 if (!withdrawBank || !withdrawAmount) return
                 const amt = parseInt(withdrawAmount) || 0
                 if (amt <= 0) { fireToast("Số xu không hợp lệ"); return }
-                if (amt > BALANCE) { fireToast("Số xu vượt quá số dư"); return }
+                if (amt > balance) { fireToast("Số xu vượt quá số dư"); return }
                 if (withdrawBank.replace(/\D/g,"").length < 8) { fireToast("Số tài khoản không hợp lệ"); return }
                 fireToast("Đã gửi yêu cầu rút xu thành công!")
                 setShowWithdraw(false); setWithdrawBank(""); setWithdrawAmount("")
@@ -277,12 +301,12 @@ export default function XuPage() {
               <div style={{ fontSize:36, fontWeight:800, lineHeight:1,
                 background:"linear-gradient(135deg,#b464ff,#d484ff,#e8a4ff)",
                 WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text" }}>
-                {fmt(BALANCE)}
+                {fmt(balance)}
               </div>
               <span style={{ color:"#b464ff", fontSize:16, fontWeight:600 }}>xu</span>
             </div>
             <div style={{ color:"rgba(180,100,255,0.4)", fontSize:10, marginBottom:10, position:"relative", zIndex:1 }}>
-              = {fmt(BALANCE)}đ · dùng thanh toán đơn hàng
+              = {fmt(balance)}đ · dùng thanh toán đơn hàng
             </div>
           </div>
 

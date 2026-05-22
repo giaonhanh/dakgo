@@ -23,19 +23,14 @@ import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { useCartStore } from "@/store/cartStore"
+import { createClient } from "@/lib/supabase/client"
 
-// ─── Mock data (thay bằng Supabase fetch) ──────────────────
-const USER_NAME   = "Minh Tuấn"
-const NOTIF_COUNT = 3
-const LIVE_ORDER  = { id: "GN2851", shopName: "Bún Bò Huế Ngon", eta: 3 }
-const HAS_LIVE    = true
-
-const ALL_VOUCHERS = [
-  { id:1, type:"app",  icon:"🎉", code:"WELCOME25", value:"-25%",      label:"Toàn bộ đơn hàng", expiry:"Hết hạn HÔM NAY!", urgent:true  },
-  { id:2, type:"app",  icon:"🚚", code:"FREESHIP",  value:"Free ship", label:"Đơn từ 50.000đ",   expiry:"Còn 3 ngày",       urgent:false },
-  { id:3, type:"shop", icon:"🍜", code:"SHOP10",    value:"-10%",      label:"Bún bò Huế Ngon",  expiry:"Còn 5 ngày",       urgent:false },
-  { id:4, type:"shop", icon:"🥤", code:"GNSHOP",    value:"-5.000đ",   label:"Ding Tea PA",      expiry:"Còn 7 ngày",       urgent:false },
-]
+// ─── Types ─────────────────────────────────────────────────
+type ShopRow    = { id: string; name: string; is_open: boolean; rating: number | null; address: string; avatar_url: string | null }
+type ProductRow = { id: string; name: string; price: number; sold_count: number; shops: { name: string } | { name: string }[] | null }
+type OrderRow   = { id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
+type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null }
+type LiveOrderRow = { id: string; shops: { name: string } | { name: string }[] | null }
 
 const MEAL_TIMES = [
   { icon:"☀️",  label:"Buổi sáng",  value:"buoi-sang"  },
@@ -55,44 +50,7 @@ function getDefaultMealTime() {
   return 4                         // Nhậu (khuya)
 }
 
-const PROMOS = [
-  { id:1, emoji:"🍜", name:"Bún bò Huế",       shop:"Quán Bà Lan",   price:34000, oldPrice:45000, disc:25, star:4.9, km:1.2 },
-  { id:2, emoji:"🥤", name:"Trà sữa size L",    shop:"Ding Tea",      price:28000, oldPrice:35000, disc:20, star:4.8, km:0.8 },
-  { id:3, emoji:"🍱", name:"Cơm văn phòng",     shop:"Cơm Nhà Bếp",   price:38000, oldPrice:45000, disc:15, star:4.7, km:1.5 },
-  { id:4, emoji:"🍗", name:"Gà rán giòn",       shop:"Gà Vàng PA",    price:28000, oldPrice:40000, disc:30, star:4.6, km:0.6 },
-  { id:5, emoji:"🍔", name:"Burger phô mai",    shop:"Burger House",  price:45000, oldPrice:55000, disc:18, star:4.5, km:2.1 },
-]
-
-const NEARBY_SHOPS = [
-  { id:2, emoji:"🥤", name:"Trà Sữa Ding Tea PA",   tags:["Đồ uống","Trà sữa"],          star:4.8, km:0.5, eta:10, disc:20, freeShip:true  },
-  { id:4, emoji:"🍗", name:"Gà Vàng Phước An",       tags:["🆕 Mới","Gà rán"],            star:4.6, km:0.6, eta:15, disc:30, freeShip:true  },
-  { id:1, emoji:"🍜", name:"Quán Bún Bò Huế Ngon", tags:["🔥 Bán chạy","Bún · Phở"],    star:4.9, km:0.8, eta:20, disc:25, freeShip:true  },
-  { id:3, emoji:"🍱", name:"Cơm Nhà Bếp Phước An",  tags:["Cơm hộp","Bình dân"],         star:4.7, km:1.2, eta:25, disc:0,  freeShip:false },
-]
-
-const BEST_SELLERS = [
-  { rank:1, emoji:"🍜", name:"Bún bò đặc biệt",  shop:"Bún Bò Huế Ngon", price:45000, sold:890  },
-  { rank:2, emoji:"🥤", name:"Trà sữa trân châu", shop:"Ding Tea",        price:35000, sold:742  },
-  { rank:3, emoji:"🍗", name:"Gà rán giòn cay",   shop:"Gà Vàng PA",     price:38000, sold:601  },
-  { rank:4, emoji:"🦑", name:"Chả chiên giòn",    shop:"Bún Bò Huế Ngon",price:15000, sold:488  },
-  { rank:5, emoji:"🍔", name:"Burger phô mai",    shop:"Burger House",    price:45000, sold:321  },
-]
-
-const REORDERS = [
-  { id:1, emoji:"🍜", name:"Bún bò đặc biệt x2", shop:"Bún Bò Huế Ngon", price:90 },
-  { id:2, emoji:"🥤", name:"Trà sữa size L x1",   shop:"Ding Tea",        price:35 },
-  { id:3, emoji:"🛵", name:"Xe ôm · Chợ → Nhà",    shop:"3.2km · 25.000đ", price:25 },
-]
-
-// Cửa hàng yêu thích — sắp xếp từ mới nhất đến cũ nhất
-// Để ẩn section: đặt FAVE_SHOPS = []
-const FAVE_SHOPS = [
-  { id:1, emoji:"🍜", name:"Quán Bún Bò Huế Ngon", tags:["Bún·Phở","🔥 Bán chạy"], star:4.9, km:0.8, eta:20, disc:25, freeShip:true  },
-  { id:2, emoji:"🥤", name:"Trà Sữa Ding Tea PA",   tags:["Đồ uống","Giảm 20%"],    star:4.8, km:0.5, eta:10, disc:20, freeShip:true  },
-  { id:4, emoji:"🍗", name:"Gà Vàng Phước An",       tags:["Gà rán","🆕 Mới"],       star:4.6, km:0.6, eta:15, disc:30, freeShip:true  },
-  { id:3, emoji:"🍱", name:"Cơm Nhà Bếp Phước An",   tags:["Cơm hộp","Bình dân"],    star:4.7, km:1.2, eta:25, disc:0,  freeShip:false },
-  { id:5, emoji:"🍔", name:"Burger House PA",         tags:["Burger","Fast food"],    star:4.5, km:2.1, eta:30, disc:10, freeShip:false },
-]
+// ─── Không còn mock data — dùng Supabase thật ─────────────
 
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -152,11 +110,12 @@ export default function HomePage() {
   const storeShopId   = useCartStore(s => s.shopId)
   const storeShopName = useCartStore(s => s.items[0]?.shop ?? "")
   const cartCount     = useCartStore(s => s.totalQty())
+  const supabase      = createClient()
 
   type PendingItem = { id:string; name:string; price:number; shop:string; shopId:string }
 
   const [activeMealTime,  setActiveMealTime]  = useState(getDefaultMealTime)
-  const [savedVoucherIds, setSavedVoucherIds] = useState<number[]>([])
+  const [savedVoucherIds, setSavedVoucherIds] = useState<string[]>([])
   const [bannerIdx,     setBannerIdx]     = useState(0)
   const [countdown,     setCountdown]     = useState({ h:2, m:15, s:0 })
   const [activeTab,     setActiveTab]     = useState("home")
@@ -165,6 +124,96 @@ export default function HomePage() {
   const [weatherTip,    setWeatherTip]    = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const cartIconRef  = useRef<HTMLDivElement>(null)
+
+  // ─── Real data state ───────────────────────────────────────
+  const [userName,     setUserName]     = useState("bạn")
+  const [notifCount,   setNotifCount]   = useState(0)
+  const [liveOrder,    setLiveOrder]    = useState<LiveOrderRow | null>(null)
+  const [vouchers,     setVouchers]     = useState<VoucherRow[]>([])
+  const [nearbyShops,  setNearbyShops]  = useState<ShopRow[]>([])
+  const [bestSellers,  setBestSellers]  = useState<ProductRow[]>([])
+  const [reorders,     setReorders]     = useState<OrderRow[]>([])
+  const [promos,       setPromos]       = useState<ProductRow[]>([])
+
+  // ─── Fetch real data from Supabase ────────────────────────
+  useEffect(() => {
+    async function loadData() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Profile (user name)
+      const { data: profile } = await supabase
+        .from("profiles").select("full_name").eq("id", user.id).single()
+      if (profile?.full_name) setUserName(profile.full_name.split(" ").pop() ?? profile.full_name)
+
+      // Unread notification count
+      const { count } = await supabase
+        .from("notifications").select("*", { count: "exact", head: true })
+        .eq("user_id", user.id).eq("is_read", false)
+      setNotifCount(count ?? 0)
+
+      // Live order (đơn đang giao)
+      const { data: live } = await supabase
+        .from("orders")
+        .select("id, shops(name)")
+        .eq("customer_id", user.id)
+        .in("status", ["accepted","preparing","ready","delivering"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      setLiveOrder(live as LiveOrderRow | null)
+
+      // Vouchers
+      const { data: voucherData } = await supabase
+        .from("vouchers")
+        .select("id,code,title,discount_type,discount_value,valid_to,shop_id")
+        .eq("is_active", true)
+        .gt("valid_to", new Date().toISOString())
+        .order("valid_to", { ascending: true })
+        .limit(6)
+      setVouchers((voucherData ?? []) as VoucherRow[])
+
+      // Nearby shops (all approved shops)
+      const { data: shopData } = await supabase
+        .from("shops")
+        .select("id,name,is_open,rating,address,avatar_url")
+        .order("rating", { ascending: false })
+        .limit(10)
+      setNearbyShops((shopData ?? []) as ShopRow[])
+
+      // Best sellers (top products by sold_count)
+      const { data: bsData } = await supabase
+        .from("products")
+        .select("id,name,price,sold_count,shops(name)")
+        .eq("is_available", true)
+        .order("sold_count", { ascending: false })
+        .limit(8)
+      setBestSellers((bsData ?? []) as ProductRow[])
+
+      // Promos (products with discount — original_price higher than price)
+      // Dùng sold_count > 0 như proxy cho "có khuyến mãi" nếu chưa có cột discount
+      const { data: promoData } = await supabase
+        .from("products")
+        .select("id,name,price,sold_count,shops(name)")
+        .eq("is_available", true)
+        .gt("sold_count", 0)
+        .order("sold_count", { ascending: false })
+        .limit(6)
+      setPromos((promoData ?? []) as ProductRow[])
+
+      // Reorders (last 5 delivered orders for this user)
+      const { data: orderData } = await supabase
+        .from("orders")
+        .select("id,total_amount,shops(name),order_items(name)")
+        .eq("customer_id", user.id)
+        .eq("status", "delivered")
+        .order("created_at", { ascending: false })
+        .limit(5)
+      setReorders((orderData ?? []) as OrderRow[])
+    }
+    loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // GPS location + weather
   useEffect(() => {
@@ -354,14 +403,14 @@ export default function HomePage() {
                   background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)",
                   display:"flex", alignItems:"center", justifyContent:"center",
                   fontSize:15 }}>🔔</div>
-                {NOTIF_COUNT > 0 && (
+                {notifCount > 0 && (
                   <div style={{ position:"absolute", top:3, right:3,
                     width:14, height:14, borderRadius:"50%",
                     background:"#ff4040", border:"1.5px solid #080806",
                     display:"flex", alignItems:"center", justifyContent:"center",
                     color:"#fff", fontSize:7, fontWeight:700,
                     boxShadow:"0 0 4px #ff4040", animation:"pulse 1.5s infinite" }}>
-                    {NOTIF_COUNT}
+                    {notifCount > 9 ? "9+" : notifCount}
                   </div>
                 )}
               </a>
@@ -380,7 +429,7 @@ export default function HomePage() {
           ────────────────────────────────────── */}
           <div style={{ padding:"2px 16px 12px" }}>
             <div style={{ color:"#6a5a40", fontSize:10, marginBottom:2 }}>
-              {greet()}, {USER_NAME} 👋
+              {greet()}, {userName} 👋
             </div>
             <div style={{ fontSize:18, fontWeight:700, lineHeight:1.2, marginBottom:8 }}>
               Hôm nay bạn{" "}
@@ -433,8 +482,8 @@ export default function HomePage() {
               S3 — LiveStatusBanner (điều kiện)
           ────────────────────────────────────── */}
           <AnimatePresence>
-            {HAS_LIVE && (
-              <motion.a key="live-banner" href={`/tracking/${LIVE_ORDER.id}`}
+            {liveOrder && (
+              <motion.a key="live-banner" href={`/tracking/${liveOrder.id}`}
                 initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }}
                 exit={{ opacity:0, y:-8 }} style={{ textDecoration:"none" }}>
                 <div style={{
@@ -457,10 +506,10 @@ export default function HomePage() {
                       <span style={{ color:"#3ecf6e", fontSize:9, fontWeight:600 }}>Đơn đang giao</span>
                     </div>
                     <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginTop:2 }}>
-                      {LIVE_ORDER.shopName} · #{LIVE_ORDER.id}
+                      {(liveOrder.shops as {name:string}|null)?.name ?? "Quán đang chuẩn bị"} · #{liveOrder.id.slice(0,8).toUpperCase()}
                     </div>
                     <div style={{ color:"rgba(255,255,255,0.4)", fontSize:8.5, marginTop:1 }}>
-                      Tài xế cách bạn ~500m · Còn {LIVE_ORDER.eta} phút
+                      Đơn hàng đang được xử lý
                     </div>
                   </div>
                   <div style={{
@@ -549,8 +598,8 @@ export default function HomePage() {
             gap:7, padding:"0 16px", marginBottom:14,
           }}>
             {[
-              { icon:"📦", label:"Giao hộ",  href:"/giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00", badge:"" },
-              { icon:"🛒", label:"Mua hộ",   href:"/mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e", badge:"HOT" },
+              { icon:"📦", label:"Giao hộ",  href:"/giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00", badge:"HOT" },
+              { icon:"🛒", label:"Mua hộ",   href:"/mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e", badge:"" },
               { icon:"🛵", label:"Xe ôm",    href:"/xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5", badge:"" },
               { icon:"🚗", label:"Taxi",     href:"/taxi",    bg:"rgba(180,100,255,0.10)",ic:"#b464ff", badge:"" },
             ].map((s,i) => (
@@ -586,7 +635,7 @@ export default function HomePage() {
               S6 — Voucher (khám phá tất cả)
           ────────────────────────────────────── */}
           <SectionHeader title="🎟️ Voucher" more="Xem tất cả →" href="/vouchers" />
-          {ALL_VOUCHERS.length === 0 ? (
+          {vouchers.length === 0 ? (
             <div style={{ margin:"0 16px 14px",
               background:"rgba(255,107,0,0.04)",
               border:"1.5px dashed rgba(255,107,0,0.2)",
@@ -621,14 +670,22 @@ export default function HomePage() {
             </div>
           ) : (
             <HScroll>
-              {ALL_VOUCHERS.map(v => {
+              {vouchers.map(v => {
                 const saved = savedVoucherIds.includes(v.id)
+                const isShop = !!v.shop_id
+                const expDate = new Date(v.valid_to)
+                const daysLeft = Math.ceil((expDate.getTime() - Date.now()) / 86400000)
+                const urgent = daysLeft <= 1
+                const expiryLabel = daysLeft <= 0 ? "Hết hạn HÔM NAY!" : daysLeft === 1 ? "Còn 1 ngày" : `Còn ${daysLeft} ngày`
+                const valueLabel = v.discount_type === "percent" ? `-${v.discount_value}%`
+                  : v.discount_type === "freeship" ? "Free ship"
+                  : `-${v.discount_value.toLocaleString("vi-VN")}đ`
                 return (
                   <div key={v.id} style={{
                     minWidth:162, flexShrink:0,
-                    background: v.type === "shop" ? "rgba(74,143,245,0.07)" : "rgba(255,107,0,0.07)",
+                    background: isShop ? "rgba(74,143,245,0.07)" : "rgba(255,107,0,0.07)",
                     backdropFilter:"blur(10px)",
-                    border: `1px solid ${v.type === "shop" ? "rgba(74,143,245,0.22)" : "rgba(255,107,0,0.2)"}`,
+                    border: `1px solid ${isShop ? "rgba(74,143,245,0.22)" : "rgba(255,107,0,0.2)"}`,
                     borderRadius:12, padding:"9px 11px",
                     display:"flex", flexDirection:"column", gap:7,
                     position:"relative", overflow:"hidden",
@@ -638,24 +695,21 @@ export default function HomePage() {
                       animation:"shimmer 3s infinite" }} />
                     <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                       <div style={{ width:32, height:32, borderRadius:9,
-                        background: v.type === "shop" ? "rgba(74,143,245,0.12)" : "rgba(255,107,0,0.12)",
-                        border: `1px solid ${v.type === "shop" ? "rgba(74,143,245,0.25)" : "rgba(255,107,0,0.25)"}`,
+                        background: isShop ? "rgba(74,143,245,0.12)" : "rgba(255,107,0,0.12)",
+                        border: `1px solid ${isShop ? "rgba(74,143,245,0.25)" : "rgba(255,107,0,0.25)"}`,
                         display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
-                        {v.icon}
+                        {isShop ? "🏪" : "🎉"}
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ color: v.type === "shop" ? "#4a8ff5" : "#FF8C00", fontSize:12, fontWeight:700 }}>{v.value}</div>
-                        <div style={{ color:"#b0956a", fontSize:8, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.label}</div>
+                        <div style={{ color: isShop ? "#4a8ff5" : "#FF8C00", fontSize:12, fontWeight:700 }}>{valueLabel}</div>
+                        <div style={{ color:"#b0956a", fontSize:8, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.title}</div>
                       </div>
                     </div>
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                      <div style={{ fontSize:7.5,
-                        color: v.urgent ? "#ff4040" : "rgba(255,107,0,0.45)",
-                        fontWeight: v.urgent ? 700 : 400 }}>
-                        {v.urgent ? "⏰ " : ""}{v.expiry}
+                      <div style={{ fontSize:7.5, color: urgent ? "#ff4040" : "rgba(255,107,0,0.45)", fontWeight: urgent ? 700 : 400 }}>
+                        {urgent ? "⏰ " : ""}{expiryLabel}
                       </div>
-                      <button
-                        type="button"
+                      <button type="button"
                         onClick={() => setSavedVoucherIds(prev =>
                           saved ? prev.filter(x => x !== v.id) : [...prev, v.id]
                         )}
@@ -663,8 +717,7 @@ export default function HomePage() {
                           height:20, padding:"0 7px", borderRadius:6, border:"none",
                           cursor:"pointer", fontSize:8, fontWeight:700, fontFamily:"Lexend",
                           background: saved ? "rgba(62,207,110,0.15)" : "rgba(255,107,0,0.15)",
-                          color: saved ? "#3ecf6e" : "#FF8C00",
-                          transition:"all .2s",
+                          color: saved ? "#3ecf6e" : "#FF8C00", transition:"all .2s",
                         }}>
                         {saved ? "✓ Đã lưu" : "🔖 Lưu"}
                       </button>
@@ -719,7 +772,7 @@ export default function HomePage() {
               S8 — PromoSection
           ────────────────────────────────────── */}
           <SectionHeader title="🔥 Khuyến mãi hôm nay" more="Xem tất cả →" href="/promo-items" />
-          {PROMOS.length === 0 ? (
+          {promos.length === 0 ? (
             <div style={{ margin:"0 16px 14px",
               background:"linear-gradient(135deg,rgba(255,107,0,0.05),rgba(255,64,64,0.04))",
               border:"1.5px dashed rgba(255,107,0,0.18)",
@@ -769,60 +822,52 @@ export default function HomePage() {
             </div>
           ) : (
             <HScroll>
-            {PROMOS.map(p => (
-              <div key={p.id} className="promo-card" style={{
-                minWidth:120, flexShrink:0,
-                background:"rgba(255,255,255,0.04)", backdropFilter:"blur(10px)",
-                border:"1px solid rgba(255,255,255,0.08)",
-                borderRadius:14, overflow:"hidden", cursor:"pointer",
-              }}>
-                {/* Image area */}
-                <div style={{ height:74, display:"flex", alignItems:"center",
-                  justifyContent:"center", fontSize:32, position:"relative",
-                  background:"rgba(255,107,0,0.04)" }}>
-                  <div style={{ position:"absolute", inset:0,
-                    background:"radial-gradient(circle at 50% 65%,rgba(255,107,0,0.1) 0%,transparent 65%)" }} />
-                  {p.emoji}
-                  <div style={{ position:"absolute", top:5, left:5,
-                    background:"#ff4040", color:"#fff",
-                    fontSize:7, fontWeight:700, padding:"2px 5px", borderRadius:5,
-                    boxShadow:"0 0 6px rgba(255,64,64,0.35)" }}>
-                    -{p.disc}%
+            {promos.map(p => {
+              const shopName = (p.shops as {name:string}|null)?.name ?? ""
+              return (
+                <div key={p.id} className="promo-card" style={{
+                  minWidth:120, flexShrink:0,
+                  background:"rgba(255,255,255,0.04)", backdropFilter:"blur(10px)",
+                  border:"1px solid rgba(255,255,255,0.08)",
+                  borderRadius:14, overflow:"hidden", cursor:"pointer",
+                }}>
+                  <div style={{ height:74, display:"flex", alignItems:"center",
+                    justifyContent:"center", fontSize:32, position:"relative",
+                    background:"rgba(255,107,0,0.04)" }}>
+                    <div style={{ position:"absolute", inset:0,
+                      background:"radial-gradient(circle at 50% 65%,rgba(255,107,0,0.1) 0%,transparent 65%)" }} />
+                    🍽️
+                    {p.sold_count > 0 && (
+                      <div style={{ position:"absolute", top:5, left:5,
+                        background:"#ff4040", color:"#fff",
+                        fontSize:7, fontWeight:700, padding:"2px 5px", borderRadius:5 }}>
+                        HOT
+                      </div>
+                    )}
                   </div>
-                </div>
-                {/* Info */}
-                <div style={{ padding:"7px 9px 8px" }}>
-                  <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600,
-                    whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                    {p.name}
-                  </div>
-                  <div style={{ color:"#6a5a40", fontSize:8, marginTop:1,
-                    whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                    {p.shop}
-                  </div>
-                  <div style={{
-                    background:"linear-gradient(135deg,#FF6B00,#FFB347)",
-                    WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
-                    backgroundClip:"text",
-                    fontSize:11, fontWeight:700, marginTop:3,
-                  }}>{fmt(p.price)}</div>
-                  <div style={{ display:"flex", alignItems:"center",
-                    justifyContent:"space-between", marginTop:4 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:3 }}>
-                      <span style={{ color:"#FFB347", fontSize:8 }}>★</span>
-                      <span style={{ color:"#6a5a40", fontSize:7.5 }}>{p.star} · {p.km}km</span>
+                  <div style={{ padding:"7px 9px 8px" }}>
+                    <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600,
+                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
+                    <div style={{ color:"#6a5a40", fontSize:8, marginTop:1,
+                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
+                    <div style={{ background:"linear-gradient(135deg,#FF6B00,#FFB347)",
+                      WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                      backgroundClip:"text", fontSize:11, fontWeight:700, marginTop:3 }}>{fmt(p.price)}</div>
+                    <div style={{ display:"flex", alignItems:"center",
+                      justifyContent:"space-between", marginTop:4 }}>
+                      <span style={{ color:"#6a5a40", fontSize:7.5 }}>🔥 {p.sold_count} đã bán</span>
+                      <button
+                        onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:p.id, name:p.name, price:p.price, shop:shopName, shopId:p.id }) }}
+                        style={{ width:22, height:22, borderRadius:7,
+                          background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
+                          border:"none", color:"#fff", fontSize:14, fontWeight:700,
+                          cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+                          boxShadow:"0 2px 6px rgba(255,107,0,0.4)", flexShrink:0 }}>+</button>
                     </div>
-                    <button
-                      onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:`promo-${p.id}`, name:p.name, price:p.price, shop:p.shop, shopId:p.shop }) }}
-                      style={{ width:22, height:22, borderRadius:7,
-                        background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
-                        border:"none", color:"#fff", fontSize:14, fontWeight:700,
-                        cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
-                        boxShadow:"0 2px 6px rgba(255,107,0,0.4)", flexShrink:0 }}>+</button>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
             </HScroll>
           )}
 
@@ -832,7 +877,11 @@ export default function HomePage() {
           <SectionHeader title="📍 Quán gần bạn" more="Xem tất cả →" href="/nearby-shops" />
           <div style={{ padding:"0 16px", display:"flex", flexDirection:"column",
             gap:9, marginBottom:14 }}>
-            {NEARBY_SHOPS.map(s => (
+            {nearbyShops.length === 0 ? (
+              <div style={{ textAlign:"center", padding:"20px 0", color:"#6a5a40", fontSize:11 }}>
+                Chưa có quán nào trong khu vực
+              </div>
+            ) : nearbyShops.map(s => (
               <a key={s.id} href={`/shop/${s.id}`} style={{ textDecoration:"none" }}>
                 <div className="shop-card" style={{
                   background:"rgba(255,255,255,0.06)", backdropFilter:"blur(10px)",
@@ -843,7 +892,9 @@ export default function HomePage() {
                   <div style={{ width:54, height:54, borderRadius:12, flexShrink:0,
                     background:"rgba(255,107,0,0.07)", border:"1px solid rgba(255,255,255,0.08)",
                     display:"flex", alignItems:"center", justifyContent:"center", fontSize:27 }}>
-                    {s.emoji}
+                    {s.avatar_url ? (
+                      <img src={s.avatar_url} alt={s.name} style={{ width:"100%", height:"100%", borderRadius:12, objectFit:"cover" }} />
+                    ) : "🏪"}
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ color:"#f8f0e0", fontSize:11.5, fontWeight:600,
@@ -851,43 +902,23 @@ export default function HomePage() {
                       {s.name}
                     </div>
                     <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
-                      {s.tags.map(t => (
-                        <span key={t} style={{
-                          background: t.startsWith("🔥") ? "rgba(255,64,64,0.1)" :
-                                      t.startsWith("🆕") ? "rgba(62,207,110,0.08)" :
-                                                           "rgba(255,255,255,0.04)",
-                          border: t.startsWith("🔥") ? "1px solid rgba(255,64,64,0.2)" :
-                                  t.startsWith("🆕") ? "1px solid rgba(62,207,110,0.2)" :
-                                                       "1px solid rgba(255,255,255,0.06)",
-                          color: t.startsWith("🔥") ? "#ff6060" :
-                                 t.startsWith("🆕") ? "#3ecf6e" : "#6a5a40",
-                          fontSize:7.5, borderRadius:5, padding:"2px 6px",
-                        }}>{t}</span>
-                      ))}
+                      <span style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.06)",
+                        color:"#6a5a40", fontSize:7.5, borderRadius:5, padding:"2px 6px" }}>
+                        {s.address.split(",")[0]}
+                      </span>
+                      {s.is_open ? (
+                        <span style={{ background:"rgba(62,207,110,0.08)", border:"1px solid rgba(62,207,110,0.2)",
+                          color:"#3ecf6e", fontSize:7.5, borderRadius:5, padding:"2px 6px" }}>🟢 Đang mở</span>
+                      ) : (
+                        <span style={{ background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)",
+                          color:"#ff6060", fontSize:7.5, borderRadius:5, padding:"2px 6px" }}>🔴 Đóng cửa</span>
+                      )}
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:7, marginTop:5 }}>
                       <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
-                      <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.star}</span>
+                      <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.rating?.toFixed(1) ?? "Mới"}</span>
                       <span style={{ color:"#4a5040", fontSize:9 }}>·</span>
-                      <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.km}km</span>
-                      <span style={{ color:"#4a5040", fontSize:9 }}>·</span>
-                      <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.eta}–{s.eta+10} phút</span>
-                    </div>
-                  </div>
-                  <div style={{ display:"flex", flexDirection:"column",
-                    alignItems:"flex-end", gap:5, flexShrink:0 }}>
-                    {s.disc > 0 && (
-                      <div style={{
-                        background:"rgba(255,107,0,0.10)", border:"1px solid rgba(255,107,0,0.25)",
-                        borderRadius:6, padding:"2px 7px",
-                        color:"#FF8C00", fontSize:8, fontWeight:600 }}>
-                        -{s.disc}%
-                      </div>
-                    )}
-                    <div style={{
-                      color: s.freeShip ? "#3ecf6e" : "#b0956a",
-                      fontSize:8, fontWeight: s.freeShip ? 600 : 400 }}>
-                      {s.freeShip ? "Free ship" : "Ship 8k"}
+                      <span style={{ color:"#b0956a", fontSize:8.5 }}>Ship 15k</span>
                     </div>
                   </div>
                 </div>
@@ -899,177 +930,125 @@ export default function HomePage() {
               S10 — BestSellers
           ────────────────────────────────────── */}
           <SectionHeader title="🏆 Bán chạy tuần này" more="Xem tất cả →" href="/bestsellers" />
-          <HScroll>
-            {BEST_SELLERS.map(b => (
-              <div key={b.rank} style={{
-                minWidth:110, flexShrink:0,
-                background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
-                border:"1px solid rgba(255,255,255,0.08)",
-                borderRadius:13, overflow:"hidden", cursor:"pointer",
-              }}>
-                <div style={{ height:80, display:"flex", alignItems:"center",
-                  justifyContent:"center", fontSize:34, position:"relative",
-                  background:"rgba(255,255,255,0.02)" }}>
-                  <div style={{ position:"absolute", inset:0,
-                    background:"radial-gradient(circle at 50% 60%,rgba(255,107,0,0.09) 0%,transparent 65%)" }} />
-                  {b.emoji}
-                  <div style={{ position:"absolute", top:6, left:6,
-                    width:20, height:20, borderRadius:6,
-                    background: b.rank<=3 ? "rgba(255,215,0,0.15)" : "rgba(255,107,0,0.1)",
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    fontSize:10, fontWeight:800,
-                    color: b.rank===1 ? "#FFD700" : b.rank===2 ? "#C0C0C0" : b.rank===3 ? "#CD7F32" : "#FF8C00" }}>
-                    {b.rank <= 3 ? RANK_ICON[b.rank-1] : b.rank}
-                  </div>
-                </div>
-                <div style={{ padding:"7px 9px 8px" }}>
-                  <div style={{ color:"#f8f0e0", fontSize:9.5, fontWeight:600,
-                    whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                    {b.name}
-                  </div>
-                  <div style={{ color:"#6a5a40", fontSize:8, marginTop:1,
-                    whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                    {b.shop}
-                  </div>
-                  <div style={{ color:"#3ecf6e", fontSize:7.5, fontWeight:600, marginTop:3 }}>
-                    🔥 {b.sold.toLocaleString("vi-VN")} đã bán tuần này
-                  </div>
-                  <div style={{ display:"flex", justifyContent:"space-between",
-                    alignItems:"center", marginTop:4 }}>
-                    <div style={{
-                      background:"linear-gradient(135deg,#FF6B00,#FFB347)",
-                      WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
-                      backgroundClip:"text", fontSize:11, fontWeight:700 }}>
-                      {fmt(b.price)}
+          {bestSellers.length === 0 ? (
+            <div style={{ padding:"0 16px 14px", color:"#6a5a40", fontSize:11, textAlign:"center" }}>
+              Chưa có dữ liệu bán chạy
+            </div>
+          ) : (
+            <HScroll>
+              {bestSellers.map((b, idx) => {
+                const rank = idx + 1
+                const shopName = (b.shops as {name:string}|null)?.name ?? ""
+                return (
+                  <div key={b.id} style={{
+                    minWidth:110, flexShrink:0,
+                    background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
+                    border:"1px solid rgba(255,255,255,0.08)",
+                    borderRadius:13, overflow:"hidden", cursor:"pointer",
+                  }}>
+                    <div style={{ height:80, display:"flex", alignItems:"center",
+                      justifyContent:"center", fontSize:34, position:"relative",
+                      background:"rgba(255,255,255,0.02)" }}>
+                      <div style={{ position:"absolute", inset:0,
+                        background:"radial-gradient(circle at 50% 60%,rgba(255,107,0,0.09) 0%,transparent 65%)" }} />
+                      🍽️
+                      <div style={{ position:"absolute", top:6, left:6,
+                        width:20, height:20, borderRadius:6,
+                        background: rank<=3 ? "rgba(255,215,0,0.15)" : "rgba(255,107,0,0.1)",
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        fontSize:10, fontWeight:800,
+                        color: rank===1 ? "#FFD700" : rank===2 ? "#C0C0C0" : rank===3 ? "#CD7F32" : "#FF8C00" }}>
+                        {rank <= 3 ? RANK_ICON[rank-1] : rank}
+                      </div>
                     </div>
-                    <button
-                      onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:`best-${b.rank}`, name:b.name, price:b.price, shop:b.shop, shopId:b.shop }) }}
-                      style={{ width:22, height:22, borderRadius:7,
-                        background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
-                        border:"none", color:"#fff", fontSize:14, fontWeight:700,
-                        cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
-                        boxShadow:"0 2px 6px rgba(255,107,0,0.4)", flexShrink:0 }}>+</button>
+                    <div style={{ padding:"7px 9px 8px" }}>
+                      <div style={{ color:"#f8f0e0", fontSize:9.5, fontWeight:600,
+                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{b.name}</div>
+                      <div style={{ color:"#6a5a40", fontSize:8, marginTop:1,
+                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
+                      <div style={{ color:"#3ecf6e", fontSize:7.5, fontWeight:600, marginTop:3 }}>
+                        🔥 {b.sold_count.toLocaleString("vi-VN")} đã bán
+                      </div>
+                      <div style={{ display:"flex", justifyContent:"space-between",
+                        alignItems:"center", marginTop:4 }}>
+                        <div style={{ background:"linear-gradient(135deg,#FF6B00,#FFB347)",
+                          WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                          backgroundClip:"text", fontSize:11, fontWeight:700 }}>
+                          {fmt(b.price)}
+                        </div>
+                        <button
+                          onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:b.id, name:b.name, price:b.price, shop:shopName, shopId:b.id }) }}
+                          style={{ width:22, height:22, borderRadius:7,
+                            background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
+                            border:"none", color:"#fff", fontSize:14, fontWeight:700,
+                            cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+                            boxShadow:"0 2px 6px rgba(255,107,0,0.4)", flexShrink:0 }}>+</button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
-          </HScroll>
+                )
+              })}
+            </HScroll>
+          )}
 
           {/* S11 — LoyaltyPoints removed: điểm chỉ hiển thị trong Profile cá nhân */}
 
-          {/* ──────────────────────────────────────
-              S11 — Cửa hàng yêu thích (ẩn nếu chưa có)
-          ────────────────────────────────────── */}
-          {FAVE_SHOPS.length > 0 && (
-            <>
-              <SectionHeader title="❤️ Cửa hàng yêu thích" more="Xem tất cả →" href="/favorites" />
-              <div style={{ padding:"0 16px", display:"flex", flexDirection:"column", gap:8, marginBottom:14 }}>
-                {FAVE_SHOPS.slice(0,5).map((s,i) => (
-                  <motion.a key={s.id} href={`/shop/${s.id}`}
-                    initial={{ opacity:0, x:-12 }} animate={{ opacity:1, x:0 }}
-                    transition={{ delay: i * 0.06 }}
-                    style={{ textDecoration:"none" }}>
-                    <div style={{
-                      background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
-                      border:"1px solid rgba(255,107,0,0.12)",
-                      borderRadius:14, padding:"10px 11px",
-                      display:"flex", alignItems:"center", gap:10,
-                      position:"relative", overflow:"hidden",
-                    }}>
-                      {/* Heart badge */}
-                      <div style={{ position:"absolute", top:7, right:10,
-                        width:20, height:20, borderRadius:"50%",
-                        background:"rgba(255,64,64,0.12)", border:"1px solid rgba(255,64,64,0.25)",
-                        display:"flex", alignItems:"center", justifyContent:"center", fontSize:10 }}>❤️</div>
-                      {/* Shop logo */}
-                      <div style={{ width:50, height:50, borderRadius:12, flexShrink:0,
-                        background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.18)",
-                        display:"flex", alignItems:"center", justifyContent:"center", fontSize:25 }}>
-                        {s.emoji}
-                      </div>
-                      {/* Info */}
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ color:"#f8f0e0", fontSize:11.5, fontWeight:600,
-                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", paddingRight:24 }}>
-                          {s.name}
-                        </div>
-                        <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
-                          {s.tags.map(t => (
-                            <span key={t} style={{
-                              background: t.startsWith("🔥") ? "rgba(255,64,64,0.1)" :
-                                          t.startsWith("🆕") ? "rgba(62,207,110,0.08)" :
-                                                               "rgba(255,255,255,0.04)",
-                              border: t.startsWith("🔥") ? "1px solid rgba(255,64,64,0.2)" :
-                                      t.startsWith("🆕") ? "1px solid rgba(62,207,110,0.2)" :
-                                                           "1px solid rgba(255,255,255,0.06)",
-                              color: t.startsWith("🔥") ? "#ff6060" :
-                                     t.startsWith("🆕") ? "#3ecf6e" : "#6a5a40",
-                              fontSize:7.5, borderRadius:5, padding:"2px 6px",
-                            }}>{t}</span>
-                          ))}
-                        </div>
-                        <div style={{ display:"flex", alignItems:"center", gap:7, marginTop:5 }}>
-                          <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
-                          <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.star}</span>
-                          <span style={{ color:"#4a5040", fontSize:9 }}>·</span>
-                          <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.km}km</span>
-                          <span style={{ color:"#4a5040", fontSize:9 }}>·</span>
-                          <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.eta}–{s.eta+10} phút</span>
-                          {s.freeShip && (
-                            <>
-                              <span style={{ color:"#4a5040", fontSize:9 }}>·</span>
-                              <span style={{ color:"#3ecf6e", fontSize:8, fontWeight:600 }}>Free ship</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </motion.a>
-                ))}
-              </div>
-            </>
-          )}
+          {/* S11 — Cửa hàng yêu thích: sẽ hiện khi có bảng favorites */}
 
           {/* ──────────────────────────────────────
               S12 — ReorderSection
           ────────────────────────────────────── */}
           <SectionHeader title="🔄 Đặt lại nhanh" more="Lịch sử →" href="/orders" />
-          <HScroll>
-            {REORDERS.map(r => (
-              <div key={r.id} style={{
-                minWidth:132, flexShrink:0,
-                background:"rgba(255,255,255,0.04)", backdropFilter:"blur(10px)",
-                border:"1px solid rgba(255,255,255,0.08)",
-                borderRadius:12, padding:"10px 11px", cursor:"pointer",
-              }}>
-                <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:7 }}>
-                  <span style={{ fontSize:20 }}>{r.emoji}</span>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ color:"#f8f0e0", fontSize:9.5, fontWeight:600,
-                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                      {r.name}
-                    </div>
-                    <div style={{ color:"#6a5a40", fontSize:8, marginTop:1,
-                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                      {r.shop}
-                    </div>
-                  </div>
-                </div>
-                <button className="reorder-btn"
-                  onClick={() => handleAdd(null, { id:`reorder-${r.id}`, name:r.name, price:r.price*1000, shop:r.shop, shopId:r.shop })}
-                  style={{
-                    width:"100%", height:28, borderRadius:8, border:"1px solid rgba(255,107,0,0.25)",
-                    background:"rgba(255,107,0,0.08)",
-                    color:"#FF8C00", fontSize:8.5, fontWeight:600,
-                    cursor:"pointer", fontFamily:"Lexend",
-                    display:"flex", alignItems:"center", justifyContent:"center", gap:4,
-                    transition:"background .15s",
-                  }}>
-                  🔄 Đặt lại · {r.price}k
-                </button>
+          {reorders.length === 0 ? (
+            <div style={{ padding:"0 16px 14px" }}>
+              <div style={{ background:"rgba(255,255,255,0.03)", border:"1px dashed rgba(255,255,255,0.07)",
+                borderRadius:12, padding:"16px", textAlign:"center" }}>
+                <div style={{ fontSize:28, marginBottom:6 }}>🍽️</div>
+                <div style={{ color:"#6a5a40", fontSize:10 }}>Đặt đơn đầu tiên để thấy<br/>lịch sử đặt lại nhanh ở đây</div>
               </div>
-            ))}
-          </HScroll>
+            </div>
+          ) : (
+            <HScroll>
+              {reorders.map(r => {
+                const shopName = (r.shops as {name:string}|null)?.name ?? "Quán"
+                const firstItem = (r.order_items as {name:string}[])?.[0]?.name ?? "Đơn hàng"
+                return (
+                  <div key={r.id} style={{
+                    minWidth:132, flexShrink:0,
+                    background:"rgba(255,255,255,0.04)", backdropFilter:"blur(10px)",
+                    border:"1px solid rgba(255,255,255,0.08)",
+                    borderRadius:12, padding:"10px 11px", cursor:"pointer",
+                  }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:7 }}>
+                      <span style={{ fontSize:20 }}>🛒</span>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ color:"#f8f0e0", fontSize:9.5, fontWeight:600,
+                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                          {firstItem}
+                        </div>
+                        <div style={{ color:"#6a5a40", fontSize:8, marginTop:1,
+                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                          {shopName}
+                        </div>
+                      </div>
+                    </div>
+                    <a href={`/shop/${r.id}`} style={{ textDecoration:"none" }}>
+                      <div className="reorder-btn" style={{
+                        width:"100%", height:28, borderRadius:8, border:"1px solid rgba(255,107,0,0.25)",
+                        background:"rgba(255,107,0,0.08)",
+                        color:"#FF8C00", fontSize:8.5, fontWeight:600,
+                        cursor:"pointer", fontFamily:"Lexend",
+                        display:"flex", alignItems:"center", justifyContent:"center", gap:4,
+                        transition:"background .15s",
+                      }}>
+                        🔄 Đặt lại · {Math.round(r.total_amount/1000)}k
+                      </div>
+                    </a>
+                  </div>
+                )
+              })}
+            </HScroll>
+          )}
 
           <div style={{ height:8 }} />
 

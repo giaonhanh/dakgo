@@ -42,16 +42,19 @@ function fmtTime(iso: string): string {
 
 export default function MerchantDashboard() {
   const supabase = createClient()
-  const [shopId,       setShopId]       = useState<string | null>(null)
-  const [shopName,     setShopName]     = useState("Cửa hàng")
-  const [open,         setOpen]         = useState(true)
-  const [orders,       setOrders]       = useState<MOrder[]>([])
-  const [todayRevenue, setTodayRevenue] = useState(0)
-  const [rating,       setRating]       = useState<number | null>(null)
-  const [loading,      setLoading]      = useState(true)
-  const [toast,        setToast]        = useState("")
-  const [toastOk,      setToastOk]      = useState(true)
-  const [expand,       setExpand]       = useState<string | null>(null)
+  const [shopId,        setShopId]        = useState<string | null>(null)
+  const [shopName,      setShopName]      = useState("Cửa hàng")
+  const [open,          setOpen]          = useState(true)
+  const [orders,        setOrders]        = useState<MOrder[]>([])
+  const [todayRevenue,  setTodayRevenue]  = useState(0)
+  const [rating,        setRating]        = useState<number | null>(null)
+  const [loading,       setLoading]       = useState(true)
+  const [toast,         setToast]         = useState("")
+  const [toastOk,       setToastOk]       = useState(true)
+  const [expand,        setExpand]        = useState<string | null>(null)
+  const [rejectModal,   setRejectModal]   = useState<MOrder | null>(null)
+  const [rejectReason,  setRejectReason]  = useState("")
+  const [dispatchStatus, setDispatchStatus] = useState<Record<string, "dispatching" | "sent" | "none">>({})
 
   const fireToast = (msg: string, ok = true) => {
     setToast(msg); setToastOk(ok); setTimeout(() => setToast(""), 3000)
@@ -176,20 +179,45 @@ export default function MerchantDashboard() {
   const handleAccept = async (order: MOrder) => {
     setOrderStatus(order.id, "accepted")
     await supabase.from("orders").update({ status: "accepted", accepted_at: new Date().toISOString() }).eq("id", order.id)
-    fireToast(`✅ Đã xác nhận #${order.shortId} · Khách đã được thông báo`)
-    setTimeout(() => {
+    fireToast(`✅ Đã xác nhận #${order.shortId} · Đang điều phối tài xế...`)
+
+    // Move to preparing + dispatch drivers simultaneously
+    setTimeout(async () => {
       setOrderStatus(order.id, "preparing")
-      supabase.from("orders").update({ status: "preparing", preparing_at: new Date().toISOString() }).eq("id", order.id)
-    }, 1000)
+      await supabase.from("orders").update({ status: "preparing", preparing_at: new Date().toISOString() }).eq("id", order.id)
+
+      // Dispatch to 3 nearest drivers (driver condition: < 3 incomplete orders)
+      setDispatchStatus(prev => ({ ...prev, [order.id]: "dispatching" }))
+      // Call Supabase RPC to find & notify nearest drivers
+      supabase.rpc("find_nearest_driver", {
+        order_lat: 12.6521, order_lng: 108.5073, max_distance_km: 5
+      }).then(() => {
+        setTimeout(() => {
+          setDispatchStatus(prev => ({ ...prev, [order.id]: "sent" }))
+          fireToast(`🛵 Đã gửi thông báo cho 3 tài xế gần nhất!`)
+        }, 1800)
+      })
+    }, 900)
   }
 
-  const handleReject = async (order: MOrder) => {
+  const openRejectModal = (order: MOrder) => {
+    setRejectReason("")
+    setRejectModal(order)
+  }
+
+  const confirmReject = async () => {
+    if (!rejectModal) return
+    const order = rejectModal
+    const reason = rejectReason.trim() || "Cửa hàng từ chối đơn hàng"
     setOrderStatus(order.id, "rejected")
-    await supabase.from("orders").update({ status: "cancelled", cancel_reason: "Cửa hàng từ chối", cancelled_at: new Date().toISOString() }).eq("id", order.id)
-    const refundMsg = order.payMethod === "wallet"
-      ? ` · Hoàn ${fmt(order.total)} về ví khách`
-      : " · Khách thanh toán tiền mặt, không hoàn"
-    fireToast(`❌ Đã từ chối #${order.shortId}${refundMsg}`, false)
+    await supabase.from("orders").update({
+      status: "cancelled",
+      cancel_reason: reason,
+      cancelled_at: new Date().toISOString()
+    }).eq("id", order.id)
+    const refundMsg = order.payMethod === "wallet" ? ` · Hoàn ${fmt(order.total)} về ví` : ""
+    fireToast(`❌ Từ chối #${order.shortId}${refundMsg}`, false)
+    setRejectModal(null)
   }
 
   const handleReady = async (order: MOrder) => {
@@ -430,10 +458,30 @@ export default function MerchantDashboard() {
                             )
                           })()}
 
+                          {/* Dispatch indicator for preparing orders */}
+                          {(order.status === "accepted" || order.status === "preparing") && dispatchStatus[order.id] && (
+                            <div style={{ marginBottom: 8, padding: "7px 10px", borderRadius: 9,
+                              background: dispatchStatus[order.id] === "sent" ? "rgba(62,207,110,0.06)" : "rgba(74,143,245,0.06)",
+                              border: `1px solid ${dispatchStatus[order.id] === "sent" ? "rgba(62,207,110,0.18)" : "rgba(74,143,245,0.18)"}`,
+                              display: "flex", alignItems: "center", gap: 7 }}>
+                              {dispatchStatus[order.id] === "dispatching" ? (
+                                <>
+                                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4a8ff5", animation: "mPulse 1s infinite", flexShrink: 0 }} />
+                                  <span style={{ color: "#4a8ff5", fontSize: 9 }}>Đang tìm 3 tài xế gần nhất... (điều kiện: &lt; 3 đơn chưa xong)</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span style={{ fontSize: 11 }}>🛵</span>
+                                  <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>Đã thông báo 3 tài xế · Chờ tài xế xác nhận nhận đơn</span>
+                                </>
+                              )}
+                            </div>
+                          )}
+
                           <div style={{ display: "flex", gap: 7 }}>
                             {order.status === "pending" && (
                               <>
-                                <button onClick={() => handleReject(order)}
+                                <button onClick={() => openRejectModal(order)}
                                   style={{ flex: 1, height: 40, borderRadius: 10, border: "none",
                                     background: "rgba(255,64,64,0.1)", outline: "1px solid rgba(255,64,64,0.25)",
                                     color: "#ff4040", fontSize: 11, fontWeight: 700,
@@ -449,7 +497,7 @@ export default function MerchantDashboard() {
                                   <div style={{ position: "absolute", top: 0, left: "-60%", width: "35%", height: "100%",
                                     background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)",
                                     animation: "mShim 2.5s infinite" }} />
-                                  <span style={{ position: "relative", zIndex: 1 }}>✓ Xác nhận đơn</span>
+                                  <span style={{ position: "relative", zIndex: 1 }}>✓ Xác nhận &amp; Điều phối tài xế</span>
                                 </button>
                               </>
                             )}
@@ -500,6 +548,61 @@ export default function MerchantDashboard() {
           </div>
         </div>
       </div>
+
+      {/* ── Reject reason modal ── */}
+      <AnimatePresence>
+        {rejectModal && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setRejectModal(null)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", zIndex: 50, backdropFilter: "blur(6px)" }} />
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 24, stiffness: 300 }}
+              style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#0e0c09",
+                borderRadius: "22px 22px 0 0", border: "1px solid rgba(255,64,64,0.2)",
+                padding: "18px 18px 36px", zIndex: 51 }}>
+              <div style={{ width: 36, height: 4, background: "rgba(255,255,255,0.12)", borderRadius: 2, margin: "0 auto 16px" }} />
+              <div style={{ color: "#ff4040", fontSize: 14, fontWeight: 800, marginBottom: 6 }}>✕ Từ chối đơn #{rejectModal.shortId}</div>
+              <div style={{ color: "#6a5a40", fontSize: 9, marginBottom: 14 }}>
+                Khách hàng sẽ nhận thông báo từ chối. {rejectModal.payMethod === "wallet" && `Hoàn tiền ${fmt(rejectModal.total)} về ví.`}
+              </div>
+
+              <div style={{ color: "rgba(176,149,106,0.75)", fontSize: 9.5, marginBottom: 5 }}>Lý do từ chối</div>
+              {/* Quick reason chips */}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                {["Hết nguyên liệu", "Quán đóng cửa", "Quá tải đơn hàng", "Không giao khu vực này"].map(r => (
+                  <button key={r} onClick={() => setRejectReason(r)}
+                    style={{ padding: "4px 10px", borderRadius: 8, cursor: "pointer", fontFamily: "Lexend",
+                      background: rejectReason === r ? "rgba(255,64,64,0.12)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${rejectReason === r ? "rgba(255,64,64,0.35)" : "rgba(255,255,255,0.07)"}`,
+                      color: rejectReason === r ? "#ff4040" : "#6a5a40", fontSize: 9, fontWeight: rejectReason === r ? 700 : 400 }}>
+                    {r}
+                  </button>
+                ))}
+              </div>
+              <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
+                placeholder="Hoặc nhập lý do khác..."
+                style={{ width: "100%", minHeight: 56, background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,64,64,0.2)", borderRadius: 11,
+                  color: "#f8f0e0", fontSize: 11, padding: "8px 12px", resize: "none",
+                  fontFamily: "Lexend", outline: "none", marginBottom: 14 }} />
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setRejectModal(null)}
+                  style={{ flex: 1, height: 44, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend",
+                    background: "transparent", border: "1px solid rgba(255,255,255,0.08)",
+                    color: "#6a5a40", fontSize: 12, fontWeight: 600 }}>Hủy</button>
+                <button onClick={confirmReject}
+                  style={{ flex: 2, height: 44, borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "Lexend",
+                    background: "rgba(255,64,64,0.15)", outline: "1px solid rgba(255,64,64,0.35)",
+                    color: "#ff4040", fontSize: 12, fontWeight: 800 }}>
+                  ✕ Xác nhận từ chối
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   )
 }

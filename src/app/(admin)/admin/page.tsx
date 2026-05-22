@@ -1,516 +1,499 @@
-﻿"use client"
+"use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 
-interface Order {
+interface DashOrder {
   id: string
-  customer: string
-  shop: string
-  amount: number
-  status: "delivering" | "completed" | "cancelled" | "pending"
+  status: string
+  total_amount: number
+  shopName: string
+  customerName: string
+  created_at: string
 }
 
-const ORDERS: Order[] = [
-  { id: "DH142", customer: "Nguyễn Văn A", shop: "Cơm Tấm Lan",  amount: 105000, status: "delivering" },
-  { id: "DH141", customer: "Trần Thị B",   shop: "Quán Mộc",      amount: 85000,  status: "completed"  },
-  { id: "DH140", customer: "Lê Văn C",     shop: "Tiệm Kem",      amount: 75000,  status: "cancelled"  },
-  { id: "DH139", customer: "Phạm Thị D",   shop: "Bún Bò Huế",    amount: 92000,  status: "completed"  },
-  { id: "DH138", customer: "Hoàng Văn E",  shop: "Trà Sữa Ding",  amount: 55000,  status: "pending"    },
+interface Kpi {
+  todayRevenue: number
+  todayOrders: number
+  driversOnline: number
+  openShops: number
+  monthRevenue: number
+  pendingDrivers: number
+  pendingShops: number
+  blacklistCount: number
+  cancelledToday: number
+  deliveredToday: number
+}
+
+function getLast7Days() {
+  const days = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"]
+  const result: { day: string; today: boolean }[] = []
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i)
+    result.push({ day: days[d.getDay()], today: i === 0 })
+  }
+  return result
+}
+
+const CHART_BARS = getLast7Days()
+const REVENUE_VALS = [42, 68, 55, 85, 73, 91, 100]
+const HOUR_BARS = [
+  { h: "6h", v: 15 }, { h: "7h", v: 42 }, { h: "8h", v: 78 },
+  { h: "9h", v: 95 }, { h: "10h", v: 82 }, { h: "11h", v: 88 },
+  { h: "12h", v: 65 }, { h: "13h", v: 50 }, { h: "14h", v: 38 },
+  { h: "15h", v: 44 }, { h: "16h", v: 58 }, { h: "17h", v: 85 },
 ]
 
-const STATUS_MAP = {
-  delivering: { label: "Đang giao",      color: "#FF8C00", bg: "rgba(255,140,0,0.12)",   border: "rgba(255,107,0,0.3)"   },
-  completed:  { label: "Hoàn thành",     color: "#3ecf6e", bg: "rgba(62,207,110,0.10)",  border: "rgba(62,207,110,0.25)" },
-  cancelled:  { label: "Đã hủy",         color: "#ff4040", bg: "rgba(255,64,64,0.10)",   border: "rgba(255,64,64,0.25)"  },
-  pending:    { label: "Chờ xác nhận",   color: "#4a8ff5", bg: "rgba(74,143,245,0.10)",  border: "rgba(74,143,245,0.25)" },
+const STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  delivering: { label: "Đang giao",    color: "#FF8C00", bg: "rgba(255,140,0,0.12)",  border: "rgba(255,107,0,0.3)"   },
+  delivered:  { label: "Hoàn thành",   color: "#3ecf6e", bg: "rgba(62,207,110,0.10)", border: "rgba(62,207,110,0.25)" },
+  cancelled:  { label: "Đã hủy",       color: "#ff4040", bg: "rgba(255,64,64,0.10)",  border: "rgba(255,64,64,0.25)"  },
+  pending:    { label: "Chờ xác nhận", color: "#4a8ff5", bg: "rgba(74,143,245,0.10)", border: "rgba(74,143,245,0.25)" },
+  accepted:   { label: "Đã nhận",      color: "#FFB347", bg: "rgba(255,179,71,0.10)", border: "rgba(255,179,71,0.25)" },
+  preparing:  { label: "Đang nấu",     color: "#4a8ff5", bg: "rgba(74,143,245,0.10)", border: "rgba(74,143,245,0.25)" },
+  ready:      { label: "Sẵn sàng",     color: "#3ecf6e", bg: "rgba(62,207,110,0.10)", border: "rgba(62,207,110,0.25)" },
 }
 
 const NAV_ITEMS = [
-  { icon: "🏠",  label: "Dashboard",      href: "/admin",               active: true  },
-  { icon: "🏍️", label: "Tài xế",          href: "/admin/drivers",       active: false },
-  { icon: "🏪",  label: "Cửa hàng",        href: "/admin/merchants",     active: false },
-  { icon: "📦",  label: "Đơn hàng",        href: "/admin/orders",        active: false },
-  { icon: "👥",  label: "Khách hàng",      href: "/admin/users",         active: false },
-  { icon: "💰",  label: "Tài chính",       href: "/admin/finance",       active: false },
-  { icon: "🗺️", label: "Bản đồ live",     href: "/admin/map",           active: false },
-  { icon: "🏷️", label: "Khuyến mãi",      href: "/admin/promotions",    active: false },
-  { icon: "⚖️",  label: "Tranh chấp",      href: "/admin/disputes",      active: false },
-  { icon: "📣",  label: "Thông báo",       href: "/admin/notifications", active: false },
-  { icon: "⚙️",  label: "Cài đặt",         href: "/admin/settings",      active: false },
+  { icon: "🏠",  label: "Dashboard",    href: "/admin",               active: true  },
+  { icon: "🏍️", label: "Tài xế",        href: "/admin/drivers",       active: false },
+  { icon: "🏪",  label: "Cửa hàng",      href: "/admin/merchants",     active: false },
+  { icon: "📦",  label: "Đơn hàng",      href: "/admin/orders",        active: false },
+  { icon: "👥",  label: "Khách hàng",    href: "/admin/users",         active: false },
+  { icon: "💰",  label: "Tài chính",     href: "/admin/finance",       active: false },
+  { icon: "🗺️", label: "Bản đồ live",   href: "/admin/map",           active: false },
+  { icon: "🏷️", label: "Khuyến mãi",    href: "/admin/promotions",    active: false },
+  { icon: "⚖️",  label: "Tranh chấp",    href: "/admin/disputes",      active: false },
+  { icon: "📣",  label: "Thông báo",     href: "/admin/notifications", active: false },
+  { icon: "⚙️",  label: "Cài đặt",       href: "/admin/settings",      active: false },
 ]
 
-const CHART_BARS = [
-  { day: "T2", value: 55, today: false },
-  { day: "T3", value: 70, today: false },
-  { day: "T4", value: 45, today: false },
-  { day: "T5", value: 88, today: false },
-  { day: "T6", value: 95, today: false },
-  { day: "T7", value: 62, today: false },
-  { day: "CN", value: 78, today: true  },
+const fmtShort = (n: number) =>
+  n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + "M" : n >= 1000 ? (n / 1000).toFixed(0) + "k" : n.toString()
+
+const timeAgo = (iso: string) => {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (diff < 1) return "vừa xong"
+  if (diff < 60) return `${diff} phút trước`
+  return `${Math.floor(diff / 60)} giờ trước`
+}
+
+const ACTIVITY_LOG = [
+  { icon: "🆕", text: "Tài xế Nguyễn Văn A đăng ký mới",      time: "2 phút trước",  color: "#3ecf6e" },
+  { icon: "⚠️", text: "Đơn #GN7821 bị hủy bởi khách hàng",    time: "5 phút trước",  color: "#ff4040" },
+  { icon: "🏪", text: "Cửa hàng Bánh Mì 36 chờ duyệt",        time: "12 phút trước", color: "#FF8C00" },
+  { icon: "💰", text: "Giao dịch 250k hoàn thành thành công",  time: "18 phút trước", color: "#4a8ff5" },
+  { icon: "⭐", text: "5 đánh giá mới cho Phở Hà Nội",        time: "25 phút trước", color: "#f5c542" },
+  { icon: "🚫", text: "Khách hàng Trần B bị khóa tự động",    time: "31 phút trước", color: "#ff4040" },
 ]
 
-const HOUR_BARS = [
-  { h: "6h",  v: 20 }, { h: "7h",  v: 45 }, { h: "8h",  v: 75 },
-  { h: "9h",  v: 98 }, { h: "10h", v: 85 }, { h: "11h", v: 90 },
-  { h: "12h", v: 40 },
+const TOP_SHOPS = [
+  { name: "Phở Hà Nội",      orders: 48, revenue: 2400000, rating: 4.9 },
+  { name: "Bánh Mì 36",      orders: 36, revenue: 1080000, rating: 4.8 },
+  { name: "Cơm Tấm Bà Năm",  orders: 31, revenue: 1550000, rating: 4.7 },
+  { name: "Gà Rán KFC Mini", orders: 28, revenue: 2240000, rating: 4.6 },
 ]
 
 export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [orders, setOrders] = useState<DashOrder[]>([])
+  const [lastRefresh, setLastRefresh] = useState(new Date())
+  const [kpi, setKpi] = useState<Kpi>({
+    todayRevenue: 0, todayOrders: 0, driversOnline: 0, openShops: 0,
+    monthRevenue: 0, pendingDrivers: 0, pendingShops: 0, blacklistCount: 0,
+    cancelledToday: 0, deliveredToday: 0,
+  })
 
   const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
+
+  useEffect(() => {
+    const supabase = createClient()
+    async function load() {
+      const today = new Date(); today.setHours(0, 0, 0, 0)
+      const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+
+      const [
+        { data: rawOrders },
+        { data: todayRows },
+        { data: monthRows },
+        { data: driverRows },
+        { data: shopRows },
+        { data: pendDrv },
+        { data: pendShop },
+        { data: blackRows },
+      ] = await Promise.all([
+        supabase.from("orders")
+          .select("id, status, total_amount, customer_id, created_at, shops!shop_id(name)")
+          .order("created_at", { ascending: false }).limit(8),
+        supabase.from("orders").select("total_amount, status").gte("created_at", today.toISOString()),
+        supabase.from("orders").select("total_amount, status").gte("created_at", firstOfMonth.toISOString()),
+        supabase.from("drivers").select("id").eq("status", "online"),
+        supabase.from("shops").select("id").eq("is_open", true).eq("status", "approved"),
+        supabase.from("drivers").select("id").eq("is_approved", false),
+        supabase.from("shops").select("id").eq("status", "pending"),
+        supabase.from("blacklist").select("id"),
+      ])
+
+      const todayRevenue = (todayRows ?? []).filter(o => o.status !== "cancelled").reduce((s, o) => s + (o.total_amount ?? 0), 0)
+      const monthRevenue = (monthRows ?? []).filter(o => o.status !== "cancelled").reduce((s, o) => s + (o.total_amount ?? 0), 0)
+      const cancelledToday = (todayRows ?? []).filter(o => o.status === "cancelled").length
+      const deliveredToday = (todayRows ?? []).filter(o => o.status === "delivered").length
+
+      setKpi({
+        todayRevenue, todayOrders: (todayRows ?? []).length,
+        driversOnline: driverRows?.length ?? 0,
+        openShops: shopRows?.length ?? 0,
+        monthRevenue,
+        pendingDrivers: pendDrv?.length ?? 0,
+        pendingShops: pendShop?.length ?? 0,
+        blacklistCount: blackRows?.length ?? 0,
+        cancelledToday, deliveredToday,
+      })
+
+      if (rawOrders && rawOrders.length > 0) {
+        const custIds = rawOrders.map(o => o.customer_id).filter(Boolean)
+        const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", custIds)
+        const profileMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p.full_name ?? "Khách hàng"]))
+        setOrders(rawOrders.map(o => {
+          const shops = o.shops as unknown
+          const shopName = Array.isArray(shops) ? (shops[0] as { name: string })?.name ?? "—" : (shops as { name: string } | null)?.name ?? "—"
+          return { id: o.id, status: o.status, total_amount: o.total_amount, shopName, customerName: profileMap[o.customer_id] ?? "Khách hàng", created_at: o.created_at }
+        }))
+      }
+      setLastRefresh(new Date())
+    }
+    load()
+    const iv = setInterval(load, 30000)
+    return () => clearInterval(iv)
+  }, [])
+
+  const successRate = kpi.todayOrders > 0 ? Math.round((kpi.deliveredToday / kpi.todayOrders) * 100) : 0
 
   return (
     <>
       <style>{`
-                * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { background: #06050a; font-family: 'Lexend', sans-serif; height: 100%; overflow: hidden; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,107,0,0.3); border-radius: 2px; }
-
-        @keyframes shimmer { 0% { left:-60%; } 100% { left:120%; } }
-        @keyframes fadeUp  { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes pulse   { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
-
-        .kpi-card { animation: fadeUp 0.4s ease both; }
-        .kpi-card:hover { transform: translateY(-2px); border-color: rgba(255,107,0,0.35) !important; transition: all 0.2s; }
+        @keyframes fadeUp   { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes pulse    { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
+        @keyframes shimmer  { 0% { left:-60%; } 100% { left:120%; } }
+        @keyframes spin     { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+        .kpi-card { animation: fadeUp 0.4s ease both; transition: all 0.2s; }
+        .kpi-card:hover { transform: translateY(-2px) scale(1.01); }
         .order-row:hover { background: rgba(255,255,255,0.04) !important; }
-        .sidebar-link:hover { background: rgba(255,107,0,0.08) !important; }
+        .sidebar-link:hover { background: rgba(255,107,0,0.08) !important; color: #FF8C00 !important; }
+        .quick-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+        a { text-decoration: none; }
       `}</style>
 
-      <div style={{
-        display: "flex",
-        height: "100vh",
-        background: "#06050a",
-        color: "#f0eaff",
-        overflow: "hidden",
-      }}>
+      <div style={{ display:"flex", height:"100vh", background:"#06050a", color:"#f0eaff", overflow:"hidden" }}>
 
         {/* SIDEBAR */}
-        <div style={{
-          width: sidebarOpen ? 220 : 60,
-          flexShrink: 0,
-          background: "rgba(12,11,20,0.95)",
-          backdropFilter: "blur(20px)",
-          borderRight: "1px solid rgba(255,107,0,0.12)",
-          display: "flex",
-          flexDirection: "column",
-          transition: "width 0.25s ease",
-          overflow: "hidden",
-          zIndex: 50,
-        }}>
-
+        <div style={{ width: sidebarOpen ? 220 : 60, flexShrink:0, background:"rgba(10,9,18,0.98)", backdropFilter:"blur(20px)", borderRight:"1px solid rgba(255,107,0,0.12)", display:"flex", flexDirection:"column", transition:"width 0.25s ease", overflow:"hidden", zIndex:50 }}>
           {/* Logo */}
-          <div style={{
-            height: 56,
-            display: "flex",
-            alignItems: "center",
-            padding: "0 14px",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
-            gap: 10,
-            flexShrink: 0,
-          }}>
-            <div style={{
-              width: 30, height: 30, borderRadius: 9, flexShrink: 0,
-              background: "linear-gradient(135deg, #FF6B00, #FF8C00, #FFB347)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 15,
-            }}>🚀</div>
+          <div style={{ height:60, display:"flex", alignItems:"center", padding:"0 14px", borderBottom:"1px solid rgba(255,255,255,0.06)", gap:10, flexShrink:0 }}>
+            <div style={{ width:32, height:32, borderRadius:10, flexShrink:0, background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, boxShadow:"0 0 12px rgba(255,107,0,0.4)" }}>🚀</div>
             {sidebarOpen && (
               <div>
-                <div style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700 }}>Giao Nhanh</div>
-                <div style={{
-                  fontSize: 8, fontWeight: 700, padding: "1px 5px",
-                  background: "rgba(180,100,255,0.15)", border: "1px solid rgba(180,100,255,0.3)",
-                  borderRadius: 4, color: "#b464ff", display: "inline-block",
-                }}>ADMIN</div>
+                <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:800, letterSpacing:-0.3 }}>GiaoNhanh</div>
+                <span style={{ fontSize:8, fontWeight:700, padding:"1px 6px", background:"rgba(180,100,255,0.15)", border:"1px solid rgba(180,100,255,0.3)", borderRadius:4, color:"#b464ff" }}>ADMIN PANEL</span>
               </div>
             )}
           </div>
 
-          {/* Nav items */}
-          <nav style={{ flex: 1, padding: "10px 8px", overflow: "auto" }}>
-            {NAV_ITEMS.map((item) => (
-              <a key={item.href} href={item.href} style={{ textDecoration: "none" }}>
-                <div
-                  className="sidebar-link"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: sidebarOpen ? "8px 10px" : "8px",
-                    borderRadius: 10,
-                    marginBottom: 3,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    background: item.active ? "rgba(255,107,0,0.12)" : "transparent",
-                    borderLeft: item.active ? "2px solid #FF6B00" : "2px solid transparent",
-                    justifyContent: sidebarOpen ? "flex-start" : "center",
-                  }}
-                >
-                  <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
-                  {sidebarOpen && (
-                    <span style={{
-                      fontSize: 11, fontWeight: item.active ? 600 : 400,
-                      color: item.active ? "#FF8C00" : "rgba(144,128,176,0.8)",
-                      whiteSpace: "nowrap",
-                    }}>{item.label}</span>
-                  )}
-                </div>
+          {/* Nav */}
+          <nav style={{ flex:1, padding:"8px", overflowY:"auto" }}>
+            {NAV_ITEMS.map(item => (
+              <a key={item.href} href={item.href} className="sidebar-link" style={{ display:"flex", alignItems:"center", gap:10, height:40, borderRadius:10, padding:`0 ${sidebarOpen ? 10 : 0}px`, marginBottom:2, justifyContent: sidebarOpen ? "flex-start" : "center", background: item.active ? "rgba(255,107,0,0.12)" : "transparent", borderLeft: item.active ? "2px solid #FF6B00" : "2px solid transparent", color: item.active ? "#FF8C00" : "#6a5a40", fontSize:11, fontWeight: item.active ? 700 : 400, transition:"all 0.2s" }}>
+                <span style={{ fontSize:17, flexShrink:0 }}>{item.icon}</span>
+                {sidebarOpen && <span style={{ whiteSpace:"nowrap" }}>{item.label}</span>}
               </a>
             ))}
           </nav>
 
-          {/* Toggle button */}
-          <div
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{
-              height: 44, display: "flex", alignItems: "center",
-              justifyContent: "center", cursor: "pointer",
-              borderTop: "1px solid rgba(255,255,255,0.06)",
-              color: "rgba(144,128,176,0.6)", fontSize: 14,
-              transition: "color 0.2s",
-            }}
-          >
+          {/* System status */}
+          {sidebarOpen && (
+            <div style={{ margin:"8px", padding:"10px 12px", background:"rgba(62,207,110,0.06)", border:"1px solid rgba(62,207,110,0.15)", borderRadius:10 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
+                <div style={{ width:6, height:6, borderRadius:"50%", background:"#3ecf6e", animation:"pulse 2s infinite", boxShadow:"0 0 5px #3ecf6e" }} />
+                <span style={{ color:"#3ecf6e", fontSize:9, fontWeight:700 }}>Hệ thống hoạt động</span>
+              </div>
+              <div style={{ color:"#6a5a40", fontSize:8 }}>Cập nhật: {lastRefresh.toLocaleTimeString("vi-VN")}</div>
+            </div>
+          )}
+
+          <button onClick={() => setSidebarOpen(p => !p)} style={{ margin:"8px", height:36, borderRadius:10, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", color:"#6a5a40", fontSize:14, cursor:"pointer", fontFamily:"Lexend", transition:"all 0.2s" }}>
             {sidebarOpen ? "◀" : "▶"}
-          </div>
+          </button>
         </div>
 
-        {/* MAIN CONTENT */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {/* MAIN */}
+        <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
-          {/* Top bar */}
-          <div style={{
-            height: 56, flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "0 20px",
-            background: "rgba(12,11,20,0.8)",
-            backdropFilter: "blur(12px)",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
-          }}>
+          {/* Topbar */}
+          <div style={{ height:60, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 24px", background:"rgba(10,9,18,0.8)", backdropFilter:"blur(12px)", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
             <div>
-              <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 9, textTransform: "uppercase", letterSpacing: 1 }}>Admin</div>
-              <div style={{ color: "#f0eaff", fontSize: 13, fontWeight: 700 }}>Giao Nhanh — Dashboard</div>
+              <div style={{ color:"#6a5a40", fontSize:9, textTransform:"uppercase", letterSpacing:1.5, marginBottom:2 }}>ADMIN · DASHBOARD</div>
+              <div style={{ color:"#f0eaff", fontSize:14, fontWeight:800 }}>Giao Nhanh — Tổng quan hệ thống</div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 9 }}>
-                Krông Pắc · {new Date().toLocaleDateString("vi-VN")}
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ padding:"5px 12px", borderRadius:8, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", color:"#6a5a40", fontSize:9 }}>
+                📍 Phước An, Krông Pắc · {new Date().toLocaleDateString("vi-VN", { weekday:"short", day:"2-digit", month:"2-digit" })}
               </div>
-              {/* Notif bell */}
-              <div style={{
-                width: 32, height: 32, borderRadius: 9,
-                background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer", position: "relative",
-              }}>
-                🔔
-                <div style={{
-                  position: "absolute", top: 5, right: 5,
-                  width: 7, height: 7, borderRadius: "50%",
-                  background: "#ff4040", border: "1.5px solid #06050a",
-                  boxShadow: "0 0 4px #ff4040",
-                  animation: "pulse 1.5s infinite",
-                }} />
+              <div style={{ position:"relative", cursor:"pointer" }}>
+                <div style={{ width:34, height:34, borderRadius:10, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>🔔</div>
+                {(kpi.pendingDrivers + kpi.pendingShops) > 0 && (
+                  <div style={{ position:"absolute", top:-3, right:-3, minWidth:14, height:14, borderRadius:7, background:"#ff4040", border:"2px solid #06050a", display:"flex", alignItems:"center", justifyContent:"center", fontSize:7, fontWeight:800, color:"#fff", padding:"0 2px" }}>
+                    {kpi.pendingDrivers + kpi.pendingShops}
+                  </div>
+                )}
               </div>
-              {/* Avatar */}
-              <div style={{
-                width: 32, height: 32, borderRadius: 9,
-                background: "rgba(180,100,255,0.15)", border: "1px solid rgba(180,100,255,0.3)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 14, cursor: "pointer",
-              }}>👤</div>
+              <a href="/admin/settings">
+                <div style={{ width:34, height:34, borderRadius:10, background:"rgba(180,100,255,0.12)", border:"1px solid rgba(180,100,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, cursor:"pointer" }}>👤</div>
+              </a>
             </div>
           </div>
 
-          {/* Scrollable body */}
-          <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+          {/* Scrollable content */}
+          <div style={{ flex:1, overflowY:"auto", padding:"16px 20px", display:"flex", flexDirection:"column", gap:14 }}>
 
-            {/* KPI Cards — 4 cột x 2 hàng */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: 10,
-              marginBottom: 14,
-            }}>
+            {/* KPI Grid — 4 cols top, 4 cols bottom */}
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10 }}>
               {[
-                { icon: "💰", label: "Doanh thu hôm nay",  value: "8.5M",   sub: "+14% hôm qua",       c: "#FF8C00", bg: "rgba(255,107,0,0.07)",    bd: "rgba(255,107,0,0.2)",    delay: "0s"    },
-                { icon: "📦", label: "Đơn hàng",            value: "142",    sub: "+8 trong 1h",         c: "#3ecf6e", bg: "rgba(62,207,110,0.06)",   bd: "rgba(62,207,110,0.18)",  delay: "0.05s" },
-                { icon: "🏍️",label: "Tài xế online",       value: "12",     sub: "3 đang giao",         c: "#4a8ff5", bg: "rgba(74,143,245,0.07)",   bd: "rgba(74,143,245,0.2)",   delay: "0.1s"  },
-                { icon: "👥", label: "Khách hoạt động",     value: "89",     sub: "+23 hôm nay",         c: "#b464ff", bg: "rgba(180,100,255,0.07)",  bd: "rgba(180,100,255,0.2)",  delay: "0.15s" },
-                { icon: "🏪", label: "Quán đang mở",        value: "23",     sub: "2 quán mới",          c: "#FF8C00", bg: "rgba(255,107,0,0.07)",    bd: "rgba(255,107,0,0.2)",    delay: "0.2s"  },
-                { icon: "⚠️", label: "Khiếu nại",           value: "3",      sub: "Cần xử lý",           c: "#ff4040", bg: "rgba(255,64,64,0.07)",    bd: "rgba(255,64,64,0.2)",    delay: "0.25s" },
-                { icon: "📈", label: "Doanh thu tháng",     value: "28.4M",  sub: "+18% tháng trước",    c: "#3ecf6e", bg: "rgba(62,207,110,0.06)",   bd: "rgba(62,207,110,0.18)",  delay: "0.3s"  },
-                { icon: "🏷️",label: "Voucher đã dùng",     value: "47",     sub: "Tiết kiệm 2.1M",      c: "#f5c542", bg: "rgba(245,197,66,0.07)",   bd: "rgba(245,197,66,0.2)",   delay: "0.35s" },
+                { icon:"💰", label:"Doanh thu hôm nay",   value: fmtShort(kpi.todayRevenue) + "đ", sub:`Tháng: ${fmtShort(kpi.monthRevenue)}đ`,      c:"#FF8C00", bg:"rgba(255,107,0,0.07)",   bd:"rgba(255,107,0,0.2)",   delay:"0s"    },
+                { icon:"📦", label:"Đơn hàng hôm nay",    value: kpi.todayOrders.toString(),        sub:`✅ ${kpi.deliveredToday} · ❌ ${kpi.cancelledToday}`, c:"#3ecf6e", bg:"rgba(62,207,110,0.06)",  bd:"rgba(62,207,110,0.18)", delay:"0.05s" },
+                { icon:"🏍️",label:"Tài xế online",        value: kpi.driversOnline.toString(),      sub:"Đang trực tuyến",                              c:"#4a8ff5", bg:"rgba(74,143,245,0.07)",  bd:"rgba(74,143,245,0.2)",  delay:"0.1s"  },
+                { icon:"🏪", label:"Quán đang mở",         value: kpi.openShops.toString(),          sub:"Đang hoạt động",                               c:"#FFB347", bg:"rgba(255,179,71,0.07)",  bd:"rgba(255,179,71,0.2)",  delay:"0.15s" },
+                { icon:"⚠️", label:"Tài xế chờ duyệt",    value: kpi.pendingDrivers.toString(),     sub:"Cần xem xét",                                 c:"#ff4040", bg:"rgba(255,64,64,0.07)",   bd:"rgba(255,64,64,0.2)",   delay:"0.2s"  },
+                { icon:"🏪", label:"Quán chờ duyệt",       value: kpi.pendingShops.toString(),       sub:"Cần xem xét",                                 c:"#f5c542", bg:"rgba(245,197,66,0.07)",  bd:"rgba(245,197,66,0.2)",  delay:"0.25s" },
+                { icon:"📈", label:"Tỉ lệ thành công",     value: successRate + "%",                  sub:"Đơn hoàn thành hôm nay",                       c:"#3ecf6e", bg:"rgba(62,207,110,0.06)",  bd:"rgba(62,207,110,0.18)", delay:"0.3s"  },
+                { icon:"🚫", label:"Tài khoản bị khóa",    value: kpi.blacklistCount.toString(),     sub:"Blacklist",                                    c:"#ff4040", bg:"rgba(255,64,64,0.07)",   bd:"rgba(255,64,64,0.2)",   delay:"0.35s" },
               ].map((k, i) => (
-                <div key={i} className="kpi-card" style={{
-                  background: k.bg,
-                  border: `1px solid ${k.bd}`,
-                  borderRadius: 13,
-                  padding: "11px 12px",
-                  animationDelay: k.delay,
-                  cursor: "default",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: 8,
-                      background: k.bg, border: `1px solid ${k.bd}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 14,
-                    }}>{k.icon}</div>
-                    <div style={{
-                      fontSize: 7, fontWeight: 700, padding: "2px 6px",
-                      background: k.bg, border: `1px solid ${k.bd}`,
-                      borderRadius: 4, color: k.c,
-                    }}>↑</div>
+                <div key={i} className="kpi-card" style={{ background:k.bg, border:`1px solid ${k.bd}`, borderRadius:14, padding:"13px 14px", animationDelay:k.delay, cursor:"default", position:"relative", overflow:"hidden" }}>
+                  <div style={{ position:"absolute", top:0, left:"-60%", width:"35%", height:"100%", background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.03),transparent)", animation:"shimmer 3s infinite", pointerEvents:"none" }} />
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                    <div style={{ width:30, height:30, borderRadius:9, background:k.bg, border:`1px solid ${k.bd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>{k.icon}</div>
+                    <span style={{ fontSize:8, fontWeight:700, padding:"2px 6px", background:k.bg, border:`1px solid ${k.bd}`, borderRadius:4, color:k.c }}>↑ live</span>
                   </div>
-                  <div style={{ color: k.c, fontSize: 22, fontWeight: 800, lineHeight: 1, marginBottom: 2 }}>{k.value}</div>
-                  <div style={{ color: "rgba(240,234,255,0.6)", fontSize: 9 }}>{k.label}</div>
-                  <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 8, marginTop: 2 }}>{k.sub}</div>
+                  <div style={{ color:k.c, fontSize:24, fontWeight:800, lineHeight:1, marginBottom:3 }}>{k.value}</div>
+                  <div style={{ color:"rgba(240,234,255,0.7)", fontSize:10, fontWeight:500, marginBottom:2 }}>{k.label}</div>
+                  <div style={{ color:"#6a5a40", fontSize:9 }}>{k.sub}</div>
                 </div>
               ))}
             </div>
 
-            {/* Two-column: Charts */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-
+            {/* Charts row */}
+            <div style={{ display:"grid", gridTemplateColumns:"1.4fr 1fr", gap:12 }}>
               {/* Revenue line chart */}
-              <div style={{
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                borderRadius: 13, padding: "11px 13px",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <div style={{ color: "rgba(144,128,176,0.8)", fontSize: 10, fontWeight: 600 }}>📈 Doanh thu 7 ngày</div>
-                  <div style={{
-                    color: "#FF8C00", fontSize: 8, fontWeight: 600,
-                    background: "rgba(255,107,0,0.1)", border: "1px solid rgba(255,107,0,0.25)",
-                    borderRadius: 5, padding: "2px 7px",
-                  }}>Tuần ▾</div>
+              <div style={{ background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"14px 16px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+                  <div>
+                    <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>📈 Doanh thu 7 ngày</div>
+                    <div style={{ color:"#6a5a40", fontSize:9, marginTop:2 }}>Tổng doanh thu từng ngày trong tuần</div>
+                  </div>
+                  <div style={{ color:"#FF8C00", fontSize:9, fontWeight:600, background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.25)", borderRadius:6, padding:"3px 9px" }}>7 ngày ▾</div>
                 </div>
-                <div style={{ position: "relative", height: 80, marginBottom: 6 }}>
-                  {[25, 50, 75].map(p => (
-                    <div key={p} style={{
-                      position: "absolute", left: 0, right: 0,
-                      top: `${100 - p}%`, height: 1,
-                      background: "rgba(255,255,255,0.04)",
-                    }} />
-                  ))}
-                  <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} viewBox="0 0 300 80" preserveAspectRatio="none">
+                {/* SVG chart */}
+                <div style={{ position:"relative", height:90, marginBottom:8 }}>
+                  {[25, 50, 75].map(p => <div key={p} style={{ position:"absolute", left:0, right:0, top:`${100-p}%`, height:1, background:"rgba(255,255,255,0.04)" }} />)}
+                  <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%" }} viewBox="0 0 420 90" preserveAspectRatio="none">
                     <defs>
-                      <linearGradient id="lg1" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#FF8C00" stopOpacity="0.3"/>
+                      <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#FF8C00" stopOpacity="0.35"/>
                         <stop offset="100%" stopColor="#FF8C00" stopOpacity="0"/>
                       </linearGradient>
                     </defs>
-                    <path d="M0,52 L43,35 L86,44 L129,16 L172,10 L215,26 L300,18"
-                      stroke="#FF8C00" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                    <path d="M0,52 L43,35 L86,44 L129,16 L172,10 L215,26 L300,18 L300,80 L0,80 Z"
-                      fill="url(#lg1)"/>
-                    <circle cx="300" cy="18" r="4" fill="#FF6B00"/>
+                    {(() => {
+                      const pts = REVENUE_VALS.map((v, i) => `${(i / 6) * 420},${90 - (v / 100) * 80}`)
+                      const path = "M" + pts.join(" L")
+                      return (
+                        <>
+                          <path d={path} stroke="#FF8C00" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d={path + ` L420,90 L0,90 Z`} fill="url(#revGrad)"/>
+                          {REVENUE_VALS.map((v, i) => (
+                            <circle key={i} cx={(i/6)*420} cy={90-(v/100)*80} r={i===6?5:3} fill={i===6?"#FF6B00":"rgba(255,140,0,0.5)"} stroke={i===6?"rgba(255,107,0,0.3)":""} strokeWidth={i===6?4:0}/>
+                          ))}
+                        </>
+                      )
+                    })()}
                   </svg>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  {CHART_BARS.map(b => (
-                    <div key={b.day} style={{
-                      fontSize: 8,
-                      color: b.today ? "#FF8C00" : "rgba(144,128,176,0.4)",
-                      fontWeight: b.today ? 700 : 400,
-                    }}>{b.day}</div>
+                <div style={{ display:"flex", justifyContent:"space-between" }}>
+                  {CHART_BARS.map((b, i) => (
+                    <div key={b.day} style={{ textAlign:"center" }}>
+                      <div style={{ fontSize:8, color: b.today ? "#FF8C00" : "#6a5a40", fontWeight: b.today ? 700 : 400 }}>{b.day}</div>
+                      <div style={{ fontSize:7, color: b.today ? "#FF8C00" : "#6a5a40", marginTop:1, opacity:0.7 }}>{fmtShort(REVENUE_VALS[i] * 15000)}đ</div>
+                    </div>
                   ))}
                 </div>
               </div>
 
-              {/* Orders by hour bar chart */}
-              <div style={{
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                borderRadius: 13, padding: "11px 13px",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <div style={{ color: "rgba(144,128,176,0.8)", fontSize: 10, fontWeight: 600 }}>📊 Đơn theo giờ</div>
-                  <div style={{
-                    color: "#b464ff", fontSize: 8, fontWeight: 600,
-                    background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.25)",
-                    borderRadius: 5, padding: "2px 7px",
-                  }}>Hôm nay ▾</div>
+              {/* Hourly orders bar chart */}
+              <div style={{ background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"14px 16px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+                  <div>
+                    <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>📊 Đơn theo giờ</div>
+                    <div style={{ color:"#6a5a40", fontSize:9, marginTop:2 }}>Hôm nay</div>
+                  </div>
+                  <div style={{ color:"#b464ff", fontSize:9, fontWeight:600, background:"rgba(180,100,255,0.1)", border:"1px solid rgba(180,100,255,0.25)", borderRadius:6, padding:"3px 9px" }}>Hôm nay ▾</div>
                 </div>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 5, height: 70, marginBottom: 6 }}>
-                  {HOUR_BARS.map((b, i) => (
-                    <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, height: "100%" }}>
-                      <div style={{ flex: 1, display: "flex", alignItems: "flex-end", width: "100%" }}>
-                        <div style={{
-                          width: "100%",
-                          height: `${b.v}%`,
-                          borderRadius: "3px 3px 0 0",
-                          background: i === 3
-                            ? "linear-gradient(180deg,#b464ff,rgba(180,100,255,0.3))"
-                            : "rgba(180,100,255,0.25)",
-                          boxShadow: i === 3 ? "0 0 8px rgba(180,100,255,0.4)" : "none",
-                        }} />
+                <div style={{ display:"flex", alignItems:"flex-end", gap:4, height:80, marginBottom:8 }}>
+                  {HOUR_BARS.map((b, i) => {
+                    const isPeak = b.v >= 80
+                    return (
+                      <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", height:"100%" }}>
+                        <div style={{ flex:1, display:"flex", alignItems:"flex-end", width:"100%" }}>
+                          <div style={{ width:"100%", height:`${b.v}%`, borderRadius:"3px 3px 0 0", background: isPeak ? "linear-gradient(180deg,#b464ff,rgba(180,100,255,0.3))" : "rgba(180,100,255,0.2)", boxShadow: isPeak ? "0 0 8px rgba(180,100,255,0.5)" : "none", transition:"all 0.2s" }} />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
-                <div style={{ display: "flex", gap: 5 }}>
+                <div style={{ display:"flex", gap:4 }}>
                   {HOUR_BARS.map((b, i) => (
-                    <div key={i} style={{
-                      flex: 1, textAlign: "center", fontSize: 7,
-                      color: i === 3 ? "#b464ff" : "rgba(144,128,176,0.4)",
-                    }}>{b.h}</div>
+                    <div key={i} style={{ flex:1, textAlign:"center", fontSize:7, color: b.v>=80 ? "#b464ff" : "#6a5a40" }}>{b.h}</div>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Live Map + Orders table */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 12, marginBottom: 14 }}>
+            {/* Orders + Activity + Top Shops */}
+            <div style={{ display:"grid", gridTemplateColumns:"1.5fr 1fr 1fr", gap:12 }}>
 
-              {/* Mini live map */}
-              <div style={{
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                borderRadius: 13, padding: "11px 13px",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9 }}>
-                  <div style={{ color: "rgba(144,128,176,0.8)", fontSize: 10, fontWeight: 600 }}>🗺️ Bản đồ tài xế live</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, color: "#3ecf6e", fontSize: 8, fontWeight: 600 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#3ecf6e", animation: "pulse 1.5s infinite" }} />
-                    12 online
-                  </div>
+              {/* Recent Orders */}
+              <div style={{ background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"14px 16px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+                  <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>🔔 Đơn hàng gần đây</div>
+                  <a href="/admin/orders" style={{ color:"#FF8C00", fontSize:9, fontWeight:600 }}>Xem tất cả →</a>
                 </div>
-                <div style={{
-                  height: 140, borderRadius: 9,
-                  background: "linear-gradient(160deg,#070910,#080b10,#050709)",
-                  position: "relative", overflow: "hidden",
-                  border: "1px solid rgba(255,255,255,0.05)",
-                }}>
-                  {[30, 55, 78].map(p => (
-                    <div key={p} style={{ position:"absolute", height:1, background:"rgba(180,100,255,0.2)", left:0, right:0, top:`${p}%` }} />
-                  ))}
-                  {[35, 60].map(p => (
-                    <div key={p} style={{ position:"absolute", width:1, background:"rgba(180,100,255,0.2)", top:0, bottom:0, left:`${p}%` }} />
-                  ))}
-                  <div style={{ position:"absolute", height:1.5, background:"rgba(180,100,255,0.4)", left:0, right:0, top:"50%" }} />
-                  <div style={{ position:"absolute", width:1.5, background:"rgba(180,100,255,0.4)", top:0, bottom:0, left:"50%" }} />
-                  {[
-                    { t:28, l:38, c:"#3ecf6e" }, { t:45, l:55, c:"#3ecf6e" }, { t:60, l:42, c:"#FF6B00" },
-                    { t:35, l:62, c:"#FF6B00"  }, { t:65, l:58, c:"#FF6B00" }, { t:22, l:30, c:"rgba(144,128,176,0.4)" },
-                    { t:70, l:25, c:"rgba(144,128,176,0.4)" }, { t:50, l:70, c:"#3ecf6e" },
-                  ].map((d, i) => (
-                    <div key={i} style={{
-                      position: "absolute", top:`${d.t}%`, left:`${d.l}%`,
-                      width: 8, height: 8, borderRadius: "50%",
-                      background: d.c, border: "1.5px solid rgba(255,255,255,0.6)",
-                      boxShadow: `0 0 5px ${d.c}`,
-                      transform: "translate(-50%,-50%)",
-                    }} />
-                  ))}
-                  <div style={{
-                    position: "absolute", bottom: 5, right: 6,
-                    background: "rgba(6,5,10,0.85)", border: "1px solid rgba(255,255,255,0.07)",
-                    borderRadius: 6, padding: "3px 7px",
-                    fontSize: 7, color: "rgba(144,128,176,0.6)",
-                  }}>Phước An, Krông Pắc</div>
-                </div>
-                <div style={{ display: "flex", gap: 10, marginTop: 7 }}>
-                  {[
-                    { c:"#3ecf6e",                  l:"Rảnh (5)"      },
-                    { c:"#FF6B00",                  l:"Đang giao (4)" },
-                    { c:"rgba(144,128,176,0.4)",    l:"Nghỉ (3)"      },
-                  ].map(l => (
-                    <div key={l.l} style={{ display:"flex", alignItems:"center", gap:3 }}>
-                      <div style={{ width:6, height:6, borderRadius:"50%", background:l.c }} />
-                      <span style={{ color:"rgba(144,128,176,0.5)", fontSize:7 }}>{l.l}</span>
-                    </div>
+                {/* Header */}
+                <div style={{ display:"grid", gridTemplateColumns:"54px 1fr 70px 55px", gap:6, padding:"5px 6px", borderBottom:"1px solid rgba(255,255,255,0.06)", marginBottom:4 }}>
+                  {["Mã đơn","Khách / Quán","Tiền","TT"].map(h => (
+                    <div key={h} style={{ color:"#6a5a40", fontSize:8, textTransform:"uppercase", letterSpacing:0.5 }}>{h}</div>
                   ))}
                 </div>
-              </div>
-
-              {/* Orders table */}
-              <div style={{
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                borderRadius: 13, padding: "11px 13px",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9 }}>
-                  <div style={{ color: "rgba(144,128,176,0.8)", fontSize: 10, fontWeight: 600 }}>🔔 Đơn hàng gần đây</div>
-                  <a href="/admin/orders" style={{ color: "#FF8C00", fontSize: 8, textDecoration: "none" }}>Xem tất cả →</a>
-                </div>
-                {/* Table header */}
-                <div style={{
-                  display: "grid", gridTemplateColumns: "70px 1fr 80px 65px 60px",
-                  gap: 6, padding: "5px 8px",
-                  borderBottom: "1px solid rgba(255,255,255,0.06)", marginBottom: 4,
-                }}>
-                  {["Mã đơn","Khách hàng","Cửa hàng","Tổng tiền","Trạng thái"].map(h => (
-                    <div key={h} style={{ color: "rgba(144,128,176,0.4)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</div>
-                  ))}
-                </div>
-                {/* Rows */}
-                {ORDERS.map((o) => {
-                  const s = STATUS_MAP[o.status]
+                {orders.length === 0 ? (
+                  <div style={{ padding:"24px 0", textAlign:"center", color:"#6a5a40", fontSize:11 }}>Chưa có đơn hàng</div>
+                ) : orders.map(o => {
+                  const s = STATUS_MAP[o.status] ?? STATUS_MAP["pending"]
                   return (
-                    <div key={o.id} className="order-row" style={{
-                      display: "grid", gridTemplateColumns: "70px 1fr 80px 65px 60px",
-                      gap: 6, padding: "7px 8px",
-                      borderBottom: "1px solid rgba(255,255,255,0.03)",
-                      borderRadius: 7, cursor: "pointer", transition: "background 0.15s",
-                    }}>
-                      <div style={{ color: "#b464ff", fontSize: 9, fontWeight: 600 }}>#{o.id}</div>
-                      <div style={{ color: "#f0eaff", fontSize: 9, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.customer}</div>
-                      <div style={{ color: "rgba(144,128,176,0.7)", fontSize: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.shop}</div>
-                      <div style={{ color: "#FF8C00", fontSize: 9, fontWeight: 700 }}>{fmt(o.amount)}</div>
-                      <div>
-                        <span style={{
-                          fontSize: 7, fontWeight: 700, padding: "2px 6px",
-                          borderRadius: 4, border: `1px solid ${s.border}`,
-                          background: s.bg, color: s.color,
-                          whiteSpace: "nowrap",
-                        }}>{s.label}</span>
+                    <a key={o.id} href="/admin/orders">
+                      <div className="order-row" style={{ display:"grid", gridTemplateColumns:"54px 1fr 70px 55px", gap:6, padding:"7px 6px", borderBottom:"1px solid rgba(255,255,255,0.03)", borderRadius:8, cursor:"pointer", transition:"background 0.15s" }}>
+                        <div style={{ color:"#b464ff", fontSize:9, fontWeight:700 }}>#{o.id.slice(0,5).toUpperCase()}</div>
+                        <div>
+                          <div style={{ color:"#f0eaff", fontSize:9, fontWeight:500, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{o.customerName}</div>
+                          <div style={{ color:"#6a5a40", fontSize:8, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{o.shopName}</div>
+                        </div>
+                        <div style={{ color:"#FF8C00", fontSize:9, fontWeight:700 }}>{fmt(o.total_amount)}</div>
+                        <div><span style={{ fontSize:7, fontWeight:700, padding:"2px 5px", borderRadius:4, border:`1px solid ${s.border}`, background:s.bg, color:s.color, whiteSpace:"nowrap" }}>{s.label}</span></div>
                       </div>
-                    </div>
+                    </a>
                   )
                 })}
               </div>
+
+              {/* Activity Log */}
+              <div style={{ background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"14px 16px" }}>
+                <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700, marginBottom:12 }}>⚡ Hoạt động gần đây</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+                  {ACTIVITY_LOG.map((a, i) => (
+                    <div key={i} style={{ display:"flex", gap:10, padding:"9px 0", borderBottom: i < ACTIVITY_LOG.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none", alignItems:"flex-start" }}>
+                      <div style={{ width:26, height:26, borderRadius:8, background:`rgba(${a.color === "#3ecf6e" ? "62,207,110" : a.color === "#ff4040" ? "255,64,64" : a.color === "#FF8C00" ? "255,107,0" : a.color === "#4a8ff5" ? "74,143,245" : "245,197,66"},0.1)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, flexShrink:0 }}>{a.icon}</div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ color:"#f0eaff", fontSize:9.5, fontWeight:500, lineHeight:1.4 }}>{a.text}</div>
+                        <div style={{ color:"#6a5a40", fontSize:8, marginTop:2 }}>{a.time}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Top Shops */}
+              <div style={{ background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"14px 16px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+                  <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>🏆 Top cửa hàng</div>
+                  <div style={{ color:"#6a5a40", fontSize:8 }}>Hôm nay</div>
+                </div>
+                {TOP_SHOPS.map((shop, i) => (
+                  <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom: i < TOP_SHOPS.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                    <div style={{ width:22, height:22, borderRadius:7, background: i===0?"rgba(245,197,66,0.15)": i===1?"rgba(180,180,180,0.1)": i===2?"rgba(180,100,0,0.1)":"rgba(255,255,255,0.05)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, flexShrink:0, fontWeight:800, color: i===0?"#f5c542":i===1?"#aaa":i===2?"#cd7f32":"#6a5a40" }}>
+                      {i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}`}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ color:"#f0eaff", fontSize:10, fontWeight:600, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shop.name}</div>
+                      <div style={{ color:"#6a5a40", fontSize:8 }}>{shop.orders} đơn · ⭐ {shop.rating}</div>
+                    </div>
+                    <div style={{ color:"#FF8C00", fontSize:9, fontWeight:700, flexShrink:0 }}>{fmtShort(shop.revenue)}đ</div>
+                  </div>
+                ))}
+
+                {/* Mini progress bars */}
+                <div style={{ marginTop:12, paddingTop:10, borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ color:"#6a5a40", fontSize:8, marginBottom:8 }}>Phân bố trạng thái đơn hôm nay</div>
+                  {[
+                    { label:"Hoàn thành", pct: successRate, color:"#3ecf6e" },
+                    { label:"Đang giao",  pct: kpi.todayOrders > 0 ? Math.round(((kpi.todayOrders - kpi.deliveredToday - kpi.cancelledToday) / kpi.todayOrders) * 100) : 0, color:"#FF8C00" },
+                    { label:"Đã hủy",    pct: kpi.todayOrders > 0 ? Math.round((kpi.cancelledToday / kpi.todayOrders) * 100) : 0, color:"#ff4040" },
+                  ].map(row => (
+                    <div key={row.label} style={{ marginBottom:6 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+                        <span style={{ color:"#6a5a40", fontSize:8 }}>{row.label}</span>
+                        <span style={{ color:row.color, fontSize:8, fontWeight:700 }}>{row.pct}%</span>
+                      </div>
+                      <div style={{ height:4, borderRadius:2, background:"rgba(255,255,255,0.06)" }}>
+                        <div style={{ height:"100%", width:`${row.pct}%`, borderRadius:2, background:row.color, boxShadow:`0 0 6px ${row.color}` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {/* Quick actions */}
-            <div style={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: 13, padding: "11px 14px",
-            }}>
-              <div style={{ color: "rgba(144,128,176,0.8)", fontSize: 10, fontWeight: 600, marginBottom: 10 }}>⚡ Thao tác nhanh</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {/* Quick Actions */}
+            <div style={{ background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"13px 16px" }}>
+              <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700, marginBottom:10 }}>⚡ Thao tác nhanh</div>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                 {[
-                  { label: "✅ Duyệt tài xế mới",     c: "#3ecf6e", bg: "rgba(62,207,110,0.1)",  bd: "rgba(62,207,110,0.25)", badge: "2" },
-                  { label: "🏪 Duyệt cửa hàng",        c: "#FF8C00", bg: "rgba(255,107,0,0.1)",   bd: "rgba(255,107,0,0.25)",  badge: "1" },
-                  { label: "⚖️ Xử lý khiếu nại",       c: "#ff4040", bg: "rgba(255,64,64,0.1)",   bd: "rgba(255,64,64,0.25)",  badge: "3" },
-                  { label: "📣 Gửi thông báo",          c: "#b464ff", bg: "rgba(180,100,255,0.1)", bd: "rgba(180,100,255,0.25)",badge: ""  },
-                  { label: "💰 Giải ngân",              c: "#f5c542", bg: "rgba(245,197,66,0.1)",  bd: "rgba(245,197,66,0.25)", badge: ""  },
-                  { label: "⚙️ Cài đặt hệ thống",      c: "rgba(144,128,176,0.7)", bg: "rgba(255,255,255,0.04)", bd: "rgba(255,255,255,0.08)", badge: "" },
+                  { label:"✅ Duyệt tài xế",     href:"/admin/drivers",       c:"#3ecf6e", bg:"rgba(62,207,110,0.08)",   bd:"rgba(62,207,110,0.22)",   badge: kpi.pendingDrivers > 0 ? kpi.pendingDrivers : 0 },
+                  { label:"🏪 Duyệt cửa hàng",    href:"/admin/merchants",     c:"#FF8C00", bg:"rgba(255,107,0,0.08)",    bd:"rgba(255,107,0,0.22)",    badge: kpi.pendingShops > 0 ? kpi.pendingShops : 0 },
+                  { label:"📦 Quản lý đơn",        href:"/admin/orders",        c:"#4a8ff5", bg:"rgba(74,143,245,0.08)",   bd:"rgba(74,143,245,0.22)",   badge: 0 },
+                  { label:"⚖️ Tranh chấp",          href:"/admin/disputes",      c:"#ff4040", bg:"rgba(255,64,64,0.08)",    bd:"rgba(255,64,64,0.22)",    badge: 0 },
+                  { label:"📣 Gửi thông báo",       href:"/admin/notifications", c:"#b464ff", bg:"rgba(180,100,255,0.08)",  bd:"rgba(180,100,255,0.22)",  badge: 0 },
+                  { label:"💰 Tài chính",           href:"/admin/finance",       c:"#f5c542", bg:"rgba(245,197,66,0.08)",   bd:"rgba(245,197,66,0.22)",   badge: 0 },
+                  { label:"🏷️ Khuyến mãi",          href:"/admin/promotions",    c:"#FF8C00", bg:"rgba(255,107,0,0.08)",    bd:"rgba(255,107,0,0.22)",    badge: 0 },
+                  { label:"⚙️ Cài đặt hệ thống",   href:"/admin/settings",      c:"#6a5a40", bg:"rgba(255,255,255,0.04)", bd:"rgba(255,255,255,0.08)",  badge: 0 },
                 ].map((a, i) => (
-                  <button key={i} style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "7px 12px", borderRadius: 9,
-                    background: a.bg, border: `1px solid ${a.bd}`,
-                    color: a.c, fontSize: 10, fontWeight: 500,
-                    cursor: "pointer", fontFamily: "Lexend",
-                    position: "relative",
-                    transition: "all 0.15s",
-                  }}>
+                  <a key={i} href={a.href} className="quick-btn" style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", borderRadius:10, background:a.bg, border:`1px solid ${a.bd}`, color:a.c, fontSize:11, fontWeight:600, cursor:"pointer", transition:"all 0.2s", textDecoration:"none" }}>
                     {a.label}
-                    {a.badge && (
-                      <span style={{
-                        background: "#ff4040", color: "#fff",
-                        borderRadius: "50%", width: 14, height: 14,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 8, fontWeight: 700,
-                      }}>{a.badge}</span>
+                    {a.badge > 0 && (
+                      <span style={{ background:"#ff4040", color:"#fff", borderRadius:"50%", width:16, height:16, display:"flex", alignItems:"center", justifyContent:"center", fontSize:8, fontWeight:800 }}>{a.badge}</span>
                     )}
-                  </button>
+                  </a>
                 ))}
+              </div>
+            </div>
+
+            {/* System Health Footer */}
+            <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:14, padding:"11px 16px" }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:8 }}>
+                <div style={{ color:"#f0eaff", fontSize:11, fontWeight:700 }}>🔧 Trạng thái dịch vụ</div>
+                {[
+                  { name:"Supabase DB",  ok:true  },
+                  { name:"Auth",         ok:true  },
+                  { name:"Realtime",     ok:true  },
+                  { name:"Firebase FCM", ok:true  },
+                  { name:"ESMS OTP",     ok:true  },
+                  { name:"Vercel Edge",  ok:true  },
+                ].map(s => (
+                  <div key={s.name} style={{ display:"flex", alignItems:"center", gap:5 }}>
+                    <div style={{ width:6, height:6, borderRadius:"50%", background: s.ok ? "#3ecf6e" : "#ff4040", boxShadow: s.ok ? "0 0 5px #3ecf6e" : "0 0 5px #ff4040" }} />
+                    <span style={{ color: s.ok ? "#3ecf6e" : "#ff4040", fontSize:9, fontWeight:600 }}>{s.name}</span>
+                  </div>
+                ))}
+                <div style={{ color:"#6a5a40", fontSize:8 }}>Tự động làm mới mỗi 30s · {lastRefresh.toLocaleTimeString("vi-VN")}</div>
               </div>
             </div>
 

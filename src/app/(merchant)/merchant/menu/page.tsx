@@ -1,144 +1,837 @@
-﻿"use client"
+"use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
+// ── Types ──────────────────────────────────────────────────────────────────
+interface MenuGroup {
+  id: string; name: string
+  allDay: boolean; startHour: string; endHour: string
+  sortOrder: number
+}
+interface Topping { id: string; name: string; price: number }
+interface SizeOpt  { id: string; label: string; priceDiff: number }
 interface Product {
-  id: number; name: string; price: number; originalPrice?: number
-  category: string; emoji: string; available: boolean; soldCount: number
+  id: string; name: string; description: string; imagePreview: string | null
+  price: number; categories: string[]; menuGroupId: string
+  allDay: boolean; startHour: string; endHour: string
+  toppings: Topping[]; sizes: SizeOpt[]
+  promoEnabled: boolean; promoPrice: number | null
+  promoStart: string; promoEnd: string; promoPerPerson: number | null
+  badge: "hot" | "bigsale" | "bestseller" | null
+  available: boolean; soldCount: number; sortOrder: number
 }
 
-const INIT: Product[] = [
-  { id:1, name:"Bún bò đặc biệt", price:45000, originalPrice:55000, category:"Bún", emoji:"🍜", available:true, soldCount:156 },
-  { id:2, name:"Bún bò thường",   price:35000, category:"Bún",      emoji:"🍜", available:true, soldCount:89 },
-  { id:3, name:"Chả chiên giòn",  price:15000, category:"Thêm",     emoji:"🍡", available:true, soldCount:234 },
-  { id:4, name:"Trứng cút luộc",  price:8000,  category:"Thêm",     emoji:"🥚", available:false, soldCount:45 },
-  { id:5, name:"Trà đá",          price:5000,  category:"Đồ uống",  emoji:"🧊", available:true, soldCount:312 },
-  { id:6, name:"Sinh tố bơ",      price:25000, category:"Đồ uống",  emoji:"🥑", available:true, soldCount:67 },
+// ── Constants ──────────────────────────────────────────────────────────────
+const CATEGORY_LIST = [
+  "Món chính","Món phụ","Đồ uống","Tráng miệng",
+  "Bún / Phở","Cơm","Gà","Bánh","Salad","Combo","Đặc biệt","Khác",
 ]
-const CATS = ["Tất cả","Bún","Thêm","Đồ uống"]
-const EMOJIS = ["🍜","🍗","🥤","🍱","🥗","🍕","🧁","🥩","🦐","🍛","🥚","🧊"]
+const BADGE_LIST = [
+  { key:"hot"        as const, label:"🔥 HOT",      color:"#ff4040", bg:"rgba(255,64,64,0.15)",    border:"rgba(255,64,64,0.4)"    },
+  { key:"bigsale"    as const, label:"💸 BIG SALE", color:"#FFD700", bg:"rgba(255,215,0,0.12)",    border:"rgba(255,215,0,0.4)"    },
+  { key:"bestseller" as const, label:"📈 BÁN CHẠY", color:"#3ecf6e", bg:"rgba(62,207,110,0.12)",  border:"rgba(62,207,110,0.4)"   },
+]
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
+const uid = () => `${Date.now()}_${Math.random().toString(36).slice(2,6)}`
 
+// ── Blank templates ────────────────────────────────────────────────────────
+const blankGroup  = (): Omit<MenuGroup,"sortOrder"> => ({ id:uid(), name:"", allDay:true, startHour:"06:00", endHour:"22:00" })
+const blankProduct = (): Product => ({
+  id:uid(), name:"", description:"", imagePreview:null,
+  price:0, categories:[], menuGroupId:"",
+  allDay:true, startHour:"06:00", endHour:"22:00",
+  toppings:[], sizes:[],
+  promoEnabled:false, promoPrice:null, promoStart:"", promoEnd:"", promoPerPerson:null,
+  badge:null, available:true, soldCount:0, sortOrder:0,
+})
+
+// ── Sample data ────────────────────────────────────────────────────────────
+const INIT_GROUPS: MenuGroup[] = [
+  { id:"g1", name:"Bún", allDay:true, startHour:"06:00", endHour:"22:00", sortOrder:0 },
+  { id:"g2", name:"Đồ uống", allDay:true, startHour:"06:00", endHour:"22:00", sortOrder:1 },
+]
+const INIT_PRODUCTS: Product[] = [
+  { id:"p1", name:"Bún bò đặc biệt", description:"Thêm sả, mắm ruốc Huế đặc trưng", imagePreview:null, price:45000, categories:["Bún / Phở","Món chính"], menuGroupId:"g1", allDay:true, startHour:"", endHour:"", toppings:[{id:"t1",name:"Chả chiên",price:10000}], sizes:[], promoEnabled:false, promoPrice:null, promoStart:"", promoEnd:"", promoPerPerson:null, badge:"bestseller", available:true, soldCount:156, sortOrder:0 },
+  { id:"p2", name:"Bún bò thường",    description:"", imagePreview:null, price:35000, categories:["Bún / Phở"], menuGroupId:"g1", allDay:true, startHour:"", endHour:"", toppings:[], sizes:[], promoEnabled:false, promoPrice:null, promoStart:"", promoEnd:"", promoPerPerson:null, badge:null, available:true, soldCount:89, sortOrder:1 },
+  { id:"p3", name:"Trà đá",           description:"", imagePreview:null, price:5000, categories:["Đồ uống"], menuGroupId:"g2", allDay:true, startHour:"", endHour:"", toppings:[], sizes:[{id:"s1",label:"Nhỏ",priceDiff:0},{id:"s2",label:"Lớn",priceDiff:3000}], promoEnabled:false, promoPrice:null, promoStart:"", promoEnd:"", promoPerPerson:null, badge:null, available:true, soldCount:312, sortOrder:0 },
+]
+
+// ── CSV Import types ───────────────────────────────────────────────────────
+interface ImportRow { name: string; description: string; price: number; promoPrice: number | null; category: string; badge: Product["badge"] }
+
+// ── Main component ─────────────────────────────────────────────────────────
 export default function MerchantMenuPage() {
-  const [products, setProducts] = useState<Product[]>(INIT)
-  const [cat, setCat] = useState("Tất cả")
-  const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name:"", price:"", originalPrice:"", category:"", emoji:"🍜" })
+  const [groups,   setGroups]   = useState<MenuGroup[]>(INIT_GROUPS)
+  const [products, setProducts] = useState<Product[]>(INIT_PRODUCTS)
+  const [mainTab,  setMainTab]  = useState<"products"|"groups">("products")
+  const [filterGid, setFilterGid] = useState("all")
 
-  const toggle = (id: number) => setProducts(p => p.map(x => x.id===id?{...x,available:!x.available}:x))
-  const remove = (id: number) => {
-    const p = products.find(x => x.id === id)
-    if (!p) return
-    if (!confirm(`Xoá "${p.name}" khỏi menu?`)) return
-    setProducts(prev => prev.filter(x => x.id !== id))
+  // Group modal state
+  const [gModal,   setGModal]   = useState<(Omit<MenuGroup,"sortOrder"> & {sortOrder?:number}) | null>(null)
+  const [gEditing, setGEditing] = useState(false)
+
+  // Product sheet state
+  const [pModal,   setPModal]   = useState<Product | null>(null)
+  const [pEditing, setPEditing] = useState(false)
+
+  // CSV Import state
+  const [importRows, setImportRows] = useState<ImportRow[] | null>(null)
+  const [importError, setImportError] = useState("")
+
+  const [toast, setToast] = useState("")
+  const fileRef  = useRef<HTMLInputElement>(null)
+  const csvRef   = useRef<HTMLInputElement>(null)
+
+  const fire = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2400) }
+
+  // ── CSV helpers ────────────────────────────────────────────────────────
+  const parseCSV = (text: string): ImportRow[] => {
+    const lines = text.trim().split(/\r?\n/)
+    const rows: ImportRow[] = []
+    // Skip header row if first cell looks like a header
+    const start = lines[0]?.toLowerCase().includes("tên") || lines[0]?.toLowerCase().includes("name") ? 1 : 0
+    for (let i = start; i < lines.length; i++) {
+      const cols = lines[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""))
+      if (!cols[0]) continue
+      const price = parseInt(cols[2]?.replace(/\D/g, "") || "0") || 0
+      const promoPrice = cols[3] ? (parseInt(cols[3].replace(/\D/g, "")) || null) : null
+      const badgeRaw = (cols[5] ?? "").toLowerCase()
+      const badge: Product["badge"] = badgeRaw === "hot" ? "hot" : badgeRaw === "bigsale" ? "bigsale" : badgeRaw === "bestseller" ? "bestseller" : null
+      rows.push({ name: cols[0], description: cols[1] ?? "", price, promoPrice, category: cols[4] ?? "", badge })
+    }
+    return rows
   }
-  const handleAdd = () => {
-    if (!form.name || !form.price) return
-    setProducts(p => [...p, { id:Date.now(), name:form.name, price:parseInt(form.price.replace(/\D/g,"")||"0"), originalPrice:form.originalPrice?parseInt(form.originalPrice.replace(/\D/g,"")||"0"):undefined, category:form.category||"Khác", emoji:form.emoji, available:true, soldCount:0 }])
-    setForm({ name:"",price:"",originalPrice:"",category:"",emoji:"🍜" })
-    setShowAdd(false)
+
+  const onCSVFile = (file: File) => {
+    setImportError("")
+    const reader = new FileReader()
+    reader.onload = e => {
+      const text = e.target?.result as string
+      const rows = parseCSV(text)
+      if (rows.length === 0) { setImportError("File trống hoặc không đúng định dạng"); return }
+      setImportRows(rows)
+    }
+    reader.readAsText(file, "utf-8")
   }
 
-  const filtered = cat==="Tất cả" ? products : products.filter(p=>p.category===cat)
-  const totalRevenue = products.reduce((s,p)=>s+p.price*p.soldCount,0)
+  const confirmImport = () => {
+    if (!importRows) return
+    const newProds: Product[] = importRows.map(r => ({
+      ...blankProduct(),
+      name: r.name, description: r.description, price: r.price,
+      promoEnabled: !!r.promoPrice && r.promoPrice < r.price,
+      promoPrice: r.promoPrice, badge: r.badge,
+      categories: r.category ? [r.category] : [],
+      sortOrder: products.length + importRows.indexOf(r),
+    }))
+    setProducts(ps => [...ps, ...newProds])
+    setImportRows(null)
+    fire(`✅ Đã nhập ${newProds.length} sản phẩm từ file`)
+  }
 
+  const downloadTemplate = () => {
+    const csv = "Tên món,Mô tả,Giá bán,Giá khuyến mãi,Danh mục,Badge\nBún bò đặc biệt,Thơm ngon đặc trưng,45000,38000,Bún / Phở,bestseller\nTrà đá,Mát lạnh,5000,,Đồ uống,\n"
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a"); a.href = url; a.download = "template_menu.csv"; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // ── Group handlers ─────────────────────────────────────────────────────
+  const openNewGroup  = () => { setGModal(blankGroup()); setGEditing(false) }
+  const openEditGroup = (g: MenuGroup) => { setGModal({...g}); setGEditing(true) }
+
+  const saveGroup = () => {
+    if (!gModal?.name.trim()) return
+    if (gEditing) {
+      setGroups(gs => gs.map(g => g.id === gModal.id ? {...gModal, sortOrder:g.sortOrder} as MenuGroup : g))
+      fire("Đã cập nhật nhóm menu")
+    } else {
+      setGroups(gs => [...gs, {...gModal, sortOrder:gs.length} as MenuGroup])
+      fire("Đã tạo nhóm menu mới")
+    }
+    setGModal(null)
+  }
+
+  const delGroup = (id: string) => {
+    if (!confirm("Xoá nhóm này? Các món trong nhóm sẽ không bị xoá.")) return
+    setGroups(gs => gs.filter(g => g.id !== id))
+    setProducts(ps => ps.map(p => p.menuGroupId === id ? {...p, menuGroupId:""} : p))
+    fire("Đã xoá nhóm")
+  }
+
+  const moveGroup = (id: string, dir: 1 | -1) => {
+    setGroups(gs => {
+      const arr = [...gs].sort((a,b) => a.sortOrder - b.sortOrder)
+      const i = arr.findIndex(g => g.id === id), j = i + dir
+      if (j < 0 || j >= arr.length) return gs
+      const tmp = arr[i].sortOrder
+      arr[i] = {...arr[i], sortOrder: arr[j].sortOrder}
+      arr[j] = {...arr[j], sortOrder: tmp}
+      return [...arr]
+    })
+  }
+
+  // ── Product handlers ───────────────────────────────────────────────────
+  const openNewProduct  = () => { setPModal(blankProduct()); setPEditing(false) }
+  const openEditProduct = (p: Product) => { setPModal({...p}); setPEditing(true) }
+
+  const saveProduct = () => {
+    if (!pModal?.name.trim() || pModal.price <= 0) return
+    if (pEditing) {
+      setProducts(ps => ps.map(p => p.id === pModal.id ? pModal : p))
+      fire("Đã cập nhật món")
+    } else {
+      setProducts(ps => [...ps, {...pModal, sortOrder:ps.length}])
+      fire("Đã thêm món mới")
+    }
+    setPModal(null)
+  }
+
+  const delProduct  = (id: string) => { setProducts(ps => ps.filter(p => p.id !== id)); fire("Đã xoá món") }
+  const toggleAvail = (id: string) => setProducts(ps => ps.map(p => p.id === id ? {...p, available:!p.available} : p))
+
+  const moveProduct = (id: string, dir: 1 | -1) => {
+    setProducts(ps => {
+      const arr = [...ps].sort((a,b) => a.sortOrder - b.sortOrder)
+      const i = arr.findIndex(p => p.id === id), j = i + dir
+      if (j < 0 || j >= arr.length) return ps
+      const tmp = arr[i].sortOrder
+      arr[i] = {...arr[i], sortOrder: arr[j].sortOrder}
+      arr[j] = {...arr[j], sortOrder: tmp}
+      return [...arr]
+    })
+  }
+
+  // ── Product form helpers ───────────────────────────────────────────────
+  const toggleCat = (cat: string) => {
+    if (!pModal) return
+    const has = pModal.categories.includes(cat)
+    if (!has && pModal.categories.length >= 3) return
+    setPModal({...pModal, categories: has ? pModal.categories.filter(c => c !== cat) : [...pModal.categories, cat]})
+  }
+
+  const addTopping    = () => { if (pModal) setPModal({...pModal, toppings:[...pModal.toppings,{id:uid(),name:"",price:0}]}) }
+  const removeTopping = (i: number) => { if (pModal) setPModal({...pModal, toppings:pModal.toppings.filter((_,idx)=>idx!==i)}) }
+  const setTopping    = (i: number, key:"name"|"price", val:string) => {
+    if (!pModal) return
+    const t = [...pModal.toppings]
+    t[i] = key==="name" ? {...t[i],name:val} : {...t[i],price:parseInt(val)||0}
+    setPModal({...pModal, toppings:t})
+  }
+
+  const addSize    = () => { if (pModal) setPModal({...pModal, sizes:[...pModal.sizes,{id:uid(),label:"",priceDiff:0}]}) }
+  const removeSize = (i: number) => { if (pModal) setPModal({...pModal, sizes:pModal.sizes.filter((_,idx)=>idx!==i)}) }
+  const setSize    = (i: number, key:"label"|"priceDiff", val:string) => {
+    if (!pModal) return
+    const s = [...pModal.sizes]
+    s[i] = key==="label" ? {...s[i],label:val} : {...s[i],priceDiff:parseInt(val)||0}
+    setPModal({...pModal, sizes:s})
+  }
+
+  const onImageFile = (file: File) => {
+    const url = URL.createObjectURL(file)
+    setPModal(m => m ? {...m, imagePreview:url} : m)
+  }
+
+  // ── Derived ────────────────────────────────────────────────────────────
+  const sortedGroups   = [...groups].sort((a,b) => a.sortOrder - b.sortOrder)
+  const filteredProds  = products
+    .filter(p => filterGid === "all" ? true : p.menuGroupId === filterGid)
+    .sort((a,b) => a.sortOrder - b.sortOrder)
+  const badgeCfg = (b: Product["badge"]) => BADGE_LIST.find(x => x.key === b)
+
+  // ── Render ─────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
-                *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
         html,body{background:#080806;font-family:'Lexend',sans-serif}
-        input{outline:none;font-family:'Lexend',sans-serif}
+        input,select,textarea{outline:none;font-family:'Lexend',sans-serif}
+        ::-webkit-scrollbar{display:none}
         @keyframes shimmer{0%{left:-60%}100%{left:120%}}
       `}</style>
-      <div style={{ position:"fixed",inset:0,background:"#080806",display:"flex",flexDirection:"column",overflow:"hidden" }}>
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div initial={{opacity:0,y:-10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}}
+            style={{position:"fixed",top:56,left:"50%",transform:"translateX(-50%)",zIndex:999,whiteSpace:"nowrap",
+              background:"rgba(62,207,110,0.15)",border:"1px solid rgba(62,207,110,0.35)",
+              borderRadius:12,padding:"7px 18px",color:"#3ecf6e",fontSize:11,fontWeight:600,backdropFilter:"blur(10px)"}}>
+            ✓ {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Hidden file inputs */}
+      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}}
+        onChange={e => { const f = e.target.files?.[0]; if (f) onImageFile(f); e.target.value="" }} />
+      <input ref={csvRef} type="file" accept=".csv,.txt" style={{display:"none"}}
+        onChange={e => { const f = e.target.files?.[0]; if (f) onCSVFile(f); e.target.value="" }} />
+
+      {/* ── LAYOUT ── */}
+      <div style={{position:"fixed",inset:0,background:"#080806",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
         {/* Header */}
-        <div style={{ padding:"52px 16px 0",borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
-          <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:12 }}>
-            <a href="/merchant" style={{ width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",color:"#f8f0e0",fontSize:16 }}>←</a>
-            <div style={{ flex:1 }}>
-              <div style={{ color:"#f8f0e0",fontSize:16,fontWeight:800 }}>Quản lý menu</div>
-              <div style={{ color:"#6a5a40",fontSize:9 }}>{products.length} món · {products.filter(p=>p.available).length} đang bán</div>
+        <div style={{padding:"52px 16px 0",background:"rgba(8,8,6,0.98)",backdropFilter:"blur(20px)",borderBottom:"1px solid rgba(255,255,255,0.06)",flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+            <a href="/merchant" style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",color:"#f8f0e0",fontSize:16}}>←</a>
+            <div style={{flex:1}}>
+              <div style={{color:"#f8f0e0",fontSize:16,fontWeight:800}}>Quản lý Menu</div>
+              <div style={{color:"#6a5a40",fontSize:9}}>{products.length} món · {groups.length} nhóm · {products.filter(p=>p.available).length} đang bán</div>
             </div>
-            <button onClick={()=>setShowAdd(true)} style={{ background:"linear-gradient(90deg,#FF6B00,#FF8C00)",border:"none",borderRadius:10,padding:"8px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",boxShadow:"0 2px 12px rgba(255,107,0,0.4)",flexShrink:0,whiteSpace:"nowrap" }}>+ Thêm món</button>
+            <div style={{display:"flex",gap:6}}>
+              {mainTab === "products" && (
+                <button onClick={() => csvRef.current?.click()}
+                  style={{background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.3)",borderRadius:10,padding:"8px 12px",color:"#3ecf6e",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",whiteSpace:"nowrap"}}>
+                  📥 Nhập Excel
+                </button>
+              )}
+              <button onClick={mainTab==="groups" ? openNewGroup : openNewProduct}
+                style={{background:"linear-gradient(90deg,#FF6B00,#FF8C00)",border:"none",borderRadius:10,padding:"8px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",boxShadow:"0 2px 12px rgba(255,107,0,0.4)",whiteSpace:"nowrap"}}>
+                + {mainTab==="groups" ? "Nhóm mới" : "Thêm món"}
+              </button>
+            </div>
           </div>
 
-          {/* Stats row */}
-          <div style={{ display:"flex",gap:8,marginBottom:12 }}>
-            {[
-              { label:"Doanh thu (ước tính)", value:fmt(totalRevenue), color:"#FF8C00" },
-              { label:"Đang bán", value:`${products.filter(p=>p.available).length} món`, color:"#3ecf6e" },
-              { label:"Tạm ẩn", value:`${products.filter(p=>!p.available).length} món`, color:"#6a5a40" },
-            ].map(({label,value,color}) => (
-              <div key={label} style={{ flex:1,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,padding:8 }}>
-                <div style={{ color,fontSize:11,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{value}</div>
-                <div style={{ color:"#6a5a40",fontSize:7,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Category tabs */}
-          <div style={{ display:"flex",gap:6,overflowX:"auto",paddingBottom:14 }}>
-            {CATS.map(c => (
-              <button key={c} onClick={()=>setCat(c)} style={{ flexShrink:0,padding:"6px 14px",borderRadius:20,background:cat===c?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",border:cat===c?"1px solid rgba(255,107,0,0.35)":"1px solid rgba(255,255,255,0.06)",color:cat===c?"#FF8C00":"#6a5a40",fontSize:10,fontWeight:cat===c?700:400,cursor:"pointer",fontFamily:"Lexend",transition:"all .15s",whiteSpace:"nowrap" }}>{c}</button>
+          {/* Main tab switcher */}
+          <div style={{display:"flex",gap:0}}>
+            {([["products","🍽️ Danh sách món"],["groups","📋 Nhóm menu"]] as const).map(([k,l]) => (
+              <button key={k} onClick={() => setMainTab(k)}
+                style={{flex:1,height:38,border:"none",background:"transparent",
+                  borderBottom:`2px solid ${mainTab===k?"#FF6B00":"transparent"}`,
+                  color:mainTab===k?"#FF8C00":"#6a5a40",fontSize:11,fontWeight:mainTab===k?700:400,cursor:"pointer",fontFamily:"Lexend",transition:"all .2s"}}>
+                {l}
+              </button>
             ))}
           </div>
         </div>
 
-        {/* List */}
-        <div style={{ flex:1,overflowY:"auto",padding:"10px 16px 20px" }}>
-          {filtered.map(p => (
-            <div key={p.id} style={{ background:"rgba(255,255,255,0.04)",border:`1px solid ${p.available?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.04)"}`,borderRadius:14,padding:12,marginBottom:8,opacity:p.available?1:0.6,display:"flex",gap:12,alignItems:"center" }}>
-              <div style={{ width:56,height:56,borderRadius:12,flexShrink:0,background:"rgba(255,255,255,0.04)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28 }}>{p.emoji}</div>
-              <div style={{ flex:1,minWidth:0 }}>
-                <div style={{ color:"#f8f0e0",fontSize:11.5,fontWeight:700,marginBottom:3,display:"flex",gap:6,alignItems:"center" }}>
-                  {p.name}
-                  {!p.available && <span style={{ background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"1px 5px",color:"#ff4040",fontSize:7,fontWeight:700 }}>TẠM ẨN</span>}
-                </div>
-                <div style={{ display:"flex",gap:8,alignItems:"center",marginBottom:3 }}>
-                  <span style={{ background:"linear-gradient(90deg,#FF6B00,#FFB347)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontSize:12,fontWeight:800 }}>{fmt(p.price)}</span>
-                  {p.originalPrice && <span style={{ color:"#6a5a40",fontSize:9,textDecoration:"line-through" }}>{fmt(p.originalPrice)}</span>}
-                </div>
-                <div style={{ color:"#6a5a40",fontSize:8 }}>Đã bán: {p.soldCount} · {p.category}</div>
-              </div>
-              <div style={{ display:"flex",flexDirection:"column",gap:6,flexShrink:0 }}>
-                <button onClick={()=>toggle(p.id)} style={{ width:44,height:24,borderRadius:12,background:p.available?"rgba(62,207,110,0.2)":"rgba(255,255,255,0.06)",border:p.available?"1px solid rgba(62,207,110,0.4)":"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"center",padding:"2px 4px",cursor:"pointer",justifyContent:p.available?"flex-end":"flex-start",transition:"all .2s" }}>
-                  <div style={{ width:16,height:16,borderRadius:"50%",background:p.available?"#3ecf6e":"#6a5a40",transition:"background .2s" }} />
+        {/* ══ TAB: Danh sách món ══ */}
+        {mainTab === "products" && (
+          <>
+            {/* Filter chips */}
+            <div style={{display:"flex",gap:6,padding:"10px 16px",overflowX:"auto",flexShrink:0} as React.CSSProperties}>
+              {[{id:"all",name:"Tất cả"}, ...sortedGroups].map(g => (
+                <button key={g.id} onClick={() => setFilterGid(g.id)}
+                  style={{flexShrink:0,padding:"5px 14px",borderRadius:20,
+                    background:filterGid===g.id?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
+                    border:filterGid===g.id?"1px solid rgba(255,107,0,0.35)":"1px solid rgba(255,255,255,0.06)",
+                    color:filterGid===g.id?"#FF8C00":"#6a5a40",fontSize:10,fontWeight:filterGid===g.id?700:400,cursor:"pointer",fontFamily:"Lexend",whiteSpace:"nowrap"}}>
+                  {g.name}
                 </button>
-                <button onClick={()=>remove(p.id)} style={{ width:44,height:24,borderRadius:7,background:"rgba(255,64,64,0.06)",border:"1px solid rgba(255,64,64,0.15)",color:"#ff4040",fontSize:12,cursor:"pointer" }}>🗑</button>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Add modal */}
-        <AnimatePresence>
-          {showAdd && (
-            <>
-              <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} onClick={()=>setShowAdd(false)} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:50,backdropFilter:"blur(4px)" }} />
-              <motion.div initial={{ y:"100%" }} animate={{ y:0 }} exit={{ y:"100%" }} transition={{ type:"spring",damping:22,stiffness:300 }} style={{ position:"fixed",bottom:0,left:0,right:0,background:"#0e0c09",borderRadius:"20px 20px 0 0",border:"1px solid rgba(255,255,255,0.08)",padding:"20px 16px 32px",zIndex:51 }}>
-                <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14 }}>
-                  <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:800 }}>Thêm món mới</div>
-                  <button onClick={()=>setShowAdd(false)} style={{ width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"none",color:"#6a5a40",fontSize:16,cursor:"pointer" }}>×</button>
+            {/* Product list */}
+            <div style={{flex:1,overflowY:"auto",padding:"4px 16px 24px"}}>
+              {filteredProds.length === 0 ? (
+                <div style={{textAlign:"center",padding:"40px 0"}}>
+                  <div style={{fontSize:36,marginBottom:8}}>🍽️</div>
+                  <div style={{color:"#6a5a40",fontSize:12,marginBottom:12}}>Chưa có món nào trong nhóm này</div>
+                  <button onClick={openNewProduct}
+                    style={{background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.3)",borderRadius:10,padding:"8px 18px",color:"#FF8C00",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"Lexend"}}>
+                    + Thêm món đầu tiên
+                  </button>
                 </div>
-                <div style={{ display:"flex",gap:5,marginBottom:12,overflowX:"auto" }}>
-                  {EMOJIS.map(e => (
-                    <button key={e} onClick={()=>setForm(f=>({...f,emoji:e}))} style={{ width:36,height:36,borderRadius:8,flexShrink:0,background:form.emoji===e?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",border:form.emoji===e?"1px solid rgba(255,107,0,0.35)":"1px solid rgba(255,255,255,0.06)",fontSize:18,cursor:"pointer" }}>{e}</button>
-                  ))}
-                </div>
-                {[{ph:"Tên món *",fld:"name"},{ph:"Giá bán (VD: 45000) *",fld:"price"},{ph:"Giá gốc (nếu đang giảm)",fld:"originalPrice"},{ph:"Danh mục (Bún, Đồ uống...)",fld:"category"}].map(({ph,fld}) => (
-                  <input key={fld} value={(form as Record<string,string>)[fld]} onChange={e=>setForm(f=>({...f,[fld]:e.target.value}))} placeholder={ph} style={{ width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"10px 12px",color:"#f8f0e0",fontSize:12,marginBottom:8 }} />
-                ))}
-                <button onClick={handleAdd} style={{ width:"100%",height:48,borderRadius:12,background:"linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)",border:"none",cursor:"pointer",color:"#fff",fontSize:13,fontWeight:800,fontFamily:"Lexend",boxShadow:"0 4px 20px rgba(255,107,0,0.4)",position:"relative",overflow:"hidden",marginTop:4 }}>
-                  <div style={{ position:"absolute",top:0,left:"-60%",width:"35%",height:"100%",background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)",animation:"shimmer 2.5s infinite" }} />
-                  <span style={{ position:"relative",zIndex:1 }}>✅ Thêm vào menu</span>
+              ) : filteredProds.map((p, idx) => {
+                const bc = badgeCfg(p.badge)
+                const gName = groups.find(g => g.id === p.menuGroupId)?.name ?? ""
+                const isFirst = idx === 0
+                const isLast  = idx === filteredProds.length - 1
+                return (
+                  <div key={p.id} style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${p.available?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.04)"}`,borderRadius:14,padding:11,marginBottom:8,opacity:p.available?1:0.6,display:"flex",gap:10,alignItems:"center"}}>
+
+                    {/* Sort arrows */}
+                    <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
+                      <button onClick={() => moveProduct(p.id,-1)} disabled={isFirst}
+                        style={{width:20,height:20,borderRadius:5,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.06)",color:isFirst?"rgba(255,255,255,0.12)":"#6a5a40",fontSize:9,cursor:isFirst?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▲</button>
+                      <button onClick={() => moveProduct(p.id,1)} disabled={isLast}
+                        style={{width:20,height:20,borderRadius:5,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.06)",color:isLast?"rgba(255,255,255,0.12)":"#6a5a40",fontSize:9,cursor:isLast?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▼</button>
+                    </div>
+
+                    {/* Image */}
+                    <div style={{width:54,height:54,borderRadius:12,flexShrink:0,background:"rgba(255,107,0,0.07)",border:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,overflow:"hidden",position:"relative"}}>
+                      {p.imagePreview ? <img src={p.imagePreview} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}} /> : <span>🍽️</span>}
+                      {bc && <div style={{position:"absolute",top:2,left:2,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:4,padding:"1px 4px",fontSize:7,fontWeight:800,color:bc.color,lineHeight:1.3}}>{bc.label.split(" ")[0]}</div>}
+                    </div>
+
+                    {/* Info */}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:2}}>
+                        <div style={{color:"#f8f0e0",fontSize:11,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1,minWidth:0}}>{p.name}</div>
+                        {!p.available && <span style={{background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"1px 5px",color:"#ff4040",fontSize:7,fontWeight:700,flexShrink:0}}>ẨN</span>}
+                      </div>
+                      <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:4}}>
+                        <span style={{background:"linear-gradient(90deg,#FF6B00,#FFB347)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontSize:12,fontWeight:800}}>{fmt(p.price)}</span>
+                        {p.promoEnabled && p.promoPrice && p.promoPrice < p.price && (
+                          <span style={{background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"1px 6px",color:"#ff4040",fontSize:9,fontWeight:700}}>{fmt(p.promoPrice)}</span>
+                        )}
+                      </div>
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                        {gName && <span style={{background:"rgba(74,143,245,0.1)",border:"1px solid rgba(74,143,245,0.2)",borderRadius:4,padding:"1px 5px",color:"#4a8ff5",fontSize:7}}>{gName}</span>}
+                        {p.categories.slice(0,2).map(c => (
+                          <span key={c} style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:4,padding:"1px 5px",color:"#6a5a40",fontSize:7}}>{c}</span>
+                        ))}
+                        {p.toppings.length > 0 && <span style={{background:"rgba(180,100,255,0.08)",border:"1px solid rgba(180,100,255,0.2)",borderRadius:4,padding:"1px 5px",color:"#b464ff",fontSize:7}}>{p.toppings.length} topping</span>}
+                        {p.sizes.length > 0 && <span style={{background:"rgba(62,207,110,0.08)",border:"1px solid rgba(62,207,110,0.2)",borderRadius:4,padding:"1px 5px",color:"#3ecf6e",fontSize:7}}>{p.sizes.length} size</span>}
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
+                      <button onClick={() => openEditProduct(p)}
+                        style={{width:34,height:28,borderRadius:8,background:"rgba(255,107,0,0.08)",border:"1px solid rgba(255,107,0,0.2)",color:"#FF8C00",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✏️</button>
+                      <button onClick={() => toggleAvail(p.id)}
+                        style={{width:34,height:28,borderRadius:8,background:p.available?"rgba(62,207,110,0.08)":"rgba(255,255,255,0.04)",border:p.available?"1px solid rgba(62,207,110,0.25)":"1px solid rgba(255,255,255,0.06)",color:p.available?"#3ecf6e":"#6a5a40",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>
+                        {p.available?"👁":"🙈"}
+                      </button>
+                      <button onClick={() => delProduct(p.id)}
+                        style={{width:34,height:28,borderRadius:8,background:"rgba(255,64,64,0.06)",border:"1px solid rgba(255,64,64,0.15)",color:"#ff4040",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>🗑</button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        {/* ══ TAB: Nhóm menu ══ */}
+        {mainTab === "groups" && (
+          <div style={{flex:1,overflowY:"auto",padding:"12px 16px 24px"}}>
+            {sortedGroups.length === 0 ? (
+              <div style={{textAlign:"center",padding:"40px 0"}}>
+                <div style={{fontSize:36,marginBottom:8}}>📋</div>
+                <div style={{color:"#6a5a40",fontSize:12,marginBottom:12}}>Chưa có nhóm menu nào</div>
+                <button onClick={openNewGroup}
+                  style={{background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.3)",borderRadius:10,padding:"8px 18px",color:"#FF8C00",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"Lexend"}}>
+                  + Tạo nhóm đầu tiên
                 </button>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
+              </div>
+            ) : sortedGroups.map((g, idx) => {
+              const count = products.filter(p => p.menuGroupId === g.id).length
+              return (
+                <div key={g.id} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
+                  {/* Sort */}
+                  <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
+                    <button onClick={() => moveGroup(g.id,-1)} disabled={idx===0}
+                      style={{width:20,height:20,borderRadius:5,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.06)",color:idx===0?"rgba(255,255,255,0.12)":"#6a5a40",fontSize:9,cursor:idx===0?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▲</button>
+                    <button onClick={() => moveGroup(g.id,1)} disabled={idx===sortedGroups.length-1}
+                      style={{width:20,height:20,borderRadius:5,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.06)",color:idx===sortedGroups.length-1?"rgba(255,255,255,0.12)":"#6a5a40",fontSize:9,cursor:idx===sortedGroups.length-1?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▼</button>
+                  </div>
+
+                  {/* Icon */}
+                  <div style={{width:40,height:40,borderRadius:10,background:"rgba(255,107,0,0.08)",border:"1px solid rgba(255,107,0,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📋</div>
+
+                  {/* Info */}
+                  <div style={{flex:1}}>
+                    <div style={{color:"#f8f0e0",fontSize:12,fontWeight:700}}>{g.name}</div>
+                    <div style={{color:"#6a5a40",fontSize:9,marginTop:2}}>
+                      {count} món · {g.allDay ? "Cả ngày" : `${g.startHour} – ${g.endHour}`}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <button onClick={() => openEditGroup(g)}
+                    style={{width:34,height:34,borderRadius:9,background:"rgba(255,107,0,0.08)",border:"1px solid rgba(255,107,0,0.2)",color:"#FF8C00",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✏️</button>
+                  <button onClick={() => delGroup(g.id)}
+                    style={{width:34,height:34,borderRadius:9,background:"rgba(255,64,64,0.06)",border:"1px solid rgba(255,64,64,0.15)",color:"#ff4040",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>🗑</button>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
+
+      {/* ══ MODAL: Import CSV ══ */}
+      <AnimatePresence>
+        {(importRows !== null || importError) && (
+          <>
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              onClick={() => { setImportRows(null); setImportError("") }}
+              style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:70,backdropFilter:"blur(5px)"}} />
+            <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}} transition={{type:"spring",damping:24,stiffness:280}}
+              style={{position:"fixed",bottom:0,left:0,right:0,zIndex:71,background:"#0e0c09",border:"1px solid rgba(62,207,110,0.2)",borderRadius:"22px 22px 0 0",maxHeight:"85vh",display:"flex",flexDirection:"column"}}>
+
+              <div style={{padding:"14px 18px 10px",flexShrink:0,borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                <div style={{width:36,height:4,background:"rgba(255,255,255,0.12)",borderRadius:2,margin:"0 auto 12px"}} />
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div>
+                    <div style={{color:"#f8f0e0",fontSize:14,fontWeight:800}}>📥 Nhập sản phẩm từ file</div>
+                    {importRows && <div style={{color:"#6a5a40",fontSize:9,marginTop:2}}>Xem trước {importRows.length} sản phẩm · Xác nhận để thêm vào menu</div>}
+                  </div>
+                  <button onClick={() => { setImportRows(null); setImportError("") }}
+                    style={{width:30,height:30,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"none",color:"#6a5a40",fontSize:16,cursor:"pointer"}}>×</button>
+                </div>
+              </div>
+
+              {importError ? (
+                <div style={{padding:"24px 18px",textAlign:"center"}}>
+                  <div style={{fontSize:32,marginBottom:8}}>⚠️</div>
+                  <div style={{color:"#ff4040",fontSize:12,fontWeight:700,marginBottom:6}}>Lỗi đọc file</div>
+                  <div style={{color:"rgba(255,100,100,0.7)",fontSize:10}}>{importError}</div>
+                  <button onClick={downloadTemplate} style={{marginTop:16,background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.3)",borderRadius:10,padding:"8px 16px",color:"#3ecf6e",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"Lexend"}}>
+                    📋 Tải file mẫu (.csv)
+                  </button>
+                </div>
+              ) : importRows && (
+                <>
+                  {/* Format hint */}
+                  <div style={{margin:"10px 18px 0",background:"rgba(74,143,245,0.06)",border:"1px solid rgba(74,143,245,0.18)",borderRadius:10,padding:"8px 12px",flexShrink:0}}>
+                    <div style={{color:"#4a8ff5",fontSize:9,fontWeight:700,marginBottom:3}}>📋 Định dạng cột CSV</div>
+                    <div style={{color:"rgba(74,143,245,0.7)",fontSize:8,lineHeight:1.6}}>
+                      <strong>Tên món</strong> · Mô tả · Giá bán · Giá KM (tuỳ chọn) · Danh mục · Badge (hot/bigsale/bestseller)
+                    </div>
+                    <button onClick={downloadTemplate} style={{marginTop:5,background:"transparent",border:"none",color:"#4a8ff5",fontSize:8,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",textDecoration:"underline",padding:0}}>
+                      Tải file mẫu
+                    </button>
+                  </div>
+
+                  {/* Preview table */}
+                  <div style={{flex:1,overflowY:"auto",padding:"10px 18px"}}>
+                    {/* Table header */}
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 80px 80px 80px",gap:6,padding:"6px 8px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:6}}>
+                      {["Tên món","Giá","KM","Danh mục"].map(h => (
+                        <div key={h} style={{color:"rgba(255,255,255,0.3)",fontSize:7.5,fontWeight:700,textTransform:"uppercase"}}>{h}</div>
+                      ))}
+                    </div>
+                    {importRows.map((r, i) => (
+                      <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 80px 80px 80px",gap:6,padding:"7px 8px",borderBottom:"1px solid rgba(255,255,255,0.04)",alignItems:"center"}}>
+                        <div>
+                          <div style={{color:"#f8f0e0",fontSize:10,fontWeight:600}}>{r.name}</div>
+                          {r.description && <div style={{color:"#6a5a40",fontSize:8,marginTop:1}}>{r.description}</div>}
+                          {r.badge && (
+                            <span style={{background:r.badge==="hot"?"rgba(255,64,64,0.15)":r.badge==="bigsale"?"rgba(255,215,0,0.12)":"rgba(62,207,110,0.12)",borderRadius:4,padding:"1px 5px",fontSize:7,fontWeight:700,color:r.badge==="hot"?"#ff4040":r.badge==="bigsale"?"#FFD700":"#3ecf6e",marginTop:2,display:"inline-block"}}>
+                              {r.badge==="hot"?"🔥 HOT":r.badge==="bigsale"?"💸 BIG SALE":"📈 BÁN CHẠY"}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{color:"#FF8C00",fontSize:10,fontWeight:700}}>{r.price.toLocaleString("vi-VN")}đ</div>
+                        <div style={{color:r.promoPrice?"#ff4040":"rgba(255,255,255,0.2)",fontSize:10}}>{r.promoPrice ? r.promoPrice.toLocaleString("vi-VN")+"đ" : "—"}</div>
+                        <div style={{color:"#6a5a40",fontSize:9}}>{r.category || "—"}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{padding:"12px 18px 28px",flexShrink:0,borderTop:"1px solid rgba(255,255,255,0.06)",display:"flex",gap:8}}>
+                    <button onClick={() => { setImportRows(null); setImportError("") }}
+                      style={{flex:1,height:44,borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",background:"transparent",color:"#6a5a40",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"Lexend"}}>
+                      Hủy
+                    </button>
+                    <button onClick={confirmImport}
+                      style={{flex:2,height:44,borderRadius:12,border:"none",background:"linear-gradient(90deg,#3ecf6e,#2bba5e)",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"Lexend",boxShadow:"0 3px 16px rgba(62,207,110,0.35)"}}>
+                      ✅ Nhập {importRows.length} sản phẩm
+                    </button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ══ MODAL: Tạo / Sửa nhóm ══ */}
+      <AnimatePresence>
+        {gModal && (
+          <>
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              onClick={() => setGModal(null)}
+              style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:50,backdropFilter:"blur(4px)"}} />
+            <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}} transition={{type:"spring",damping:24,stiffness:300}}
+              style={{position:"fixed",bottom:0,left:0,right:0,background:"#0e0c09",borderRadius:"22px 22px 0 0",border:"1px solid rgba(255,255,255,0.08)",padding:"18px 18px 36px",zIndex:51}}>
+              <div style={{width:36,height:4,background:"rgba(255,255,255,0.12)",borderRadius:2,margin:"0 auto 16px"}} />
+              <div style={{color:"#f8f0e0",fontSize:14,fontWeight:800,marginBottom:16}}>
+                {gEditing ? "✏️ Chỉnh sửa nhóm" : "📋 Tạo nhóm menu mới"}
+              </div>
+
+              <FLabel>Tên nhóm *</FLabel>
+              <FInput value={gModal.name} onChange={v => setGModal(m => m ? {...m,name:v} : m)} placeholder="VD: Bún, Đồ uống, Món thêm..." />
+
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                <Toggle on={gModal.allDay} onToggle={() => setGModal(m => m ? {...m,allDay:!m.allDay} : m)} />
+                <span style={{color:"#b0956a",fontSize:11}}>Phục vụ cả ngày</span>
+              </div>
+
+              {!gModal.allDay && (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+                  <div>
+                    <FLabel>Bắt đầu</FLabel>
+                    <input type="time" value={gModal.startHour} onChange={e => setGModal(m => m ? {...m,startHour:e.target.value} : m)}
+                      style={{width:"100%",height:40,borderRadius:10,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:12,padding:"0 10px",colorScheme:"dark"} as React.CSSProperties} />
+                  </div>
+                  <div>
+                    <FLabel>Kết thúc</FLabel>
+                    <input type="time" value={gModal.endHour} onChange={e => setGModal(m => m ? {...m,endHour:e.target.value} : m)}
+                      style={{width:"100%",height:40,borderRadius:10,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:12,padding:"0 10px",colorScheme:"dark"} as React.CSSProperties} />
+                  </div>
+                </div>
+              )}
+
+              <button onClick={saveGroup} disabled={!gModal.name.trim()}
+                style={{width:"100%",height:46,borderRadius:12,border:"none",background:"linear-gradient(90deg,#FF6B00,#FF8C00)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",boxShadow:"0 3px 16px rgba(255,107,0,0.4)",opacity:!gModal.name.trim()?0.5:1,position:"relative",overflow:"hidden"}}>
+                <ShimmerBar />
+                <span style={{position:"relative",zIndex:1}}>{gEditing ? "💾 Lưu thay đổi" : "✅ Tạo nhóm"}</span>
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ══ SHEET: Thêm / Sửa món ══ */}
+      <AnimatePresence>
+        {pModal && (
+          <>
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              onClick={() => setPModal(null)}
+              style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.78)",zIndex:60,backdropFilter:"blur(4px)"}} />
+            <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}} transition={{type:"spring",damping:24,stiffness:280}}
+              style={{position:"fixed",bottom:0,left:0,right:0,zIndex:61,background:"#0e0c09",border:"1px solid rgba(255,107,0,0.2)",borderRadius:"22px 22px 0 0",maxHeight:"95vh",display:"flex",flexDirection:"column"}}>
+
+              {/* Sheet header */}
+              <div style={{padding:"14px 18px 10px",flexShrink:0,borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                <div style={{width:36,height:4,background:"rgba(255,255,255,0.12)",borderRadius:2,margin:"0 auto 12px"}} />
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{color:"#f8f0e0",fontSize:14,fontWeight:800}}>{pEditing ? "✏️ Chỉnh sửa món" : "🍽️ Thêm món mới"}</div>
+                  <button onClick={() => setPModal(null)}
+                    style={{width:30,height:30,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"none",color:"#6a5a40",fontSize:16,cursor:"pointer"}}>×</button>
+                </div>
+              </div>
+
+              {/* Scrollable form */}
+              <div style={{flex:1,overflowY:"auto",padding:"14px 18px 8px"}}>
+
+                {/* ─ Ảnh + Tên ─ */}
+                <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:14}}>
+                  <div onClick={() => fileRef.current?.click()}
+                    style={{width:90,height:90,borderRadius:16,flexShrink:0,background:"rgba(255,107,0,0.06)",border:"2px dashed rgba(255,107,0,0.35)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",position:"relative"}}>
+                    {pModal.imagePreview
+                      ? <>
+                          <img src={pModal.imagePreview} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} />
+                          <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            <span style={{color:"#fff",fontSize:10,fontWeight:700}}>Đổi ảnh</span>
+                          </div>
+                        </>
+                      : <div style={{textAlign:"center"}}>
+                          <div style={{fontSize:26,marginBottom:2}}>📷</div>
+                          <div style={{color:"#6a5a40",fontSize:8}}>Tải ảnh lên</div>
+                        </div>
+                    }
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <FLabel>Tên món *</FLabel>
+                    <FInput value={pModal.name} onChange={v => setPModal(m => m ? {...m,name:v} : m)} placeholder="VD: Bún bò đặc biệt" />
+                    <FLabel>Mô tả ngắn</FLabel>
+                    <FInput value={pModal.description} onChange={v => setPModal(m => m ? {...m,description:v} : m)} placeholder="Tuỳ chọn..." />
+                  </div>
+                </div>
+
+                {/* ─ Giá & Nhóm ─ */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <div>
+                    <FLabel>Giá bán *</FLabel>
+                    <FInput value={pModal.price > 0 ? String(pModal.price) : ""} type="number"
+                      onChange={v => setPModal(m => m ? {...m,price:parseInt(v)||0} : m)} placeholder="VD: 45000" />
+                  </div>
+                  <div>
+                    <FLabel>Nhóm menu</FLabel>
+                    <select value={pModal.menuGroupId} onChange={e => setPModal(m => m ? {...m,menuGroupId:e.target.value} : m)}
+                      style={{width:"100%",height:42,borderRadius:11,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:pModal.menuGroupId?"#f8f0e0":"#6a5a40",fontSize:11,padding:"0 10px",marginBottom:10,colorScheme:"dark",fontFamily:"Lexend"} as React.CSSProperties}>
+                      <option value="" style={{background:"#0e0c09"}}>-- Không chọn --</option>
+                      {sortedGroups.map(g => <option key={g.id} value={g.id} style={{background:"#0e0c09"}}>{g.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* ─ Giờ bán ─ */}
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+                  <Toggle on={pModal.allDay} onToggle={() => setPModal(m => m ? {...m,allDay:!m.allDay} : m)} />
+                  <span style={{color:"#b0956a",fontSize:11}}>Bán cả ngày</span>
+                  {!pModal.allDay && (
+                    <div style={{display:"flex",gap:6,alignItems:"center",flex:1,minWidth:160}}>
+                      <input type="time" value={pModal.startHour} onChange={e => setPModal(m => m ? {...m,startHour:e.target.value} : m)}
+                        style={{flex:1,height:34,borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:11,padding:"0 8px",colorScheme:"dark"} as React.CSSProperties} />
+                      <span style={{color:"#6a5a40",fontSize:11}}>–</span>
+                      <input type="time" value={pModal.endHour} onChange={e => setPModal(m => m ? {...m,endHour:e.target.value} : m)}
+                        style={{flex:1,height:34,borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:11,padding:"0 8px",colorScheme:"dark"} as React.CSSProperties} />
+                    </div>
+                  )}
+                </div>
+
+                {/* ─ Danh mục (max 3) ─ */}
+                <div style={{marginBottom:14}}>
+                  <FLabel>Danh mục <span style={{color:"#6a5a40"}}>(chọn tối đa 3 · đã chọn {pModal.categories.length}/3)</span></FLabel>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {CATEGORY_LIST.map(c => {
+                      const on       = pModal.categories.includes(c)
+                      const disabled = !on && pModal.categories.length >= 3
+                      return (
+                        <button key={c} onClick={() => toggleCat(c)} disabled={disabled}
+                          style={{padding:"5px 11px",borderRadius:20,
+                            background:on?"rgba(255,107,0,0.14)":"rgba(255,255,255,0.04)",
+                            border:on?"1px solid rgba(255,107,0,0.4)":"1px solid rgba(255,255,255,0.07)",
+                            color:on?"#FF8C00":disabled?"rgba(106,90,64,0.4)":"#6a5a40",
+                            fontSize:10,fontWeight:on?700:400,cursor:disabled?"not-allowed":"pointer",fontFamily:"Lexend",opacity:disabled?0.5:1}}>
+                          {on && "✓ "}{c}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* ─ Badge / Ghim ─ */}
+                <div style={{marginBottom:14}}>
+                  <FLabel>Ghim / Badge nổi bật</FLabel>
+                  <div style={{display:"flex",gap:6}}>
+                    {BADGE_LIST.map(b => {
+                      const on = pModal.badge === b.key
+                      return (
+                        <button key={b.key} onClick={() => setPModal(m => m ? {...m,badge:on?null:b.key} : m)}
+                          style={{flex:1,height:36,borderRadius:9,
+                            background:on?b.bg:"rgba(255,255,255,0.04)",
+                            border:`1px solid ${on?b.border:"rgba(255,255,255,0.07)"}`,
+                            color:on?b.color:"#6a5a40",fontSize:9,fontWeight:on?700:400,cursor:"pointer",fontFamily:"Lexend"}}>
+                          {b.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* ─ Size ─ */}
+                <SectionBox label="Size" color="#3ecf6e" onAdd={addSize} addLabel="+ Thêm size">
+                  {pModal.sizes.map((s, i) => (
+                    <div key={s.id} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
+                      <input value={s.label} onChange={e => setSize(i,"label",e.target.value)} placeholder="Tên size (S/M/L...)"
+                        style={{flex:1,height:36,borderRadius:9,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:11,padding:"0 10px"}} />
+                      <input value={s.priceDiff > 0 ? String(s.priceDiff) : ""} type="number"
+                        onChange={e => setSize(i,"priceDiff",e.target.value)} placeholder="+giá (đ)"
+                        style={{width:90,height:36,borderRadius:9,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:11,padding:"0 10px"}} />
+                      <button onClick={() => removeSize(i)}
+                        style={{width:30,height:30,borderRadius:7,background:"rgba(255,64,64,0.07)",border:"1px solid rgba(255,64,64,0.2)",color:"#ff4040",fontSize:14,cursor:"pointer"}}>×</button>
+                    </div>
+                  ))}
+                </SectionBox>
+
+                {/* ─ Topping ─ */}
+                <SectionBox label="Topping" color="#b464ff" onAdd={addTopping} addLabel="+ Thêm topping">
+                  {pModal.toppings.map((t, i) => (
+                    <div key={t.id} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
+                      <input value={t.name} onChange={e => setTopping(i,"name",e.target.value)} placeholder="Tên topping"
+                        style={{flex:1,height:36,borderRadius:9,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:11,padding:"0 10px"}} />
+                      <input value={t.price > 0 ? String(t.price) : ""} type="number"
+                        onChange={e => setTopping(i,"price",e.target.value)} placeholder="Giá thêm (đ)"
+                        style={{width:90,height:36,borderRadius:9,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:11,padding:"0 10px"}} />
+                      <button onClick={() => removeTopping(i)}
+                        style={{width:30,height:30,borderRadius:7,background:"rgba(255,64,64,0.07)",border:"1px solid rgba(255,64,64,0.2)",color:"#ff4040",fontSize:14,cursor:"pointer"}}>×</button>
+                    </div>
+                  ))}
+                </SectionBox>
+
+                {/* ─ Khuyến mãi ─ */}
+                <div style={{background:"rgba(255,64,64,0.04)",border:"1px solid rgba(255,64,64,0.12)",borderRadius:14,padding:12,marginBottom:20}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:pModal.promoEnabled?14:0}}>
+                    <Toggle on={pModal.promoEnabled} onToggle={() => setPModal(m => m ? {...m,promoEnabled:!m.promoEnabled} : m)} activeColor="#ff4040" activeBg="rgba(255,64,64,0.2)" activeBorder="rgba(255,64,64,0.4)" />
+                    <span style={{color:pModal.promoEnabled?"#ff4040":"#6a5a40",fontSize:11,fontWeight:pModal.promoEnabled?700:400}}>🔥 Bật khuyến mãi cho món này</span>
+                  </div>
+
+                  {pModal.promoEnabled && (
+                    <>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                        <div>
+                          <FLabel>Giá khuyến mãi *</FLabel>
+                          <FInput value={pModal.promoPrice ? String(pModal.promoPrice) : ""} type="number"
+                            onChange={v => setPModal(m => m ? {...m,promoPrice:parseInt(v)||null} : m)} placeholder="VD: 35000" />
+                        </div>
+                        <div>
+                          <FLabel>Giới hạn / người</FLabel>
+                          <FInput value={pModal.promoPerPerson ? String(pModal.promoPerPerson) : ""} type="number"
+                            onChange={v => setPModal(m => m ? {...m,promoPerPerson:parseInt(v)||null} : m)} placeholder="VD: 2 lần" />
+                        </div>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        <div>
+                          <FLabel>Từ ngày</FLabel>
+                          <input type="datetime-local" value={pModal.promoStart}
+                            onChange={e => setPModal(m => m ? {...m,promoStart:e.target.value} : m)}
+                            style={{width:"100%",height:40,borderRadius:10,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:10,padding:"0 8px",colorScheme:"dark"} as React.CSSProperties} />
+                        </div>
+                        <div>
+                          <FLabel>Đến ngày</FLabel>
+                          <input type="datetime-local" value={pModal.promoEnd}
+                            onChange={e => setPModal(m => m ? {...m,promoEnd:e.target.value} : m)}
+                            style={{width:"100%",height:40,borderRadius:10,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:10,padding:"0 8px",colorScheme:"dark"} as React.CSSProperties} />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Save button */}
+              <div style={{padding:"10px 18px 32px",flexShrink:0,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                <button onClick={saveProduct} disabled={!pModal.name.trim() || pModal.price <= 0}
+                  style={{width:"100%",height:48,borderRadius:13,border:"none",background:"linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"Lexend",boxShadow:"0 4px 20px rgba(255,107,0,0.4)",position:"relative",overflow:"hidden",opacity:!pModal.name.trim()||pModal.price<=0?0.5:1}}>
+                  <ShimmerBar />
+                  <span style={{position:"relative",zIndex:1}}>{pEditing ? "💾 Lưu thay đổi" : "✅ Thêm vào menu"}</span>
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   )
+}
+
+// ── Helper components ──────────────────────────────────────────────────────
+function FLabel({ children }: { children: React.ReactNode }) {
+  return <div style={{color:"rgba(176,149,106,0.75)",fontSize:9.5,marginBottom:5}}>{children}</div>
+}
+
+function FInput({ value, onChange, placeholder, type="text" }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; type?: string
+}) {
+  const [focused, setFocused] = useState(false)
+  return (
+    <div style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${focused?"rgba(255,107,0,0.45)":"rgba(255,255,255,0.08)"}`,borderRadius:11,padding:"0 12px",height:42,marginBottom:10,transition:"all .2s",boxShadow:focused?"0 0 0 3px rgba(255,107,0,0.09)":"none",display:"flex",alignItems:"center"}}>
+      <input type={type} value={value} placeholder={placeholder}
+        onChange={e => onChange(e.target.value)}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        style={{flex:1,background:"transparent",border:"none",color:"#f8f0e0",fontSize:12}} />
+    </div>
+  )
+}
+
+function Toggle({ on, onToggle, activeColor="#FF8C00", activeBg="rgba(255,107,0,0.2)", activeBorder="rgba(255,107,0,0.4)" }: {
+  on: boolean; onToggle: () => void; activeColor?: string; activeBg?: string; activeBorder?: string
+}) {
+  return (
+    <button onClick={onToggle}
+      style={{width:42,height:24,borderRadius:12,background:on?activeBg:"rgba(255,255,255,0.06)",border:`1px solid ${on?activeBorder:"rgba(255,255,255,0.1)"}`,display:"flex",alignItems:"center",padding:"3px 4px",cursor:"pointer",justifyContent:on?"flex-end":"flex-start",flexShrink:0,transition:"all .2s"}}>
+      <div style={{width:16,height:16,borderRadius:"50%",background:on?activeColor:"#6a5a40",transition:"background .2s"}} />
+    </button>
+  )
+}
+
+function SectionBox({ label, color, onAdd, addLabel, children }: {
+  label: string; color: string; onAdd: () => void; addLabel: string; children: React.ReactNode
+}) {
+  return (
+    <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:14,padding:12,marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <span style={{color,fontSize:10,fontWeight:700}}>{label}</span>
+        <button onClick={onAdd}
+          style={{background:"rgba(255,107,0,0.08)",border:"1px solid rgba(255,107,0,0.2)",borderRadius:8,padding:"3px 10px",color:"#FF8C00",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"Lexend"}}>
+          {addLabel}
+        </button>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function ShimmerBar() {
+  return <div style={{position:"absolute",top:0,left:"-60%",width:"35%",height:"100%",background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)",animation:"shimmer 2.5s infinite"}} />
 }

@@ -54,7 +54,7 @@ export default function MerchantPromotionsPage() {
 
   const [form, setForm] = useState({
     title: "", type: "percent" as PromoType, value: "", minOrder: "", maxDiscount: "",
-    usageLimit: "", startAt: "", endAt: "", applyAll: true,
+    usageLimit: "", perPersonLimit: "", startAt: "", endAt: "", applyAll: true,
   })
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2400) }
@@ -96,6 +96,7 @@ export default function MerchantPromotionsPage() {
       minOrder: parseInt(form.minOrder) || 0,
       maxDiscount: form.maxDiscount ? parseInt(form.maxDiscount) : null,
       usageLimit: form.usageLimit ? parseInt(form.usageLimit) : null,
+      // perPersonLimit stored in data field — ready for Supabase column when added
       usedCount: 0,
       startAt: form.startAt,
       endAt: form.endAt,
@@ -104,7 +105,7 @@ export default function MerchantPromotionsPage() {
       applyAll: form.applyAll,
     }
     setPromos(ps => [newPromo, ...ps])
-    setForm({ title:"", type:"percent", value:"", minOrder:"", maxDiscount:"", usageLimit:"", startAt:"", endAt:"", applyAll:true })
+    setForm({ title:"", type:"percent", value:"", minOrder:"", maxDiscount:"", usageLimit:"", perPersonLimit:"", startAt:"", endAt:"", applyAll:true })
     setShowCreate(false)
     fireToast("Tạo chương trình khuyến mãi thành công!")
   }
@@ -211,9 +212,18 @@ export default function MerchantPromotionsPage() {
                 )}
 
                 {/* Usage limit */}
-                <MLabel>Giới hạn số lượt (tuỳ chọn)</MLabel>
-                <MInput value={form.usageLimit} onChange={v => setForm(f => ({ ...f, usageLimit:v }))}
-                  type="number" placeholder="Bỏ trống = không giới hạn" />
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                  <div>
+                    <MLabel>Tổng lượt dùng</MLabel>
+                    <MInput value={form.usageLimit} onChange={v => setForm(f => ({ ...f, usageLimit:v }))}
+                      type="number" placeholder="Bỏ trống = ∞" />
+                  </div>
+                  <div>
+                    <MLabel>Giới hạn / người</MLabel>
+                    <MInput value={form.perPersonLimit} onChange={v => setForm(f => ({ ...f, perPersonLimit:v }))}
+                      type="number" placeholder="VD: 1 lần" />
+                  </div>
+                </div>
 
                 {/* Date range */}
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:12 }}>

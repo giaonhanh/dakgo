@@ -192,6 +192,8 @@ function LoginContent() {
   }
 
   useEffect(() => {
+    // Xóa session cũ khi vào login — tránh bị kẹt account cũ
+    supabase.auth.signOut()
     const t = setTimeout(() => setPhase("auth"), 3000)
     if (params.get("error") === "suspended") {
       setError("Tài khoản của bạn đã bị tạm khóa. Liên hệ hỗ trợ để biết thêm.")

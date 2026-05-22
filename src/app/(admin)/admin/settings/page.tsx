@@ -16,7 +16,8 @@ const NAV_ITEMS = [
   { icon: "⚙️",  label: "Cài đặt",       href: "/admin/settings",      active: true  },
 ]
 
-type SettingSection = "delivery" | "commission" | "area" | "features" | "account" | "maintenance"
+type SettingSection = "pricing" | "delivery" | "commission" | "area" | "features" | "account" | "maintenance"
+type ServiceType = "food" | "delivery_pkg" | "errand" | "motorbike" | "taxi"
 
 interface ToggleSetting {
   key: string; label: string; description: string; value: boolean
@@ -28,8 +29,49 @@ interface InputSetting {
 
 export default function AdminSettingsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [activeSection, setActiveSection] = useState<SettingSection>("delivery")
+  const [activeSection, setActiveSection] = useState<SettingSection>("pricing")
+  const [activeService, setActiveService] = useState<ServiceType>("food")
   const [saved, setSaved] = useState(false)
+
+  // Pricing per service (km1..km10 + extra per km from km11)
+  const [pricing, setPricing] = useState<Record<ServiceType, { rows: string[]; extra: string }>>({
+    food:         { rows: ["15000","12000","10000","9000","8000","7500","7000","6500","6000","5500"], extra: "5000" },
+    delivery_pkg: { rows: ["18000","15000","12000","10000","9000","8500","8000","7500","7000","6500"], extra: "6000" },
+    errand:       { rows: ["20000","17000","14000","12000","11000","10000","9000","8500","8000","7500"], extra: "7000" },
+    motorbike:    { rows: ["10000","8000","7000","6500","6000","5500","5000","4800","4600","4500"],    extra: "4000" },
+    taxi:         { rows: ["15000","13000","11000","10000","9500","9000","8500","8000","7500","7000"], extra: "6500" },
+  })
+
+  const SERVICE_META: Record<ServiceType, { label: string; icon: string; color: string; desc: string }> = {
+    food:         { label: "Giao đồ ăn",  icon: "🍜", color: "#FF6B00", desc: "Giao thức ăn từ cửa hàng đến khách" },
+    delivery_pkg: { label: "Giao hàng",   icon: "📦", color: "#4a8ff5", desc: "Giao bưu kiện, hàng hóa thông thường" },
+    errand:       { label: "Mua hộ",      icon: "🛒", color: "#3ecf6e", desc: "Tài xế mua hàng theo yêu cầu và giao" },
+    motorbike:    { label: "Xe ôm",       icon: "🏍️", color: "#b464ff", desc: "Đặt xe ôm di chuyển cá nhân" },
+    taxi:         { label: "Taxi",         icon: "🚗", color: "#f5c542", desc: "Đặt taxi 4 chỗ / 7 chỗ" },
+  }
+
+  const updateKmPrice = (service: ServiceType, kmIndex: number, value: string) => {
+    setPricing(p => ({
+      ...p,
+      [service]: { ...p[service], rows: p[service].rows.map((r, i) => i === kmIndex ? value : r) }
+    }))
+  }
+
+  const calcExampleFare = (service: ServiceType, distKm: number): number => {
+    const { rows, extra } = pricing[service]
+    let total = 0
+    for (let i = 0; i < Math.min(distKm, 10); i++) {
+      const raw = rows[i]
+      // if empty, fallback to previous non-empty (or km1)
+      let price = 0
+      for (let j = i; j >= 0; j--) {
+        if (rows[j] && rows[j] !== "") { price = parseInt(rows[j]) || 0; break }
+      }
+      total += price
+    }
+    if (distKm > 10) total += (distKm - 10) * (parseInt(extra) || 0)
+    return total
+  }
 
   // Delivery settings
   const [deliverySettings, setDeliverySettings] = useState({
@@ -85,6 +127,7 @@ export default function AdminSettingsPage() {
   }
 
   const SECTIONS: { key: SettingSection; label: string; icon: string }[] = [
+    { key:"pricing",     label:"Cài đặt cước",   icon:"💵" },
     { key:"delivery",    label:"Phí giao hàng",  icon:"🛵" },
     { key:"commission",  label:"Hoa hồng",       icon:"💰" },
     { key:"area",        label:"Khu vực",         icon:"🗺️" },
@@ -171,6 +214,115 @@ export default function AdminSettingsPage() {
 
             {/* Settings content */}
             <div style={{ overflowY:"auto", padding:"24px 32px" }}>
+
+              {/* PRICING */}
+              {activeSection === "pricing" && (
+                <div style={{ animation:"fadeUp 0.3s ease" }}>
+                  <div style={{ color:"#f0eaff", fontSize:15, fontWeight:700, marginBottom:4 }}>💵 Cài đặt cước dịch vụ</div>
+                  <div style={{ color:"#6a5a40", fontSize:11, marginBottom:16 }}>Giá cước từng km cho mỗi loại dịch vụ. Ô trống = dùng giá km trước đó.</div>
+
+                  {/* Service tabs */}
+                  <div style={{ display:"flex", gap:8, marginBottom:20, flexWrap:"wrap" }}>
+                    {(Object.keys(SERVICE_META) as ServiceType[]).map(svc => {
+                      const m = SERVICE_META[svc]
+                      const isActive = activeService === svc
+                      return (
+                        <button key={svc} onClick={() => setActiveService(svc)} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", borderRadius:20, border: isActive ? `1.5px solid ${m.color}` : "1.5px solid rgba(255,255,255,0.08)", background: isActive ? `rgba(${m.color === "#FF6B00" ? "255,107,0" : m.color === "#4a8ff5" ? "74,143,245" : m.color === "#3ecf6e" ? "62,207,110" : m.color === "#b464ff" ? "180,100,255" : "245,197,66"},0.12)` : "rgba(255,255,255,0.03)", color: isActive ? m.color : "#6a5a40", fontSize:12, fontWeight: isActive ? 700 : 400, cursor:"pointer", fontFamily:"Lexend", transition:"all 0.2s" }}>
+                          <span style={{ fontSize:16 }}>{m.icon}</span>
+                          {m.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* Service description */}
+                  <div style={{ marginBottom:16, padding:"10px 14px", background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:10, color:"#6a5a40", fontSize:11 }}>
+                    {SERVICE_META[activeService].icon} {SERVICE_META[activeService].desc}
+                  </div>
+
+                  {/* KM price table */}
+                  <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
+                    {/* Header */}
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 2fr", padding:"10px 20px", background:"rgba(255,255,255,0.04)", borderBottom:"1px solid rgba(255,255,255,0.07)" }}>
+                      <span style={{ color:"#6a5a40", fontSize:10, fontWeight:700 }}>KHOẢNG CÁCH</span>
+                      <span style={{ color:"#6a5a40", fontSize:10, fontWeight:700, textAlign:"right" }}>GIÁ (đ/km)</span>
+                      <span style={{ color:"#6a5a40", fontSize:10, fontWeight:700, textAlign:"right", paddingRight:8 }}>GHI CHÚ</span>
+                    </div>
+
+                    {/* Km 1-10 rows */}
+                    {pricing[activeService].rows.map((price, i) => {
+                      const km = i + 1
+                      const isEmpty = price === ""
+                      // find effective price (walk backwards)
+                      let effectivePrice = price
+                      if (isEmpty && i > 0) {
+                        for (let j = i - 1; j >= 0; j--) {
+                          if (pricing[activeService].rows[j] !== "") { effectivePrice = pricing[activeService].rows[j]; break }
+                        }
+                      }
+                      return (
+                        <div key={km} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 2fr", alignItems:"center", padding:"11px 20px", borderBottom:"1px solid rgba(255,255,255,0.05)", background: isEmpty ? "rgba(255,255,255,0.01)" : "transparent" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            <span style={{ width:28, height:28, borderRadius:8, background:`rgba(${SERVICE_META[activeService].color === "#FF6B00" ? "255,107,0" : SERVICE_META[activeService].color === "#4a8ff5" ? "74,143,245" : SERVICE_META[activeService].color === "#3ecf6e" ? "62,207,110" : SERVICE_META[activeService].color === "#b464ff" ? "180,100,255" : "245,197,66"},0.12)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color: SERVICE_META[activeService].color, flexShrink:0 }}>{km}</span>
+                            <span style={{ color:"#f0eaff", fontSize:12, fontWeight:500 }}>Km {km}</span>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <input
+                              type="number"
+                              value={price}
+                              placeholder={isEmpty && i > 0 ? effectivePrice : ""}
+                              onChange={e => updateKmPrice(activeService, i, e.target.value)}
+                              style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:`1px solid ${isEmpty && i > 0 ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.12)"}`, borderRadius:8, color: isEmpty ? "#6a5a40" : "#f0eaff", fontSize:12, textAlign:"right", fontFamily:"Lexend", outline:"none" }}
+                            />
+                          </div>
+                          <div style={{ textAlign:"right", paddingRight:8 }}>
+                            {i === 1 && <span style={{ fontSize:10, color:"#6a5a40" }}>Bỏ trống = dùng giá km 1</span>}
+                            {i > 1 && isEmpty && <span style={{ fontSize:10, color:"#6a5a40", fontStyle:"italic" }}>→ {parseInt(effectivePrice || "0").toLocaleString("vi-VN")}đ</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {/* Km 11+ row */}
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 2fr", alignItems:"center", padding:"11px 20px", background:"rgba(255,107,0,0.03)", borderTop:"1px solid rgba(255,107,0,0.1)" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <span style={{ width:28, height:28, borderRadius:8, background:"rgba(255,107,0,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:800, color:"#FF8C00", flexShrink:0 }}>11+</span>
+                        <span style={{ color:"#FF8C00", fontSize:12, fontWeight:600 }}>Km 11 trở đi</span>
+                      </div>
+                      <div style={{ textAlign:"right" }}>
+                        <input
+                          type="number"
+                          value={pricing[activeService].extra}
+                          onChange={e => setPricing(p => ({ ...p, [activeService]: { ...p[activeService], extra: e.target.value } }))}
+                          style={{ width:90, padding:"7px 10px", background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.25)", borderRadius:8, color:"#FF8C00", fontSize:12, textAlign:"right", fontFamily:"Lexend", outline:"none" }}
+                        />
+                      </div>
+                      <div style={{ textAlign:"right", paddingRight:8 }}>
+                        <span style={{ fontSize:10, color:"#6a5a40" }}>cộng thêm mỗi km</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Example fare calculator */}
+                  <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"16px 20px" }}>
+                    <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700, marginBottom:12 }}>📊 Ví dụ tính cước</div>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:8 }}>
+                      {[1, 3, 5, 8, 12].map(dist => {
+                        const fare = calcExampleFare(activeService, dist)
+                        return (
+                          <div key={dist} style={{ textAlign:"center", padding:"10px 8px", background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:10 }}>
+                            <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>{dist} km</div>
+                            <div style={{ color: SERVICE_META[activeService].color, fontSize:12, fontWeight:700 }}>{fare.toLocaleString("vi-VN")}đ</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div style={{ marginTop:10, color:"#6a5a40", fontSize:10 }}>
+                      * Cước tính bằng tổng giá từng km (không phải giá/km × quãng đường). Km trống dùng giá km gần nhất phía trên.
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* DELIVERY */}
               {activeSection === "delivery" && (

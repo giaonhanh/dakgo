@@ -1,15 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { createClient } from "@/lib/supabase/client"
 
-type PtsTxType = "order" | "bonus" | "minigame" | "redeem"
+type PtsTxType = "order_complete" | "bonus" | "redeem" | string
 interface PtsTx {
   id: string; type: PtsTxType; label: string
-  points: number; balance: number; time: string
+  points: number; time: string
 }
 
-const USER_EARNED = 1840
 const REDEEM_RATE = 100 // 100 điểm = 1.000 xu
 
 const TIERS_DATA = [
@@ -18,10 +18,6 @@ const TIERS_DATA = [
   { id:"gold",     name:"Vàng",     icon:"🥇", min:5000,  max:19999,    color:"#F5C542", bg:"rgba(245,197,66,0.12)",  benefits:["+10% điểm mỗi đơn","Ưu tiên tài xế","Giảm phí ship 5%"] },
   { id:"platinum", name:"Bạch Kim", icon:"💎", min:20000, max:Infinity, color:"#b464ff", bg:"rgba(180,100,255,0.12)", benefits:["+20% điểm mỗi đơn","Freeship mỗi tuần","VIP support 24/7"] },
 ]
-const CUR_IDX  = Math.max(0, TIERS_DATA.findIndex(t => USER_EARNED >= t.min && USER_EARNED <= t.max))
-const CUR_TIER = TIERS_DATA[CUR_IDX]
-const NXT_TIER = TIERS_DATA[CUR_IDX + 1] ?? null
-const TIER_PCT = NXT_TIER ? Math.round((USER_EARNED - CUR_TIER.min) / (NXT_TIER.min - CUR_TIER.min) * 100) : 100
 
 const REWARD_VOUCHERS = [
   { id:"R001", title:"Freeship đơn tiếp theo", icon:"🚀", type:"freeship" as const, value:15000, pointCost:200, stock:50, minTier:"Đồng"  },
@@ -30,32 +26,57 @@ const REWARD_VOUCHERS = [
   { id:"R004", title:"Giảm 50k đơn từ 200k",  icon:"🎁", type:"fixed"    as const, value:50000, pointCost:800, stock:10, minTier:"Vàng"  },
 ]
 
-const PTS_TX_CFG: Record<PtsTxType, { icon:string; color:string; bg:string; label:string }> = {
-  order:    { icon:"🛒", color:"#F5C542", bg:"rgba(245,197,66,0.1)",  label:"Đơn hàng"   },
-  bonus:    { icon:"🎁", color:"#FFB347", bg:"rgba(255,179,71,0.12)", label:"Admin cộng" },
-  minigame: { icon:"🎮", color:"#3ecf6e", bg:"rgba(62,207,110,0.1)", label:"Mini game"  },
-  redeem:   { icon:"🔄", color:"#b464ff", bg:"rgba(180,100,255,0.1)","label":"Đổi điểm"  },
+const PTS_TX_CFG: Record<string, { icon:string; color:string; bg:string; label:string }> = {
+  order_complete: { icon:"🛒", color:"#F5C542", bg:"rgba(245,197,66,0.1)",  label:"Đơn hàng"   },
+  bonus:          { icon:"🎁", color:"#FFB347", bg:"rgba(255,179,71,0.12)", label:"Admin cộng" },
+  redeem:         { icon:"🔄", color:"#b464ff", bg:"rgba(180,100,255,0.1)", label:"Đổi điểm"   },
 }
 
-const PTS_TXS: PtsTx[] = [
-  { id:"pt8", type:"order",    label:"Đơn #GN2851 hoàn thành",    points:13,   balance:1840, time:"Hôm nay · 22:10" },
-  { id:"pt7", type:"bonus",    label:"Admin thưởng — Sinh nhật",  points:200,  balance:1827, time:"Hôm nay · 09:00" },
-  { id:"pt6", type:"order",    label:"Đơn #GN2849 hoàn thành",    points:10,   balance:1627, time:"Hôm qua · 21:55" },
-  { id:"pt5", type:"order",    label:"Đơn #GN2840 hoàn thành",    points:7,    balance:1617, time:"3 ngày trước" },
-  { id:"pt4", type:"minigame", label:"Mini game Tháng 5 — Top 3", points:100,  balance:1610, time:"4 ngày trước · 18:00" },
-  { id:"pt3", type:"redeem",   label:"Đổi điểm → 500 xu",        points:-50,  balance:1510, time:"5 ngày trước" },
-  { id:"pt2", type:"order",    label:"Đơn #GN2820 hoàn thành",    points:6,    balance:1560, time:"1 tuần trước" },
-  { id:"pt1", type:"order",    label:"Đơn #GN2801 hoàn thành",    points:15,   balance:1554, time:"2 tuần trước" },
-]
+function timeAgo(dateStr: string): string {
+  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
+  if (diff < 86400)  return `Hôm nay · ${new Date(dateStr).toLocaleTimeString("vi-VN", { hour:"2-digit", minute:"2-digit" })}`
+  if (diff < 172800) return "Hôm qua"
+  return `${Math.floor(diff/86400)} ngày trước`
+}
 
 export default function PointsPage() {
+  const supabase = createClient()
+  const [userEarned, setUserEarned] = useState(0)
+  const [ptsTxs,     setPtsTxs]    = useState<PtsTx[]>([])
   const [showRedeem,  setShowRedeem]  = useState(false)
   const [redeemInput, setRedeemInput] = useState("")
-  const [filterType,  setFilterType]  = useState<PtsTxType|"all">("all")
+  const [filterType,  setFilterType]  = useState<string>("all")
   const [toast,       setToast]       = useState("")
 
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: pts } = await supabase
+        .from("loyalty_points").select("total_points").eq("user_id", user.id).maybeSingle()
+      if (pts) setUserEarned(pts.total_points)
+      const { data: txData } = await supabase
+        .from("point_transactions")
+        .select("id,points,reason,created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(30)
+      setPtsTxs((txData ?? []).map((t: {id:string;points:number;reason:string;created_at:string}) => ({
+        id: t.id, type: t.reason, label: PTS_TX_CFG[t.reason]?.label ?? t.reason,
+        points: t.points, time: timeAgo(t.created_at),
+      })))
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const CUR_IDX  = Math.max(0, TIERS_DATA.findIndex(t => userEarned >= t.min && userEarned <= t.max))
+  const CUR_TIER = TIERS_DATA[CUR_IDX]
+  const NXT_TIER = TIERS_DATA[CUR_IDX + 1] ?? null
+  const TIER_PCT = NXT_TIER ? Math.round((userEarned - CUR_TIER.min) / (NXT_TIER.min - CUR_TIER.min) * 100) : 100
+
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2400) }
-  const filtered = PTS_TXS.filter(t => filterType === "all" || t.type === filterType)
+  const filtered = ptsTxs.filter(t => filterType === "all" || t.type === filterType)
 
   return (
     <>
@@ -101,11 +122,11 @@ export default function PointsPage() {
               </div>
               <div style={{ color:"#6a5a40", fontSize:9, marginBottom:14 }}>
                 Tỷ lệ: {REDEEM_RATE} điểm = 1.000 xu · Bạn có{" "}
-                <span style={{ color:"#F5C542", fontWeight:700 }}>{USER_EARNED.toLocaleString()} điểm</span>
+                <span style={{ color:"#F5C542", fontWeight:700 }}>{userEarned.toLocaleString()} điểm</span>
               </div>
 
               <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:7, marginBottom:12 }}>
-                {[200, 500, 1000].filter(v => v <= USER_EARNED).map(v => (
+                {[200, 500, 1000].filter(v => v <= userEarned).map(v => (
                   <div key={v} onClick={() => setRedeemInput(String(v))}
                     style={{ height:52, borderRadius:11, cursor:"pointer",
                       background: redeemInput===String(v) ? "rgba(245,197,66,0.12)" : "rgba(255,255,255,0.04)",
@@ -120,7 +141,7 @@ export default function PointsPage() {
               </div>
 
               <GInput label="Hoặc nhập số điểm muốn đổi" value={redeemInput}
-                onChange={setRedeemInput} placeholder={`Tối đa ${USER_EARNED.toLocaleString()} · bội số ${REDEEM_RATE}`}
+                onChange={setRedeemInput} placeholder={`Tối đa ${userEarned.toLocaleString()} · bội số ${REDEEM_RATE}`}
                 icon="⭐" type="number" />
 
               {redeemInput && parseInt(redeemInput) > 0 && (
@@ -136,7 +157,7 @@ export default function PointsPage() {
                   <div style={{ textAlign:"right" }}>
                     <div style={{ color:"#6a5a40", fontSize:9 }}>Điểm còn lại</div>
                     <div style={{ color:"#F5C542", fontSize:13, fontWeight:700, marginTop:1 }}>
-                      {(USER_EARNED - (parseInt(redeemInput)||0)).toLocaleString()} điểm
+                      {(userEarned - (parseInt(redeemInput)||0)).toLocaleString()} điểm
                     </div>
                   </div>
                 </div>
@@ -145,7 +166,7 @@ export default function PointsPage() {
               <button onClick={() => {
                 const pts = parseInt(redeemInput) || 0
                 if (pts <= 0) { fireToast("Nhập số điểm muốn đổi"); return }
-                if (pts > USER_EARNED) { fireToast("Không đủ điểm"); return }
+                if (pts > userEarned) { fireToast("Không đủ điểm"); return }
                 if (pts % REDEEM_RATE !== 0) { fireToast(`Phải là bội số của ${REDEEM_RATE} điểm`); return }
                 fireToast(`Đổi thành công ${pts.toLocaleString()} điểm → ${(pts*10).toLocaleString()} xu!`)
                 setShowRedeem(false); setRedeemInput("")
@@ -200,7 +221,7 @@ export default function PointsPage() {
               <div style={{ fontSize:36, fontWeight:800, lineHeight:1,
                 background:"linear-gradient(135deg,#F5C542,#FFB347,#FF8C00)",
                 WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text" }}>
-                {USER_EARNED.toLocaleString("vi-VN")}
+                {userEarned.toLocaleString("vi-VN")}
               </div>
               <span style={{ color:"#F5C542", fontSize:16, fontWeight:600 }}>điểm</span>
             </div>
@@ -258,7 +279,7 @@ export default function PointsPage() {
               <div style={{ marginBottom:12 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
                   <span style={{ color:CUR_TIER.color, fontSize:8.5, fontWeight:600 }}>
-                    {CUR_TIER.icon} {CUR_TIER.name} · {USER_EARNED.toLocaleString("vi-VN")} điểm
+                    {CUR_TIER.icon} {CUR_TIER.name} · {userEarned.toLocaleString("vi-VN")} điểm
                   </span>
                   <span style={{ color:NXT_TIER.color, fontSize:8.5 }}>
                     {NXT_TIER.icon} {NXT_TIER.name} · {NXT_TIER.min.toLocaleString("vi-VN")} điểm
@@ -270,7 +291,7 @@ export default function PointsPage() {
                     style={{ height:"100%", background:`linear-gradient(90deg,${CUR_TIER.color},${NXT_TIER.color})`, borderRadius:4 }} />
                 </div>
                 <div style={{ color:"#6a5a40", fontSize:8.5, marginTop:5, textAlign:"center" }}>
-                  Tích thêm {(NXT_TIER.min - USER_EARNED).toLocaleString("vi-VN")} điểm để lên hạng {NXT_TIER.name} {NXT_TIER.icon}
+                  Tích thêm {(NXT_TIER.min - userEarned).toLocaleString("vi-VN")} điểm để lên hạng {NXT_TIER.name} {NXT_TIER.icon}
                 </div>
               </div>
             )}
@@ -326,7 +347,7 @@ export default function PointsPage() {
             <div style={{ color:"#b0956a", fontSize:9, fontWeight:600, marginBottom:8 }}>🎫 Đổi điểm lấy voucher</div>
             <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
               {REWARD_VOUCHERS.map(rv => {
-                const canRedeem = USER_EARNED >= rv.pointCost
+                const canRedeem = userEarned >= rv.pointCost
                 return (
                   <div key={rv.id}
                     style={{ background: canRedeem ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
@@ -347,7 +368,7 @@ export default function PointsPage() {
                       </div>
                     </div>
                     <button onClick={() => {
-                      if (!canRedeem) { fireToast(`Cần thêm ${(rv.pointCost-USER_EARNED).toLocaleString()} điểm`); return }
+                      if (!canRedeem) { fireToast(`Cần thêm ${(rv.pointCost-userEarned).toLocaleString()} điểm`); return }
                       fireToast(`Đã đổi voucher "${rv.title}" thành công!`)
                     }} style={{ height:30, padding:"0 12px", borderRadius:8, border:"none",
                       cursor: canRedeem ? "pointer" : "not-allowed", fontFamily:"Lexend",
@@ -417,7 +438,7 @@ export default function PointsPage() {
                         </span>
                       </div>
                       <div style={{ color:"#6a5a40", fontSize:7.5, marginTop:1 }}>
-                        Số dư: {tx.balance.toLocaleString("vi-VN")} điểm
+                        {tx.label}
                       </div>
                     </div>
                     <div style={{ textAlign:"right", flexShrink:0 }}>

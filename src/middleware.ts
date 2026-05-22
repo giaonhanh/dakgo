@@ -71,12 +71,18 @@ export async function middleware(request: NextRequest) {
     // Profile chưa tạo (trigger thất bại) → mặc định customer, cho qua
     const role = profile?.role ?? "customer";
 
+    // Normalize: DB có thể dùng "shop" hoặc "merchant" — đều vào /merchant
+    const isMerchant = role === "merchant" || role === "shop";
+
+    // /login: cho qua dù đã đăng nhập (để đổi account)
+    if (pathname === "/login") return response;
+
     // Sau login → redirect đúng dashboard theo role
-    if (pathname === "/" || pathname === "/login") {
+    if (pathname === "/") {
       const dest =
-        role === "driver"   ? "/driver"   :
-        role === "merchant" ? "/merchant" :
-        role === "admin"    ? "/admin"    : "/";
+        role === "driver" ? "/driver"   :
+        isMerchant        ? "/merchant" :
+        role === "admin"  ? "/admin"    : "/";
       if (dest !== pathname) {
         return NextResponse.redirect(new URL(dest, request.url));
       }
@@ -87,8 +93,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
-    // Bảo vệ route (merchant): chỉ merchant + admin được vào
-    if (pathname.startsWith("/merchant") && role !== "merchant" && role !== "admin") {
+    // Bảo vệ route (merchant): chỉ merchant/shop + admin được vào
+    if (pathname.startsWith("/merchant") && !isMerchant && role !== "admin") {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
