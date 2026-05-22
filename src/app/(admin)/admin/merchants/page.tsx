@@ -21,6 +21,10 @@ interface Merchant {
   totalOrders: number
   isOpen: boolean
   coverColor: string
+  ownerId: string
+  description: string
+  openTime: string
+  closeTime: string
 }
 
 interface EditShop {
@@ -100,6 +104,7 @@ export default function AdminMerchantsPage() {
 
     setMerchants(rows.map(r => {
       const prof = profMap[r.owner_id] ?? {}
+      const oh = (r.opening_hours ?? {}) as Record<string, string>
       return {
         id: r.id, shopName: r.name,
         ownerName: (prof as { full_name?: string }).full_name ?? "Chủ quán",
@@ -110,6 +115,10 @@ export default function AdminMerchantsPage() {
         commissionRate: r.commission_rate ?? 15, rating: r.rating_avg ?? null,
         totalOrders: r.total_reviews ?? 0, isOpen: r.is_open ?? false,
         coverColor: categoryColor(r.category),
+        ownerId: r.owner_id,
+        description: r.description ?? "",
+        openTime: oh.open ?? "06:00",
+        closeTime: oh.close ?? "22:00",
       }
     }))
     setLoading(false)
@@ -118,17 +127,18 @@ export default function AdminMerchantsPage() {
   const updateStatus = async (id: string, status: ShopStatus, extra?: { is_open?: boolean }) => {
     setSaving(true)
     const supabase = createClient()
-    await supabase.from("shops").update({ status, ...(extra ?? {}) }).eq("id", id)
+    const { error } = await supabase.from("shops").update({ status, ...(extra ?? {}) }).eq("id", id)
+    setSaving(false)
+    if (error) { fireToast("❌ Lỗi cập nhật trạng thái", false); return }
     setMerchants(p => p.map(m => m.id === id ? { ...m, status, ...(extra ?? {}) } : m))
     if (selected?.id === id) setSelected(p => p ? { ...p, status, ...(extra ?? {}) } : p)
-    setSaving(false)
   }
 
   const openEditMode = (m: Merchant) => {
     setEditShop({
       name: m.shopName, phone: m.phone, address: m.address,
       category: m.category, commissionRate: m.commissionRate,
-      isOpen: m.isOpen, openTime: "06:00", closeTime: "22:00", description: "",
+      isOpen: m.isOpen, openTime: m.openTime, closeTime: m.closeTime, description: m.description,
     })
     setDrawerTab("settings")
   }
@@ -137,21 +147,23 @@ export default function AdminMerchantsPage() {
     if (!selected || !editShop) return
     setEditSaving(true)
     const supabase = createClient()
-    await supabase.from("shops").update({
+    const { error } = await supabase.from("shops").update({
       name: editShop.name, phone: editShop.phone, address: editShop.address,
       category: editShop.category, commission_rate: editShop.commissionRate,
       is_open: editShop.isOpen, description: editShop.description,
       opening_hours: { open: editShop.openTime, close: editShop.closeTime },
     }).eq("id", selected.id)
+    setEditSaving(false)
+    if (error) { fireToast("❌ Lỗi lưu dữ liệu: " + error.message, false); return }
     const updated = {
       shopName: editShop.name, phone: editShop.phone, address: editShop.address,
       category: editShop.category, categoryIcon: categoryIcon(editShop.category),
       commissionRate: editShop.commissionRate, isOpen: editShop.isOpen,
       coverColor: categoryColor(editShop.category),
+      description: editShop.description, openTime: editShop.openTime, closeTime: editShop.closeTime,
     }
     setMerchants(p => p.map(m => m.id === selected.id ? { ...m, ...updated } : m))
     setSelected(p => p ? { ...p, ...updated } : p)
-    setEditSaving(false)
     fireToast("✅ Đã cập nhật thông tin cửa hàng")
   }
 
@@ -159,10 +171,11 @@ export default function AdminMerchantsPage() {
     if (!deleteConfirm) return
     setSaving(true)
     const supabase = createClient()
-    await supabase.from("shops").update({ status: "suspended", is_open: false }).eq("id", deleteConfirm.id)
-    await supabase.from("profiles")
-      .update({ is_active: false })
-      .eq("id", merchants.find(m => m.id === deleteConfirm.id)?.id ?? "")
+    const ownerId = merchants.find(m => m.id === deleteConfirm.id)?.ownerId ?? ""
+    const { error: e1 } = await supabase.from("shops").update({ status: "suspended", is_open: false }).eq("id", deleteConfirm.id)
+    if (e1) { setSaving(false); fireToast("❌ Lỗi xóa cửa hàng", false); return }
+    const { error: e2 } = await supabase.from("profiles").update({ is_active: false }).eq("id", ownerId)
+    if (e2) { setSaving(false); fireToast("❌ Lỗi vô hiệu hóa tài khoản", false); return }
     setMerchants(p => p.filter(m => m.id !== deleteConfirm.id))
     setDeleteConfirm(null)
     setSelected(null)
@@ -219,7 +232,7 @@ export default function AdminMerchantsPage() {
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-            style={{ position: "fixed", top: 14, left: "50%", transform: "translateX(-50%)", zIndex: 200,
+            style={{ position: "fixed", top: 70, left: "50%", transform: "translateX(-50%)", zIndex: 200,
               background: toastOk ? "rgba(62,207,110,0.15)" : "rgba(255,64,64,0.15)",
               border: `1px solid ${toastOk ? "rgba(62,207,110,0.35)" : "rgba(255,64,64,0.35)"}`,
               borderRadius: 12, padding: "8px 20px", color: toastOk ? "#3ecf6e" : "#ff4040",

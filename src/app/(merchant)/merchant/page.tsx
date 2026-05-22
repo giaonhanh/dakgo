@@ -55,6 +55,8 @@ export default function MerchantDashboard() {
   const [rejectModal,   setRejectModal]   = useState<MOrder | null>(null)
   const [rejectReason,  setRejectReason]  = useState("")
   const [dispatchStatus, setDispatchStatus] = useState<Record<string, "dispatching" | "sent" | "none">>({})
+  const [shopLat, setShopLat] = useState(12.6521)
+  const [shopLng, setShopLng] = useState(108.5073)
 
   const fireToast = (msg: string, ok = true) => {
     setToast(msg); setToastOk(ok); setTimeout(() => setToast(""), 3000)
@@ -69,7 +71,7 @@ export default function MerchantDashboard() {
       // Get merchant's shop
       const { data: shop } = await supabase
         .from("shops")
-        .select("id, name, is_open, rating, rating_count")
+        .select("id, name, is_open, rating_avg, total_reviews")
         .eq("owner_id", user.id)
         .single()
 
@@ -77,7 +79,7 @@ export default function MerchantDashboard() {
       setShopId(shop.id)
       setShopName(shop.name)
       setOpen(shop.is_open)
-      setRating(shop.rating ?? null)
+      setRating(shop.rating_avg ?? null)
 
       await fetchOrders(shop.id)
       setLoading(false)
@@ -133,7 +135,7 @@ export default function MerchantDashboard() {
         subtotal: o.subtotal ?? o.total_amount,
         discountAmount: o.discount_amount ?? 0,
         payMethod: pm === "wallet" ? "wallet" : pm === "vietqr" ? "vietqr" : "cash",
-        status: (o.status === "delivered" ? "ready" : o.status) as OrderStatus,
+        status: (o.status === "delivered" ? "ready" : o.status === "cancelled" ? "rejected" : o.status) as OrderStatus,
         time: fmtTime(o.created_at),
         note: o.note ?? undefined,
       }
@@ -171,14 +173,16 @@ export default function MerchantDashboard() {
     const next = !open
     setOpen(next)
     if (shopId) {
-      await supabase.from("shops").update({ is_open: next }).eq("id", shopId)
+      const { error } = await supabase.from("shops").update({ is_open: next }).eq("id", shopId)
+      if (error) { setOpen(!next); fireToast("❌ Lỗi kết nối, thử lại", false); return }
     }
     fireToast(next ? "✅ Quán đã mở cửa" : "🔒 Quán đã đóng cửa")
   }
 
   const handleAccept = async (order: MOrder) => {
     setOrderStatus(order.id, "accepted")
-    await supabase.from("orders").update({ status: "accepted", accepted_at: new Date().toISOString() }).eq("id", order.id)
+    const { error } = await supabase.from("orders").update({ status: "accepted", accepted_at: new Date().toISOString() }).eq("id", order.id)
+    if (error) { setOrderStatus(order.id, "pending"); fireToast("❌ Không thể xác nhận, thử lại", false); return }
     fireToast(`✅ Đã xác nhận #${order.shortId} · Đang điều phối tài xế...`)
 
     // Move to preparing + dispatch drivers simultaneously
@@ -188,9 +192,8 @@ export default function MerchantDashboard() {
 
       // Dispatch to 3 nearest drivers (driver condition: < 3 incomplete orders)
       setDispatchStatus(prev => ({ ...prev, [order.id]: "dispatching" }))
-      // Call Supabase RPC to find & notify nearest drivers
       supabase.rpc("find_nearest_driver", {
-        order_lat: 12.6521, order_lng: 108.5073, max_distance_km: 5
+        order_lat: shopLat, order_lng: shopLng, max_distance_km: 5
       }).then(() => {
         setTimeout(() => {
           setDispatchStatus(prev => ({ ...prev, [order.id]: "sent" }))
@@ -210,11 +213,12 @@ export default function MerchantDashboard() {
     const order = rejectModal
     const reason = rejectReason.trim() || "Cửa hàng từ chối đơn hàng"
     setOrderStatus(order.id, "rejected")
-    await supabase.from("orders").update({
+    const { error } = await supabase.from("orders").update({
       status: "cancelled",
       cancel_reason: reason,
       cancelled_at: new Date().toISOString()
     }).eq("id", order.id)
+    if (error) { setOrderStatus(order.id, "pending"); fireToast("❌ Không thể từ chối, thử lại", false); setRejectModal(null); return }
     const refundMsg = order.payMethod === "wallet" ? ` · Hoàn ${fmt(order.total)} về ví` : ""
     fireToast(`❌ Từ chối #${order.shortId}${refundMsg}`, false)
     setRejectModal(null)
@@ -222,7 +226,8 @@ export default function MerchantDashboard() {
 
   const handleReady = async (order: MOrder) => {
     setOrderStatus(order.id, "ready")
-    await supabase.from("orders").update({ status: "ready", ready_at: new Date().toISOString() }).eq("id", order.id)
+    const { error } = await supabase.from("orders").update({ status: "ready", ready_at: new Date().toISOString() }).eq("id", order.id)
+    if (error) { setOrderStatus(order.id, "preparing"); fireToast("❌ Lỗi kết nối, thử lại", false); return }
     fireToast(`📦 #${order.shortId} sẵn sàng · Đang tìm tài xế...`)
   }
 
@@ -467,7 +472,7 @@ export default function MerchantDashboard() {
                               {dispatchStatus[order.id] === "dispatching" ? (
                                 <>
                                   <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4a8ff5", animation: "mPulse 1s infinite", flexShrink: 0 }} />
-                                  <span style={{ color: "#4a8ff5", fontSize: 9 }}>Đang tìm 3 tài xế gần nhất... (điều kiện: &lt; 3 đơn chưa xong)</span>
+                                  <span style={{ color: "#4a8ff5", fontSize: 9 }}>Đang tìm 3 tài xế gần nhất...</span>
                                 </>
                               ) : (
                                 <>

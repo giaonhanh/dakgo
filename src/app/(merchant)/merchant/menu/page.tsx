@@ -86,13 +86,30 @@ export default function MerchantMenuPage() {
   const fire = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2400) }
 
   // ── CSV helpers ────────────────────────────────────────────────────────
+  const splitCSVLine = (line: string): string[] => {
+    const result: string[] = []
+    let current = "", inQuotes = false
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
+        else inQuotes = !inQuotes
+      } else if (ch === ',' && !inQuotes) {
+        result.push(current.trim()); current = ""
+      } else {
+        current += ch
+      }
+    }
+    result.push(current.trim())
+    return result
+  }
+
   const parseCSV = (text: string): ImportRow[] => {
     const lines = text.trim().split(/\r?\n/)
     const rows: ImportRow[] = []
-    // Skip header row if first cell looks like a header
     const start = lines[0]?.toLowerCase().includes("tên") || lines[0]?.toLowerCase().includes("name") ? 1 : 0
     for (let i = start; i < lines.length; i++) {
-      const cols = lines[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""))
+      const cols = splitCSVLine(lines[i])
       if (!cols[0]) continue
       const price = parseInt(cols[2]?.replace(/\D/g, "") || "0") || 0
       const promoPrice = cols[3] ? (parseInt(cols[3].replace(/\D/g, "")) || null) : null
@@ -276,24 +293,24 @@ export default function MerchantMenuPage() {
 
         {/* Header */}
         <div style={{padding:"52px 16px 0",background:"rgba(8,8,6,0.98)",backdropFilter:"blur(20px)",borderBottom:"1px solid rgba(255,255,255,0.06)",flexShrink:0}}>
-          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-            <a href="/merchant" style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",color:"#f8f0e0",fontSize:16}}>←</a>
-            <div style={{flex:1}}>
-              <div style={{color:"#f8f0e0",fontSize:16,fontWeight:800}}>Quản lý Menu</div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+            <a href="/merchant" style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",color:"#f8f0e0",fontSize:16,flexShrink:0}}>←</a>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:"#f8f0e0",fontSize:16,fontWeight:800,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>Quản lý Menu</div>
               <div style={{color:"#6a5a40",fontSize:9}}>{products.length} món · {groups.length} nhóm · {products.filter(p=>p.available).length} đang bán</div>
             </div>
-            <div style={{display:"flex",gap:6}}>
-              {mainTab === "products" && (
-                <button onClick={() => csvRef.current?.click()}
-                  style={{background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.3)",borderRadius:10,padding:"8px 12px",color:"#3ecf6e",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",whiteSpace:"nowrap"}}>
-                  📥 Nhập Excel
-                </button>
-              )}
-              <button onClick={mainTab==="groups" ? openNewGroup : openNewProduct}
-                style={{background:"linear-gradient(90deg,#FF6B00,#FF8C00)",border:"none",borderRadius:10,padding:"8px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",boxShadow:"0 2px 12px rgba(255,107,0,0.4)",whiteSpace:"nowrap"}}>
-                + {mainTab==="groups" ? "Nhóm mới" : "Thêm món"}
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:6,marginBottom:10}}>
+            {mainTab === "products" && (
+              <button onClick={() => csvRef.current?.click()}
+                style={{background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.3)",borderRadius:10,padding:"7px 12px",color:"#3ecf6e",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",whiteSpace:"nowrap"}}>
+                📥 Nhập Excel
               </button>
-            </div>
+            )}
+            <button onClick={mainTab==="groups" ? openNewGroup : openNewProduct}
+              style={{background:"linear-gradient(90deg,#FF6B00,#FF8C00)",border:"none",borderRadius:10,padding:"7px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",boxShadow:"0 2px 12px rgba(255,107,0,0.4)",whiteSpace:"nowrap"}}>
+              + {mainTab==="groups" ? "Nhóm mới" : "Thêm món"}
+            </button>
           </div>
 
           {/* Main tab switcher */}
