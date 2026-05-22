@@ -539,6 +539,7 @@ export default function MerchantDashboard() {
             {[
               { href: "/merchant/menu",       icon: "🍽️", label: "Quản lý menu"  },
               { href: "/merchant/revenue",    icon: "📊", label: "Doanh thu"      },
+              { href: "/merchant/reviews",    icon: "⭐", label: "Đánh giá"       },
               { href: "/merchant/promotions", icon: "🎁", label: "Khuyến mãi"    },
               { href: "/merchant/settings",   icon: "⚙️", label: "Cài đặt"      },
             ].map(n => (

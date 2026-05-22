@@ -427,7 +427,8 @@ export default function DriverDashboard() {
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
             {[
               { href:"/driver/earnings", icon:"📊", label:"Thu nhập chi tiết", sub:"Xem báo cáo tuần/tháng", color:"#3ecf6e" },
-              { href:"/driver/profile",  icon:"👤", label:"Hồ sơ & giấy tờ",   sub:"Cập nhật thông tin xe",  color:"#4a8ff5" },
+              { href:"/driver/reviews",  icon:"⭐", label:"Đánh giá của tôi",  sub:"Xem nhận xét từ khách",   color:"#f5c542" },
+              { href:"/driver/profile",  icon:"👤", label:"Hồ sơ & giấy tờ",  sub:"Cập nhật thông tin xe",   color:"#4a8ff5" },
             ].map(l => (
               <a key={l.href} href={l.href} style={{ textDecoration:"none" }}>
                 <div style={{
