@@ -77,12 +77,15 @@ export async function middleware(request: NextRequest) {
     // /login: cho qua dù đã đăng nhập (để đổi account)
     if (pathname === "/login") return response;
 
+    // Admin Preview Mode: admin xem giao diện khách mà không cần đăng xuất
+    const adminPreview = request.cookies.get("admin_preview")?.value === "1";
+
     // Sau login → redirect đúng dashboard theo role
     if (pathname === "/") {
       const dest =
-        role === "driver" ? "/driver"   :
-        isMerchant        ? "/merchant" :
-        role === "admin"  ? "/admin"    : "/";
+        role === "driver"                    ? "/driver"   :
+        isMerchant                           ? "/merchant" :
+        role === "admin" && !adminPreview    ? "/admin"    : "/";
       if (dest !== pathname) {
         return NextResponse.redirect(new URL(dest, request.url));
       }

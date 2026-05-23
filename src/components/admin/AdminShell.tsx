@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -27,9 +27,10 @@ interface AdminShellProps {
 
 export default function AdminShell({ pageTitle, pageSubtitle, actions, children }: AdminShellProps) {
   const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(false)
-  const [isMobile, setIsMobile]   = useState(false)
-  const [drawer, setDrawer]       = useState(false)
+  const [collapsed, setCollapsed]       = useState(false)
+  const [isMobile, setIsMobile]         = useState(false)
+  const [drawer, setDrawer]             = useState(false)
+  const [launching, setLaunching]       = useState(false)
 
   useEffect(() => {
     const check = () => {
@@ -44,6 +45,34 @@ export default function AdminShell({ pageTitle, pageSubtitle, actions, children 
 
   const isActive = (href: string) =>
     href === "/admin" ? pathname === href : pathname.startsWith(href)
+
+  const launchPreview = useCallback(async () => {
+    setLaunching(true)
+    await fetch("/api/admin/preview", { method: "POST" })
+    window.location.href = "/"
+  }, [])
+
+  const PreviewBtn = ({ collapsed: c }: { collapsed: boolean }) => (
+    <button
+      onClick={launchPreview}
+      disabled={launching}
+      title="Mở giao diện khách để test đơn hàng"
+      style={{
+        display: "flex", alignItems: "center", gap: 8,
+        width: "100%", height: c ? 36 : 40, borderRadius: 10,
+        padding: c ? "0" : "0 12px", justifyContent: c ? "center" : "flex-start",
+        background: "linear-gradient(135deg,rgba(255,107,0,0.18),rgba(255,107,0,0.08))",
+        border: "1px solid rgba(255,107,0,0.35)",
+        color: launching ? "#6a5a40" : "#FF8C00",
+        fontSize: 12, fontWeight: 700, cursor: launching ? "not-allowed" : "pointer",
+        fontFamily: "Lexend", whiteSpace: "nowrap", overflow: "hidden",
+        transition: "all .2s", marginTop: 4,
+      }}
+    >
+      <span style={{ fontSize: 16, flexShrink: 0 }}>{launching ? "⏳" : "👁️"}</span>
+      {!c && <span>{launching ? "Đang mở..." : "Test giao diện khách"}</span>}
+    </button>
+  )
 
   const NavLinks = ({ onClick }: { onClick?: () => void }) => (
     <>
@@ -100,6 +129,11 @@ export default function AdminShell({ pageTitle, pageSubtitle, actions, children 
                 <nav style={{ flex: 1, padding: "8px", overflowY: "auto" }}>
                   <NavLinks onClick={() => setDrawer(false)} />
                 </nav>
+
+                {/* Preview button — bottom of drawer */}
+                <div style={{ padding: "6px 8px 24px", flexShrink: 0 }}>
+                  <PreviewBtn collapsed={false} />
+                </div>
               </motion.div>
             </>
           )}
@@ -135,6 +169,11 @@ export default function AdminShell({ pageTitle, pageSubtitle, actions, children 
         <nav style={{ flex: 1, padding: "8px", overflowY: "auto" }}>
           <NavLinks />
         </nav>
+
+        {/* Preview button — bottom of sidebar */}
+        <div style={{ padding: "6px 8px 12px", flexShrink: 0 }}>
+          <PreviewBtn collapsed={collapsed} />
+        </div>
       </div>
 
       {/* Main */}
