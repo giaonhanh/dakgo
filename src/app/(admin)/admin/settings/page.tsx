@@ -27,6 +27,13 @@ export default function AdminSettingsPage() {
   const [cfmPw, setCfmPw]  = useState("")
   const [pwMsg, setPwMsg]  = useState("")
 
+  /* ── Admin wallet ── */
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
+  const [walletId,      setWalletId]      = useState<string | null>(null)
+  const [topupAmt,      setTopupAmt]      = useState("2000000")
+  const [topupSaving,   setTopupSaving]   = useState(false)
+  const [topupMsg,      setTopupMsg]      = useState("")
+
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 900)
     check()
@@ -52,6 +59,12 @@ export default function AdminSettingsPage() {
       setAdminName(prof?.full_name ?? "")
       setAdminPhone(prof?.phone ?? "")
       setAdminContactLink(localStorage.getItem("admin_contact_link") ?? "")
+
+      // Load wallet
+      const { data: wallet } = await supabase
+        .from("wallets").select("id,balance").eq("user_id", user.id).eq("type", "customer").maybeSingle()
+      setWalletBalance(wallet?.balance ?? 0)
+      setWalletId(wallet?.id ?? null)
     }
     loadAccount()
   }, [])
@@ -199,6 +212,30 @@ export default function AdminSettingsPage() {
       setPwMsg("✅ Đã đổi mật khẩu thành công")
       setCurPw(""); setNewPw(""); setCfmPw("")
     }
+  }
+
+  const handleTopup = async () => {
+    if (!adminId || !topupAmt) return
+    const amt = parseInt(topupAmt)
+    if (!amt || amt <= 0 || amt > 100_000_000) return
+    setTopupSaving(true)
+    setTopupMsg("")
+    const supabase = createClient()
+    const newBalance = (walletBalance ?? 0) + amt
+    const { data: wallet, error: we } = await supabase
+      .from("wallets")
+      .upsert({ user_id: adminId, type: "customer", balance: newBalance, updated_at: new Date().toISOString() }, { onConflict: "user_id,type" })
+      .select("id").single()
+    if (we || !wallet) { setTopupMsg("❌ Lỗi nạp xu: " + (we?.message ?? "")); setTopupSaving(false); return }
+    await supabase.from("transactions").insert({
+      wallet_id: wallet.id, type: "topup", amount: amt,
+      balance_after: newBalance, note: "Admin nạp xu hệ thống",
+    })
+    setWalletBalance(newBalance)
+    setWalletId(wallet.id)
+    setTopupMsg(`✅ Đã nạp ${amt.toLocaleString("vi-VN")} xu · Số dư: ${newBalance.toLocaleString("vi-VN")}`)
+    setTimeout(() => setTopupMsg(""), 5000)
+    setTopupSaving(false)
   }
 
   const SECTIONS: { key: SettingSection; label: string; icon: string }[] = [
@@ -514,6 +551,74 @@ export default function AdminSettingsPage() {
             <div style={{ animation:"fadeUp .3s ease" }}>
               <div style={{ color:"#f0eaff", fontSize:15, fontWeight:700, marginBottom:4 }}>👤 Tài khoản quản trị</div>
               <div style={{ color:"#6a5a40", fontSize:11, marginBottom:20 }}>Thông tin liên hệ admin · Bảo mật tài khoản</div>
+
+              {/* ── HUY HIỆU ADMIN ── */}
+              <div style={{ background:"linear-gradient(135deg,#0e0819,#1a0b2e,#0f1420)", border:"1px solid rgba(180,100,255,0.35)", borderRadius:18, padding:"22px", marginBottom:14, position:"relative", overflow:"hidden" }}>
+                {/* Shimmer */}
+                <div style={{ position:"absolute", top:0, left:"-80%", width:"50%", height:"100%", background:"linear-gradient(90deg,transparent,rgba(180,100,255,0.1),transparent)", animation:"shimmer 4s infinite", pointerEvents:"none" }} />
+                {/* Glow orbs */}
+                <div style={{ position:"absolute", top:-30, right:-30, width:120, height:120, borderRadius:"50%", background:"rgba(180,100,255,0.1)", filter:"blur(28px)", pointerEvents:"none" }} />
+                <div style={{ position:"absolute", bottom:-20, left:-10, width:90, height:90, borderRadius:"50%", background:"rgba(255,107,0,0.1)", filter:"blur(24px)", pointerEvents:"none" }} />
+
+                <div style={{ display:"flex", gap:18, alignItems:"center", position:"relative" }}>
+                  {/* Avatar */}
+                  <div style={{ position:"relative", flexShrink:0 }}>
+                    <div style={{ width:76, height:76, borderRadius:22, background:"linear-gradient(135deg,#b464ff,#FF6B00,#FFB347)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:38, boxShadow:"0 0 32px rgba(180,100,255,0.45),0 0 12px rgba(255,107,0,0.3)" }}>👑</div>
+                    <div style={{ position:"absolute", bottom:2, right:2, width:16, height:16, borderRadius:"50%", background:"#3ecf6e", border:"2.5px solid #0e0819", boxShadow:"0 0 8px #3ecf6e" }} />
+                  </div>
+
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:"#f8f0e8", fontSize:20, fontWeight:800, marginBottom:5 }}>{adminName || "Quản trị viên"}</div>
+                    <div style={{ color:"rgba(180,100,255,0.65)", fontSize:10, marginBottom:8 }}>{adminEmail}</div>
+                    <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                      <span style={{ padding:"3px 12px", borderRadius:20, background:"linear-gradient(90deg,rgba(180,100,255,0.3),rgba(255,107,0,0.2))", border:"1px solid rgba(180,100,255,0.5)", color:"#f8f0e8", fontSize:9, fontWeight:800, letterSpacing:1.5 }}>⚡ SUPER ADMIN</span>
+                      <span style={{ padding:"3px 9px", borderRadius:20, background:"rgba(62,207,110,0.1)", border:"1px solid rgba(62,207,110,0.3)", color:"#3ecf6e", fontSize:9, fontWeight:700 }}>● Đang online</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop:14, padding:"8px 12px", background:"rgba(255,255,255,0.04)", borderRadius:10, display:"flex", justifyContent:"space-between", alignItems:"center", position:"relative" }}>
+                  <span style={{ color:"rgba(180,100,255,0.5)", fontSize:9, fontWeight:600, letterSpacing:0.5 }}>ADMIN ID</span>
+                  <span style={{ color:"rgba(180,100,255,0.8)", fontSize:9, fontFamily:"monospace", letterSpacing:2 }}>{adminId ? adminId.slice(0,8).toUpperCase() : "..."}</span>
+                </div>
+              </div>
+
+              {/* ── VÍ XU ADMIN ── */}
+              <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"20px", marginBottom:14 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+                  <div>
+                    <div style={{ color:"#f0eaff", fontSize:13, fontWeight:700 }}>💰 Ví xu hệ thống</div>
+                    <div style={{ color:"#6a5a40", fontSize:10, marginTop:2 }}>Dùng cho thử nghiệm &amp; phát thưởng nội bộ</div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ color:"#FFB347", fontSize:22, fontWeight:800 }}>{walletBalance !== null ? walletBalance.toLocaleString("vi-VN") : "—"}</div>
+                    <div style={{ color:"#6a5a40", fontSize:9 }}>xu</div>
+                  </div>
+                </div>
+
+                {/* Quick amounts */}
+                <div style={{ display:"flex", gap:6, marginBottom:10 }}>
+                  {[["100000","+100k"],["500000","+500k"],["1000000","+1M"],["2000000","+2M"]].map(([amt,label]) => (
+                    <button key={amt} onClick={() => setTopupAmt(amt)}
+                      style={{ flex:1, padding:"7px 0", borderRadius:9, cursor:"pointer", fontFamily:"Lexend",
+                        background: topupAmt===amt ? "rgba(255,107,0,0.14)" : "rgba(255,255,255,0.04)",
+                        border: topupAmt===amt ? "1px solid rgba(255,107,0,0.4)" : "1px solid rgba(255,255,255,0.08)",
+                        color: topupAmt===amt ? "#FF8C00" : "#6a5a40", fontSize:10, fontWeight: topupAmt===amt ? 800 : 400 }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display:"flex", gap:8 }}>
+                  <input type="number" value={topupAmt} onChange={e => setTopupAmt(e.target.value)} placeholder="Nhập số xu..."
+                    style={{ flex:1, padding:"9px 12px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, color:"#f0eaff", fontSize:12 }} />
+                  <button onClick={handleTopup} disabled={topupSaving || !topupAmt || parseInt(topupAmt) <= 0}
+                    style={{ padding:"9px 20px", borderRadius:10, background:"linear-gradient(90deg,#FF6B00,#FF8C00)", border:"none", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", opacity: topupSaving ? 0.6 : 1, whiteSpace:"nowrap" }}>
+                    {topupSaving ? "Đang nạp..." : "⚡ Nạp xu"}
+                  </button>
+                </div>
+                {topupMsg && <div style={{ marginTop:8, color: topupMsg.startsWith("✅") ? "#3ecf6e" : "#ff4040", fontSize:11, fontWeight:600 }}>{topupMsg}</div>}
+              </div>
 
               {/* Profile */}
               <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"20px", marginBottom:14 }}>

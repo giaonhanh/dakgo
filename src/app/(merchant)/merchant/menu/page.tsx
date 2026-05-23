@@ -71,8 +71,9 @@ export default function MerchantMenuPage() {
   const [pEditing, setPEditing] = useState(false)
 
   // CSV Import state
-  const [importRows, setImportRows] = useState<ImportRow[] | null>(null)
+  const [importRows, setImportRows]   = useState<ImportRow[] | null>(null)
   const [importError, setImportError] = useState("")
+  const [importSaving, setImportSaving] = useState(false)
 
   const [toast, setToast] = useState("")
   const fileRef  = useRef<HTMLInputElement>(null)
@@ -162,23 +163,52 @@ export default function MerchantMenuPage() {
     reader.readAsText(file, "utf-8")
   }
 
-  const confirmImport = () => {
-    if (!importRows) return
-    const newProds: Product[] = importRows.map(r => ({
-      ...blankProduct(),
-      name: r.name, description: r.description, price: r.price,
-      promoEnabled: !!r.promoPrice && r.promoPrice < r.price,
-      promoPrice: r.promoPrice, badge: r.badge,
-      categories: r.category ? [r.category] : [],
-      sortOrder: products.length + importRows.indexOf(r),
-    }))
-    setProducts(ps => [...ps, ...newProds])
+  const confirmImport = async () => {
+    if (!importRows || !shopId) return
+    setImportSaving(true)
+    const saved: Product[] = []
+    for (let i = 0; i < importRows.length; i++) {
+      const r = importRows[i]
+      const category = r.category || null
+      const { data, error } = await supabase.from("products").insert({
+        shop_id: shopId, name: r.name, description: r.description || null,
+        price: r.price, original_price: r.promoPrice || null,
+        category, is_available: true, sold_count: 0,
+        sort_order: products.length + saved.length,
+      }).select("id").single()
+      if (!error && data) {
+        saved.push({
+          ...blankProduct(), id: data.id,
+          name: r.name, description: r.description ?? "", price: r.price,
+          promoEnabled: !!r.promoPrice && r.promoPrice < r.price,
+          promoPrice: r.promoPrice, badge: r.badge,
+          categories: category ? [category] : [], menuGroupId: category ?? "",
+          sortOrder: products.length + saved.length,
+        })
+        if (category && !groups.find(g => g.id === category)) {
+          setGroups(gs => [...gs, { id: category, name: category, allDay: true, startHour: "06:00", endHour: "22:00", sortOrder: gs.length }])
+        }
+      }
+    }
+    setProducts(ps => [...ps, ...saved])
     setImportRows(null)
-    fire(`✅ Đã nhập ${newProds.length} sản phẩm từ file`)
+    setImportSaving(false)
+    fire(`✅ Đã lưu ${saved.length}/${importRows.length} sản phẩm vào Supabase`)
   }
 
   const downloadTemplate = () => {
-    const csv = "Tên món,Mô tả,Giá bán,Giá khuyến mãi,Danh mục,Badge\nBún bò đặc biệt,Thơm ngon đặc trưng,45000,38000,Bún / Phở,bestseller\nTrà đá,Mát lạnh,5000,,Đồ uống,\n"
+    const rows = [
+      ["Tên món","Mô tả","Giá bán","Giá khuyến mãi","Danh mục","Badge"],
+      ["Bún bò đặc biệt","Thịt bò tươi + bún thơm + rau sống","45000","38000","Bún / Phở","bestseller"],
+      ["Cơm gà xối mỡ","Cơm trắng + gà giòn xối mỡ + rau","42000","","Cơm","hot"],
+      ["Trà đá","Trà đậm đà mát lạnh","5000","","Đồ uống",""],
+      ["Nước cam tươi","Cam vắt tươi không đường","25000","","Đồ uống",""],
+      ["Bánh mì thịt","Bánh mì giòn + thịt nguội + pate","18000","15000","Bánh","bigsale"],
+      ["Gà rán cay","2 miếng gà rán sốt cay Hàn Quốc","55000","","Gà",""],
+      ["Cơm sườn bì chả","Cơm + sườn nướng + bì + chả lụa","40000","","Cơm","bestseller"],
+      ["Sinh tố bơ","Bơ tươi béo ngậy không đường","30000","","Đồ uống","hot"],
+    ]
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(",")).join("\n")
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a"); a.href = url; a.download = "template_menu.csv"; a.click()
@@ -606,9 +636,9 @@ export default function MerchantMenuPage() {
                       style={{flex:1,height:44,borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",background:"transparent",color:"#6a5a40",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"Lexend"}}>
                       Hủy
                     </button>
-                    <button onClick={confirmImport}
-                      style={{flex:2,height:44,borderRadius:12,border:"none",background:"linear-gradient(90deg,#3ecf6e,#2bba5e)",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"Lexend",boxShadow:"0 3px 16px rgba(62,207,110,0.35)"}}>
-                      ✅ Nhập {importRows.length} sản phẩm
+                    <button onClick={confirmImport} disabled={importSaving}
+                      style={{flex:2,height:44,borderRadius:12,border:"none",background:"linear-gradient(90deg,#3ecf6e,#2bba5e)",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"Lexend",boxShadow:"0 3px 16px rgba(62,207,110,0.35)",opacity:importSaving?0.7:1}}>
+                      {importSaving ? `⏳ Đang lưu... (${importRows.length} món)` : `✅ Nhập ${importRows.length} sản phẩm`}
                     </button>
                   </div>
                 </>
