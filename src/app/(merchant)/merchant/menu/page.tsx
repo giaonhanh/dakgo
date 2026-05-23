@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -46,24 +47,18 @@ const blankProduct = (): Product => ({
   badge:null, available:true, soldCount:0, sortOrder:0,
 })
 
-// ── Sample data ────────────────────────────────────────────────────────────
-const INIT_GROUPS: MenuGroup[] = [
-  { id:"g1", name:"Bún", allDay:true, startHour:"06:00", endHour:"22:00", sortOrder:0 },
-  { id:"g2", name:"Đồ uống", allDay:true, startHour:"06:00", endHour:"22:00", sortOrder:1 },
-]
-const INIT_PRODUCTS: Product[] = [
-  { id:"p1", name:"Bún bò đặc biệt", description:"Thêm sả, mắm ruốc Huế đặc trưng", imagePreview:null, price:45000, categories:["Bún / Phở","Món chính"], menuGroupId:"g1", allDay:true, startHour:"", endHour:"", toppings:[{id:"t1",name:"Chả chiên",price:10000}], sizes:[], promoEnabled:false, promoPrice:null, promoStart:"", promoEnd:"", promoPerPerson:null, badge:"bestseller", available:true, soldCount:156, sortOrder:0 },
-  { id:"p2", name:"Bún bò thường",    description:"", imagePreview:null, price:35000, categories:["Bún / Phở"], menuGroupId:"g1", allDay:true, startHour:"", endHour:"", toppings:[], sizes:[], promoEnabled:false, promoPrice:null, promoStart:"", promoEnd:"", promoPerPerson:null, badge:null, available:true, soldCount:89, sortOrder:1 },
-  { id:"p3", name:"Trà đá",           description:"", imagePreview:null, price:5000, categories:["Đồ uống"], menuGroupId:"g2", allDay:true, startHour:"", endHour:"", toppings:[], sizes:[{id:"s1",label:"Nhỏ",priceDiff:0},{id:"s2",label:"Lớn",priceDiff:3000}], promoEnabled:false, promoPrice:null, promoStart:"", promoEnd:"", promoPerPerson:null, badge:null, available:true, soldCount:312, sortOrder:0 },
-]
+// (no hardcoded sample data — loaded from Supabase)
 
 // ── CSV Import types ───────────────────────────────────────────────────────
 interface ImportRow { name: string; description: string; price: number; promoPrice: number | null; category: string; badge: Product["badge"] }
 
 // ── Main component ─────────────────────────────────────────────────────────
 export default function MerchantMenuPage() {
-  const [groups,   setGroups]   = useState<MenuGroup[]>(INIT_GROUPS)
-  const [products, setProducts] = useState<Product[]>(INIT_PRODUCTS)
+  const supabase = createClient()
+  const [shopId,   setShopId]   = useState<string | null>(null)
+  const [loading,  setLoading]  = useState(true)
+  const [groups,   setGroups]   = useState<MenuGroup[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [mainTab,  setMainTab]  = useState<"products"|"groups">("products")
   const [filterGid, setFilterGid] = useState("all")
 
@@ -84,6 +79,41 @@ export default function MerchantMenuPage() {
   const csvRef   = useRef<HTMLInputElement>(null)
 
   const fire = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2400) }
+
+  // ── Load from Supabase ─────────────────────────────────────────────────
+  const loadProducts = useCallback(async (sid: string) => {
+    const { data } = await supabase
+      .from("products")
+      .select("id,name,description,price,original_price,category,is_available,sold_count,sort_order,image_url")
+      .eq("shop_id", sid)
+      .order("sort_order", { ascending: true })
+
+    const mapped: Product[] = (data ?? []).map(p => ({
+      id: p.id, name: p.name, description: p.description ?? "", imagePreview: p.image_url ?? null,
+      price: p.price, categories: p.category ? [p.category] : [], menuGroupId: p.category ?? "",
+      allDay: true, startHour: "", endHour: "", toppings: [], sizes: [],
+      promoEnabled: !!(p.original_price && p.original_price < p.price),
+      promoPrice: p.original_price ?? null, promoStart: "", promoEnd: "", promoPerPerson: null,
+      badge: null, available: p.is_available, soldCount: p.sold_count, sortOrder: p.sort_order,
+    }))
+    setProducts(mapped)
+
+    // Derive groups from unique categories
+    const cats = Array.from(new Set(mapped.map(p => p.menuGroupId).filter(Boolean)))
+    setGroups(cats.map((cat, i) => ({ id: cat, name: cat, allDay: true, startHour: "06:00", endHour: "22:00", sortOrder: i })))
+  }, [supabase])
+
+  useEffect(() => {
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoading(false); return }
+      const { data: shop } = await supabase.from("shops").select("id").eq("owner_id", user.id).single()
+      if (shop) { setShopId(shop.id); await loadProducts(shop.id) }
+      setLoading(false)
+    }
+    init()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── CSV helpers ────────────────────────────────────────────────────────
   const splitCSVLine = (line: string): string[] => {
@@ -194,20 +224,52 @@ export default function MerchantMenuPage() {
   const openNewProduct  = () => { setPModal(blankProduct()); setPEditing(false) }
   const openEditProduct = (p: Product) => { setPModal({...p}); setPEditing(true) }
 
-  const saveProduct = () => {
+  const saveProduct = async () => {
     if (!pModal?.name.trim() || pModal.price <= 0) return
+    const category = pModal.categories[0] || pModal.menuGroupId || null
+    const payload = {
+      name: pModal.name, description: pModal.description || null,
+      price: pModal.price, original_price: pModal.promoEnabled && pModal.promoPrice ? pModal.promoPrice : null,
+      category, is_available: pModal.available, sort_order: pModal.sortOrder,
+      updated_at: new Date().toISOString(),
+    }
     if (pEditing) {
-      setProducts(ps => ps.map(p => p.id === pModal.id ? pModal : p))
+      const { error } = await supabase.from("products").update(payload).eq("id", pModal.id)
+      if (error) { fire("❌ Lỗi cập nhật: " + error.message); return }
+      setProducts(ps => ps.map(p => p.id === pModal.id ? {...pModal, categories: category ? [category] : [], menuGroupId: category ?? ""} : p))
       fire("Đã cập nhật món")
     } else {
-      setProducts(ps => [...ps, {...pModal, sortOrder:ps.length}])
+      if (!shopId) return
+      const { data, error } = await supabase.from("products")
+        .insert({ ...payload, shop_id: shopId, sold_count: 0 })
+        .select("id").single()
+      if (error || !data) { fire("❌ Lỗi thêm món: " + (error?.message ?? "")); return }
+      const newProd: Product = { ...pModal, id: data.id, sortOrder: products.length, categories: category ? [category] : [], menuGroupId: category ?? "" }
+      setProducts(ps => [...ps, newProd])
+      // Add group if new category
+      if (category && !groups.find(g => g.id === category)) {
+        setGroups(gs => [...gs, { id: category, name: category, allDay: true, startHour: "06:00", endHour: "22:00", sortOrder: gs.length }])
+      }
       fire("Đã thêm món mới")
     }
     setPModal(null)
   }
 
-  const delProduct  = (id: string) => { setProducts(ps => ps.filter(p => p.id !== id)); fire("Đã xoá món") }
-  const toggleAvail = (id: string) => setProducts(ps => ps.map(p => p.id === id ? {...p, available:!p.available} : p))
+  const delProduct = async (id: string) => {
+    const { error } = await supabase.from("products").delete().eq("id", id)
+    if (error) { fire("❌ Lỗi xoá: " + error.message); return }
+    setProducts(ps => ps.filter(p => p.id !== id))
+    fire("Đã xoá món")
+  }
+
+  const toggleAvail = async (id: string) => {
+    const p = products.find(x => x.id === id)
+    if (!p) return
+    const next = !p.available
+    const { error } = await supabase.from("products").update({ is_available: next }).eq("id", id)
+    if (error) { fire("❌ Lỗi cập nhật"); return }
+    setProducts(ps => ps.map(x => x.id === id ? {...x, available: next} : x))
+  }
 
   const moveProduct = (id: string, dir: 1 | -1) => {
     setProducts(ps => {
@@ -260,6 +322,13 @@ export default function MerchantMenuPage() {
   const badgeCfg = (b: Product["badge"]) => BADGE_LIST.find(x => x.key === b)
 
   // ── Render ─────────────────────────────────────────────────────────────
+  if (loading) return (
+    <div style={{ position:"fixed",inset:0,background:"#080806",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12 }}>
+      <div style={{ fontSize:32 }}>🍽️</div>
+      <div style={{ color:"#6a5a40",fontSize:12 }}>Đang tải menu...</div>
+    </div>
+  )
+
   return (
     <>
       <style>{`

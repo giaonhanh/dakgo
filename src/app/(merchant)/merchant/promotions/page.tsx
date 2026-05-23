@@ -1,23 +1,13 @@
-﻿"use client"
+"use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { createClient } from "@/lib/supabase/client"
 
 type PromoType = "percent" | "fixed" | "freeship" | "combo"
 type PromoStatus = "active" | "scheduled" | "ended"
 
-interface MockProduct { id: string; name: string; price: number; category: string }
-
-const MOCK_PRODUCTS: MockProduct[] = [
-  { id:"mp1", name:"Bún bò Huế đặc biệt",   price:45000, category:"Bún"      },
-  { id:"mp2", name:"Bún bò Huế thường",      price:35000, category:"Bún"      },
-  { id:"mp3", name:"Cơm gà xối mỡ",          price:40000, category:"Cơm"      },
-  { id:"mp4", name:"Cơm sườn bì chả",        price:42000, category:"Cơm"      },
-  { id:"mp5", name:"Bánh mì thịt đặc biệt",  price:25000, category:"Bánh mì"  },
-  { id:"mp6", name:"Nước chanh tươi",         price:15000, category:"Đồ uống"  },
-  { id:"mp7", name:"Trà đá",                  price:10000, category:"Đồ uống"  },
-  { id:"mp8", name:"Chè thái",                price:20000, category:"Tráng miệng" },
-]
+interface PickerProduct { id: string; name: string; price: number; category: string }
 
 interface Promotion {
   id: string
@@ -37,6 +27,17 @@ interface Promotion {
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
+function genCode() {
+  return "GN" + Math.random().toString(36).substring(2, 8).toUpperCase()
+}
+
+function deriveStatus(v: { is_active: boolean; valid_from: string; valid_to: string }): PromoStatus {
+  const now = new Date()
+  if (!v.is_active || new Date(v.valid_to) < now) return "ended"
+  if (new Date(v.valid_from) > now) return "scheduled"
+  return "active"
+}
+
 const TYPE_CFG: Record<PromoType, { label: string; icon: string; color: string; bg: string; border: string }> = {
   percent:  { label:"Giảm %",    icon:"🏷️", color:"#FF8C00", bg:"rgba(255,140,0,0.12)",  border:"rgba(255,140,0,0.35)"  },
   fixed:    { label:"Giảm tiền", icon:"💸", color:"#3ecf6e", bg:"rgba(62,207,110,0.12)", border:"rgba(62,207,110,0.35)" },
@@ -45,31 +46,90 @@ const TYPE_CFG: Record<PromoType, { label: string; icon: string; color: string; 
 }
 
 const STATUS_CFG: Record<PromoStatus, { label: string; color: string; bg: string }> = {
-  active:    { label:"Đang chạy", color:"#3ecf6e", bg:"rgba(62,207,110,0.12)"  },
-  scheduled: { label:"Lên lịch",  color:"#f5c542", bg:"rgba(245,197,66,0.12)"  },
-  ended:     { label:"Đã kết thúc",color:"#6a5a40", bg:"rgba(255,255,255,0.06)"},
+  active:    { label:"Đang chạy",   color:"#3ecf6e", bg:"rgba(62,207,110,0.12)"  },
+  scheduled: { label:"Lên lịch",    color:"#f5c542", bg:"rgba(245,197,66,0.12)"  },
+  ended:     { label:"Đã kết thúc", color:"#6a5a40", bg:"rgba(255,255,255,0.06)"},
 }
 
-const INIT_PROMOS: Promotion[] = [
-  { id:"p1", title:"Flash Sale cuối tuần",        type:"percent",  value:25, minOrder:80000,  maxDiscount:50000,  usageLimit:200, usedCount:127, startAt:"2026-05-17T08:00", endAt:"2026-05-18T22:00", status:"active",    productIds:[], applyAll:true  },
-  { id:"p2", title:"Free ship đơn từ 60k",        type:"freeship", value:0,  minOrder:60000,  maxDiscount:null,   usageLimit:null,usedCount:89,  startAt:"2026-05-15T00:00", endAt:"2026-05-31T23:59", status:"active",    productIds:[], applyAll:true  },
-  { id:"p3", title:"Giảm 15k combo bún + nước",   type:"fixed",    value:15000,minOrder:55000,maxDiscount:null,   usageLimit:50,  usedCount:32,  startAt:"2026-05-17T10:00", endAt:"2026-05-20T23:59", status:"active",    productIds:["p1","p5"], applyAll:false },
-  { id:"p4", title:"Khai trương tháng 6 giảm 30%",type:"percent",  value:30, minOrder:100000, maxDiscount:80000,  usageLimit:300, usedCount:0,   startAt:"2026-06-01T00:00", endAt:"2026-06-07T23:59", status:"scheduled", productIds:[], applyAll:true  },
-  { id:"p5", title:"Mua 2 tặng 1 món tráng miệng",type:"combo",    value:0,  minOrder:0,      maxDiscount:null,   usageLimit:100, usedCount:100, startAt:"2026-05-01T00:00", endAt:"2026-05-14T23:59", status:"ended",     productIds:[], applyAll:false },
-]
-
 export default function MerchantPromotionsPage() {
-  const [promos, setPromos]         = useState<Promotion[]>(INIT_PROMOS)
-  const [filter, setFilter]         = useState<"all" | PromoStatus>("all")
-  const [showCreate, setShowCreate] = useState(false)
-  const [selected, setSelected]     = useState<Promotion | null>(null)
-  const [toast, setToast]           = useState("")
+  const supabase = createClient()
+
+  const [shopId, setShopId]             = useState<string | null>(null)
+  const [loading, setLoading]           = useState(true)
+  const [saving, setSaving]             = useState(false)
+  const [promos, setPromos]             = useState<Promotion[]>([])
+  const [pickerProducts, setPickerProducts] = useState<PickerProduct[]>([])
+  const [filter, setFilter]             = useState<"all" | PromoStatus>("all")
+  const [showCreate, setShowCreate]     = useState(false)
+  const [selected, setSelected]         = useState<Promotion | null>(null)
+  const [toast, setToast]               = useState("")
 
   const [form, setForm] = useState({
     title: "", type: "percent" as PromoType, value: "", minOrder: "", maxDiscount: "",
     usageLimit: "", perPersonLimit: "", startAt: "", endAt: "", applyAll: true,
     selectedProductIds: [] as string[],
   })
+
+  const loadData = useCallback(async (sid: string) => {
+    const [{ data: vouchers }, { data: products }] = await Promise.all([
+      supabase.from("vouchers")
+        .select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,used_count,valid_from,valid_to,is_active")
+        .eq("shop_id", sid)
+        .order("created_at", { ascending: false }),
+      supabase.from("products")
+        .select("id,name,price,category")
+        .eq("shop_id", sid)
+        .eq("is_available", true)
+        .order("sort_order"),
+    ])
+    if (vouchers) {
+      setPromos(vouchers.map(v => ({
+        id: v.id,
+        title: v.title,
+        type: (v.discount_type as PromoType) ?? "percent",
+        value: v.discount_value,
+        minOrder: v.min_order,
+        maxDiscount: v.max_discount,
+        usageLimit: v.usage_limit,
+        usedCount: v.used_count,
+        startAt: v.valid_from,
+        endAt: v.valid_to,
+        status: deriveStatus(v),
+        productIds: [],
+        applyAll: true,
+      })))
+    }
+    if (products) {
+      setPickerProducts(products.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        category: p.category ?? "Khác",
+      })))
+    }
+  }, [supabase])
+
+  useEffect(() => {
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoading(false); return }
+      const { data: shop } = await supabase.from("shops")
+        .select("id").eq("owner_id", user.id).single()
+      if (!shop) { setLoading(false); return }
+      setShopId(shop.id)
+      await loadData(shop.id)
+      setLoading(false)
+    }
+    init()
+  }, [loadData, supabase])
+
+  const productsByCategory = useMemo(() =>
+    pickerProducts.reduce<Record<string, PickerProduct[]>>((acc, p) => {
+      if (!acc[p.category]) acc[p.category] = []
+      acc[p.category].push(p)
+      return acc
+    }, {}),
+  [pickerProducts])
 
   const toggleProduct = (id: string) =>
     setForm(f => ({
@@ -79,58 +139,81 @@ export default function MerchantPromotionsPage() {
         : [...f.selectedProductIds, id],
     }))
 
-  const productsByCategory = MOCK_PRODUCTS.reduce<Record<string, MockProduct[]>>((acc, p) => {
-    if (!acc[p.category]) acc[p.category] = []
-    acc[p.category].push(p)
-    return acc
-  }, {})
-
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2400) }
 
-  const toggleStatus = (id: string) => {
+  const toggleStatus = async (id: string) => {
     const p = promos.find(x => x.id === id)
-    const isCurrentlyActive = p?.status === "active"
-    setPromos(ps => ps.map(p => {
-      if (p.id !== id) return p
-      const next: PromoStatus = p.status === "active" ? "ended" : "active"
-      return { ...p, status: next }
-    }))
-    fireToast(isCurrentlyActive ? "Đã tắt chương trình" : "Đã bật chương trình")
+    if (!p) return
+    const nowActive = p.status === "active"
+    setPromos(ps => ps.map(x => x.id !== id ? x : { ...x, status: nowActive ? "ended" : "active" }))
+    const { error } = await supabase.from("vouchers")
+      .update({ is_active: !nowActive })
+      .eq("id", id)
+    if (error) {
+      setPromos(ps => ps.map(x => x.id !== id ? x : { ...x, status: p.status }))
+      fireToast("Lỗi cập nhật trạng thái!")
+    } else {
+      fireToast(nowActive ? "Đã tắt chương trình" : "Đã bật chương trình")
+    }
   }
 
-  const deletePromo = (id: string) => {
+  const deletePromo = async (id: string) => {
+    const backup = promos
     setPromos(ps => ps.filter(p => p.id !== id))
     setSelected(null)
-    fireToast("Đã xoá chương trình khuyến mãi")
+    const { error } = await supabase.from("vouchers").delete().eq("id", id)
+    if (error) {
+      setPromos(backup)
+      fireToast("Lỗi xoá!")
+    } else {
+      fireToast("Đã xoá chương trình khuyến mãi")
+    }
   }
 
-  const handleCreate = () => {
-    if (!form.title || !form.startAt || !form.endAt) return
+  const handleCreate = async () => {
+    if (!form.title || !form.startAt || !form.endAt || !shopId) return
     if (!form.applyAll && form.selectedProductIds.length === 0) {
       fireToast("Vui lòng chọn ít nhất 1 món!"); return
     }
     if (new Date(form.endAt) <= new Date(form.startAt)) {
-      fireToast("Ngày kết thúc phải sau ngày bắt đầu!")
-      return
+      fireToast("Ngày kết thúc phải sau ngày bắt đầu!"); return
     }
     if (form.type === "percent") {
       const pct = parseInt(form.value) || 0
       if (pct <= 0 || pct > 100) { fireToast("Phần trăm giảm phải từ 1–100"); return }
     }
+    setSaving(true)
+    const { data: { user } } = await supabase.auth.getUser()
     const now = new Date()
     const start = new Date(form.startAt)
-    const newPromo: Promotion = {
-      id: `p${Date.now()}`,
+    const dbType = form.type === "combo" ? "fixed" : form.type
+    const { data, error } = await supabase.from("vouchers").insert({
+      code: genCode(),
       title: form.title,
+      discount_type: dbType,
+      discount_value: parseInt(form.value) || 0,
+      min_order: parseInt(form.minOrder) || 0,
+      max_discount: form.maxDiscount ? parseInt(form.maxDiscount) : null,
+      usage_limit: form.usageLimit ? parseInt(form.usageLimit) : null,
+      valid_from: new Date(form.startAt).toISOString(),
+      valid_to: new Date(form.endAt).toISOString(),
+      is_active: true,
+      shop_id: shopId,
+      created_by: user?.id,
+    }).select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,used_count,valid_from,valid_to,is_active").single()
+    setSaving(false)
+    if (error || !data) { fireToast("Lỗi tạo chương trình!"); return }
+    const newPromo: Promotion = {
+      id: data.id,
+      title: data.title,
       type: form.type,
-      value: parseInt(form.value) || 0,
-      minOrder: parseInt(form.minOrder) || 0,
-      maxDiscount: form.maxDiscount ? parseInt(form.maxDiscount) : null,
-      usageLimit: form.usageLimit ? parseInt(form.usageLimit) : null,
-      // perPersonLimit stored in data field — ready for Supabase column when added
+      value: data.discount_value,
+      minOrder: data.min_order,
+      maxDiscount: data.max_discount,
+      usageLimit: data.usage_limit,
       usedCount: 0,
-      startAt: form.startAt,
-      endAt: form.endAt,
+      startAt: data.valid_from,
+      endAt: data.valid_to,
       status: start > now ? "scheduled" : "active",
       productIds: form.applyAll ? [] : form.selectedProductIds,
       applyAll: form.applyAll,
@@ -142,15 +225,29 @@ export default function MerchantPromotionsPage() {
   }
 
   const filtered = promos.filter(p => filter === "all" ? true : p.status === filter)
-
-  const totalActive  = promos.filter(p => p.status === "active").length
-  const totalUsed    = promos.reduce((s, p) => s + p.usedCount, 0)
+  const totalActive   = promos.filter(p => p.status === "active").length
+  const totalUsed     = promos.reduce((s, p) => s + p.usedCount, 0)
   const totalRevImpact = promos.filter(p => p.status === "active").reduce((s, p) => s + p.usedCount * (p.type === "fixed" ? p.value : 15000), 0)
+
+  if (loading) {
+    return (
+      <div style={{ position:"fixed", inset:0, background:"#080806",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        flexDirection:"column", gap:12, fontFamily:"'Lexend',sans-serif" }}>
+        <div style={{ width:36, height:36, borderRadius:"50%",
+          border:"3px solid rgba(255,107,0,0.2)",
+          borderTop:"3px solid #FF6B00",
+          animation:"spin 0.8s linear infinite" }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        <div style={{ color:"#6a5a40", fontSize:11 }}>Đang tải khuyến mãi...</div>
+      </div>
+    )
+  }
 
   return (
     <>
       <style>{`
-                *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
         html,body{background:#080806;font-family:'Lexend',sans-serif;height:100%;overflow:hidden}
         input,select,textarea{outline:none;font-family:'Lexend',sans-serif}
         ::-webkit-scrollbar{width:3px}
@@ -264,8 +361,7 @@ export default function MerchantPromotionsPage() {
                       onChange={e => setForm(f => ({ ...f, startAt:e.target.value }))}
                       style={{ width:"100%", height:42, borderRadius:11, border:"1px solid rgba(255,255,255,0.08)",
                         background:"rgba(255,255,255,0.04)", color:"#f8f0e0", fontSize:11,
-                        padding:"0 10px", boxSizing:"border-box",
-                        colorScheme:"dark" }} />
+                        padding:"0 10px", boxSizing:"border-box", colorScheme:"dark" }} />
                   </div>
                   <div>
                     <MLabel>Kết thúc</MLabel>
@@ -273,8 +369,7 @@ export default function MerchantPromotionsPage() {
                       onChange={e => setForm(f => ({ ...f, endAt:e.target.value }))}
                       style={{ width:"100%", height:42, borderRadius:11, border:"1px solid rgba(255,255,255,0.08)",
                         background:"rgba(255,255,255,0.04)", color:"#f8f0e0", fontSize:11,
-                        padding:"0 10px", boxSizing:"border-box",
-                        colorScheme:"dark" }} />
+                        padding:"0 10px", boxSizing:"border-box", colorScheme:"dark" }} />
                   </div>
                 </div>
 
@@ -309,7 +404,7 @@ export default function MerchantPromotionsPage() {
                   </div>
                 </div>
 
-                {/* Product picker — shown when applyAll = false */}
+                {/* Product picker */}
                 {!form.applyAll && (
                   <div style={{ marginBottom:18 }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
@@ -323,45 +418,53 @@ export default function MerchantPromotionsPage() {
                         </button>
                       )}
                     </div>
-                    <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:12, overflow:"hidden" }}>
-                      {Object.entries(productsByCategory).map(([cat, items], ci) => (
-                        <div key={cat}>
-                          <div style={{ padding:"7px 12px", background:"rgba(255,255,255,0.02)",
-                            borderBottom:"1px solid rgba(255,255,255,0.05)",
-                            color:"#6a5a40", fontSize:8.5, fontWeight:700, letterSpacing:".3px", textTransform:"uppercase" }}>
-                            {cat}
-                          </div>
-                          {items.map((prod, pi) => {
-                            const checked = form.selectedProductIds.includes(prod.id)
-                            const isLast = ci === Object.keys(productsByCategory).length - 1 && pi === items.length - 1
-                            return (
-                              <div key={prod.id} onClick={() => toggleProduct(prod.id)}
-                                style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px",
-                                  borderBottom:isLast?"none":"1px solid rgba(255,255,255,0.05)",
-                                  background:checked?"rgba(255,107,0,0.04)":"transparent",
-                                  cursor:"pointer", transition:"background .15s" }}>
-                                <div style={{ width:20, height:20, borderRadius:6, flexShrink:0,
-                                  background:checked?"#FF6B00":"rgba(255,255,255,0.06)",
-                                  border:`1.5px solid ${checked?"#FF6B00":"rgba(255,255,255,0.12)"}`,
-                                  display:"flex", alignItems:"center", justifyContent:"center",
-                                  fontSize:10, transition:"all .15s" }}>
-                                  {checked && <span style={{ color:"#fff", fontSize:9, fontWeight:900 }}>✓</span>}
-                                </div>
-                                <div style={{ flex:1 }}>
-                                  <div style={{ color:checked?"#f8f0e0":"#b0956a", fontSize:11, fontWeight:checked?600:400 }}>
-                                    {prod.name}
+                    {pickerProducts.length === 0 ? (
+                      <div style={{ padding:"16px", textAlign:"center", color:"#6a5a40", fontSize:10,
+                        background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)",
+                        borderRadius:12 }}>
+                        Chưa có sản phẩm nào trong menu
+                      </div>
+                    ) : (
+                      <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:12, overflow:"hidden" }}>
+                        {Object.entries(productsByCategory).map(([cat, items], ci) => (
+                          <div key={cat}>
+                            <div style={{ padding:"7px 12px", background:"rgba(255,255,255,0.02)",
+                              borderBottom:"1px solid rgba(255,255,255,0.05)",
+                              color:"#6a5a40", fontSize:8.5, fontWeight:700, letterSpacing:".3px", textTransform:"uppercase" }}>
+                              {cat}
+                            </div>
+                            {items.map((prod, pi) => {
+                              const checked = form.selectedProductIds.includes(prod.id)
+                              const isLast = ci === Object.keys(productsByCategory).length - 1 && pi === items.length - 1
+                              return (
+                                <div key={prod.id} onClick={() => toggleProduct(prod.id)}
+                                  style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px",
+                                    borderBottom:isLast?"none":"1px solid rgba(255,255,255,0.05)",
+                                    background:checked?"rgba(255,107,0,0.04)":"transparent",
+                                    cursor:"pointer", transition:"background .15s" }}>
+                                  <div style={{ width:20, height:20, borderRadius:6, flexShrink:0,
+                                    background:checked?"#FF6B00":"rgba(255,255,255,0.06)",
+                                    border:`1.5px solid ${checked?"#FF6B00":"rgba(255,255,255,0.12)"}`,
+                                    display:"flex", alignItems:"center", justifyContent:"center",
+                                    fontSize:10, transition:"all .15s" }}>
+                                    {checked && <span style={{ color:"#fff", fontSize:9, fontWeight:900 }}>✓</span>}
+                                  </div>
+                                  <div style={{ flex:1 }}>
+                                    <div style={{ color:checked?"#f8f0e0":"#b0956a", fontSize:11, fontWeight:checked?600:400 }}>
+                                      {prod.name}
+                                    </div>
+                                  </div>
+                                  <div style={{ color:"#6a5a40", fontSize:9.5, flexShrink:0 }}>
+                                    {prod.price.toLocaleString("vi-VN")}đ
                                   </div>
                                 </div>
-                                <div style={{ color:"#6a5a40", fontSize:9.5, flexShrink:0 }}>
-                                  {prod.price.toLocaleString("vi-VN")}đ
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                    {!form.applyAll && form.selectedProductIds.length === 0 && (
+                              )
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {!form.applyAll && form.selectedProductIds.length === 0 && pickerProducts.length > 0 && (
                       <div style={{ marginTop:6, color:"rgba(255,64,64,0.7)", fontSize:9 }}>
                         ⚠ Chọn ít nhất 1 món để tiếp tục
                       </div>
@@ -369,18 +472,21 @@ export default function MerchantPromotionsPage() {
                   </div>
                 )}
 
-                <button onClick={handleCreate}
-                  disabled={!form.title || !form.startAt || !form.endAt || (!form.applyAll && form.selectedProductIds.length === 0)}
+                <button onClick={handleCreate} disabled={saving ||
+                  !form.title || !form.startAt || !form.endAt ||
+                  (!form.applyAll && form.selectedProductIds.length === 0 && pickerProducts.length > 0)}
                   style={{ width:"100%", height:48, borderRadius:13, border:"none",
                     background:"linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)",
                     color:"#fff", fontSize:12, fontWeight:700, fontFamily:"Lexend",
-                    cursor:"pointer", position:"relative", overflow:"hidden",
+                    cursor:saving?"not-allowed":"pointer", position:"relative", overflow:"hidden",
                     boxShadow:"0 3px 16px rgba(255,107,0,0.4)",
-                    opacity:(!form.title||!form.startAt||!form.endAt||(!form.applyAll&&form.selectedProductIds.length===0))?0.5:1 }}>
+                    opacity:(saving||!form.title||!form.startAt||!form.endAt||(!form.applyAll&&form.selectedProductIds.length===0&&pickerProducts.length>0))?0.5:1 }}>
                   <div style={{ position:"absolute", top:0, left:"-60%", width:"35%", height:"100%",
                     background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)",
                     animation:"shimmer 2.5s infinite" }} />
-                  <span style={{ position:"relative", zIndex:1 }}>🚀 Tạo chương trình</span>
+                  <span style={{ position:"relative", zIndex:1 }}>
+                    {saving ? "Đang lưu..." : "🚀 Tạo chương trình"}
+                  </span>
                 </button>
               </div>
             </motion.div>
@@ -404,9 +510,7 @@ export default function MerchantPromotionsPage() {
                 borderRadius:"16px 0 0 16px",
                 display:"flex", flexDirection:"column" }}>
 
-              {/* Drawer Header */}
-              <div style={{ padding:"16px 16px 12px",
-                borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ padding:"16px 16px 12px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
                   <button onClick={() => setSelected(null)}
                     style={{ width:32, height:32, borderRadius:9, border:"none",
@@ -432,25 +536,22 @@ export default function MerchantPromotionsPage() {
               </div>
 
               <div style={{ flex:1, overflowY:"auto", padding:"14px 16px" }}>
-                {/* Stats */}
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
                   {[
-                    { label:"Đã dùng",       value:`${selected.usedCount}/${selected.usageLimit ?? "∞"}`,  color:"#FF8C00" },
-                    { label:"Áp dụng",        value:selected.applyAll?"Tất cả món":"Món chọn",             color:"#4a8ff5" },
-                    { label:"Đơn tối thiểu",  value:fmt(selected.minOrder),                                color:"#b0956a" },
-                    { label:"Giảm tối đa",    value:selected.maxDiscount?fmt(selected.maxDiscount):"Không giới hạn", color:"#b0956a" },
+                    { label:"Đã dùng",      value:`${selected.usedCount}/${selected.usageLimit ?? "∞"}`, color:"#FF8C00" },
+                    { label:"Áp dụng",       value:selected.applyAll?"Tất cả món":"Món chọn",            color:"#4a8ff5" },
+                    { label:"Đơn tối thiểu", value:fmt(selected.minOrder),                               color:"#b0956a" },
+                    { label:"Giảm tối đa",   value:selected.maxDiscount?fmt(selected.maxDiscount):"Không giới hạn", color:"#b0956a" },
                   ].map(s => (
                     <div key={s.label} style={{ background:"rgba(255,255,255,0.03)",
-                      border:"1px solid rgba(255,255,255,0.06)",
-                      borderRadius:10, padding:"9px 10px" }}>
+                      border:"1px solid rgba(255,255,255,0.06)", borderRadius:10, padding:"9px 10px" }}>
                       <div style={{ color:s.color, fontSize:11, fontWeight:700 }}>{s.value}</div>
                       <div style={{ color:"#6a5a40", fontSize:7.5, marginTop:2 }}>{s.label}</div>
                     </div>
                   ))}
                 </div>
 
-                {/* Usage bar */}
-                {selected.usageLimit && (
+                {selected.usageLimit !== null && (
                   <div style={{ marginBottom:14 }}>
                     <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
                       <span style={{ color:"#6a5a40", fontSize:9 }}>Tỉ lệ sử dụng</span>
@@ -458,17 +559,14 @@ export default function MerchantPromotionsPage() {
                         {Math.round((selected.usedCount / selected.usageLimit) * 100)}%
                       </span>
                     </div>
-                    <div style={{ height:6, borderRadius:3,
-                      background:"rgba(255,255,255,0.07)", overflow:"hidden" }}>
+                    <div style={{ height:6, borderRadius:3, background:"rgba(255,255,255,0.07)", overflow:"hidden" }}>
                       <div style={{ height:"100%", borderRadius:3,
                         width:`${Math.min(100,(selected.usedCount/selected.usageLimit)*100)}%`,
-                        background:"linear-gradient(90deg,#FF6B00,#FFB347)",
-                        transition:"width .5s" }} />
+                        background:"linear-gradient(90deg,#FF6B00,#FFB347)", transition:"width .5s" }} />
                     </div>
                   </div>
                 )}
 
-                {/* Date range */}
                 <div style={{ background:"rgba(255,255,255,0.03)",
                   border:"1px solid rgba(255,255,255,0.06)",
                   borderRadius:10, padding:"10px 12px", marginBottom:14 }}>
@@ -487,9 +585,7 @@ export default function MerchantPromotionsPage() {
                 </div>
               </div>
 
-              {/* Actions */}
-              <div style={{ padding:"12px 16px 28px",
-                borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ padding:"12px 16px 28px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
                 {selected.status !== "ended" && (
                   <button onClick={() => { toggleStatus(selected.id); setSelected(null) }}
                     style={{ width:"100%", height:44, borderRadius:12, marginBottom:8,
@@ -542,9 +638,9 @@ export default function MerchantPromotionsPage() {
           {/* KPI row */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:7, marginBottom:12 }}>
             {[
-              { label:"Đang chạy",    value:String(totalActive),                  color:"#3ecf6e" },
-              { label:"Tổng lượt dùng",value:String(totalUsed),                   color:"#FF8C00" },
-              { label:"Ưu đãi đã trao",value:fmt(totalRevImpact),                 color:"#b464ff" },
+              { label:"Đang chạy",     value:String(totalActive),  color:"#3ecf6e" },
+              { label:"Tổng lượt dùng",value:String(totalUsed),    color:"#FF8C00" },
+              { label:"Ưu đãi đã trao",value:fmt(totalRevImpact),  color:"#b464ff" },
             ].map(s => (
               <div key={s.label} style={{ background:"rgba(255,255,255,0.03)",
                 border:"1px solid rgba(255,255,255,0.06)", borderRadius:11, padding:"8px 10px" }}>
@@ -578,6 +674,7 @@ export default function MerchantPromotionsPage() {
                 style={{ textAlign:"center", padding:"40px 0", color:"#6a5a40" }}>
                 <div style={{ fontSize:40, marginBottom:8 }}>🎁</div>
                 <div style={{ fontSize:12 }}>Chưa có chương trình khuyến mãi</div>
+                <div style={{ fontSize:10, marginTop:4 }}>Nhấn "+ Tạo mới" để bắt đầu</div>
               </motion.div>
             ) : (
               <div style={{ display:"flex", flexDirection:"column", gap:8 }}>

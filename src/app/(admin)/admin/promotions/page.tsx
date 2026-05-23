@@ -1,7 +1,8 @@
-﻿"use client"
+"use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { createClient } from "@/lib/supabase/client"
 
 const NAV_ITEMS = [
   { icon: "🏠",  label: "Dashboard",    href: "/admin",               active: false },
@@ -17,84 +18,151 @@ const NAV_ITEMS = [
   { icon: "⚙️",  label: "Cài đặt",       href: "/admin/settings",      active: false },
 ]
 
-type VoucherType = "percent" | "fixed" | "freeship"
+type VoucherType   = "percent" | "fixed" | "freeship"
 type VoucherStatus = "active" | "expired" | "scheduled"
 
 interface Voucher {
   id: string; code: string; title: string; type: VoucherType; value: number
   minOrder: number; maxDiscount: number | null; used: number; limit: number | null
   validFrom: string; validTo: string; status: VoucherStatus; shopId: string | null
-  totalDiscount: number
+  is_active: boolean
 }
 
-const VOUCHERS: Voucher[] = [
-  { id:"V001", code:"GIAONHANH10", title:"Giảm 10% đơn đầu tiên",       type:"percent",  value:10,    minOrder:50000,  maxDiscount:30000,  used:124, limit:500,  validFrom:"01/05/2025", validTo:"31/05/2025", status:"active",    shopId:null,   totalDiscount:2480000 },
-  { id:"V002", code:"FREESHIP5K",  title:"Miễn phí ship 5km",            type:"freeship", value:15000, minOrder:30000,  maxDiscount:null,   used:89,  limit:200,  validFrom:"10/05/2025", validTo:"20/05/2025", status:"active",    shopId:null,   totalDiscount:1335000 },
-  { id:"V003", code:"BUNBO20K",    title:"Giảm 20k tại Bún Bò Huế Ngon", type:"fixed",    value:20000, minOrder:80000,  maxDiscount:null,   used:32,  limit:100,  validFrom:"05/05/2025", validTo:"15/05/2025", status:"expired",   shopId:"S001", totalDiscount:640000  },
-  { id:"V004", code:"WELCOME50",   title:"Giảm 50k cho thành viên mới",   type:"fixed",    value:50000, minOrder:100000, maxDiscount:null,   used:7,   limit:50,   validFrom:"15/05/2025", validTo:"30/05/2025", status:"active",    shopId:null,   totalDiscount:350000  },
-  { id:"V005", code:"FLASH30",     title:"Flash sale cuối tuần -30%",     type:"percent",  value:30,    minOrder:70000,  maxDiscount:50000,  used:0,   limit:300,  validFrom:"18/05/2025", validTo:"19/05/2025", status:"scheduled", shopId:null,   totalDiscount:0       },
-  { id:"V006", code:"GANNHA15",    title:"Giảm 15% quán gần nhà",         type:"percent",  value:15,    minOrder:40000,  maxDiscount:25000,  used:56,  limit:null, validFrom:"01/05/2025", validTo:"31/05/2025", status:"active",    shopId:null,   totalDiscount:980000  },
-]
-
 const TYPE_CFG: Record<VoucherType, { label:string; color:string; bg:string; icon:string }> = {
-  percent:  { label:"% Giảm giá",  color:"#FF8C00", bg:"rgba(255,140,0,0.1)",   icon:"%" },
+  percent:  { label:"% Giảm giá",   color:"#FF8C00", bg:"rgba(255,140,0,0.1)",   icon:"%" },
   fixed:    { label:"Giảm cố định", color:"#4a8ff5", bg:"rgba(74,143,245,0.1)", icon:"₫" },
   freeship: { label:"Miễn phí ship",color:"#3ecf6e", bg:"rgba(62,207,110,0.1)", icon:"🚀" },
 }
 
 const STATUS_CFG: Record<VoucherStatus, { label:string; color:string; bg:string }> = {
-  active:    { label:"Đang chạy",    color:"#3ecf6e", bg:"rgba(62,207,110,0.1)" },
-  expired:   { label:"Hết hạn",      color:"#6a5a40", bg:"rgba(255,255,255,0.06)" },
-  scheduled: { label:"Chờ kích hoạt",color:"#FFB347", bg:"rgba(255,179,71,0.1)" },
+  active:    { label:"Đang chạy",     color:"#3ecf6e", bg:"rgba(62,207,110,0.1)" },
+  expired:   { label:"Hết hạn",       color:"#6a5a40", bg:"rgba(255,255,255,0.06)" },
+  scheduled: { label:"Chờ kích hoạt", color:"#FFB347", bg:"rgba(255,179,71,0.1)" },
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
-const TIER_LABELS: Record<string, string> = {
-  bronze:"Đồng 🥉", silver:"Bạc 🥈", gold:"Vàng 🥇", platinum:"Bạch Kim 💎"
+function deriveStatus(v: { is_active: boolean; valid_from: string; valid_to: string }): VoucherStatus {
+  const now = new Date()
+  if (!v.is_active || new Date(v.valid_to) < now) return "expired"
+  if (new Date(v.valid_from) > now) return "scheduled"
+  return "active"
 }
 
-interface LoyaltyReward {
-  id: string; title: string; icon: string
-  type: VoucherType; value: number
-  pointCost: number; stock: number; redeemed: number
-  minTier: "bronze" | "silver" | "gold" | "platinum"
-  isActive: boolean
+function fmtDate(iso: string) {
+  try { return new Date(iso).toLocaleDateString("vi-VN") } catch { return iso }
 }
-
-const REWARDS: LoyaltyReward[] = [
-  { id:"LR001", title:"Freeship đơn tiếp theo",    icon:"🚀", type:"freeship", value:15000, pointCost:200,  stock:50, redeemed:12, minTier:"bronze",   isActive:true  },
-  { id:"LR002", title:"Giảm 20k đơn từ 100k",     icon:"💳", type:"fixed",    value:20000, pointCost:300,  stock:30, redeemed:8,  minTier:"silver",   isActive:true  },
-  { id:"LR003", title:"Giảm 10% tối đa 30k",      icon:"%",  type:"percent",  value:10,    pointCost:500,  stock:20, redeemed:3,  minTier:"silver",   isActive:true  },
-  { id:"LR004", title:"Giảm 50k đơn từ 200k",     icon:"🎁", type:"fixed",    value:50000, pointCost:800,  stock:10, redeemed:1,  minTier:"gold",     isActive:true  },
-  { id:"LR005", title:"Freeship 1 tuần liên tục",  icon:"🎯", type:"freeship", value:15000, pointCost:2000, stock:5,  redeemed:0,  minTier:"platinum", isActive:false },
-]
 
 export default function AdminPromotionsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [filter, setFilter] = useState<"all"|VoucherStatus>("all")
-  const [search, setSearch] = useState("")
-  const [selected, setSelected] = useState<Voucher|null>(null)
-  const [showCreate,       setShowCreate]       = useState(false)
-  const [pageTab,          setPageTab]          = useState<"voucher"|"rewards">("voucher")
-  const [showCreateReward, setShowCreateReward] = useState(false)
-  const [rewardForm,       setRewardForm]       = useState({ title:"", icon:"🎁", type:"freeship" as VoucherType, value:"", pointCost:"", stock:"", minTier:"bronze" as LoyaltyReward["minTier"] })
+  const [filter,      setFilter]      = useState<"all" | VoucherStatus>("all")
+  const [search,      setSearch]      = useState("")
+  const [selected,    setSelected]    = useState<Voucher | null>(null)
+  const [showCreate,  setShowCreate]  = useState(false)
+  const [pageTab,     setPageTab]     = useState<"voucher" | "rewards">("voucher")
+  const [loading,     setLoading]     = useState(true)
+  const [saving,      setSaving]      = useState(false)
+  const [vouchers,    setVouchers]    = useState<Voucher[]>([])
+  const [userId,      setUserId]      = useState<string | null>(null)
 
-  // Create form state
-  const [form, setForm] = useState({ code:"", title:"", type:"percent" as VoucherType, value:"", minOrder:"", maxDiscount:"", limit:"", validFrom:"", validTo:"" })
+  const [form, setForm] = useState({
+    code: "", title: "", type: "percent" as VoucherType,
+    value: "", minOrder: "", maxDiscount: "", limit: "",
+    validFrom: "", validTo: "",
+  })
 
-  const shown = VOUCHERS
-    .filter(v => filter==="all" || v.status===filter)
-    .filter(v => !search || v.code.includes(search.toUpperCase()) || v.title.toLowerCase().includes(search.toLowerCase()))
+  const load = useCallback(async () => {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("vouchers")
+      .select("id,code,title,discount_type,discount_value,min_order,max_discount,usage_limit,used_count,valid_from,valid_to,shop_id,is_active")
+      .order("created_at", { ascending: false })
 
-  const totalDiscount = VOUCHERS.filter(v=>v.status==="active").reduce((s,v)=>s+v.totalDiscount, 0)
-  const activeCount   = VOUCHERS.filter(v=>v.status==="active").length
-  const usedToday     = 47
+    if (error || !data) { setLoading(false); return }
+
+    setVouchers(data.map(r => ({
+      id:         r.id,
+      code:       r.code,
+      title:      r.title,
+      type:       r.discount_type as VoucherType,
+      value:      r.discount_value,
+      minOrder:   r.min_order,
+      maxDiscount:r.max_discount,
+      used:       r.used_count,
+      limit:      r.usage_limit,
+      validFrom:  r.valid_from,
+      validTo:    r.valid_to,
+      shopId:     r.shop_id,
+      is_active:  r.is_active,
+      status:     deriveStatus({ is_active: r.is_active, valid_from: r.valid_from, valid_to: r.valid_to }),
+    })))
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
+    load()
+  }, [load])
+
+  const shown = useMemo(() =>
+    vouchers
+      .filter(v => filter === "all" || v.status === filter)
+      .filter(v => !search || v.code.includes(search.toUpperCase()) || v.title.toLowerCase().includes(search.toLowerCase())),
+    [vouchers, filter, search]
+  )
+
+  const activeCount    = useMemo(() => vouchers.filter(v => v.status === "active").length, [vouchers])
+  const scheduledCount = useMemo(() => vouchers.filter(v => v.status === "scheduled").length, [vouchers])
+  const totalUsed      = useMemo(() => vouchers.reduce((s, v) => s + v.used, 0), [vouchers])
+
+  async function handleCreate() {
+    if (!form.code || !form.title || !form.value || !form.validFrom || !form.validTo) return
+    setSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from("vouchers").insert({
+      code:           form.code.toUpperCase().trim(),
+      title:          form.title.trim(),
+      discount_type:  form.type,
+      discount_value: Number(form.value),
+      min_order:      Number(form.minOrder) || 0,
+      max_discount:   form.maxDiscount ? Number(form.maxDiscount) : null,
+      usage_limit:    form.limit ? Number(form.limit) : null,
+      valid_from:     new Date(form.validFrom).toISOString(),
+      valid_to:       new Date(form.validTo + "T23:59:59").toISOString(),
+      is_active:      true,
+      created_by:     userId,
+    })
+    setSaving(false)
+    if (!error) {
+      setShowCreate(false)
+      setForm({ code:"", title:"", type:"percent", value:"", minOrder:"", maxDiscount:"", limit:"", validFrom:"", validTo:"" })
+      load()
+    }
+  }
+
+  async function handleToggle(v: Voucher) {
+    const nowActive = v.status === "active"
+    setVouchers(prev => prev.map(x => x.id === v.id ? { ...x, is_active: !nowActive, status: deriveStatus({ is_active: !nowActive, valid_from: x.validFrom, valid_to: x.validTo }) } : x))
+    if (selected?.id === v.id) setSelected(s => s ? { ...s, is_active: !nowActive, status: deriveStatus({ is_active: !nowActive, valid_from: s.validFrom, valid_to: s.validTo }) } : s)
+    const supabase = createClient()
+    const { error } = await supabase.from("vouchers").update({ is_active: !nowActive }).eq("id", v.id)
+    if (error) load()
+  }
+
+  async function handleDelete(id: string) {
+    const backup = vouchers
+    setVouchers(prev => prev.filter(x => x.id !== id))
+    setSelected(null)
+    const supabase = createClient()
+    const { error } = await supabase.from("vouchers").delete().eq("id", id)
+    if (error) setVouchers(backup)
+  }
 
   return (
     <>
       <style>{`
-                * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { background: #06050a; font-family: 'Lexend', sans-serif; height: 100%; overflow: hidden; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -137,11 +205,11 @@ export default function AdminPromotionsPage() {
               <div style={{ color:"#f0eaff", fontSize:16, fontWeight:800 }}>🏷️ Khuyến mãi</div>
               <div style={{ color:"#6a5a40", fontSize:10 }}>Quản lý voucher · Mã giảm giá · Flash sale</div>
             </div>
-            <button
-              onClick={() => pageTab === "voucher" ? setShowCreate(true) : setShowCreateReward(true)}
-              style={{ padding:"8px 20px", borderRadius:10, background:"linear-gradient(90deg,#FF6B00,#FF8C00)", border:"none", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
-              {pageTab === "voucher" ? "+ Tạo voucher mới" : "+ Tạo phần thưởng"}
-            </button>
+            {pageTab === "voucher" && (
+              <button onClick={() => setShowCreate(true)} style={{ padding:"8px 20px", borderRadius:10, background:"linear-gradient(90deg,#FF6B00,#FF8C00)", border:"none", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
+                + Tạo voucher mới
+              </button>
+            )}
           </div>
 
           {/* Content */}
@@ -164,20 +232,16 @@ export default function AdminPromotionsPage() {
             {pageTab === "voucher" && (<>
 
             {/* KPI */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:12, marginBottom:20 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:20 }}>
               {[
-                { label:"Tổng voucher",       value:VOUCHERS.length,  icon:"🏷️", delta:"", color:"#f0eaff" },
-                { label:"Đang hoạt động",     value:activeCount,      icon:"✅",  delta:"+1 hôm nay", color:"#3ecf6e" },
-                { label:"Dùng hôm nay",       value:usedToday,        icon:"📊", delta:"+12%", color:"#4a8ff5" },
-                { label:"Chờ kích hoạt",      value:VOUCHERS.filter(v=>v.status==="scheduled").length, icon:"⏰", delta:"", color:"#FFB347" },
-                { label:"Tổng giảm giá TT",   value:fmt(totalDiscount), icon:"💸", delta:"tháng này", color:"#FF8C00" },
+                { label:"Tổng voucher",     value: vouchers.length, icon:"🏷️", color:"#f0eaff" },
+                { label:"Đang hoạt động",   value: activeCount,      icon:"✅",  color:"#3ecf6e" },
+                { label:"Chờ kích hoạt",    value: scheduledCount,   icon:"⏰", color:"#FFB347" },
+                { label:"Tổng lượt dùng",   value: totalUsed,        icon:"📊", color:"#4a8ff5" },
               ].map((k, i) => (
                 <div key={k.label} className="kpi-card" style={{ animationDelay:`${i*0.06}s`, background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"14px 16px" }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
-                    <div style={{ fontSize:24 }}>{k.icon}</div>
-                    {k.delta && <span style={{ color:"#6a5a40", fontSize:9 }}>{k.delta}</span>}
-                  </div>
-                  <div style={{ color:k.color, fontSize:typeof k.value==="number" ? 22 : 14, fontWeight:800, marginBottom:4 }}>{k.value}</div>
+                  <div style={{ fontSize:24, marginBottom:10 }}>{k.icon}</div>
+                  <div style={{ color:k.color, fontSize:22, fontWeight:800, marginBottom:4 }}>{loading ? "–" : k.value}</div>
                   <div style={{ color:"#6a5a40", fontSize:10 }}>{k.label}</div>
                 </div>
               ))}
@@ -187,12 +251,12 @@ export default function AdminPromotionsPage() {
             <div style={{ display:"flex", gap:10, marginBottom:16, alignItems:"center" }}>
               <div style={{ flex:1, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, padding:"8px 14px", display:"flex", gap:8, alignItems:"center" }}>
                 <span style={{ color:"#6a5a40" }}>🔍</span>
-                <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Tìm mã voucher, tên..." style={{ flex:1, background:"none", border:"none", color:"#f0eaff", fontSize:12 }} />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Tìm mã voucher, tên..." style={{ flex:1, background:"none", border:"none", color:"#f0eaff", fontSize:12 }} />
               </div>
               <div style={{ display:"flex", gap:6 }}>
                 {(["all","active","scheduled","expired"] as const).map(f => (
-                  <button key={f} onClick={()=>setFilter(f)} style={{ padding:"7px 14px", borderRadius:8, background: filter===f ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.04)", border: filter===f ? "1px solid rgba(255,107,0,0.35)" : "1px solid rgba(255,255,255,0.08)", color: filter===f ? "#FF8C00" : "#6a5a40", fontSize:11, cursor:"pointer", fontFamily:"Lexend", fontWeight: filter===f ? 700 : 400 }}>
-                    {f==="all"?"Tất cả":STATUS_CFG[f as VoucherStatus]?.label ?? f}
+                  <button key={f} onClick={() => setFilter(f)} style={{ padding:"7px 14px", borderRadius:8, background: filter===f ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.04)", border: filter===f ? "1px solid rgba(255,107,0,0.35)" : "1px solid rgba(255,255,255,0.08)", color: filter===f ? "#FF8C00" : "#6a5a40", fontSize:11, cursor:"pointer", fontFamily:"Lexend", fontWeight: filter===f ? 700 : 400 }}>
+                    {f==="all" ? "Tất cả" : STATUS_CFG[f as VoucherStatus]?.label ?? f}
                   </button>
                 ))}
               </div>
@@ -200,17 +264,24 @@ export default function AdminPromotionsPage() {
 
             {/* Table */}
             <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, overflow:"hidden" }}>
-              <div style={{ display:"grid", gridTemplateColumns:"130px 1.6fr 90px 100px 90px 80px 100px 120px", padding:"10px 20px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"130px 1.6fr 90px 100px 90px 80px 110px 120px", padding:"10px 20px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
                 {["Mã voucher","Tên","Loại","Giá trị","Đã dùng","Tỉ lệ","Hạn dùng","Trạng thái"].map(h => (
                   <span key={h} style={{ color:"#6a5a40", fontSize:10, fontWeight:600 }}>{h}</span>
                 ))}
               </div>
-              {shown.map(v => {
+
+              {loading ? (
+                <div style={{ padding:"40px", textAlign:"center", color:"#6a5a40", fontSize:12 }}>Đang tải...</div>
+              ) : shown.length === 0 ? (
+                <div style={{ padding:"40px", textAlign:"center", color:"#6a5a40", fontSize:12 }}>
+                  {vouchers.length === 0 ? "Chưa có voucher nào. Tạo voucher đầu tiên!" : "Không có voucher phù hợp"}
+                </div>
+              ) : shown.map(v => {
                 const tc = TYPE_CFG[v.type]
                 const sc = STATUS_CFG[v.status]
-                const usageRate = v.limit ? Math.round((v.used/v.limit)*100) : null
+                const usageRate = v.limit ? Math.round((v.used / v.limit) * 100) : null
                 return (
-                  <div key={v.id} className="voucher-row" onClick={() => setSelected(v)} style={{ display:"grid", gridTemplateColumns:"130px 1.6fr 90px 100px 90px 80px 100px 120px", padding:"13px 20px", borderBottom:"1px solid rgba(255,255,255,0.04)", alignItems:"center", cursor:"pointer", transition:"background 0.15s" }}>
+                  <div key={v.id} className="voucher-row" onClick={() => setSelected(v)} style={{ display:"grid", gridTemplateColumns:"130px 1.6fr 90px 100px 90px 80px 110px 120px", padding:"13px 20px", borderBottom:"1px solid rgba(255,255,255,0.04)", alignItems:"center", cursor:"pointer", transition:"background 0.15s" }}>
                     <span style={{ color:"#FF8C00", fontSize:12, fontWeight:800, fontFamily:"monospace" }}>{v.code}</span>
                     <span style={{ color:"#f0eaff", fontSize:11, fontWeight:500 }}>{v.title}</span>
                     <span style={{ display:"flex", alignItems:"center", gap:5 }}>
@@ -233,7 +304,7 @@ export default function AdminPromotionsPage() {
                         </div>
                       ) : <span style={{ color:"#6a5a40", fontSize:9 }}>Không giới hạn</span>}
                     </span>
-                    <span style={{ color:"#6a5a40", fontSize:9 }}>{v.validFrom}<br />→ {v.validTo}</span>
+                    <span style={{ color:"#6a5a40", fontSize:9 }}>{fmtDate(v.validFrom)}<br />→ {fmtDate(v.validTo)}</span>
                     <span style={{ padding:"3px 10px", borderRadius:7, background:sc.bg, color:sc.color, fontSize:9, fontWeight:700, width:"fit-content" }}>{sc.label}</span>
                   </div>
                 )
@@ -241,73 +312,20 @@ export default function AdminPromotionsPage() {
             </div>
             </>)}
 
-            {pageTab === "rewards" && (<>
-              {/* KPI — Rewards */}
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:20 }}>
-                {[
-                  { label:"Tổng phần thưởng",  value:REWARDS.length,                                                  icon:"🎁", color:"#f0eaff" },
-                  { label:"Đang hoạt động",     value:REWARDS.filter(r=>r.isActive).length,                           icon:"✅",  color:"#3ecf6e" },
-                  { label:"Tổng lượt đổi",      value:REWARDS.reduce((s,r)=>s+r.redeemed,0),                          icon:"🔄",  color:"#4a8ff5" },
-                  { label:"Điểm đã tiêu thụ",   value:REWARDS.reduce((s,r)=>s+r.redeemed*r.pointCost,0).toLocaleString("vi-VN"), icon:"⭐", color:"#b464ff" },
-                ].map((k,i) => (
-                  <div key={k.label} className="kpi-card" style={{ animationDelay:`${i*0.06}s`, background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"14px 16px" }}>
-                    <div style={{ fontSize:24, marginBottom:10 }}>{k.icon}</div>
-                    <div style={{ color:k.color, fontSize:22, fontWeight:800, marginBottom:4 }}>{k.value}</div>
-                    <div style={{ color:"#6a5a40", fontSize:10 }}>{k.label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Info */}
-              <div style={{ background:"rgba(180,100,255,0.06)", border:"1px solid rgba(180,100,255,0.15)", borderRadius:12, padding:"12px 16px", marginBottom:16, display:"flex", gap:12, alignItems:"flex-start" }}>
-                <span style={{ fontSize:20 }}>💡</span>
-                <div style={{ color:"#6a5a40", fontSize:10, lineHeight:1.7 }}>
-                  <strong style={{ color:"#b464ff" }}>Quy tắc:</strong> 100 điểm = 1.000 xu · Khách đổi điểm lấy voucher trong ứng dụng.<br />
+            {pageTab === "rewards" && (
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"60px 20px", gap:16 }}>
+                <div style={{ fontSize:48 }}>🎁</div>
+                <div style={{ color:"#f0eaff", fontSize:16, fontWeight:700 }}>Chưa có danh mục đổi điểm</div>
+                <div style={{ color:"#6a5a40", fontSize:12, textAlign:"center", maxWidth:400, lineHeight:1.7 }}>
+                  Tính năng đổi điểm lấy phần thưởng sẽ yêu cầu bảng <code style={{ color:"#FF8C00" }}>loyalty_rewards</code> trong cơ sở dữ liệu.<br />
+                  Khách hàng tích điểm qua mỗi đơn hàng và có thể đổi lấy voucher tại đây.
+                </div>
+                <div style={{ background:"rgba(180,100,255,0.06)", border:"1px solid rgba(180,100,255,0.15)", borderRadius:12, padding:"12px 20px", color:"#6a5a40", fontSize:10, lineHeight:1.7, maxWidth:440 }}>
+                  💡 <strong style={{ color:"#b464ff" }}>Quy tắc:</strong> 100 điểm = 1.000 xu · Khách đổi điểm lấy voucher trong ứng dụng.<br />
                   Voucher đổi điểm tự động tạo code riêng cho từng khách khi đổi thành công.
                 </div>
               </div>
-
-              {/* Rewards table */}
-              <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, overflow:"hidden" }}>
-                <div style={{ display:"grid", gridTemplateColumns:"46px 1.8fr 110px 100px 80px 70px 130px 100px", padding:"10px 20px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
-                  {["","Tên phần thưởng","Ưu đãi","Giá điểm","Tồn kho","Đã đổi","Hạng tối thiểu","Trạng thái"].map((h,hi) => (
-                    <span key={hi} style={{ color:"#6a5a40", fontSize:10, fontWeight:600 }}>{h}</span>
-                  ))}
-                </div>
-                {REWARDS.map((r,i) => {
-                  const tc = TYPE_CFG[r.type]
-                  return (
-                    <div key={r.id} className="voucher-row"
-                      style={{ display:"grid", gridTemplateColumns:"46px 1.8fr 110px 100px 80px 70px 130px 100px", padding:"13px 20px", borderBottom:i<REWARDS.length-1?"1px solid rgba(255,255,255,0.04)":"none", alignItems:"center", transition:"background 0.15s", cursor:"default" }}>
-                      <span style={{ fontSize:22 }}>{r.icon}</span>
-                      <span style={{ color:"#f0eaff", fontSize:11, fontWeight:500 }}>{r.title}</span>
-                      <span>
-                        <span style={{ padding:"2px 8px", borderRadius:6, background:tc.bg, color:tc.color, fontSize:9, fontWeight:700 }}>{tc.icon} {tc.label}</span>
-                      </span>
-                      <span style={{ color:"#b464ff", fontSize:13, fontWeight:700 }}>
-                        {r.pointCost.toLocaleString()}
-                        <span style={{ color:"#6a5a40", fontSize:9, fontWeight:400 }}> điểm</span>
-                      </span>
-                      <span style={{ color:"#b0956a", fontSize:12 }}>
-                        {r.stock - r.redeemed}
-                        <span style={{ color:"#6a5a40", fontSize:9 }}>/{r.stock}</span>
-                      </span>
-                      <span style={{ color:"#4a8ff5", fontSize:12, fontWeight:600 }}>{r.redeemed}</span>
-                      <span style={{ padding:"2px 9px", borderRadius:6, background:"rgba(180,100,255,0.1)", color:"#b464ff", fontSize:9, fontWeight:700, width:"fit-content" }}>
-                        {TIER_LABELS[r.minTier]}
-                      </span>
-                      <span style={{ display:"flex", gap:6 }}>
-                        <span style={{ padding:"3px 9px", borderRadius:7, fontSize:9, fontWeight:700, width:"fit-content",
-                          background:r.isActive?"rgba(62,207,110,0.1)":"rgba(255,255,255,0.06)",
-                          color:r.isActive?"#3ecf6e":"#6a5a40" }}>
-                          {r.isActive ? "✅ Hoạt động" : "⏸ Tắt"}
-                        </span>
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </>)}
+            )}
 
           </div>
         </div>
@@ -318,7 +336,6 @@ export default function AdminPromotionsPage() {
             <>
               <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} onClick={() => setSelected(null)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:100, backdropFilter:"blur(4px)" }} />
               <motion.div initial={{ x:"100%" }} animate={{ x:0 }} exit={{ x:"100%" }} transition={{ type:"spring", damping:24, stiffness:300 }} style={{ position:"fixed", top:0, right:0, bottom:0, width:380, background:"#0d0b12", borderLeft:"1px solid rgba(255,107,0,0.15)", zIndex:101, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-                {/* Header */}
                 <div style={{ padding:"20px", borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                   <div>
                     <div style={{ color:"#FF8C00", fontSize:18, fontWeight:800, fontFamily:"monospace", marginBottom:4 }}>{selected.code}</div>
@@ -328,12 +345,10 @@ export default function AdminPromotionsPage() {
                 </div>
 
                 <div style={{ flex:1, overflowY:"auto", padding:"16px 20px" }}>
-                  {/* Stats */}
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:16 }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16 }}>
                     {[
-                      { label:"Đã dùng",    value:`${selected.used}${selected.limit?`/${selected.limit}`:""}` },
-                      { label:"Tổng giảm",  value:fmt(selected.totalDiscount) },
-                      { label:"Min. đơn",   value:fmt(selected.minOrder) },
+                      { label:"Đã dùng", value:`${selected.used}${selected.limit ? `/${selected.limit}` : ""}` },
+                      { label:"Min. đơn", value:fmt(selected.minOrder) },
                     ].map(s => (
                       <div key={s.label} style={{ background:"rgba(255,255,255,0.04)", borderRadius:10, padding:"10px", textAlign:"center" }}>
                         <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>{s.value}</div>
@@ -342,51 +357,50 @@ export default function AdminPromotionsPage() {
                     ))}
                   </div>
 
-                  {/* Info */}
                   {[
                     ["Loại voucher",   TYPE_CFG[selected.type].label],
                     ["Giá trị",        selected.type==="percent" ? `Giảm ${selected.value}%` : fmt(selected.value)],
                     ["Giảm tối đa",    selected.maxDiscount ? fmt(selected.maxDiscount) : "Không giới hạn"],
                     ["Đơn tối thiểu",  fmt(selected.minOrder)],
-                    ["Hiệu lực",       `${selected.validFrom} → ${selected.validTo}`],
+                    ["Hiệu lực",       `${fmtDate(selected.validFrom)} → ${fmtDate(selected.validTo)}`],
                     ["Phạm vi",        selected.shopId ? "Riêng cửa hàng" : "Toàn hệ thống"],
                     ["Trạng thái",     STATUS_CFG[selected.status].label],
-                  ].map(([k,v]) => (
+                  ].map(([k, v]) => (
                     <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"10px 0", borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
                       <span style={{ color:"#6a5a40", fontSize:11 }}>{k}</span>
                       <span style={{ color:"#f0eaff", fontSize:11, fontWeight:600 }}>{v}</span>
                     </div>
                   ))}
 
-                  {/* Usage bar */}
                   {selected.limit && (
                     <div style={{ marginTop:16 }}>
                       <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
                         <span style={{ color:"#6a5a40", fontSize:10 }}>Mức sử dụng</span>
-                        <span style={{ color:"#f0eaff", fontSize:10 }}>{Math.round((selected.used/selected.limit)*100)}%</span>
+                        <span style={{ color:"#f0eaff", fontSize:10 }}>{Math.round((selected.used / selected.limit) * 100)}%</span>
                       </div>
                       <div style={{ height:6, borderRadius:3, background:"rgba(255,255,255,0.06)", overflow:"hidden" }}>
-                        <div style={{ height:"100%", width:`${(selected.used/selected.limit)*100}%`, background:"linear-gradient(90deg,#FF6B00,#FFB347)", borderRadius:3 }} />
+                        <div style={{ height:"100%", width:`${(selected.used / selected.limit) * 100}%`, background:"linear-gradient(90deg,#FF6B00,#FFB347)", borderRadius:3 }} />
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Actions */}
                 <div style={{ padding:"16px 20px", borderTop:"1px solid rgba(255,255,255,0.06)", display:"flex", gap:8 }}>
                   {selected.status === "active" && (
-                    <button style={{ flex:1, height:40, borderRadius:10, background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)", color:"#ff4040", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
+                    <button onClick={() => handleToggle(selected)} style={{ flex:1, height:40, borderRadius:10, background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)", color:"#ff4040", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
                       ⏹ Dừng voucher
                     </button>
                   )}
                   {selected.status === "scheduled" && (
-                    <button style={{ flex:1, height:40, borderRadius:10, background:"rgba(62,207,110,0.1)", border:"1px solid rgba(62,207,110,0.25)", color:"#3ecf6e", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
+                    <button onClick={() => handleToggle(selected)} style={{ flex:1, height:40, borderRadius:10, background:"rgba(62,207,110,0.1)", border:"1px solid rgba(62,207,110,0.25)", color:"#3ecf6e", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
                       ▶ Kích hoạt ngay
                     </button>
                   )}
-                  <button style={{ flex:1, height:40, borderRadius:10, background:"rgba(74,143,245,0.1)", border:"1px solid rgba(74,143,245,0.25)", color:"#4a8ff5", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
-                    ✏️ Chỉnh sửa
-                  </button>
+                  {selected.status === "expired" && (
+                    <button onClick={() => handleDelete(selected.id)} style={{ flex:1, height:40, borderRadius:10, background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)", color:"#ff4040", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
+                      🗑 Xóa voucher
+                    </button>
+                  )}
                 </div>
               </motion.div>
             </>
@@ -403,121 +417,43 @@ export default function AdminPromotionsPage() {
                   <div style={{ color:"#f0eaff", fontSize:15, fontWeight:800 }}>+ Tạo voucher mới</div>
                   <button onClick={() => setShowCreate(false)} style={{ width:32, height:32, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
                 </div>
-                <div style={{ padding:"20px", display:"flex", flexDirection:"column", gap:12 }}>
+                <div style={{ padding:"20px", display:"flex", flexDirection:"column", gap:12, maxHeight:"70vh", overflowY:"auto" }}>
                   {[
-                    { label:"Mã voucher",  key:"code",      placeholder:"GIAONHANH10" },
-                    { label:"Tên voucher", key:"title",     placeholder:"Giảm 10% đơn đầu tiên" },
-                    { label:"Giá trị",     key:"value",     placeholder:"10" },
-                    { label:"Đơn tối thiểu",key:"minOrder", placeholder:"50000" },
-                    { label:"Giới hạn dùng",key:"limit",   placeholder:"500 (để trống = không giới hạn)" },
-                    { label:"Từ ngày",     key:"validFrom", placeholder:"dd/mm/yyyy" },
-                    { label:"Đến ngày",    key:"validTo",   placeholder:"dd/mm/yyyy" },
+                    { label:"Mã voucher",      key:"code",        placeholder:"GIAONHANH10", type:"text" },
+                    { label:"Tên voucher",      key:"title",       placeholder:"Giảm 10% đơn đầu tiên", type:"text" },
+                    { label:"Giá trị",          key:"value",       placeholder:"10 (hoặc 20000)", type:"number" },
+                    { label:"Đơn tối thiểu (đ)",key:"minOrder",    placeholder:"50000", type:"number" },
+                    { label:"Giảm tối đa (đ)",  key:"maxDiscount", placeholder:"30000 (để trống nếu không có)", type:"number" },
+                    { label:"Giới hạn dùng",    key:"limit",       placeholder:"500 (để trống = không giới hạn)", type:"number" },
+                    { label:"Từ ngày",          key:"validFrom",   placeholder:"", type:"date" },
+                    { label:"Đến ngày",         key:"validTo",     placeholder:"", type:"date" },
                   ].map(f => (
                     <div key={f.key}>
                       <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>{f.label}</div>
-                      <input value={form[f.key as keyof typeof form]} onChange={e => setForm(p => ({...p, [f.key]: e.target.value}))} placeholder={f.placeholder} style={{ width:"100%", padding:"10px 14px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, color:"#f0eaff", fontSize:12 }} />
+                      <input
+                        type={f.type}
+                        value={form[f.key as keyof typeof form]}
+                        onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                        placeholder={f.placeholder}
+                        style={{ width:"100%", padding:"10px 14px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, color:"#f0eaff", fontSize:12 }}
+                      />
                     </div>
                   ))}
                   <div>
                     <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>Loại khuyến mãi</div>
                     <div style={{ display:"flex", gap:8 }}>
                       {(["percent","fixed","freeship"] as VoucherType[]).map(t => (
-                        <button key={t} onClick={() => setForm(p=>({...p, type:t}))} style={{ flex:1, height:36, borderRadius:10, background: form.type===t ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.04)", border: form.type===t ? "1px solid rgba(255,107,0,0.35)" : "1px solid rgba(255,255,255,0.08)", color: form.type===t ? "#FF8C00" : "#6a5a40", fontSize:10, cursor:"pointer", fontFamily:"Lexend", fontWeight: form.type===t ? 700 : 400 }}>
+                        <button key={t} onClick={() => setForm(p => ({ ...p, type:t }))} style={{ flex:1, height:36, borderRadius:10, background: form.type===t ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.04)", border: form.type===t ? "1px solid rgba(255,107,0,0.35)" : "1px solid rgba(255,255,255,0.08)", color: form.type===t ? "#FF8C00" : "#6a5a40", fontSize:10, cursor:"pointer", fontFamily:"Lexend", fontWeight: form.type===t ? 700 : 400 }}>
                           {TYPE_CFG[t].icon} {TYPE_CFG[t].label}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <button onClick={() => setShowCreate(false)} style={{ width:"100%", height:44, borderRadius:12, background:"linear-gradient(90deg,#FF6B00,#FF8C00)", border:"none", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", marginTop:4 }}>
-                    🏷️ Tạo voucher
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-        {/* Create reward modal */}
-        <AnimatePresence>
-          {showCreateReward && (
-            <>
-              <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} onClick={() => setShowCreateReward(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:100, backdropFilter:"blur(4px)" }} />
-              <motion.div initial={{ opacity:0, scale:0.92 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.92 }} transition={{ type:"spring", damping:24, stiffness:300 }}
-                style={{ position:"fixed", top:"50%", left:"50%", transform:"translate(-50%,-50%)", width:500, background:"#0d0b12", borderRadius:18, border:"1px solid rgba(180,100,255,0.22)", zIndex:101, overflow:"hidden" }}>
-                <div style={{ padding:"20px", borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <div>
-                    <div style={{ color:"#f0eaff", fontSize:15, fontWeight:800 }}>🎁 Tạo phần thưởng đổi điểm</div>
-                    <div style={{ color:"#6a5a40", fontSize:10, marginTop:2 }}>Khách hàng dùng điểm tích lũy để đổi lấy voucher này</div>
-                  </div>
-                  <button onClick={() => setShowCreateReward(false)} style={{ width:32, height:32, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
-                </div>
-                <div style={{ padding:"20px", display:"flex", flexDirection:"column", gap:12, maxHeight:"70vh", overflowY:"auto" }}>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 80px", gap:10 }}>
-                    <div>
-                      <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>Tên phần thưởng</div>
-                      <input value={rewardForm.title} onChange={e => setRewardForm(p=>({...p, title:e.target.value}))} placeholder="Freeship đơn tiếp theo" style={{ width:"100%", padding:"10px 14px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", outline:"none" }} />
-                    </div>
-                    <div>
-                      <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>Icon</div>
-                      <input value={rewardForm.icon} onChange={e => setRewardForm(p=>({...p, icon:e.target.value}))} placeholder="🎁" style={{ width:"100%", padding:"10px 14px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, color:"#f0eaff", fontSize:20, textAlign:"center", fontFamily:"Lexend", outline:"none" }} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ color:"#6a5a40", fontSize:10, marginBottom:6 }}>Loại ưu đãi</div>
-                    <div style={{ display:"flex", gap:8 }}>
-                      {(["percent","fixed","freeship"] as VoucherType[]).map(t => (
-                        <button key={t} onClick={() => setRewardForm(p=>({...p, type:t}))}
-                          style={{ flex:1, height:36, borderRadius:10, cursor:"pointer", fontFamily:"Lexend",
-                            background: rewardForm.type===t ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.04)",
-                            border: rewardForm.type===t ? "1px solid rgba(255,107,0,0.35)" : "1px solid rgba(255,255,255,0.08)",
-                            color: rewardForm.type===t ? "#FF8C00" : "#6a5a40",
-                            fontSize:10, fontWeight: rewardForm.type===t ? 700 : 400 }}>
-                          {TYPE_CFG[t].icon} {TYPE_CFG[t].label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
-                    {[
-                      { label:"Giá trị ưu đãi",  key:"value",     placeholder:"15000 hoặc 10 (%)" },
-                      { label:"Giá điểm đổi",    key:"pointCost", placeholder:"200 điểm" },
-                      { label:"Số lượng tồn kho",key:"stock",     placeholder:"50" },
-                    ].map(f => (
-                      <div key={f.key}>
-                        <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>{f.label}</div>
-                        <input value={rewardForm[f.key as keyof typeof rewardForm] as string} onChange={e => setRewardForm(p=>({...p, [f.key]:e.target.value}))} placeholder={f.placeholder} style={{ width:"100%", padding:"10px 14px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", outline:"none" }} />
-                      </div>
-                    ))}
-                  </div>
-
-                  <div>
-                    <div style={{ color:"#6a5a40", fontSize:10, marginBottom:6 }}>Hạng tối thiểu được đổi</div>
-                    <div style={{ display:"flex", gap:8 }}>
-                      {(["bronze","silver","gold","platinum"] as const).map(tier => (
-                        <button key={tier} onClick={() => setRewardForm(p=>({...p, minTier:tier}))}
-                          style={{ flex:1, height:36, borderRadius:10, cursor:"pointer", fontFamily:"Lexend",
-                            background: rewardForm.minTier===tier ? "rgba(180,100,255,0.12)" : "rgba(255,255,255,0.04)",
-                            border: rewardForm.minTier===tier ? "1px solid rgba(180,100,255,0.35)" : "1px solid rgba(255,255,255,0.08)",
-                            color: rewardForm.minTier===tier ? "#b464ff" : "#6a5a40",
-                            fontSize:9, fontWeight: rewardForm.minTier===tier ? 700 : 400 }}>
-                          {TIER_LABELS[tier]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ background:"rgba(180,100,255,0.06)", border:"1px solid rgba(180,100,255,0.15)", borderRadius:10, padding:"10px 14px", color:"#6a5a40", fontSize:9, lineHeight:1.6 }}>
-                    💡 Voucher này sẽ xuất hiện trong ứng dụng khách hàng · Khách chọn đổi → hệ thống tự tạo code riêng · Code tự hết hạn sau 30 ngày
-                  </div>
-
                   <button
-                    onClick={() => {
-                      setShowCreateReward(false)
-                      setRewardForm({ title:"", icon:"🎁", type:"freeship", value:"", pointCost:"", stock:"", minTier:"bronze" })
-                    }}
-                    style={{ width:"100%", height:44, borderRadius:12, background:"linear-gradient(90deg,#b464ff,#d484ff)", border:"none", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
-                    🎁 Tạo phần thưởng
+                    onClick={handleCreate}
+                    disabled={saving || !form.code || !form.title || !form.value || !form.validFrom || !form.validTo}
+                    style={{ width:"100%", height:44, borderRadius:12, background:"linear-gradient(90deg,#FF6B00,#FF8C00)", border:"none", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", marginTop:4, opacity: saving ? 0.6 : 1 }}>
+                    {saving ? "Đang tạo..." : "🏷️ Tạo voucher"}
                   </button>
                 </div>
               </motion.div>

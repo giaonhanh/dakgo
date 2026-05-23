@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import dynamic from "next/dynamic"
+import { createClient } from "@/lib/supabase/client"
 
 const NAV_ITEMS = [
   { icon: "🏠",  label: "Dashboard",    href: "/admin",               active: false },
@@ -31,27 +32,23 @@ interface ActiveOrder {
   id: string; status: string; shop: string; customer: string; driver: string | null; eta: string
 }
 
-const ONLINE_DRIVERS: DriverMarker[] = [
-  { id:"D003", name:"Lê Văn Cường",  vehicle:"Honda Air Blade", lat:12.6521, lng:108.5063, status:"busy",   order:"GN2851" },
-  { id:"D004", name:"Phạm Thị Dung", vehicle:"Suzuki Raider",   lat:12.6558, lng:108.5112, status:"busy",   order:"GN2850" },
-  { id:"D006", name:"Trần Văn Bình", vehicle:"Honda Wave",       lat:12.6485, lng:108.5020, status:"online", order:null     },
-  { id:"D007", name:"Vũ Thị Hoa",    vehicle:"Yamaha Sirius",    lat:12.6601, lng:108.5175, status:"online", order:null     },
-]
-
-const SHOPS: ShopMarker[] = [
-  { id:"S001", name:"Bún Bò Huế Ngon",   lat:12.6530, lng:108.5080, isOpen:true  },
-  { id:"S002", name:"Cơm Tấm Sài Gòn",   lat:12.6495, lng:108.5050, isOpen:true  },
-  { id:"S003", name:"Bánh Mì Thanh Nga",  lat:12.6570, lng:108.5130, isOpen:true  },
-  { id:"S004", name:"Gà Rán KFC Mini",    lat:12.6510, lng:108.5095, isOpen:true  },
-  { id:"S005", name:"Quán Cà Phê Nhớ",   lat:12.6545, lng:108.5145, isOpen:false },
-]
-
-const ACTIVE_ORDERS: ActiveOrder[] = [
-  { id:"GN2851", status:"delivering", shop:"Bún Bò Huế Ngon",  customer:"Nguyễn Thị A", driver:"Lê Văn Cường",  eta:"~5 phút"    },
-  { id:"GN2850", status:"preparing",  shop:"Cơm Tấm Sài Gòn",  customer:"Lê Văn B",     driver:"Phạm Thị Dung", eta:"~12 phút"   },
-  { id:"GN2853", status:"pending",    shop:"Bánh Mì Thanh Nga", customer:"Vũ Văn F",     driver:null,            eta:"Chờ tài xế" },
-  { id:"GN2855", status:"accepted",   shop:"Gà Rán KFC Mini",   customer:"Trần Thị C",   driver:"Vũ Thị Hoa",   eta:"~18 phút"  },
-]
+function parseWKB(location: unknown): { lat: number; lng: number } | null {
+  if (!location) return null
+  try {
+    if (typeof location === "object") {
+      const geo = location as { type?: string; coordinates?: [number, number] }
+      if (geo.type === "Point" && Array.isArray(geo.coordinates)) return { lat: geo.coordinates[1], lng: geo.coordinates[0] }
+    }
+    if (typeof location !== "string") return null
+    const bytes = new Uint8Array((location as string).match(/../g)!.map(b => parseInt(b, 16)))
+    const view = new DataView(bytes.buffer)
+    const le = bytes[0] === 1
+    const typeCode = view.getUint32(1, le)
+    const hasSRID = (typeCode & 0x20000000) !== 0
+    let offset = 5; if (hasSRID) offset += 4
+    return { lat: view.getFloat64(offset + 8, le), lng: view.getFloat64(offset, le) }
+  } catch { return null }
+}
 
 const STATUS_CFG: Record<string, { label:string; color:string; bg:string }> = {
   pending:    { label:"Chờ tài xế", color:"#ff4040", bg:"rgba(255,64,64,0.1)"   },
@@ -188,21 +185,72 @@ const AdminMapClient = dynamic(
 
 // ─── Main page ───────────────────────────────────────────────────────────────
 export default function AdminMapPage() {
+  const supabase = createClient()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [layer, setLayer] = useState<"all"|"drivers"|"orders">("all")
   const [selected, setSelected] = useState<DriverMarker | null>(null)
-  const [tick, setTick] = useState(0)
+  const [onlineDrivers, setOnlineDrivers] = useState<DriverMarker[]>([])
+  const [shopMarkers, setShopMarkers]     = useState<ShopMarker[]>([])
+  const [activeOrders, setActiveOrders]   = useState<ActiveOrder[]>([])
 
-  // Simulate real-time driver position updates
+  const loadMapData = useCallback(async () => {
+    // Load online drivers + their profiles
+    const { data: driverRows } = await supabase.from("drivers")
+      .select("id, status, vehicle_type, license_plate, location")
+      .in("status", ["online", "busy"])
+    const driverIds = (driverRows ?? []).map(d => d.id)
+    const { data: profileRows } = driverIds.length > 0
+      ? await supabase.from("profiles").select("id, full_name").in("id", driverIds)
+      : { data: [] }
+    const nameMap = Object.fromEntries((profileRows ?? []).map(p => [p.id, p.full_name ?? "Tài xế"]))
+    const drivers: DriverMarker[] = (driverRows ?? []).flatMap(d => {
+      const pos = parseWKB(d.location)
+      if (!pos) return []
+      return [{ id: d.id, name: nameMap[d.id] ?? "Tài xế", vehicle: d.vehicle_type ?? "", lat: pos.lat, lng: pos.lng, status: d.status as "online"|"busy", order: null }]
+    })
+    setOnlineDrivers(drivers)
+
+    // Load shops with location
+    const { data: shopRows } = await supabase.from("shops")
+      .select("id, name, location, is_open").eq("status", "approved")
+    const shops: ShopMarker[] = (shopRows ?? []).flatMap(s => {
+      const pos = parseWKB(s.location)
+      if (!pos) return []
+      return [{ id: s.id, name: s.name, lat: pos.lat, lng: pos.lng, isOpen: s.is_open }]
+    })
+    setShopMarkers(shops)
+
+    // Load active orders
+    const { data: orderRows } = await supabase.from("orders")
+      .select("id, status, shop_id, customer_id, driver_id, estimated_delivery_at, shops!shop_id(name)")
+      .in("status", ["pending","accepted","preparing","ready","delivering"])
+      .order("created_at", { ascending: false }).limit(10)
+    const custIds = (orderRows ?? []).map(o => o.customer_id).filter(Boolean)
+    const drvIds  = (orderRows ?? []).map(o => o.driver_id).filter(Boolean)
+    const allIds  = [...new Set([...custIds, ...drvIds])]
+    const { data: pRows } = allIds.length > 0
+      ? await supabase.from("profiles").select("id, full_name").in("id", allIds)
+      : { data: [] }
+    const pMap = Object.fromEntries((pRows ?? []).map(p => [p.id, p.full_name ?? "—"]))
+    setActiveOrders((orderRows ?? []).map(o => {
+      const sn = Array.isArray(o.shops) ? (o.shops[0] as {name:string})?.name : (o.shops as {name:string}|null)?.name
+      const eta = o.estimated_delivery_at
+        ? `~${Math.max(1, Math.round((new Date(o.estimated_delivery_at).getTime() - Date.now()) / 60000))} phút`
+        : o.status === "pending" ? "Chờ tài xế" : "Đang xử lý"
+      return { id: o.id.slice(0,8).toUpperCase(), status: o.status, shop: sn ?? "—", customer: pMap[o.customer_id] ?? "Khách hàng", driver: o.driver_id ? pMap[o.driver_id] ?? null : null, eta }
+    }))
+  }, [supabase])
+
   useEffect(() => {
-    const iv = setInterval(() => setTick(t => t + 1), 5000)
+    loadMapData()
+    const iv = setInterval(loadMapData, 10000)
     return () => clearInterval(iv)
-  }, [])
+  }, [loadMapData])
 
-  const onlineCount  = ONLINE_DRIVERS.length
-  const busyCount    = ONLINE_DRIVERS.filter(d => d.status === "busy").length
+  const onlineCount  = onlineDrivers.length
+  const busyCount    = onlineDrivers.filter(d => d.status === "busy").length
   const freeCount    = onlineCount - busyCount
-  const pendingCount = ACTIVE_ORDERS.filter(o => o.status === "pending").length
+  const pendingCount = activeOrders.filter(o => o.status === "pending").length
 
   return (
     <>
@@ -271,8 +319,8 @@ export default function AdminMapPage() {
             {/* Map */}
             <div style={{ flex:1, position:"relative", overflow:"hidden" }}>
               <AdminMapClient
-                drivers={ONLINE_DRIVERS}
-                shops={SHOPS}
+                drivers={onlineDrivers}
+                shops={shopMarkers}
                 selected={selected}
                 onSelect={setSelected}
               />
@@ -326,7 +374,8 @@ export default function AdminMapPage() {
 
               {/* Driver list */}
               <div style={{ maxHeight:220, overflowY:"auto", padding:"6px 8px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
-                {ONLINE_DRIVERS.map(d => (
+                {onlineDrivers.length === 0 && <div style={{padding:"16px",textAlign:"center",color:"#6a5a40",fontSize:10}}>Chưa có tài xế trực tuyến</div>}
+                {onlineDrivers.map(d => (
                   <div key={d.id} className="driver-row" onClick={() => setSelected(selected?.id===d.id ? null : d)}
                     style={{ padding:"9px 10px", borderRadius:10, marginBottom:3, background: selected?.id===d.id ? "rgba(255,107,0,0.1)" : "transparent", border: selected?.id===d.id ? "1px solid rgba(255,107,0,0.25)" : "1px solid transparent", transition:"all 0.15s" }}>
                     <div style={{ display:"flex", gap:8, alignItems:"center" }}>
@@ -353,10 +402,11 @@ export default function AdminMapPage() {
 
               {/* Active orders */}
               <div style={{ padding:"10px 14px 6px", flexShrink:0 }}>
-                <div style={{ color:"#f0eaff", fontSize:11, fontWeight:700 }}>Đơn đang xử lý ({ACTIVE_ORDERS.length})</div>
+                <div style={{ color:"#f0eaff", fontSize:11, fontWeight:700 }}>Đơn đang xử lý ({activeOrders.length})</div>
               </div>
               <div style={{ flex:1, overflowY:"auto", padding:"4px 8px" }}>
-                {ACTIVE_ORDERS.map(o => {
+                {activeOrders.length === 0 && <div style={{padding:"16px",textAlign:"center",color:"#6a5a40",fontSize:10}}>Chưa có đơn đang xử lý</div>}
+                {activeOrders.map(o => {
                   const sc = STATUS_CFG[o.status] ?? STATUS_CFG["pending"]
                   return (
                     <div key={o.id} className="order-row" style={{ padding:"10px", borderRadius:10, background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.05)", marginBottom:6, transition:"background 0.15s" }}>
@@ -380,9 +430,10 @@ export default function AdminMapPage() {
 
               {/* Shops summary */}
               <div style={{ padding:"10px 14px", borderTop:"1px solid rgba(255,255,255,0.06)", flexShrink:0 }}>
-                <div style={{ color:"#f0eaff", fontSize:11, fontWeight:700, marginBottom:8 }}>🏪 Cửa hàng ({SHOPS.filter(s=>s.isOpen).length} đang mở)</div>
+                <div style={{ color:"#f0eaff", fontSize:11, fontWeight:700, marginBottom:8 }}>🏪 Cửa hàng ({shopMarkers.filter(s=>s.isOpen).length} đang mở)</div>
                 <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
-                  {SHOPS.slice(0,4).map(s => (
+                  {shopMarkers.length === 0 && <div style={{color:"#6a5a40",fontSize:9}}>Chưa có cửa hàng có vị trí</div>}
+                  {shopMarkers.slice(0,5).map(s => (
                     <div key={s.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                       <span style={{ color:"#b0956a", fontSize:9, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:170 }}>{s.name}</span>
                       <span style={{ fontSize:7, fontWeight:700, padding:"2px 6px", borderRadius:4, background: s.isOpen?"rgba(62,207,110,0.1)":"rgba(255,64,64,0.08)", color: s.isOpen?"#3ecf6e":"#ff4040" }}>

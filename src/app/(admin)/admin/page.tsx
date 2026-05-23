@@ -36,13 +36,6 @@ function getLast7Days() {
 }
 
 const CHART_BARS = getLast7Days()
-const REVENUE_VALS = [42, 68, 55, 85, 73, 91, 100]
-const HOUR_BARS = [
-  { h: "6h", v: 15 }, { h: "7h", v: 42 }, { h: "8h", v: 78 },
-  { h: "9h", v: 95 }, { h: "10h", v: 82 }, { h: "11h", v: 88 },
-  { h: "12h", v: 65 }, { h: "13h", v: 50 }, { h: "14h", v: 38 },
-  { h: "15h", v: 44 }, { h: "16h", v: 58 }, { h: "17h", v: 85 },
-]
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
   delivering: { label: "Đang giao",    color: "#FF8C00", bg: "rgba(255,140,0,0.12)",  border: "rgba(255,107,0,0.3)"   },
@@ -78,21 +71,6 @@ const timeAgo = (iso: string) => {
   return `${Math.floor(diff / 60)} giờ trước`
 }
 
-const ACTIVITY_LOG = [
-  { icon: "🆕", text: "Tài xế Nguyễn Văn A đăng ký mới",      time: "2 phút trước",  color: "#3ecf6e" },
-  { icon: "⚠️", text: "Đơn #GN7821 bị hủy bởi khách hàng",    time: "5 phút trước",  color: "#ff4040" },
-  { icon: "🏪", text: "Cửa hàng Bánh Mì 36 chờ duyệt",        time: "12 phút trước", color: "#FF8C00" },
-  { icon: "💰", text: "Giao dịch 250k hoàn thành thành công",  time: "18 phút trước", color: "#4a8ff5" },
-  { icon: "⭐", text: "5 đánh giá mới cho Phở Hà Nội",        time: "25 phút trước", color: "#f5c542" },
-  { icon: "🚫", text: "Khách hàng Trần B bị khóa tự động",    time: "31 phút trước", color: "#ff4040" },
-]
-
-const TOP_SHOPS = [
-  { name: "Phở Hà Nội",      orders: 48, revenue: 2400000, rating: 4.9 },
-  { name: "Bánh Mì 36",      orders: 36, revenue: 1080000, rating: 4.8 },
-  { name: "Cơm Tấm Bà Năm",  orders: 31, revenue: 1550000, rating: 4.7 },
-  { name: "Gà Rán KFC Mini", orders: 28, revenue: 2240000, rating: 4.6 },
-]
 
 export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -103,6 +81,10 @@ export default function AdminDashboard() {
     monthRevenue: 0, pendingDrivers: 0, pendingShops: 0, blacklistCount: 0,
     cancelledToday: 0, deliveredToday: 0,
   })
+  const [weeklyRevData, setWeeklyRevData]   = useState<number[]>([0,0,0,0,0,0,0])
+  const [hourlyOrders, setHourlyOrders]     = useState<{h:string;v:number}[]>([])
+  const [topShops, setTopShops]             = useState<{name:string;orders:number;revenue:number;rating:number}[]>([])
+  const [activityItems, setActivityItems]   = useState<{icon:string;text:string;time:string;color:string}[]>([])
 
   const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
@@ -160,6 +142,56 @@ export default function AdminDashboard() {
           return { id: o.id, status: o.status, total_amount: o.total_amount, shopName, customerName: profileMap[o.customer_id] ?? "Khách hàng", created_at: o.created_at }
         }))
       }
+      // Weekly revenue (last 7 days)
+      const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6); sevenDaysAgo.setHours(0,0,0,0)
+      const { data: weekOrders } = await supabase.from("orders")
+        .select("created_at, total_amount")
+        .gte("created_at", sevenDaysAgo.toISOString())
+        .neq("status", "cancelled")
+      const last7 = Array.from({length:7}, (_,i) => { const d = new Date(); d.setDate(d.getDate()-(6-i)); return d.toISOString().split("T")[0] })
+      const dayRevMap: Record<string,number> = {}
+      last7.forEach(d => { dayRevMap[d] = 0 })
+      ;(weekOrders ?? []).forEach(o => { const day = o.created_at.split("T")[0]; if (day in dayRevMap) dayRevMap[day] += o.total_amount ?? 0 })
+      setWeeklyRevData(last7.map(d => dayRevMap[d]))
+
+      // Hourly order count (today, hours 6-17)
+      const { data: hourOrders } = await supabase.from("orders")
+        .select("created_at").gte("created_at", today.toISOString())
+      const hourMap: Record<number,number> = {}
+      for (let h = 6; h <= 17; h++) hourMap[h] = 0
+      ;(hourOrders ?? []).forEach(o => { const h = new Date(o.created_at).getHours(); if (h in hourMap) hourMap[h]++ })
+      const maxH = Math.max(...Object.values(hourMap), 1)
+      setHourlyOrders(Array.from({length:12},(_,i)=>i+6).map(h => ({ h:`${h}h`, v: Math.round((hourMap[h]/maxH)*100) })))
+
+      // Top shops today
+      const { data: shopOrders } = await supabase.from("orders")
+        .select("shop_id, total_amount, shops!shop_id(name, rating_avg)")
+        .gte("created_at", today.toISOString())
+        .neq("status", "cancelled")
+      const shopAgg: Record<string,{name:string;orders:number;revenue:number;rating:number}> = {}
+      ;(shopOrders ?? []).forEach(o => {
+        const s = Array.isArray(o.shops) ? o.shops[0] : o.shops as {name:string;rating_avg:number}|null
+        if (!s || !o.shop_id) return
+        if (!shopAgg[o.shop_id]) shopAgg[o.shop_id] = {name:s.name,orders:0,revenue:0,rating:s.rating_avg??5}
+        shopAgg[o.shop_id].orders++; shopAgg[o.shop_id].revenue += o.total_amount??0
+      })
+      setTopShops(Object.values(shopAgg).sort((a,b)=>b.orders-a.orders).slice(0,4))
+
+      // Activity: recent cancelled orders + recent pending drivers/shops
+      const { data: cancelOrders } = await supabase.from("orders")
+        .select("id, status, created_at, shops!shop_id(name)")
+        .in("status", ["cancelled","delivered"])
+        .order("created_at", { ascending: false }).limit(4)
+      const acts: {icon:string;text:string;time:string;color:string}[] = []
+      ;(cancelOrders ?? []).forEach(o => {
+        const sn = Array.isArray(o.shops)?(o.shops[0] as {name:string})?.name:(o.shops as {name:string}|null)?.name ?? "—"
+        if (o.status === "cancelled") acts.push({ icon:"⚠️", text:`Đơn #${o.id.slice(0,5).toUpperCase()} bị hủy · ${sn}`, time:timeAgo(o.created_at), color:"#ff4040" })
+        else acts.push({ icon:"✅", text:`Đơn #${o.id.slice(0,5).toUpperCase()} giao thành công · ${sn}`, time:timeAgo(o.created_at), color:"#3ecf6e" })
+      })
+      if (pendShop && pendShop.length > 0) acts.push({ icon:"🏪", text:`${pendShop.length} cửa hàng đang chờ duyệt`, time:"", color:"#FF8C00" })
+      if (pendDrv  && pendDrv.length  > 0) acts.push({ icon:"🏍️", text:`${pendDrv.length} tài xế đang chờ duyệt`, time:"", color:"#4a8ff5" })
+      setActivityItems(acts.slice(0,6))
+
       setLastRefresh(new Date())
     }
     load()
@@ -307,14 +339,15 @@ export default function AdminDashboard() {
                       </linearGradient>
                     </defs>
                     {(() => {
-                      const pts = REVENUE_VALS.map((v, i) => `${(i / 6) * 420},${90 - (v / 100) * 80}`)
+                      const maxRev = Math.max(...weeklyRevData, 1)
+                      const pts = weeklyRevData.map((v, i) => `${(i / 6) * 420},${90 - (v / maxRev) * 80}`)
                       const path = "M" + pts.join(" L")
                       return (
                         <>
                           <path d={path} stroke="#FF8C00" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
                           <path d={path + ` L420,90 L0,90 Z`} fill="url(#revGrad)"/>
-                          {REVENUE_VALS.map((v, i) => (
-                            <circle key={i} cx={(i/6)*420} cy={90-(v/100)*80} r={i===6?5:3} fill={i===6?"#FF6B00":"rgba(255,140,0,0.5)"} stroke={i===6?"rgba(255,107,0,0.3)":""} strokeWidth={i===6?4:0}/>
+                          {weeklyRevData.map((v, i) => (
+                            <circle key={i} cx={(i/6)*420} cy={90-(v/maxRev)*80} r={i===6?5:3} fill={i===6?"#FF6B00":"rgba(255,140,0,0.5)"} stroke={i===6?"rgba(255,107,0,0.3)":""} strokeWidth={i===6?4:0}/>
                           ))}
                         </>
                       )
@@ -325,7 +358,7 @@ export default function AdminDashboard() {
                   {CHART_BARS.map((b, i) => (
                     <div key={b.day} style={{ textAlign:"center" }}>
                       <div style={{ fontSize:8, color: b.today ? "#FF8C00" : "#6a5a40", fontWeight: b.today ? 700 : 400 }}>{b.day}</div>
-                      <div style={{ fontSize:7, color: b.today ? "#FF8C00" : "#6a5a40", marginTop:1, opacity:0.7 }}>{fmtShort(REVENUE_VALS[i] * 15000)}đ</div>
+                      <div style={{ fontSize:7, color: b.today ? "#FF8C00" : "#6a5a40", marginTop:1, opacity:0.7 }}>{fmtShort(weeklyRevData[i] ?? 0)}đ</div>
                     </div>
                   ))}
                 </div>
@@ -341,19 +374,22 @@ export default function AdminDashboard() {
                   <div style={{ color:"#b464ff", fontSize:9, fontWeight:600, background:"rgba(180,100,255,0.1)", border:"1px solid rgba(180,100,255,0.25)", borderRadius:6, padding:"3px 9px" }}>Hôm nay ▾</div>
                 </div>
                 <div style={{ display:"flex", alignItems:"flex-end", gap:4, height:80, marginBottom:8 }}>
-                  {HOUR_BARS.map((b, i) => {
-                    const isPeak = b.v >= 80
-                    return (
-                      <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", height:"100%" }}>
-                        <div style={{ flex:1, display:"flex", alignItems:"flex-end", width:"100%" }}>
-                          <div style={{ width:"100%", height:`${b.v}%`, borderRadius:"3px 3px 0 0", background: isPeak ? "linear-gradient(180deg,#b464ff,rgba(180,100,255,0.3))" : "rgba(180,100,255,0.2)", boxShadow: isPeak ? "0 0 8px rgba(180,100,255,0.5)" : "none", transition:"all 0.2s" }} />
-                        </div>
-                      </div>
-                    )
-                  })}
+                  {hourlyOrders.length === 0
+                    ? <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", color:"#6a5a40", fontSize:9 }}>Chưa có đơn hôm nay</div>
+                    : hourlyOrders.map((b, i) => {
+                        const isPeak = b.v >= 80
+                        return (
+                          <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", height:"100%" }}>
+                            <div style={{ flex:1, display:"flex", alignItems:"flex-end", width:"100%" }}>
+                              <div style={{ width:"100%", height:`${Math.max(b.v, 4)}%`, borderRadius:"3px 3px 0 0", background: isPeak ? "linear-gradient(180deg,#b464ff,rgba(180,100,255,0.3))" : "rgba(180,100,255,0.2)", boxShadow: isPeak ? "0 0 8px rgba(180,100,255,0.5)" : "none", transition:"all 0.2s" }} />
+                            </div>
+                          </div>
+                        )
+                      })
+                  }
                 </div>
                 <div style={{ display:"flex", gap:4 }}>
-                  {HOUR_BARS.map((b, i) => (
+                  {hourlyOrders.map((b, i) => (
                     <div key={i} style={{ flex:1, textAlign:"center", fontSize:7, color: b.v>=80 ? "#b464ff" : "#6a5a40" }}>{b.h}</div>
                   ))}
                 </div>
@@ -399,8 +435,10 @@ export default function AdminDashboard() {
               <div style={{ background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"14px 16px" }}>
                 <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700, marginBottom:12 }}>⚡ Hoạt động gần đây</div>
                 <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
-                  {ACTIVITY_LOG.map((a, i) => (
-                    <div key={i} style={{ display:"flex", gap:10, padding:"9px 0", borderBottom: i < ACTIVITY_LOG.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none", alignItems:"flex-start" }}>
+                  {activityItems.length === 0
+                    ? <div style={{ color:"#6a5a40", fontSize:10, textAlign:"center", padding:"16px 0" }}>Chưa có hoạt động</div>
+                    : activityItems.map((a, i) => (
+                    <div key={i} style={{ display:"flex", gap:10, padding:"9px 0", borderBottom: i < activityItems.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none", alignItems:"flex-start" }}>
                       <div style={{ width:26, height:26, borderRadius:8, background:`rgba(${a.color === "#3ecf6e" ? "62,207,110" : a.color === "#ff4040" ? "255,64,64" : a.color === "#FF8C00" ? "255,107,0" : a.color === "#4a8ff5" ? "74,143,245" : "245,197,66"},0.1)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, flexShrink:0 }}>{a.icon}</div>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ color:"#f0eaff", fontSize:9.5, fontWeight:500, lineHeight:1.4 }}>{a.text}</div>
@@ -417,14 +455,16 @@ export default function AdminDashboard() {
                   <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>🏆 Top cửa hàng</div>
                   <div style={{ color:"#6a5a40", fontSize:8 }}>Hôm nay</div>
                 </div>
-                {TOP_SHOPS.map((shop, i) => (
-                  <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom: i < TOP_SHOPS.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                {topShops.length === 0
+                  ? <div style={{ color:"#6a5a40", fontSize:10, textAlign:"center", padding:"16px 0" }}>Chưa có đơn hôm nay</div>
+                  : topShops.map((shop, i) => (
+                  <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom: i < topShops.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                     <div style={{ width:22, height:22, borderRadius:7, background: i===0?"rgba(245,197,66,0.15)": i===1?"rgba(180,180,180,0.1)": i===2?"rgba(180,100,0,0.1)":"rgba(255,255,255,0.05)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, flexShrink:0, fontWeight:800, color: i===0?"#f5c542":i===1?"#aaa":i===2?"#cd7f32":"#6a5a40" }}>
                       {i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}`}
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ color:"#f0eaff", fontSize:10, fontWeight:600, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shop.name}</div>
-                      <div style={{ color:"#6a5a40", fontSize:8 }}>{shop.orders} đơn · ⭐ {shop.rating}</div>
+                      <div style={{ color:"#6a5a40", fontSize:8 }}>{shop.orders} đơn · ⭐ {shop.rating.toFixed(1)}</div>
                     </div>
                     <div style={{ color:"#FF8C00", fontSize:9, fontWeight:700, flexShrink:0 }}>{fmtShort(shop.revenue)}đ</div>
                   </div>
