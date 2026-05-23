@@ -22,6 +22,8 @@ export default function DriverEarningsPage() {
   const [trips, setTrips] = useState<Trip[]>([])
   const [earnings, setEarnings] = useState({ today: 0, week: 0, month: 0 })
   const [tripCount, setTripCount] = useState({ today: 0, week: 0, month: 0 })
+  const [driverRating, setDriverRating] = useState<number | null>(null)
+  const [completionRate, setCompletionRate] = useState<number | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -32,6 +34,25 @@ export default function DriverEarningsPage() {
       const startOfDay = new Date(now); startOfDay.setHours(0,0,0,0)
       const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - 6); startOfWeek.setHours(0,0,0,0)
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+      // Driver rating and completion rate
+      const { data: driverRow } = await supabase
+        .from("drivers")
+        .select("rating_avg, total_trips")
+        .eq("id", user.id)
+        .single()
+      if (driverRow) setDriverRating(Number(driverRow.rating_avg ?? 5))
+
+      // All month orders (delivered + cancelled) to compute completion rate
+      const { data: allMonthOrders } = await supabase
+        .from("orders")
+        .select("id, status")
+        .eq("driver_id", user.id)
+        .gte("created_at", startOfMonth.toISOString())
+      if (allMonthOrders && allMonthOrders.length > 0) {
+        const delivered = allMonthOrders.filter(o => o.status === "delivered").length
+        setCompletionRate(Math.round((delivered / allMonthOrders.length) * 100))
+      }
 
       const { data: orders } = await supabase
         .from("orders")
@@ -132,12 +153,12 @@ export default function DriverEarningsPage() {
               </div>
               <div style={{ width:1,background:"rgba(255,255,255,0.07)" }} />
               <div style={{ textAlign:"center" }}>
-                <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>⭐ 4.9</div>
+                <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>⭐ {driverRating?.toFixed(1) ?? "—"}</div>
                 <div style={{ color:"#6a5a40",fontSize:8 }}>Đánh giá TB</div>
               </div>
               <div style={{ width:1,background:"rgba(255,255,255,0.07)" }} />
               <div style={{ textAlign:"center" }}>
-                <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>98%</div>
+                <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>{completionRate !== null ? `${completionRate}%` : "—"}</div>
                 <div style={{ color:"#6a5a40",fontSize:8 }}>Hoàn thành</div>
               </div>
             </div>
@@ -159,7 +180,7 @@ export default function DriverEarningsPage() {
               })}
             </div>
             <div style={{ display:"flex",justifyContent:"space-between",marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.05)" }}>
-              <span style={{ color:"#6a5a40",fontSize:8 }}>Thấp: {fmt(Math.min(...WEEKLY.map(d=>d.amount)))}</span>
+              <span style={{ color:"#6a5a40",fontSize:8 }}>Thấp: {fmt(Math.min(...weekly.map(d=>d.amount), 0))}</span>
               <span style={{ color:"#FF8C00",fontSize:8,fontWeight:700 }}>Cao: {fmt(maxAmt)}</span>
             </div>
           </div>

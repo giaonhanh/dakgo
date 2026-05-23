@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { createClient } from "@/lib/supabase/client"
 
 /* ── helpers ── */
 type Section = "notifications" | "security" | "payment" | "privacy" | "preferences" | "support" | "about" | "account"
@@ -446,10 +447,7 @@ export default function CustomerSettingsPage() {
           {/* ACCOUNT */}
           <SectionCard title="Tài khoản">
             <Row icon="🚪" label="Đăng xuất" sub="Đăng xuất khỏi thiết bị này" danger
-              onClick={() => {
-                // TODO: supabase.auth.signOut()
-                fire("Đang đăng xuất...")
-              }} arrow />
+              onClick={async () => { const sb = createClient(); await sb.auth.signOut(); window.location.href = "/login" }} arrow />
           </SectionCard>
         </div>
       </div>

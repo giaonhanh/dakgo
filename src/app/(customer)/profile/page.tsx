@@ -140,6 +140,7 @@ export default function ProfilePage() {
 
       setName(profile?.full_name ?? "")
       setPhone(profile?.phone ?? "")
+      setEmail(user.email ?? "")
       setAvatarUrl(profile?.avatar_url ?? "")
       setJoinYear(profile?.created_at ? new Date(profile.created_at).getFullYear().toString() : "")
       setTier(loyalty?.tier ?? "bronze")

@@ -18,6 +18,7 @@ interface Item {
 }
 interface Order {
   id: string; shopId: string; shopName: string; shopEmoji: string; shopColor: string
+  driverId: string | null
   status: Status; items: Item[]
   subtotal: number; deliveryFee: number; discount: number
   nightFee?: number; weatherFee?: string
@@ -154,6 +155,7 @@ export default function OrdersPage() {
   const [driverStar,   setDriverStar]   = useState(5)
   const [reviewTxt,    setReviewTxt]    = useState("")
   const [toast,        setToast]        = useState("")
+  const [userId,       setUserId]       = useState<string | null>(null)
 
   const fireToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2400) }
 
@@ -162,6 +164,7 @@ export default function OrdersPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
+      setUserId(user.id)
 
       const { data: rows } = await supabase
         .from("orders")
@@ -215,6 +218,7 @@ export default function OrdersPage() {
         return {
           id: o.id,
           shopId: o.shop_id ?? "",
+          driverId: o.driver_id ?? null,
           shopName: shop?.name ?? "Cửa hàng",
           shopEmoji: categoryToEmoji(shop?.category ?? null),
           shopColor: shopColor(idx),
@@ -292,12 +296,18 @@ export default function OrdersPage() {
   const cancelOrder    = orders.find(o => o.id === showCancel)
   const canSelfCancel  = cancelOrder?.status === "pending"
   const willRefundWallet = cancelOrder?.payMethod === "Ví GiaoNhanh"
+  const reviewOrder    = orders.find(o => o.id === showReview)
 
-  const handleConfirmCancel = () => {
-    if (!cancelRsn) return
-    const msg = willRefundWallet
-      ? "Đã hủy đơn · Hoàn tiền về ví GiaoNhanh!"
-      : "Đã hủy đơn hàng!"
+  const handleConfirmCancel = async () => {
+    if (!cancelRsn || !showCancel || !userId) return
+    await supabase.from("orders").update({
+      status: "cancelled",
+      cancel_reason: cancelRsn,
+      cancelled_at: new Date().toISOString(),
+      cancelled_by: userId,
+    }).eq("id", showCancel)
+    setOrders(prev => prev.map(o => o.id === showCancel ? { ...o, status: "cancelled" as Status, cancelReason: cancelRsn } : o))
+    const msg = willRefundWallet ? "Đã hủy đơn · Hoàn tiền về ví GiaoNhanh!" : "Đã hủy đơn hàng!"
     fireToast(msg)
     setShowCancel(null)
     setCancelRsn("")
@@ -519,7 +529,20 @@ export default function OrdersPage() {
                 ))}
               </div>
               <button
-                onClick={() => { fireToast("Đã gửi đánh giá, cảm ơn bạn!"); setShowReview(null); setReviewTxt(""); setFoodStar(5); setDriverStar(5) }}
+                onClick={async () => {
+                  if (!showReview || !userId || !reviewOrder) return
+                  await supabase.from("reviews").insert({
+                    order_id: showReview,
+                    reviewer_id: userId,
+                    shop_id: reviewOrder.shopId,
+                    driver_id: reviewOrder.driverId,
+                    food_rating: foodStar,
+                    driver_rating: driverStar,
+                    comment: reviewTxt || null,
+                  })
+                  fireToast("Đã gửi đánh giá, cảm ơn bạn!")
+                  setShowReview(null); setReviewTxt(""); setFoodStar(5); setDriverStar(5)
+                }}
                 style={{ width: "100%", height: 46, borderRadius: 12, border: "none", position: "relative", overflow: "hidden",
                   background: "linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)",
                   color: "#fff", fontSize: 12, fontWeight: 700, fontFamily: "Lexend", cursor: "pointer",

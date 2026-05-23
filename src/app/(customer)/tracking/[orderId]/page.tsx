@@ -204,9 +204,19 @@ export default function TrackingPage() {
   const canSelfCancel   = status === "accepted"
   const needAdminCancel = !isDelivered && !canSelfCancel
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    if (!orderId || !currentUserId) return
+    const { error } = await supabase.from("orders").update({
+      status: "cancelled",
+      cancel_reason: "Khách hàng hủy",
+      cancelled_at: new Date().toISOString(),
+      cancelled_by: currentUserId,
+    }).eq("id", orderId)
+    if (error) { fireToast("Không thể hủy đơn. Thử lại sau."); return }
+    setStatus("delivered") // visually close the tracking
     fireToast("Đã hủy đơn hàng")
     setShowCancel(false)
+    setTimeout(() => { window.location.href = "/orders" }, 1200)
   }
 
   if (loading) {

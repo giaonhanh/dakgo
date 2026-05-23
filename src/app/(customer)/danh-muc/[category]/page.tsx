@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter, useParams } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
 
 const CATEGORY_META: Record<string, { icon: string; label: string; color: string; bg: string; border: string }> = {
   "buoi-sang": { icon:"☀️",  label:"Buổi sáng",  color:"#FFB347", bg:"rgba(255,179,71,0.08)",  border:"rgba(255,179,71,0.25)" },
@@ -14,64 +15,93 @@ const CATEGORY_META: Record<string, { icon: string; label: string; color: string
   "an-vat":    { icon:"🍿",  label:"Ăn vặt",    color:"#ff6060", bg:"rgba(255,96,96,0.08)",   border:"rgba(255,96,96,0.25)"  },
 }
 
-const MOCK_ITEMS: Record<string, Array<{ id:number; emoji:string; name:string; shop:string; shopId:number; price:number; oldPrice?:number; star:number; km:number; sold:number }>> = {
-  "buoi-sang": [
-    { id:1, emoji:"🥖", name:"Bánh mì pate nóng",      shop:"Bánh Mì 24h",       shopId:10, price:18000, oldPrice:22000, star:4.8, km:0.4, sold:312 },
-    { id:2, emoji:"☕", name:"Cà phê sữa đá",           shop:"Cà Phê Phước An",   shopId:11, price:22000, star:4.7, km:0.6, sold:280 },
-    { id:3, emoji:"🥞", name:"Bánh mì trứng ốp la",     shop:"Bánh Mì 24h",       shopId:10, price:20000, star:4.6, km:0.4, sold:198 },
-    { id:4, emoji:"🍵", name:"Cháo trắng heo",          shop:"Cháo Phước An",     shopId:12, price:25000, star:4.5, km:0.9, sold:145 },
-    { id:5, emoji:"🥐", name:"Bánh ngọt buổi sáng",     shop:"Tiệm Bánh Ngọt PA", shopId:13, price:15000, star:4.4, km:1.1, sold:120 },
-  ],
-  "buoi-trua": [
-    { id:6,  emoji:"🍱", name:"Cơm văn phòng đặc biệt", shop:"Cơm Nhà Bếp PA",  shopId:3, price:38000, oldPrice:45000, star:4.7, km:1.2, sold:421 },
-    { id:7,  emoji:"🍜", name:"Bún bò đặc biệt",         shop:"Bún Bò Huế Ngon", shopId:1, price:45000, star:4.9, km:0.8, sold:890 },
-    { id:8,  emoji:"🍗", name:"Gà rán giòn cay",         shop:"Gà Vàng PA",      shopId:4, price:38000, oldPrice:48000, star:4.6, km:0.6, sold:601 },
-    { id:9,  emoji:"🥗", name:"Salad trộn tôm",          shop:"Cơm Nhà Bếp PA",  shopId:3, price:42000, star:4.5, km:1.2, sold:234 },
-    { id:10, emoji:"🍛", name:"Cơm gà xé nước mắm",      shop:"Cơm Nhà Bếp PA",  shopId:3, price:40000, star:4.8, km:1.2, sold:356 },
-  ],
-  "buoi-toi": [
-    { id:11, emoji:"🍜", name:"Bún bò Huế đêm",         shop:"Bún Bò Huế Ngon", shopId:1, price:45000, star:4.9, km:0.8, sold:567 },
-    { id:12, emoji:"🍕", name:"Pizza phô mai",           shop:"Burger House",    shopId:5, price:89000, star:4.5, km:2.1, sold:312 },
-    { id:13, emoji:"🍔", name:"Burger phô mai đặc biệt", shop:"Burger House",    shopId:5, price:65000, star:4.5, km:2.1, sold:278 },
-    { id:14, emoji:"🍲", name:"Lẩu thái 2 người",        shop:"Quán Lẩu PA",     shopId:14, price:120000, star:4.8, km:1.5, sold:189 },
-  ],
-  "nuoc-uong": [
-    { id:15, emoji:"🥤", name:"Trà sữa trân châu size L", shop:"Ding Tea PA",   shopId:2, price:35000, oldPrice:42000, star:4.8, km:0.5, sold:742 },
-    { id:16, emoji:"🍋", name:"Sinh tố xoài nhiệt đới",  shop:"Trái Cây Tươi", shopId:15, price:28000, star:4.6, km:0.7, sold:445 },
-    { id:17, emoji:"🧃", name:"Nước ép cam tươi",         shop:"Trái Cây Tươi", shopId:15, price:25000, star:4.7, km:0.7, sold:389 },
-    { id:18, emoji:"🍵", name:"Trà đào cam sả",           shop:"Ding Tea PA",   shopId:2,  price:30000, star:4.8, km:0.5, sold:512 },
-    { id:19, emoji:"☕", name:"Bạc xỉu đá",               shop:"Cà Phê PA",     shopId:11, price:22000, star:4.7, km:0.6, sold:367 },
-  ],
-  "mon-nhau": [
-    { id:20, emoji:"🦑", name:"Chả mực chiên giòn",      shop:"Nhậu Phước An",  shopId:16, price:65000, star:4.7, km:1.3, sold:324 },
-    { id:21, emoji:"🍗", name:"Gà nướng muối ớt",        shop:"Gà Vàng PA",     shopId:4,  price:95000, oldPrice:120000, star:4.8, km:0.6, sold:289 },
-    { id:22, emoji:"🌮", name:"Nem nướng cuộn bánh tráng",shop:"Nhậu Phước An",  shopId:16, price:45000, star:4.6, km:1.3, sold:256 },
-    { id:23, emoji:"🥜", name:"Đậu phộng rang muối",     shop:"Đồ Khô PA",      shopId:17, price:18000, star:4.5, km:0.9, sold:412 },
-  ],
-  "an-vat": [
-    { id:24, emoji:"🍢", name:"Chả chiên giòn",           shop:"Bún Bò Huế Ngon",  shopId:1, price:15000, star:4.9, km:0.8, sold:488 },
-    { id:25, emoji:"🧁", name:"Bánh cupcake kem tươi",    shop:"Tiệm Bánh Ngọt PA",shopId:13, price:22000, oldPrice:28000, star:4.6, km:1.1, sold:234 },
-    { id:26, emoji:"🌽", name:"Bắp nướng bơ tỏi",        shop:"Đồ Vặt PA",        shopId:18, price:15000, star:4.7, km:0.5, sold:378 },
-    { id:27, emoji:"🍡", name:"Bánh mochi nhân đậu đỏ",  shop:"Tiệm Bánh Ngọt PA",shopId:13, price:18000, star:4.5, km:1.1, sold:198 },
-    { id:28, emoji:"🥚", name:"Trứng chiên phô mai",      shop:"Đồ Vặt PA",        shopId:18, price:12000, star:4.4, km:0.5, sold:312 },
-  ],
+// Keywords used to filter products client-side by category
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  "buoi-sang": ["bánh mì","cháo","xôi","cà phê","cafe","sáng","bánh","trứng","bún","phở"],
+  "buoi-trua": ["cơm","trưa","gà","heo","bún","phở","mì","cá"],
+  "buoi-toi":  ["tối","lẩu","nướng","pizza","burger","đêm"],
+  "nuoc-uong": ["trà","nước","sinh tố","boba","ép","đồ uống","café","cà phê","sữa"],
+  "mon-nhau":  ["nhậu","lẩu","nướng","mực","hải sản","bia","nem","đậu"],
+  "an-vat":    ["bánh","vặt","snack","kẹo","mochi","chả","bắp","ăn vặt"],
+}
+
+interface DBProduct {
+  id: string; name: string; price: number; original_price: number | null
+  sold_count: number; image_url: string | null
+  shop_id: string; shop_name: string; shop_rating: number
 }
 
 export default function CategoryPage() {
   const router   = useRouter()
   const params   = useParams()
+  const supabase = createClient()
   const category = (params?.category as string) ?? ""
   const meta     = CATEGORY_META[category]
-  const items    = MOCK_ITEMS[category] ?? []
-  const [toast,  setToast] = useState("")
-  const [sortBy, setSortBy] = useState<"popular" | "price_asc" | "price_desc">("popular")
+
+  const [items,   setItems]   = useState<DBProduct[]>([])
+  const [loading, setLoading] = useState(true)
+  const [toast,   setToast]   = useState("")
+  const [sortBy,  setSortBy]  = useState<"popular" | "price_asc" | "price_desc">("popular")
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const keywords = CATEGORY_KEYWORDS[category] ?? []
+
+      const { data } = await supabase
+        .from("products")
+        .select(`
+          id, name, price, original_price, sold_count, image_url, shop_id,
+          shops!inner(name, rating_avg, status, is_available)
+        `)
+        .eq("is_available", true)
+        .eq("shops.status", "approved")
+        .order("sold_count", { ascending: false })
+        .limit(60)
+
+      if (!data) { setLoading(false); return }
+
+      const rows = (data as Array<{
+        id:string; name:string; price:number; original_price:number|null
+        sold_count:number; image_url:string|null; shop_id:string
+        shops: { name:string; rating_avg:number; status:string; is_available:boolean } | Array<{ name:string; rating_avg:number; status:string; is_available:boolean }>
+      }>)
+
+      // Filter by category keywords (Vietnamese accent-insensitive)
+      const normalize = (s: string) => s.toLowerCase()
+        .replace(/[àáạảãăắặẳẵâấậẩẫ]/g,"a").replace(/[èéẹẻẽêếệểễ]/g,"e")
+        .replace(/[ìíịỉĩ]/g,"i").replace(/[òóọỏõôốộổỗơớợởỡ]/g,"o")
+        .replace(/[ùúụủũưứựửữ]/g,"u").replace(/[ỳýỵỷỹ]/g,"y").replace(/đ/g,"d")
+
+      const matched = keywords.length > 0
+        ? rows.filter(r => {
+            const n = normalize(r.name)
+            return keywords.some(k => n.includes(normalize(k)))
+          })
+        : rows
+
+      setItems(matched.slice(0, 30).map(r => {
+        const shop = Array.isArray(r.shops) ? r.shops[0] : r.shops
+        return {
+          id: r.id, name: r.name, price: r.price,
+          original_price: r.original_price,
+          sold_count: r.sold_count, image_url: r.image_url,
+          shop_id: r.shop_id,
+          shop_name: shop?.name ?? "Cửa hàng",
+          shop_rating: Number(shop?.rating_avg ?? 5),
+        }
+      }))
+      setLoading(false)
+    }
+    load()
+  }, [category]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2000) }
 
   const sorted = [...items].sort((a, b) => {
     if (sortBy === "price_asc")  return a.price - b.price
     if (sortBy === "price_desc") return b.price - a.price
-    return b.sold - a.sold
+    return b.sold_count - a.sold_count
   })
 
   if (!meta) {
@@ -125,13 +155,13 @@ export default function CategoryPage() {
               {meta.icon} {meta.label}
             </div>
             <div style={{ color:"#6a5a40", fontSize:9, marginTop:1 }}>
-              {items.length} món · Phước An, Krông Pắc
+              {loading ? "Đang tải..." : `${items.length} món · Phước An, Krông Pắc`}
             </div>
           </div>
           <div style={{ background:meta.bg, border:`1px solid ${meta.border}`,
             borderRadius:20, padding:"4px 10px",
             color:meta.color, fontSize:9, fontWeight:700 }}>
-            {items.length} món
+            {loading ? "..." : `${items.length} món`}
           </div>
         </div>
       </div>
@@ -163,7 +193,13 @@ export default function CategoryPage() {
 
         {/* Items */}
         <div style={{ padding:"0 16px", display:"flex", flexDirection:"column", gap:10 }}>
-          {sorted.length === 0 ? (
+          {loading ? (
+            [1,2,3,4].map(i => (
+              <div key={i} style={{ height:92, borderRadius:16,
+                background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.06)",
+                animation:"pulse 1.5s infinite" }} />
+            ))
+          ) : sorted.length === 0 ? (
             <div style={{ textAlign:"center", padding:"48px 0" }}>
               <div style={{ fontSize:48, marginBottom:12 }}>🍽️</div>
               <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:600, marginBottom:4 }}>
@@ -178,7 +214,7 @@ export default function CategoryPage() {
               initial={{ opacity:0, y:12 }}
               animate={{ opacity:1, y:0 }}
               transition={{ delay: i * 0.04 }}>
-              <a href={`/shop/${item.shopId}`} style={{ textDecoration:"none" }}>
+              <a href={`/shop/${item.shop_id}`} style={{ textDecoration:"none" }}>
                 <div style={{
                   background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
                   border:"1px solid rgba(255,255,255,0.08)",
@@ -188,16 +224,19 @@ export default function CategoryPage() {
                 }}>
                   {/* Image area */}
                   <div style={{ width:70, height:70, borderRadius:14, flexShrink:0,
-                    background:meta.bg, border:`1px solid ${meta.border}`,
+                    background: item.image_url ? "transparent" : meta.bg,
+                    border:`1px solid ${meta.border}`,
                     display:"flex", alignItems:"center", justifyContent:"center",
-                    fontSize:34, position:"relative" }}>
-                    {item.emoji}
-                    {item.oldPrice && (
+                    fontSize:34, position:"relative", overflow:"hidden" }}>
+                    {item.image_url
+                      ? <img src={item.image_url} alt={item.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                      : "🍽️"}
+                    {item.original_price && item.original_price > item.price && (
                       <div style={{ position:"absolute", top:-5, left:-5,
                         background:"#ff4040", color:"#fff",
                         fontSize:7, fontWeight:700, padding:"2px 5px", borderRadius:5,
                         boxShadow:"0 0 5px rgba(255,64,64,0.3)" }}>
-                        -{Math.round((1-item.price/item.oldPrice)*100)}%
+                        -{Math.round((1-item.price/item.original_price)*100)}%
                       </div>
                     )}
                   </div>
@@ -209,17 +248,21 @@ export default function CategoryPage() {
                       {item.name}
                     </div>
                     <div style={{ color:"#6a5a40", fontSize:9, marginBottom:5 }}>
-                      🏪 {item.shop} · {item.km}km
+                      🏪 {item.shop_name}
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                       <div style={{ display:"flex", alignItems:"center", gap:3 }}>
                         <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
-                        <span style={{ color:"#b0956a", fontSize:8.5 }}>{item.star}</span>
+                        <span style={{ color:"#b0956a", fontSize:8.5 }}>{item.shop_rating.toFixed(1)}</span>
                       </div>
-                      <span style={{ color:"rgba(255,255,255,0.1)", fontSize:9 }}>·</span>
-                      <span style={{ color:"#3ecf6e", fontSize:8, fontWeight:600 }}>
-                        🔥 {item.sold.toLocaleString("vi-VN")} đã bán
-                      </span>
+                      {item.sold_count > 0 && (
+                        <>
+                          <span style={{ color:"rgba(255,255,255,0.1)", fontSize:9 }}>·</span>
+                          <span style={{ color:"#3ecf6e", fontSize:8, fontWeight:600 }}>
+                            🔥 {item.sold_count.toLocaleString("vi-VN")} đã bán
+                          </span>
+                        </>
+                      )}
                     </div>
                     {/* Price */}
                     <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:5 }}>
@@ -228,17 +271,17 @@ export default function CategoryPage() {
                         WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
                         backgroundClip:"text", fontSize:13, fontWeight:800,
                       }}>{formatPrice(item.price)}</div>
-                      {item.oldPrice && (
+                      {item.original_price && item.original_price > item.price && (
                         <div style={{ color:"#4a5040", fontSize:9, textDecoration:"line-through" }}>
-                          {formatPrice(item.oldPrice)}
+                          {formatPrice(item.original_price)}
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Add button */}
+                  {/* View button */}
                   <button
-                    onClick={e => { e.preventDefault(); e.stopPropagation(); fireToast("Đã thêm vào giỏ hàng!") }}
+                    onClick={e => { e.preventDefault(); e.stopPropagation(); router.push(`/shop/${item.shop_id}`) }}
                     style={{ width:36, height:36, borderRadius:11, flexShrink:0,
                       background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
                       border:"none", color:"#fff", fontSize:20, fontWeight:700,
@@ -247,7 +290,7 @@ export default function CategoryPage() {
                     <div style={{ position:"absolute", top:0, left:"-60%", width:"35%", height:"100%",
                       background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent)",
                       animation:"dmShim 2.5s infinite" }} />
-                    <span style={{ position:"relative", zIndex:1 }}>+</span>
+                    <span style={{ position:"relative", zIndex:1 }}>›</span>
                   </button>
                 </div>
               </a>

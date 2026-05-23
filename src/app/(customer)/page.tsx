@@ -26,9 +26,9 @@ import { useCartStore } from "@/store/cartStore"
 import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ─────────────────────────────────────────────────
-type ShopRow    = { id: string; name: string; is_open: boolean; rating: number | null; address: string; avatar_url: string | null }
-type ProductRow = { id: string; name: string; price: number; sold_count: number; shops: { name: string } | { name: string }[] | null }
-type OrderRow   = { id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
+type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; avatar_url: string | null }
+type ProductRow = { id: string; name: string; price: number; sold_count: number; shop_id: string; shops: { name: string } | { name: string }[] | null }
+type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null }
 type LiveOrderRow = { id: string; shops: { name: string } | { name: string }[] | null }
 type RecoRow = { id: string; name: string; price: number; original_price: number | null; image_url: string | null; sold_count: number; shop_id: string; shop_name: string; order_count: number }
@@ -178,15 +178,15 @@ export default function HomePage() {
       // Nearby shops (all approved shops)
       const { data: shopData } = await supabase
         .from("shops")
-        .select("id,name,is_open,rating,address,avatar_url")
-        .order("rating", { ascending: false })
+        .select("id,name,is_open,rating_avg,address,avatar_url")
+        .order("rating_avg", { ascending: false })
         .limit(10)
       setNearbyShops((shopData ?? []) as ShopRow[])
 
       // Best sellers (top products by sold_count)
       const { data: bsData } = await supabase
         .from("products")
-        .select("id,name,price,sold_count,shops(name)")
+        .select("id,name,price,sold_count,shop_id,shops(name)")
         .eq("is_available", true)
         .order("sold_count", { ascending: false })
         .limit(8)
@@ -206,7 +206,7 @@ export default function HomePage() {
       // Reorders (last 5 delivered orders for this user)
       const { data: orderData } = await supabase
         .from("orders")
-        .select("id,total_amount,shops(name),order_items(name)")
+        .select("id,shop_id,total_amount,shops(name),order_items(name)")
         .eq("customer_id", user.id)
         .eq("status", "delivered")
         .order("created_at", { ascending: false })
@@ -911,7 +911,7 @@ export default function HomePage() {
                       justifyContent:"space-between", marginTop:4 }}>
                       <span style={{ color:"#6a5a40", fontSize:7.5 }}>🔥 {p.sold_count} đã bán</span>
                       <button
-                        onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:p.id, name:p.name, price:p.price, shop:shopName, shopId:p.id }) }}
+                        onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:p.id, name:p.name, price:p.price, shop:shopName, shopId:p.shop_id }) }}
                         style={{ width:22, height:22, borderRadius:7,
                           background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
                           border:"none", color:"#fff", fontSize:14, fontWeight:700,
@@ -970,7 +970,7 @@ export default function HomePage() {
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:7, marginTop:5 }}>
                       <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
-                      <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.rating?.toFixed(1) ?? "Mới"}</span>
+                      <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.rating_avg?.toFixed(1) ?? "Mới"}</span>
                       <span style={{ color:"#4a5040", fontSize:9 }}>·</span>
                       <span style={{ color:"#b0956a", fontSize:8.5 }}>Ship 15k</span>
                     </div>
@@ -1077,7 +1077,7 @@ export default function HomePage() {
                           {fmt(b.price)}
                         </div>
                         <button
-                          onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:b.id, name:b.name, price:b.price, shop:shopName, shopId:b.id }) }}
+                          onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:b.id, name:b.name, price:b.price, shop:shopName, shopId:b.shop_id }) }}
                           style={{ width:22, height:22, borderRadius:7,
                             background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
                             border:"none", color:"#fff", fontSize:14, fontWeight:700,
@@ -1132,7 +1132,7 @@ export default function HomePage() {
                         </div>
                       </div>
                     </div>
-                    <a href={`/shop/${r.id}`} style={{ textDecoration:"none" }}>
+                    <a href={`/shop/${r.shop_id}`} style={{ textDecoration:"none" }}>
                       <div className="reorder-btn" style={{
                         width:"100%", height:28, borderRadius:8, border:"1px solid rgba(255,107,0,0.25)",
                         background:"rgba(255,107,0,0.08)",

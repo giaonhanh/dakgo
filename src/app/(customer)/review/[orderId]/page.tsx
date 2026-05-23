@@ -1,29 +1,39 @@
-﻿"use client"
+"use client"
 
 // src/app/(customer)/review/[orderId]/page.tsx
-// Đánh giá sau đơn hàng — màn hình riêng đầy đủ
-// Sao món + sao tài xế + upload ảnh + tag nhanh + tip + submit
 
-import { useState, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-
-// ─── Mock order data (thay bằng fetch theo orderId) ────────
-const ORDER = {
-  id:       "GN2840",
-  shopName: "Cơm Nhà Bếp",
-  shopEmoji:"🍱",
-  items:    ["Cơm sườn trứng", "Canh chua cá"],
-  total:    73000,
-  driver:   { name:"Nguyễn Thị Lan", plate:"47B-33412", rating:4.8 },
-  createdAt:"13/05 · 12:05",
-}
+import { useState, useRef, useEffect } from "react"
+import { useParams } from "next/navigation"
+import { motion } from "framer-motion"
+import { createClient } from "@/lib/supabase/client"
 
 const FOOD_TAGS   = ["Món ngon","Đúng mô tả","Phần nhiều","Giá hợp lý","Đóng gói đẹp"]
 const DRIVER_TAGS = ["Giao nhanh","Đúng giờ","Thân thiện","Chuyên nghiệp","Cẩn thận"]
 const TIP_OPTIONS = [0, 5000, 10000, 20000, 50000]
 const fmt = (n:number) => n === 0 ? "Không tip" : n.toLocaleString("vi-VN")+"đ"
 
-// ─── Star Row ──────────────────────────────────────────────
+interface OrderData {
+  id: string; shopId: string; shopName: string; shopEmoji: string
+  items: string[]; total: number; driverId: string | null
+  driver: { name: string; plate: string; rating: number } | null
+  createdAt: string
+}
+
+function categoryToEmoji(cat: string | null): string {
+  if (!cat) return "🍽️"
+  const c = cat.toLowerCase()
+  if (c.includes("bun") || c.includes("phở")) return "🍜"
+  if (c.includes("trà") || c.includes("drink")) return "🧋"
+  if (c.includes("gà")) return "🍗"
+  if (c.includes("cơm")) return "🍱"
+  return "🍽️"
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso)
+  return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")} · ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`
+}
+
 function StarRow({ value, onChange }: { value:number; onChange:(v:number)=>void }) {
   const [hover, setHover] = useState(0)
   const LABELS = ["","Tệ","Không tốt","Bình thường","Tốt","Xuất sắc!"]
@@ -49,8 +59,42 @@ function StarRow({ value, onChange }: { value:number; onChange:(v:number)=>void 
   )
 }
 
-// ─── Main ──────────────────────────────────────────────────
+function SCard({ title, children }: { title:string; children:React.ReactNode }) {
+  return (
+    <div style={{ background:"rgba(255,255,255,0.04)",
+      border:"1px solid rgba(255,255,255,0.07)",
+      borderRadius:14,padding:"13px 14px",marginBottom:10 }}>
+      <div style={{ color:"#b0956a",fontSize:10,fontWeight:700,
+        textTransform:"uppercase",letterSpacing:.5,marginBottom:12 }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function TagChip({ label, on, onClick }: { label:string; on:boolean; onClick:()=>void }) {
+  return (
+    <div onClick={onClick}
+      style={{ padding:"4px 11px",borderRadius:20,cursor:"pointer",
+        background:on?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
+        border:`1px solid ${on?"rgba(255,107,0,0.4)":"rgba(255,255,255,0.08)"}`,
+        color:on?"#FF8C00":"#6a5a40",
+        fontSize:9.5,fontWeight:on?600:400,
+        transition:"all .15s" }}>
+      {label}
+    </div>
+  )
+}
+
 export default function ReviewPage() {
+  const params   = useParams()
+  const orderId  = params?.orderId as string | undefined
+  const supabase = createClient()
+
+  const [order,      setOrder]      = useState<OrderData | null>(null)
+  const [userId,     setUserId]     = useState<string | null>(null)
+  const [loading,    setLoading]    = useState(true)
   const [foodStar,   setFoodStar]   = useState(0)
   const [driverStar, setDriverStar] = useState(0)
   const [foodTags,   setFoodTags]   = useState<string[]>([])
@@ -58,8 +102,59 @@ export default function ReviewPage() {
   const [comment,    setComment]    = useState("")
   const [tip,        setTip]        = useState(0)
   const [photos,     setPhotos]     = useState<string[]>([])
+  const [photoFiles, setPhotoFiles] = useState<File[]>([])
   const [submitted,  setSubmitted]  = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !orderId) { setLoading(false); return }
+      setUserId(user.id)
+
+      const { data } = await supabase
+        .from("orders")
+        .select(`
+          id, total_amount, created_at, driver_id, shop_id,
+          shops(id, name, category),
+          order_items(name),
+          drivers(id, license_plate, rating_avg)
+        `)
+        .eq("id", orderId)
+        .single()
+
+      if (!data) { setLoading(false); return }
+
+      const shop      = Array.isArray(data.shops) ? data.shops[0] : data.shops
+      const driverRow = Array.isArray(data.drivers) ? data.drivers[0] : data.drivers
+      let driverName  = "Tài xế"
+      if (data.driver_id) {
+        const { data: dp } = await supabase
+          .from("profiles").select("full_name").eq("id", data.driver_id).single()
+        driverName = dp?.full_name ?? "Tài xế"
+      }
+      const items = (data.order_items ?? []) as { name: string }[]
+
+      setOrder({
+        id: data.id,
+        shopId: data.shop_id ?? "",
+        shopName: shop?.name ?? "Cửa hàng",
+        shopEmoji: categoryToEmoji(shop?.category ?? null),
+        items: items.map(i => i.name),
+        total: data.total_amount,
+        driverId: data.driver_id ?? null,
+        driver: driverRow ? {
+          name: driverName,
+          plate: driverRow.license_plate ?? "",
+          rating: Number(driverRow.rating_avg ?? 5),
+        } : null,
+        createdAt: fmtDate(data.created_at),
+      })
+      setLoading(false)
+    }
+    load()
+  }, [orderId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleTag = (tag:string, list:string[], set:(_:string[])=>void) =>
     set(list.includes(tag) ? list.filter(t=>t!==tag) : [...list,tag])
@@ -70,10 +165,55 @@ export default function ReviewPage() {
     files.forEach(f => {
       const url = URL.createObjectURL(f)
       setPhotos(prev => [...prev, url])
+      setPhotoFiles(prev => [...prev, f])
     })
   }
 
+  const removePhoto = (idx: number) => {
+    setPhotos(prev => prev.filter((_,i) => i !== idx))
+    setPhotoFiles(prev => prev.filter((_,i) => i !== idx))
+  }
+
   const canSubmit = foodStar > 0 && driverStar > 0
+
+  const handleSubmit = async () => {
+    if (!canSubmit || !orderId || !userId || !order || submitting) return
+    setSubmitting(true)
+    try {
+      // Upload photos
+      const uploadedUrls: string[] = []
+      for (let i = 0; i < photoFiles.length; i++) {
+        const file = photoFiles[i]
+        const ext  = file.name.split(".").pop() || "jpg"
+        const path = `review-photos/${orderId}/${i}.${ext}`
+        const { error } = await supabase.storage
+          .from("review-photos").upload(path, file, { upsert: true })
+        if (!error) {
+          const { data: pub } = supabase.storage.from("review-photos").getPublicUrl(path)
+          uploadedUrls.push(pub.publicUrl)
+        }
+      }
+
+      await supabase.from("reviews").insert({
+        order_id:     orderId,
+        reviewer_id:  userId,
+        shop_id:      order.shopId,
+        driver_id:    order.driverId,
+        food_rating:  foodStar,
+        driver_rating: driverStar,
+        comment:      comment || null,
+        images:       uploadedUrls.length > 0 ? uploadedUrls : null,
+        tip_amount:   tip,
+      })
+
+      setSubmitted(true)
+    } catch {
+      // still show success to avoid blocking UX
+      setSubmitted(true)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   if (submitted) {
     return (
@@ -106,6 +246,16 @@ export default function ReviewPage() {
     )
   }
 
+  if (loading) {
+    return (
+      <div style={{ position:"fixed",inset:0,background:"#080806",
+        display:"flex",alignItems:"center",justifyContent:"center",
+        fontFamily:"'Lexend',sans-serif",color:"#6a5a40",fontSize:12 }}>
+        Đang tải...
+      </div>
+    )
+  }
+
   return (
     <>
       <style>{`
@@ -130,7 +280,9 @@ export default function ReviewPage() {
               display:"flex",alignItems:"center",justifyContent:"center",fontSize:14 }}>←</a>
             <div style={{ flex:1 }}>
               <div style={{ color:"#f8f0e0",fontSize:15,fontWeight:700 }}>Đánh giá đơn hàng</div>
-              <div style={{ color:"#6a5a40",fontSize:9,marginTop:1 }}>#{ORDER.id}</div>
+              <div style={{ color:"#6a5a40",fontSize:9,marginTop:1 }}>
+                #{orderId?.slice(0,8).toUpperCase()}
+              </div>
             </div>
           </div>
         </div>
@@ -139,25 +291,27 @@ export default function ReviewPage() {
           WebkitOverflowScrolling:"touch" } as React.CSSProperties}>
 
           {/* Order summary */}
-          <div style={{ background:"rgba(255,255,255,0.05)",
-            border:"1px solid rgba(255,255,255,0.08)",
-            borderRadius:13,padding:"11px 13px",marginBottom:14,
-            display:"flex",alignItems:"center",gap:10 }}>
-            <div style={{ width:40,height:40,borderRadius:11,flexShrink:0,
-              background:"rgba(255,107,0,0.08)",
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>
-              {ORDER.shopEmoji}
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ color:"#f8f0e0",fontSize:11.5,fontWeight:600 }}>{ORDER.shopName}</div>
-              <div style={{ color:"#6a5a40",fontSize:8.5,marginTop:2 }}>
-                {ORDER.items.join(" · ")}
+          {order && (
+            <div style={{ background:"rgba(255,255,255,0.05)",
+              border:"1px solid rgba(255,255,255,0.08)",
+              borderRadius:13,padding:"11px 13px",marginBottom:14,
+              display:"flex",alignItems:"center",gap:10 }}>
+              <div style={{ width:40,height:40,borderRadius:11,flexShrink:0,
+                background:"rgba(255,107,0,0.08)",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>
+                {order.shopEmoji}
               </div>
-              <div style={{ color:"#6a5a40",fontSize:8,marginTop:2 }}>
-                {ORDER.createdAt} · {ORDER.total.toLocaleString("vi-VN")}đ
+              <div style={{ flex:1 }}>
+                <div style={{ color:"#f8f0e0",fontSize:11.5,fontWeight:600 }}>{order.shopName}</div>
+                <div style={{ color:"#6a5a40",fontSize:8.5,marginTop:2 }}>
+                  {order.items.join(" · ")}
+                </div>
+                <div style={{ color:"#6a5a40",fontSize:8,marginTop:2 }}>
+                  {order.createdAt} · {order.total.toLocaleString("vi-VN")}đ
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Food rating */}
           <SCard title="🍽️ Chất lượng món ăn">
@@ -181,23 +335,25 @@ export default function ReviewPage() {
 
           {/* Driver rating */}
           <SCard title="🛵 Tài xế giao hàng">
-            <div style={{ display:"flex",alignItems:"center",gap:9,marginBottom:12,
-              padding:"8px 10px",background:"rgba(255,255,255,0.03)",
-              border:"1px solid rgba(255,255,255,0.06)",borderRadius:10 }}>
-              <div style={{ width:34,height:34,borderRadius:10,
-                background:"rgba(62,207,110,0.1)",
-                display:"flex",alignItems:"center",justifyContent:"center",fontSize:17 }}>
-                🛵
-              </div>
-              <div>
-                <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:600 }}>
-                  {ORDER.driver.name}
+            {order?.driver && (
+              <div style={{ display:"flex",alignItems:"center",gap:9,marginBottom:12,
+                padding:"8px 10px",background:"rgba(255,255,255,0.03)",
+                border:"1px solid rgba(255,255,255,0.06)",borderRadius:10 }}>
+                <div style={{ width:34,height:34,borderRadius:10,
+                  background:"rgba(62,207,110,0.1)",
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:17 }}>
+                  🛵
                 </div>
-                <div style={{ color:"#6a5a40",fontSize:8.5,marginTop:1 }}>
-                  {ORDER.driver.plate} · ⭐ {ORDER.driver.rating}
+                <div>
+                  <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:600 }}>
+                    {order.driver.name}
+                  </div>
+                  <div style={{ color:"#6a5a40",fontSize:8.5,marginTop:1 }}>
+                    {order.driver.plate} · ⭐ {order.driver.rating}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
             <StarRow value={driverStar} onChange={setDriverStar} />
             {driverStar > 0 && (
               <motion.div initial={{opacity:0,y:6}} animate={{opacity:1,y:0}}
@@ -236,7 +392,7 @@ export default function ReviewPage() {
                   width:70,height:70,borderRadius:10,overflow:"hidden",
                   border:"1px solid rgba(255,255,255,0.1)" }}>
                   <img src={p} alt="" style={{ width:"100%",height:"100%",objectFit:"cover" }} />
-                  <button onClick={() => setPhotos(prev=>prev.filter((_,j)=>j!==i))}
+                  <button onClick={() => removePhoto(i)}
                     style={{ position:"absolute",top:3,right:3,
                       width:18,height:18,borderRadius:"50%",border:"none",
                       background:"rgba(0,0,0,0.65)",color:"#fff",
@@ -294,25 +450,28 @@ export default function ReviewPage() {
           padding:"12px 16px 24px",
           background:"linear-gradient(to top,#080806 70%,transparent)",
           zIndex:50 }}>
-          <button onClick={() => canSubmit && setSubmitted(true)}
-            disabled={!canSubmit}
+          <button onClick={handleSubmit}
+            disabled={!canSubmit || submitting}
             style={{ width:"100%",height:50,borderRadius:14,border:"none",
               background:canSubmit
                 ?"linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)"
                 :"rgba(255,255,255,0.07)",
               color:canSubmit?"#fff":"#6a5a40",
               fontSize:13,fontWeight:700,fontFamily:"Lexend",
-              cursor:canSubmit?"pointer":"not-allowed",
+              cursor:canSubmit&&!submitting?"pointer":"not-allowed",
               position:"relative",overflow:"hidden",
               boxShadow:canSubmit?"0 4px 20px rgba(255,107,0,0.4)":"none",
-              transition:"all .25s" }}>
-            {canSubmit && (
+              transition:"all .25s",
+              opacity: submitting ? 0.7 : 1 }}>
+            {canSubmit && !submitting && (
               <div style={{ position:"absolute",top:0,left:"-60%",width:"35%",height:"100%",
                 background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)",
                 animation:"shimmer 2.5s infinite" }} />
             )}
             <span style={{ position:"relative",zIndex:1 }}>
-              {!canSubmit
+              {submitting
+                ? "Đang gửi..."
+                : !canSubmit
                 ? "Vui lòng cho điểm trước khi gửi"
                 : `⭐ Gửi đánh giá${tip>0?" + Tip "+fmt(tip):""}`}
             </span>
@@ -320,34 +479,5 @@ export default function ReviewPage() {
         </div>
       </div>
     </>
-  )
-}
-
-// ─── Sub components ────────────────────────────────────────
-function SCard({ title, children }: { title:string; children:React.ReactNode }) {
-  return (
-    <div style={{ background:"rgba(255,255,255,0.04)",
-      border:"1px solid rgba(255,255,255,0.07)",
-      borderRadius:14,padding:"13px 14px",marginBottom:10 }}>
-      <div style={{ color:"#b0956a",fontSize:10,fontWeight:700,
-        textTransform:"uppercase",letterSpacing:.5,marginBottom:12 }}>
-        {title}
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function TagChip({ label, on, onClick }: { label:string; on:boolean; onClick:()=>void }) {
-  return (
-    <div onClick={onClick}
-      style={{ padding:"4px 11px",borderRadius:20,cursor:"pointer",
-        background:on?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
-        border:`1px solid ${on?"rgba(255,107,0,0.4)":"rgba(255,255,255,0.08)"}`,
-        color:on?"#FF8C00":"#6a5a40",
-        fontSize:9.5,fontWeight:on?600:400,
-        transition:"all .15s" }}>
-      {label}
-    </div>
   )
 }

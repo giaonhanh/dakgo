@@ -536,7 +536,16 @@ export default function DriverNavigatePage() {
             <AnimatePresence mode="wait">
               {phase === "pickup" ? (
                 <PickupPhase
-                  onDone={() => { setPhase("delivery"); fireToast("Đã lấy hàng → bắt đầu giao!") }}
+                  onDone={async () => {
+                    setPhase("delivery")
+                    fireToast("Đã lấy hàng → bắt đầu giao!")
+                    if (orderId) {
+                      await supabase.from("orders").update({
+                        status: "delivering",
+                        picked_up_at: new Date().toISOString(),
+                      }).eq("id", orderId)
+                    }
+                  }}
                   onCall={() => fireToast("Đang gọi cho quán...")}
                   onChat={() => setShowChat(true)}
                   fireToast={fireToast}

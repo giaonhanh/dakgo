@@ -76,7 +76,7 @@ function CTABtn({ label, onClick, color="orange", icon, disabled }: {
   )
 }
 
-function CapturePhase({ onCapture }: { onCapture:(url:string)=>void }) {
+function CapturePhase({ onCapture }: { onCapture:(url:string, file:File)=>void }) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   return (
@@ -145,7 +145,7 @@ function CapturePhase({ onCapture }: { onCapture:(url:string)=>void }) {
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment"
-        onChange={e => { const f = e.target.files?.[0]; if (f) onCapture(URL.createObjectURL(f)); e.target.value = "" }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) onCapture(URL.createObjectURL(f), f); e.target.value = "" }}
         style={{ display:"none" }} />
     </motion.div>
   )
@@ -322,12 +322,13 @@ export default function DriverConfirmPage() {
   const { orderId } = useParams<{ orderId: string }>()
   const supabase    = createClient()
 
-  const [order,    setOrder]    = useState<OrderInfo | null>(null)
-  const [today,    setToday]    = useState<TodayStats>({ orders: 0, earning: 0 })
-  const [phase,    setPhase]    = useState<Phase>("capture")
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
-  const [toast,    setToast]    = useState("")
-  const [saving,   setSaving]   = useState(false)
+  const [order,     setOrder]     = useState<OrderInfo | null>(null)
+  const [today,     setToday]     = useState<TodayStats>({ orders: 0, earning: 0 })
+  const [phase,     setPhase]     = useState<Phase>("capture")
+  const [photoUrl,  setPhotoUrl]  = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [toast,     setToast]     = useState("")
+  const [saving,    setSaving]    = useState(false)
 
   const fireToast = (msg: string) => {
     setToast(msg); setTimeout(() => setToast(""), 2400)
@@ -387,24 +388,43 @@ export default function DriverConfirmPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
 
-  const handleCapture = (url: string) => {
+  const handleCapture = (url: string, file: File) => {
     setPhotoUrl(url)
+    setPhotoFile(file)
     setPhase("preview")
   }
 
   const handleRetake = () => {
     if (photoUrl) URL.revokeObjectURL(photoUrl)
     setPhotoUrl(null)
+    setPhotoFile(null)
     setPhase("capture")
   }
 
   const handleConfirm = async () => {
     if (!orderId || saving) return
     setSaving(true)
+
+    let deliveryPhotoUrl: string | null = null
+    if (photoFile) {
+      const ext = photoFile.name.split(".").pop() || "jpg"
+      const path = `delivery-photos/${orderId}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from("delivery-photos")
+        .upload(path, photoFile, { upsert: true })
+      if (!upErr) {
+        deliveryPhotoUrl = supabase.storage
+          .from("delivery-photos")
+          .getPublicUrl(path).data.publicUrl
+      }
+    }
+
     await supabase.from("orders").update({
       status: "delivered",
       delivered_at: new Date().toISOString(),
+      ...(deliveryPhotoUrl ? { delivery_photo_url: deliveryPhotoUrl } : {}),
     }).eq("id", orderId)
+
     setSaving(false)
     fireToast("Đã xác nhận giao hàng thành công!")
     setTimeout(() => setPhase("done"), 600)

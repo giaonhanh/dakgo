@@ -257,7 +257,13 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          <button onClick={() => setSidebarOpen(p => !p)} style={{ margin:"8px", height:36, borderRadius:10, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", color:"#6a5a40", fontSize:14, cursor:"pointer", fontFamily:"Lexend", transition:"all 0.2s" }}>
+          <button onClick={async () => { const sb = createClient(); await sb.auth.signOut(); window.location.href = "/login" }}
+            style={{ margin:"0 8px 4px", height:36, borderRadius:10, background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)", color:"#ff4040", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+            <span style={{ fontSize:14 }}>🚪</span>
+            {sidebarOpen && <span>Đăng xuất</span>}
+          </button>
+
+          <button onClick={() => setSidebarOpen(p => !p)} style={{ margin:"0 8px 8px", height:36, borderRadius:10, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", color:"#6a5a40", fontSize:14, cursor:"pointer", fontFamily:"Lexend", transition:"all 0.2s" }}>
             {sidebarOpen ? "◀" : "▶"}
           </button>
         </div>

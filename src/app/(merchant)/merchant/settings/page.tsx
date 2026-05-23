@@ -46,16 +46,25 @@ function Row({ icon, label, sub, children, danger = false, onClick, arrow = fals
 
 /* ── password sheet ── */
 function PwSheet({ onClose }: { onClose: () => void }) {
+  const supabase = createClient()
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [vals, setVals] = useState(["", "", ""])
   const [err, setErr] = useState(""); const [show, setShow] = useState(false)
+  const [saving, setSaving] = useState(false)
   const labels = ["Mật khẩu hiện tại", "Mật khẩu mới (tối thiểu 6 ký tự)", "Xác nhận mật khẩu mới"]
   const setVal = (v: string) => setVals(a => { const n = [...a]; n[step - 1] = v; return n })
-  const next = () => {
+  const next = async () => {
     setErr("")
     if (step === 1 && !vals[0]) return setErr("Vui lòng nhập mật khẩu hiện tại")
     if (step === 2 && vals[1].length < 6) return setErr("Tối thiểu 6 ký tự")
-    if (step === 3) { if (vals[1] !== vals[2]) return setErr("Mật khẩu không khớp"); onClose(); return }
+    if (step === 3) {
+      if (vals[1] !== vals[2]) return setErr("Mật khẩu không khớp")
+      setSaving(true)
+      const { error } = await supabase.auth.updateUser({ password: vals[1] })
+      setSaving(false)
+      if (error) return setErr("Không thể đổi mật khẩu. Thử lại sau.")
+      onClose(); return
+    }
     setStep(s => (s + 1) as 1 | 2 | 3)
   }
   return (
@@ -83,7 +92,7 @@ function PwSheet({ onClose }: { onClose: () => void }) {
         {err && <div style={{ color: "#ff4040", fontSize: 11, marginTop: 8 }}>⚠ {err}</div>}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10, marginTop: 16 }}>
           <button onClick={step > 1 ? () => setStep(s => (s - 1) as 1 | 2 | 3) : onClose} style={{ height: 46, borderRadius: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#b0956a", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>{step > 1 ? "← Quay lại" : "Hủy"}</button>
-          <button onClick={next} style={{ height: 46, borderRadius: 12, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend" }}>{step === 3 ? "✓ Xác nhận" : "Tiếp theo →"}</button>
+          <button onClick={next} disabled={saving} style={{ height: 46, borderRadius: 12, border: "none", background: saving ? "rgba(255,255,255,0.08)" : "linear-gradient(90deg,#FF6B00,#FF8C00)", color: saving ? "#6a5a40" : "#fff", fontSize: 13, fontWeight: 800, cursor: saving ? "not-allowed" : "pointer", fontFamily: "Lexend" }}>{saving ? "Đang lưu..." : step === 3 ? "✓ Xác nhận" : "Tiếp theo →"}</button>
         </div>
       </div>
     </motion.div>
@@ -261,12 +270,12 @@ function PrepTimeSheet({ value, onSelect, onClose }: { value: string; onSelect: 
 /* ── main ── */
 export default function MerchantSettingsPage() {
   /* shop settings */
-  const [shop, setShop] = useState({
-    autoAccept:     false,
-    busyMode:       false,
-    preorderAllow:  true,
-    showRating:     true,
-    showSoldCount:  true,
+  const [shop, setShop] = useState(() => {
+    try {
+      const saved = typeof window !== "undefined" ? localStorage.getItem("merchant_shop_settings") : null
+      if (saved) return JSON.parse(saved)
+    } catch { /* ignore */ }
+    return { autoAccept: false, busyMode: false, preorderAllow: true, showRating: true, showSoldCount: true }
   })
 
   /* notification settings */
@@ -321,7 +330,11 @@ export default function MerchantSettingsPage() {
   }, [])
 
   const fire = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2200) }
-  const sw = (k: keyof typeof shop)  => setShop(p => ({ ...p, [k]: !p[k] }))
+  const sw = (k: keyof typeof shop) => setShop(p => {
+    const next = { ...p, [k]: !p[k] }
+    try { localStorage.setItem("merchant_shop_settings", JSON.stringify(next)) } catch { /* ignore */ }
+    return next
+  })
   const sn = (k: keyof typeof notif) => setNotif(p => ({ ...p, [k]: !p[k] }))
   const sp = (k: keyof typeof priv)  => setPriv(p => ({ ...p, [k]: !p[k] }))
 
@@ -540,7 +553,7 @@ export default function MerchantSettingsPage() {
           {/* about + account merged */}
           <Section title="Về ứng dụng & Tài khoản">
             <Row icon="🚀" label="Giao Nhanh Merchant" sub="Phiên bản 1.0.0" />
-            <Row icon="🚪" label="Đăng xuất" sub="Đăng xuất khỏi thiết bị này" danger onClick={() => fire("Đang đăng xuất...")} arrow last />
+            <Row icon="🚪" label="Đăng xuất" sub="Đăng xuất khỏi thiết bị này" danger onClick={async () => { const sb = createClient(); await sb.auth.signOut(); window.location.href = "/login" }} arrow last />
           </Section>
         </div>
       </div>

@@ -45,16 +45,22 @@ function Row({ icon, label, sub, children, danger = false, onClick, arrow = fals
 
 /* ── password sheet ── */
 function PwSheet({ onClose }: { onClose: () => void }) {
+  const supabase = createClient()
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [vals, setVals] = useState(["", "", ""])
   const [err, setErr] = useState(""); const [show, setShow] = useState(false)
   const labels = ["Mật khẩu hiện tại", "Mật khẩu mới (tối thiểu 6 ký tự)", "Xác nhận mật khẩu mới"]
   const setVal = (v: string) => setVals(a => { const n = [...a]; n[step - 1] = v; return n })
-  const next = () => {
+  const next = async () => {
     setErr("")
     if (step === 1 && !vals[0]) return setErr("Vui lòng nhập mật khẩu hiện tại")
     if (step === 2 && vals[1].length < 6) return setErr("Tối thiểu 6 ký tự")
-    if (step === 3) { if (vals[1] !== vals[2]) return setErr("Mật khẩu không khớp"); onClose(); return }
+    if (step === 3) {
+      if (vals[1] !== vals[2]) return setErr("Mật khẩu không khớp")
+      const { error } = await supabase.auth.updateUser({ password: vals[1] })
+      if (error) return setErr("Không thể đổi mật khẩu. Thử lại sau.")
+      onClose(); return
+    }
     setStep(s => (s + 1) as 1 | 2 | 3)
   }
   return (
@@ -91,14 +97,38 @@ function PwSheet({ onClose }: { onClose: () => void }) {
 
 /* ── vehicle edit sheet ── */
 function VehicleSheet({ onClose }: { onClose: () => void }) {
+  const supabase = createClient()
   const [type, setType]   = useState("motorbike")
-  const [plate, setPlate] = useState("47B1-23456")
-  const [model, setModel] = useState("Honda Wave Alpha 2022")
+  const [plate, setPlate] = useState("")
+  const [model, setModel] = useState("")
+  const [saving, setSaving] = useState(false)
   const TYPES = [
     { id: "motorbike", icon: "🛵", label: "Xe máy" },
     { id: "electric",  icon: "⚡", label: "Xe điện" },
     { id: "bicycle",   icon: "🚲", label: "Xe đạp" },
   ]
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from("drivers").select("vehicle_type,license_plate,vehicle_model").eq("id", user.id).single()
+        .then(({ data }) => {
+          if (!data) return
+          setType(data.vehicle_type ?? "motorbike")
+          setPlate(data.license_plate ?? "")
+          setModel(data.vehicle_model ?? "")
+        })
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const save = async () => {
+    setSaving(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase.from("drivers").update({ vehicle_type: type, license_plate: plate, vehicle_model: model }).eq("id", user.id)
+    }
+    setSaving(false)
+    onClose()
+  }
   return (
     <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 26, stiffness: 280 }}
       style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
@@ -120,7 +150,7 @@ function VehicleSheet({ onClose }: { onClose: () => void }) {
             <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend" }} />
           </div>
         ))}
-        <button onClick={onClose} style={{ width: "100%", height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend", marginTop: 8 }}>✓ Lưu thay đổi</button>
+        <button onClick={save} disabled={saving} style={{ width: "100%", height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend", marginTop: 8, opacity: saving ? 0.7 : 1 }}>{saving ? "Đang lưu..." : "✓ Lưu thay đổi"}</button>
       </div>
     </motion.div>
   )
@@ -421,7 +451,7 @@ export default function DriverProfilePage() {
 
           {/* account */}
           <Section title="Tài khoản">
-            <Row icon="🚪" label="Đăng xuất" sub="Đăng xuất khỏi thiết bị này" danger onClick={() => fire("Đang đăng xuất...")} arrow />
+            <Row icon="🚪" label="Đăng xuất" sub="Đăng xuất khỏi thiết bị này" danger onClick={async () => { const sb = createClient(); await sb.auth.signOut(); window.location.href = "/login" }} arrow />
           </Section>
         </div>
       </div>

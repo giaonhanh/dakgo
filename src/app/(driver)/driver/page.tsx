@@ -16,6 +16,7 @@ const RING_C = 2 * Math.PI * RING_R
 
 interface OrderData {
   id:                  string
+  fullId:              string
   shopName:            string
   shopAddress:         string
   customerName:        string
@@ -353,6 +354,7 @@ export default function DriverDashboard() {
 
         const orderData: OrderData = {
           id:                  o.id.slice(0, 8).toUpperCase(),
+          fullId:              o.id,
           shopName:            shop?.name ?? "Cửa hàng",
           shopAddress:         shop?.address ?? "",
           customerName:        customer?.full_name ?? "Khách hàng",
@@ -379,24 +381,14 @@ export default function DriverDashboard() {
   const handleAccept = async () => {
     if (!pendingOrder || !driverId) return
     setShowOrder(false)
-    // Find the real order UUID (stored in id as first 8 chars — need to query)
-    // For now navigate to navigate page with the partial ID; improve with real UUID later
-    const { data: order } = await supabase
-      .from("orders")
-      .select("id")
-      .eq("status", "pending")
-      .limit(1)
-      .single()
-
-    if (order) {
-      await supabase.from("orders").update({
-        status: "accepted",
-        driver_id: driverId,
-        accepted_at: new Date().toISOString(),
-      }).eq("id", order.id)
-      setAccepted(order.id)
-      router.push(`/driver/navigate/${order.id}`)
-    }
+    const orderId = pendingOrder.fullId
+    await supabase.from("orders").update({
+      status: "accepted",
+      driver_id: driverId,
+      accepted_at: new Date().toISOString(),
+    }).eq("id", orderId)
+    setAccepted(orderId)
+    router.push(`/driver/navigate/${orderId}`)
   }
 
   const handleReject = () => {

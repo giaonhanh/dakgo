@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
+import * as XLSX from "xlsx"
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface MenuGroup {
@@ -76,6 +77,7 @@ export default function MerchantMenuPage() {
   const [importSaving, setImportSaving] = useState(false)
 
   const [toast, setToast] = useState("")
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const fileRef  = useRef<HTMLInputElement>(null)
   const csvRef   = useRef<HTMLInputElement>(null)
 
@@ -197,22 +199,63 @@ export default function MerchantMenuPage() {
   }
 
   const downloadTemplate = () => {
-    const rows = [
-      ["Tên món","Mô tả","Giá bán","Giá khuyến mãi","Danh mục","Badge"],
-      ["Bún bò đặc biệt","Thịt bò tươi + bún thơm + rau sống","45000","38000","Bún / Phở","bestseller"],
-      ["Cơm gà xối mỡ","Cơm trắng + gà giòn xối mỡ + rau","42000","","Cơm","hot"],
-      ["Trà đá","Trà đậm đà mát lạnh","5000","","Đồ uống",""],
-      ["Nước cam tươi","Cam vắt tươi không đường","25000","","Đồ uống",""],
-      ["Bánh mì thịt","Bánh mì giòn + thịt nguội + pate","18000","15000","Bánh","bigsale"],
-      ["Gà rán cay","2 miếng gà rán sốt cay Hàn Quốc","55000","","Gà",""],
-      ["Cơm sườn bì chả","Cơm + sườn nướng + bì + chả lụa","40000","","Cơm","bestseller"],
-      ["Sinh tố bơ","Bơ tươi béo ngậy không đường","30000","","Đồ uống","hot"],
+    const headers = ["Tên món *", "Mô tả", "Giá bán * (VNĐ)", "Giá khuyến mãi (VNĐ)", "Danh mục", "Badge"]
+    const samples = [
+      ["Bún bò đặc biệt", "Thịt bò tươi + bún thơm + rau sống", 45000, 38000, "Bún / Phở", "bestseller"],
+      ["Cơm gà xối mỡ",  "Cơm trắng + gà giòn xối mỡ + rau",  42000, "",     "Cơm",       "hot"],
+      ["Trà đá",          "Trà đậm đà mát lạnh",                5000,  "",     "Đồ uống",   ""],
+      ["Nước cam tươi",   "Cam vắt tươi không đường",           25000, "",     "Đồ uống",   ""],
+      ["Bánh mì thịt",    "Bánh mì giòn + thịt nguội + pate",   18000, 15000,  "Bánh",      "bigsale"],
+      ["Gà rán cay",      "2 miếng gà rán sốt cay Hàn Quốc",   55000, "",     "Gà",        ""],
+      ["Cơm sườn bì chả", "Cơm + sườn nướng + bì + chả lụa",   40000, "",     "Cơm",       "bestseller"],
+      ["Sinh tố bơ",      "Bơ tươi béo ngậy không đường",       30000, "",     "Đồ uống",   "hot"],
     ]
-    const csv = rows.map(r => r.map(v => `"${v}"`).join(",")).join("\n")
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a"); a.href = url; a.download = "template_menu.csv"; a.click()
-    URL.revokeObjectURL(url)
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...samples])
+
+    // Độ rộng cột
+    ws["!cols"] = [
+      { wch: 28 }, // Tên món
+      { wch: 36 }, // Mô tả
+      { wch: 18 }, // Giá bán
+      { wch: 20 }, // Giá KM
+      { wch: 16 }, // Danh mục
+      { wch: 14 }, // Badge
+    ]
+
+    // Style dòng tiêu đề (in đậm nền cam)
+    const headerRange = XLSX.utils.decode_range(ws["!ref"] ?? "A1:F1")
+    for (let c = headerRange.s.c; c <= headerRange.e.c; c++) {
+      const cell = XLSX.utils.encode_cell({ r: 0, c })
+      if (!ws[cell]) continue
+      ws[cell].s = {
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: "FF6B00" } },
+        alignment: { horizontal: "center" },
+      }
+    }
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Menu mẫu")
+
+    // Sheet hướng dẫn
+    const guide = XLSX.utils.aoa_to_sheet([
+      ["HƯỚNG DẪN NHẬP MENU"],
+      [""],
+      ["Cột", "Bắt buộc", "Mô tả"],
+      ["Tên món *",              "Có",  "Tên hiển thị của món ăn"],
+      ["Mô tả",                  "Không","Mô tả ngắn, nguyên liệu chính"],
+      ["Giá bán * (VNĐ)",        "Có",  "Số nguyên, không có dấu phẩy. Ví dụ: 45000"],
+      ["Giá khuyến mãi (VNĐ)",   "Không","Giá sau giảm, bỏ trống nếu không KM"],
+      ["Danh mục",               "Không","Nhóm món. Ví dụ: Cơm, Bún / Phở, Đồ uống"],
+      ["Badge",                  "Không","bestseller | hot | new | bigsale (hoặc bỏ trống)"],
+      [""],
+      ["Lưu ý: Không xoá dòng tiêu đề. Giá phải là số nguyên (VNĐ)."],
+    ])
+    guide["!cols"] = [{ wch: 26 }, { wch: 12 }, { wch: 48 }]
+    XLSX.utils.book_append_sheet(wb, guide, "Hướng dẫn")
+
+    XLSX.writeFile(wb, "template_menu_giaonhanh.xlsx")
   }
 
   // ── Group handlers ─────────────────────────────────────────────────────
@@ -257,16 +300,35 @@ export default function MerchantMenuPage() {
   const saveProduct = async () => {
     if (!pModal?.name.trim() || pModal.price <= 0) return
     const category = pModal.categories[0] || pModal.menuGroupId || null
+
+    // Upload image if new file selected
+    let imageUrl: string | undefined
+    if (imageFile) {
+      const ext = imageFile.name.split(".").pop() || "jpg"
+      const productId = pEditing ? pModal.id : `new_${Date.now()}`
+      const path = `product-images/${shopId}/${productId}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from("product-images")
+        .upload(path, imageFile, { upsert: true })
+      if (!upErr) {
+        imageUrl = supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl
+      }
+    }
+
     const payload = {
       name: pModal.name, description: pModal.description || null,
       price: pModal.price, original_price: pModal.promoEnabled && pModal.promoPrice ? pModal.promoPrice : null,
       category, is_available: pModal.available, sort_order: pModal.sortOrder,
       updated_at: new Date().toISOString(),
+      ...(imageUrl ? { image_url: imageUrl } : {}),
     }
     if (pEditing) {
       const { error } = await supabase.from("products").update(payload).eq("id", pModal.id)
       if (error) { fire("❌ Lỗi cập nhật: " + error.message); return }
-      setProducts(ps => ps.map(p => p.id === pModal.id ? {...pModal, categories: category ? [category] : [], menuGroupId: category ?? ""} : p))
+      const updatedPreview = imageUrl ?? pModal.imagePreview
+      setProducts(ps => ps.map(p => p.id === pModal.id
+        ? {...pModal, imagePreview: updatedPreview, categories: category ? [category] : [], menuGroupId: category ?? ""}
+        : p))
       fire("Đã cập nhật món")
     } else {
       if (!shopId) return
@@ -274,14 +336,18 @@ export default function MerchantMenuPage() {
         .insert({ ...payload, shop_id: shopId, sold_count: 0 })
         .select("id").single()
       if (error || !data) { fire("❌ Lỗi thêm món: " + (error?.message ?? "")); return }
-      const newProd: Product = { ...pModal, id: data.id, sortOrder: products.length, categories: category ? [category] : [], menuGroupId: category ?? "" }
+      const newProd: Product = {
+        ...pModal, id: data.id, sortOrder: products.length,
+        imagePreview: imageUrl ?? pModal.imagePreview,
+        categories: category ? [category] : [], menuGroupId: category ?? "",
+      }
       setProducts(ps => [...ps, newProd])
-      // Add group if new category
       if (category && !groups.find(g => g.id === category)) {
         setGroups(gs => [...gs, { id: category, name: category, allDay: true, startHour: "06:00", endHour: "22:00", sortOrder: gs.length }])
       }
       fire("Đã thêm món mới")
     }
+    setImageFile(null)
     setPModal(null)
   }
 
@@ -341,6 +407,7 @@ export default function MerchantMenuPage() {
 
   const onImageFile = (file: File) => {
     const url = URL.createObjectURL(file)
+    setImageFile(file)
     setPModal(m => m ? {...m, imagePreview:url} : m)
   }
 
@@ -400,12 +467,16 @@ export default function MerchantMenuPage() {
             </div>
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:6,marginBottom:10}}>
-            {mainTab === "products" && (
+            {mainTab === "products" && (<>
+              <button onClick={downloadTemplate}
+                style={{background:"rgba(74,143,245,0.1)",border:"1px solid rgba(74,143,245,0.3)",borderRadius:10,padding:"7px 12px",color:"#4a8ff5",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",whiteSpace:"nowrap"}}>
+                📄 Tải file mẫu
+              </button>
               <button onClick={() => csvRef.current?.click()}
                 style={{background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.3)",borderRadius:10,padding:"7px 12px",color:"#3ecf6e",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",whiteSpace:"nowrap"}}>
                 📥 Nhập Excel
               </button>
-            )}
+            </>)}
             <button onClick={mainTab==="groups" ? openNewGroup : openNewProduct}
               style={{background:"linear-gradient(90deg,#FF6B00,#FF8C00)",border:"none",borderRadius:10,padding:"7px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",boxShadow:"0 2px 12px rgba(255,107,0,0.4)",whiteSpace:"nowrap"}}>
               + {mainTab==="groups" ? "Nhóm mới" : "Thêm món"}
@@ -700,7 +771,7 @@ export default function MerchantMenuPage() {
         {pModal && (
           <>
             <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-              onClick={() => setPModal(null)}
+              onClick={() => { setPModal(null); setImageFile(null) }}
               style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.78)",zIndex:60,backdropFilter:"blur(4px)"}} />
             <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}} transition={{type:"spring",damping:24,stiffness:280}}
               style={{position:"fixed",bottom:0,left:0,right:0,zIndex:61,background:"#0e0c09",border:"1px solid rgba(255,107,0,0.2)",borderRadius:"22px 22px 0 0",maxHeight:"95vh",display:"flex",flexDirection:"column"}}>
@@ -710,7 +781,7 @@ export default function MerchantMenuPage() {
                 <div style={{width:36,height:4,background:"rgba(255,255,255,0.12)",borderRadius:2,margin:"0 auto 12px"}} />
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                   <div style={{color:"#f8f0e0",fontSize:14,fontWeight:800}}>{pEditing ? "✏️ Chỉnh sửa món" : "🍽️ Thêm món mới"}</div>
-                  <button onClick={() => setPModal(null)}
+                  <button onClick={() => { setPModal(null); setImageFile(null) }}
                     style={{width:30,height:30,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"none",color:"#6a5a40",fontSize:16,cursor:"pointer"}}>×</button>
                 </div>
               </div>

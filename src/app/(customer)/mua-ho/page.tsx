@@ -4,20 +4,24 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import AddressPicker from "@/components/map/AddressPicker"
+import { createClient } from "@/lib/supabase/client"
 import type { AddressPickerResult } from "@/types"
 
 type BuyItem = { id: number; name: string; qty: number; price: string }
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
 export default function MuaHoPage() {
-  const router = useRouter()
-  const [pickup,   setPickup]   = useState("")
-  const [delivery, setDelivery] = useState("")
-  const [items,    setItems]    = useState<BuyItem[]>([{ id: 1, name: "", qty: 1, price: "" }])
-  const [note,     setNote]     = useState("")
-  const [mapMode,  setMapMode]  = useState<null | "pickup" | "delivery">(null)
-  const [loading,  setLoading]  = useState(false)
-  const [toast,    setToast]    = useState("")
+  const router   = useRouter()
+  const supabase = createClient()
+  const [pickup,        setPickup]        = useState("")
+  const [delivery,      setDelivery]      = useState("")
+  const [pickupCoord,   setPickupCoord]   = useState<{ lat: number; lng: number } | null>(null)
+  const [deliveryCoord, setDeliveryCoord] = useState<{ lat: number; lng: number } | null>(null)
+  const [items,         setItems]         = useState<BuyItem[]>([{ id: 1, name: "", qty: 1, price: "" }])
+  const [note,          setNote]          = useState("")
+  const [mapMode,       setMapMode]       = useState<null | "pickup" | "delivery">(null)
+  const [loading,       setLoading]       = useState(false)
+  const [toast,         setToast]         = useState("")
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2300) }
 
@@ -35,7 +39,31 @@ export default function MuaHoPage() {
     if (!items.some(i => i.name.trim())) { fireToast("Vui lòng nhập ít nhất 1 món cần mua"); return }
     setLoading(true)
     try {
-      await new Promise(r => setTimeout(r, 1500))
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { fireToast("Vui lòng đăng nhập để đặt dịch vụ"); setLoading(false); return }
+      const pLat = pickupCoord?.lat ?? 12.683
+      const pLng = pickupCoord?.lng ?? 108.483
+      const dLat = deliveryCoord?.lat ?? 12.683
+      const dLng = deliveryCoord?.lng ?? 108.483
+      const itemsDesc = items.filter(i => i.name.trim())
+        .map(i => `${i.name} x${i.qty}${i.price ? " ~" + i.price : ""}`).join(", ")
+      const { error } = await supabase.from("errands").insert({
+        customer_id:          user.id,
+        type:                 "buy_for_me",
+        status:               "pending",
+        pickup_address:       pickup,
+        pickup_lat:           pLat,
+        pickup_lng:           pLng,
+        delivery_address:     delivery,
+        delivery_lat:         dLat,
+        delivery_lng:         dLng,
+        items_description:    itemsDesc,
+        estimated_items_cost: estimatedBudget || null,
+        note:                 note || null,
+        service_fee:          serviceFee,
+        payment_method:       "cash",
+      })
+      if (error) { fireToast("Không thể đặt dịch vụ. Thử lại sau."); setLoading(false); return }
       fireToast("✅ Đặt mua hộ thành công! Đang tìm tài xế...")
       setTimeout(() => router.push("/orders"), 2000)
     } catch {
@@ -245,8 +273,13 @@ export default function MuaHoPage() {
           <AddressPicker height="100dvh"
             onClose={() => setMapMode(null)}
             onConfirm={(result: AddressPickerResult) => {
-              if (mapMode === "pickup") setPickup(result.address)
-              else setDelivery(result.address)
+              if (mapMode === "pickup") {
+                setPickup(result.address)
+                setPickupCoord({ lat: result.lat, lng: result.lng })
+              } else {
+                setDelivery(result.address)
+                setDeliveryCoord({ lat: result.lat, lng: result.lng })
+              }
               setMapMode(null)
             }}
           />

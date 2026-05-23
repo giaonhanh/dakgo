@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
 import AddressPicker from "@/components/map/AddressPicker"
+import { createClient } from "@/lib/supabase/client"
 import type { AddressPickerResult } from "@/types"
 
 type CarType = "4cho" | "7cho"
@@ -21,7 +22,8 @@ function estimateKm(dest: string): number {
 }
 
 export default function TaxiPage() {
-  const router = useRouter()
+  const router   = useRouter()
+  const supabase = createClient()
   const [carType,     setCarType]     = useState<CarType>("4cho")
   const [pickup,      setPickup]      = useState("Phước An, Krông Pắc")
   const [dest,        setDest]        = useState("")
@@ -40,7 +42,27 @@ export default function TaxiPage() {
     if (!dest.trim()) { fireToast("Vui lòng nhập điểm đến"); return }
     setLoading(true)
     try {
-      await new Promise(r => setTimeout(r, 1500))
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { fireToast("Vui lòng đăng nhập để đặt xe"); setLoading(false); return }
+      const pLat = pickupCoord?.lat ?? 12.683
+      const pLng = pickupCoord?.lng ?? 108.483
+      const dLat = destCoord?.lat ?? 12.683
+      const dLng = destCoord?.lng ?? 108.483
+      const { error } = await supabase.from("rides").insert({
+        customer_id:     user.id,
+        vehicle_type:    "car",
+        pickup_address:  pickup,
+        pickup_lat:      pLat,
+        pickup_lng:      pLng,
+        dropoff_address: dest,
+        dropoff_lat:     dLat,
+        dropoff_lng:     dLng,
+        distance_km:     estimatedKm,
+        estimated_fare:  estimatedPrice,
+        payment_method:  "cash",
+        status:          "searching",
+      })
+      if (error) { fireToast("Không thể đặt xe. Thử lại sau."); setLoading(false); return }
       fireToast(`✅ Đang tìm ${car.label} cho bạn...`)
       setTimeout(() => router.push("/orders"), 2000)
     } catch {

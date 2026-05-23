@@ -1,9 +1,10 @@
 ﻿"use client"
 
-import React, { useState, useRef } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import AddressPicker from "@/components/map/AddressPicker"
+import { createClient } from "@/lib/supabase/client"
 import type { AddressPickerResult } from "@/types"
 
 // --- Types ---
@@ -27,19 +28,11 @@ const LABEL_CFG: Record<LabelType, { icon: string; color: string; bg: string; bd
 
 const LABEL_TYPES: LabelType[] = ["Nhà", "Công ty", "Khác"]
 
-// --- Mock data ---
-const INITIAL_ADDRESSES: Address[] = [
-  { id: "1", label: "Nhà",     customLabel: "", address: "147 Trần Phú, Phước An, Krông Pắc",     lat: 12.681, lng: 108.481, isDefault: true  },
-  { id: "2", label: "Công ty", customLabel: "", address: "Trường THPT Krông Pắc, Phước An",        lat: 12.692, lng: 108.495, isDefault: false },
-]
-
 interface NominatimResult {
   display_name: string
   lat: string
   lon: string
 }
-
-const genId = () => Math.random().toString(36).slice(2, 9)
 
 // --- Sub-components ---
 function LabelBadge({ label }: { label: string }) {
@@ -95,12 +88,37 @@ function FormInput({ label, value, onChange, placeholder, icon, type = "text" }:
 // --- Main ---
 export default function AddressesPage() {
   const router = useRouter()
-  const [addresses,    setAddresses]    = useState<Address[]>(INITIAL_ADDRESSES)
+  const supabase = createClient()
+  const [addresses,    setAddresses]    = useState<Address[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [saving,       setSaving]       = useState(false)
+  const [userId,       setUserId]       = useState<string | null>(null)
   const [showForm,     setShowForm]     = useState(false)
   const [editId,       setEditId]       = useState<string | null>(null)
   const [showDelete,   setShowDelete]   = useState<string | null>(null)
   const [toast,        setToast]        = useState("")
   const [showFullMap,  setShowFullMap]  = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoading(false); return }
+      setUserId(user.id)
+      const { data } = await supabase
+        .from("saved_addresses")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("is_default", { ascending: false })
+      if (data) {
+        setAddresses(data.map(r => ({
+          id: r.id, label: r.label, customLabel: "",
+          address: r.address, lat: r.lat, lng: r.lng, isDefault: r.is_default,
+        })))
+      }
+      setLoading(false)
+    }
+    load()
+  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Form fields
   const [formLabel,    setFormLabel]    = useState<LabelType>("Nhà")
@@ -172,42 +190,76 @@ export default function AddressesPage() {
     setSearchResults([])
   }
 
-  const saveAddress = () => {
+  const saveAddress = async () => {
     if (!formAddress.trim()) { fireToast("Vui lòng nhập địa chỉ"); return }
+    if (!userId) return
     const label = formLabel === "Khác" && formCustom.trim() ? formCustom.trim() : formLabel
-
-    if (editId) {
-      setAddresses(prev => prev.map(a => {
-        if (formDefault && a.id !== editId) return { ...a, isDefault: false }
-        if (a.id === editId) return { ...a, label, customLabel: formCustom, address: formAddress, lat: formLat, lng: formLng, isDefault: formDefault }
-        return a
-      }))
-      fireToast("Đã cập nhật địa chỉ")
-    } else {
-      const newAddr: Address = {
-        id: genId(), label, customLabel: formCustom,
-        address: formAddress, lat: formLat, lng: formLng, isDefault: formDefault,
+    setSaving(true)
+    try {
+      if (formDefault) {
+        await supabase.from("saved_addresses")
+          .update({ is_default: false })
+          .eq("user_id", userId)
       }
-      setAddresses(prev =>
-        formDefault
-          ? [...prev.map(a => ({ ...a, isDefault: false })), newAddr]
-          : [...prev, newAddr]
-      )
-      fireToast("Đã thêm địa chỉ mới")
+      if (editId) {
+        const { error } = await supabase.from("saved_addresses").update({
+          label, address: formAddress, lat: formLat, lng: formLng, is_default: formDefault,
+        }).eq("id", editId)
+        if (error) throw error
+        setAddresses(prev => prev.map(a => {
+          if (formDefault && a.id !== editId) return { ...a, isDefault: false }
+          if (a.id === editId) return { ...a, label, customLabel: formCustom, address: formAddress, lat: formLat, lng: formLng, isDefault: formDefault }
+          return a
+        }))
+        fireToast("Đã cập nhật địa chỉ")
+      } else {
+        const { data, error } = await supabase.from("saved_addresses").insert({
+          user_id: userId, label, address: formAddress,
+          lat: formLat, lng: formLng, is_default: formDefault,
+        }).select().single()
+        if (error) throw error
+        const newAddr: Address = {
+          id: data.id, label, customLabel: formCustom,
+          address: formAddress, lat: formLat, lng: formLng, isDefault: formDefault,
+        }
+        setAddresses(prev =>
+          formDefault
+            ? [...prev.map(a => ({ ...a, isDefault: false })), newAddr]
+            : [...prev, newAddr]
+        )
+        fireToast("Đã thêm địa chỉ mới")
+      }
+    } catch {
+      fireToast("Không thể lưu địa chỉ. Thử lại sau.")
+    } finally {
+      setSaving(false)
     }
     setShowForm(false)
     resetForm()
   }
 
-  const setDefault = (id: string) => {
-    setAddresses(prev => prev.map(a => ({ ...a, isDefault: a.id === id })))
-    fireToast("Đã đặt làm địa chỉ mặc định")
+  const setDefault = async (id: string) => {
+    if (!userId) return
+    try {
+      await supabase.from("saved_addresses").update({ is_default: false }).eq("user_id", userId)
+      await supabase.from("saved_addresses").update({ is_default: true }).eq("id", id)
+      setAddresses(prev => prev.map(a => ({ ...a, isDefault: a.id === id })))
+      fireToast("Đã đặt làm địa chỉ mặc định")
+    } catch {
+      fireToast("Không thể cập nhật. Thử lại sau.")
+    }
   }
 
-  const deleteAddress = (id: string) => {
-    setAddresses(prev => prev.filter(a => a.id !== id))
-    setShowDelete(null)
-    fireToast("Đã xóa địa chỉ")
+  const deleteAddress = async (id: string) => {
+    try {
+      const { error } = await supabase.from("saved_addresses").delete().eq("id", id)
+      if (error) throw error
+      setAddresses(prev => prev.filter(a => a.id !== id))
+      setShowDelete(null)
+      fireToast("Đã xóa địa chỉ")
+    } catch {
+      fireToast("Không thể xóa địa chỉ. Thử lại sau.")
+    }
   }
 
   const displayLabel = (a: Address) =>
@@ -561,22 +613,24 @@ export default function AddressesPage() {
                 {/* Save button */}
                 <button
                   onClick={saveAddress}
+                  disabled={saving}
                   style={{
                     width: "100%", height: 48, borderRadius: 13, border: "none",
                     background: "linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)",
                     color: "#fff", fontSize: 13, fontWeight: 700,
-                    fontFamily: "'Lexend', sans-serif", cursor: "pointer",
+                    fontFamily: "'Lexend', sans-serif", cursor: saving ? "not-allowed" : "pointer",
                     position: "relative", overflow: "hidden",
                     boxShadow: "0 4px 18px rgba(255,107,0,0.4)",
+                    opacity: saving ? 0.7 : 1,
                   }}
                 >
-                  <div style={{
+                  {!saving && <div style={{
                     position: "absolute", top: 0, left: "-60%", width: "35%", height: "100%",
                     background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.22),transparent)",
                     animation: "shimmer 2.5s infinite",
-                  }} />
+                  }} />}
                   <span style={{ position: "relative", zIndex: 1 }}>
-                    {editId ? "✓ Lưu thay đổi" : "＋ Thêm địa chỉ"}
+                    {saving ? "Đang lưu..." : editId ? "✓ Lưu thay đổi" : "＋ Thêm địa chỉ"}
                   </span>
                 </button>
               </div>
@@ -640,7 +694,19 @@ export default function AddressesPage() {
         {/* List */}
         <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px 88px" } as React.CSSProperties}>
 
-          {addresses.length === 0 && (
+          {loading && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {[1, 2].map(i => (
+                <div key={i} style={{
+                  height: 120, borderRadius: 16,
+                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+                  animation: "pulse 1.5s infinite",
+                }} />
+              ))}
+            </div>
+          )}
+
+          {!loading && addresses.length === 0 && (
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               style={{
@@ -666,7 +732,7 @@ export default function AddressesPage() {
             </motion.div>
           )}
 
-          <AnimatePresence>
+          {!loading && <AnimatePresence>
             {addresses.map((addr, idx) => (
               <motion.div
                 key={addr.id}
@@ -756,9 +822,9 @@ export default function AddressesPage() {
                 </div>
               </motion.div>
             ))}
-          </AnimatePresence>
+          </AnimatePresence>}
 
-          {addresses.length > 0 && (
+          {!loading && addresses.length > 0 && (
             <div style={{
               background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
               borderRadius: 12, padding: "10px 13px", marginBottom: 6,

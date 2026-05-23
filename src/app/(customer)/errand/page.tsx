@@ -4,24 +4,28 @@ import { useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import AddressPicker from "@/components/map/AddressPicker"
+import { createClient } from "@/lib/supabase/client"
 import type { AddressPickerResult } from "@/types"
 
 type BuyItem = { id: number; name: string; qty: number; price: string }
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
 function ErrandContent() {
-  const params = useSearchParams()
+  const params   = useSearchParams()
+  const supabase = createClient()
   const [tab,     setTab]     = useState<"buy" | "deliver">(
     params.get("type") === "deliver" ? "deliver" : "buy"
   )
-  const [pickup,  setPickup]  = useState("")
-  const [delivery, setDelivery] = useState("")
-  const [items,   setItems]   = useState<BuyItem[]>([{ id: 1, name: "", qty: 1, price: "" }])
-  const [note,    setNote]    = useState("")
-  const [pkgDesc, setPkgDesc] = useState("")
-  const [mapMode, setMapMode] = useState<null | "pickup" | "delivery">(null)
-  const [loading, setLoading] = useState(false)
-  const [toast,   setToast]   = useState("")
+  const [pickup,       setPickup]       = useState("")
+  const [delivery,     setDelivery]     = useState("")
+  const [pickupCoord,  setPickupCoord]  = useState<{ lat: number; lng: number } | null>(null)
+  const [deliveryCoord,setDeliveryCoord]= useState<{ lat: number; lng: number } | null>(null)
+  const [items,        setItems]        = useState<BuyItem[]>([{ id: 1, name: "", qty: 1, price: "" }])
+  const [note,         setNote]         = useState("")
+  const [pkgDesc,      setPkgDesc]      = useState("")
+  const [mapMode,      setMapMode]      = useState<null | "pickup" | "delivery">(null)
+  const [loading,      setLoading]      = useState(false)
+  const [toast,        setToast]        = useState("")
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2200) }
 
@@ -36,7 +40,44 @@ function ErrandContent() {
     }
     setLoading(true)
     try {
-      await new Promise(r => setTimeout(r, 1500))
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { fireToast("Vui lòng đăng nhập để đặt dịch vụ"); setLoading(false); return }
+
+      const pLat = pickupCoord?.lat ?? 12.683
+      const pLng = pickupCoord?.lng ?? 108.483
+      const dLat = deliveryCoord?.lat ?? 12.683
+      const dLng = deliveryCoord?.lng ?? 108.483
+
+      const itemsDesc = tab === "buy"
+        ? items.filter(i => i.name.trim()).map(i => `${i.name} x${i.qty}${i.price ? " ~" + i.price : ""}`).join(", ")
+        : null
+
+      const estimatedCost = tab === "buy"
+        ? items.reduce((acc, i) => {
+            const p = parseInt(i.price.replace(/[^0-9]/g, "")) || 0
+            return acc + p * i.qty
+          }, 0) || null
+        : null
+
+      const { error } = await supabase.from("errands").insert({
+        customer_id:           user.id,
+        type:                  tab === "buy" ? "buy_for_me" : "deliver_for_me",
+        status:                "pending",
+        pickup_address:        pickup,
+        pickup_lat:            pLat,
+        pickup_lng:            pLng,
+        delivery_address:      delivery,
+        delivery_lat:          dLat,
+        delivery_lng:          dLng,
+        items_description:     itemsDesc,
+        estimated_items_cost:  estimatedCost,
+        package_description:   tab === "deliver" ? pkgDesc : null,
+        note:                  note || null,
+        service_fee:           25000,
+        payment_method:        "cash",
+      })
+
+      if (error) { fireToast("Không thể đặt dịch vụ. Thử lại sau."); setLoading(false); return }
       fireToast("✅ Đặt dịch vụ thành công! Đang tìm tài xế...")
     } catch {
       fireToast("Có lỗi xảy ra, vui lòng thử lại")
@@ -234,8 +275,13 @@ function ErrandContent() {
             height="100dvh"
             onClose={() => setMapMode(null)}
             onConfirm={(result: AddressPickerResult) => {
-              if (mapMode === "pickup") setPickup(result.address)
-              else setDelivery(result.address)
+              if (mapMode === "pickup") {
+                setPickup(result.address)
+                setPickupCoord({ lat: result.lat, lng: result.lng })
+              } else {
+                setDelivery(result.address)
+                setDeliveryCoord({ lat: result.lat, lng: result.lng })
+              }
               setMapMode(null)
             }}
           />

@@ -30,15 +30,20 @@ interface BankInfo { code: string; name: string; short: string; featured: boolea
 
 interface AppliedVoucher { code: string; type: "app" | "shop"; label: string; discount: number }
 
-const MOCK_VOUCHERS: Array<{
-  code: string; type: "app" | "shop"; label: string
-  calcDiscount: (sub: number, fee: number) => number
-}> = [
-  { code: "WELCOME25", type: "app",  label: "Giảm 25%",        calcDiscount: (sub)      => Math.min(Math.round(sub * 0.25), 50000) },
-  { code: "FREESHIP",  type: "app",  label: "Miễn phí ship",   calcDiscount: (_s, fee)  => fee },
-  { code: "SHOP10",    type: "shop", label: "Giảm 10% quán",   calcDiscount: (sub)      => Math.min(Math.round(sub * 0.10), 20000) },
-  { code: "GNSHOP",    type: "shop", label: "Giảm 5.000đ quán",calcDiscount: ()         => 5000 },
-]
+interface DbVoucher {
+  id: string; code: string; title: string
+  discount_type: "percent" | "fixed" | "freeship"
+  discount_value: number; min_order: number; max_discount: number | null
+  valid_to: string; shop_id: string | null; is_active: boolean
+}
+
+function calcVoucherDiscount(v: DbVoucher, sub: number, fee: number): number {
+  if (v.discount_type === "percent") return Math.min(Math.round(sub * v.discount_value / 100), v.max_discount ?? 999999)
+  if (v.discount_type === "freeship") return fee
+  return v.discount_value
+}
+
+function dbVoucherType(v: DbVoucher): "app" | "shop" { return v.shop_id ? "shop" : "app" }
 const BANK_APPS: BankInfo[] = [
   // ─── MoMo ────────────────────────────────────────────
   { code: "momo",   name: "Ví MoMo",          short: "MoMo",       featured: true,  isMomo: true },
@@ -635,15 +640,16 @@ function BankRow({ bank, selected, onSelect }: { bank: BankInfo; selected: strin
 // ─── Voucher Picker Sheet ─────────────────────────────────────
 
 function VoucherPickerSheet({
-  appliedVouchers, subtotal, deliveryFee, onApply, onClose,
+  appliedVouchers, subtotal, deliveryFee, onApply, onClose, vouchers,
 }: {
   appliedVouchers: AppliedVoucher[]
   subtotal: number; deliveryFee: number
   onApply: (code: string) => void
   onClose: () => void
+  vouchers: DbVoucher[]
 }) {
-  const appVouchers  = MOCK_VOUCHERS.filter(v => v.type === "app")
-  const shopVouchers = MOCK_VOUCHERS.filter(v => v.type === "shop")
+  const appVouchers  = vouchers.filter(v => dbVoucherType(v) === "app")
+  const shopVouchers = vouchers.filter(v => dbVoucherType(v) === "shop")
 
   const rowStatus = (code: string, type: "app" | "shop") => {
     if (appliedVouchers.some(v => v.code === code))             return "applied"
@@ -652,9 +658,10 @@ function VoucherPickerSheet({
     return "available"
   }
 
-  const VoucherRow = ({ v }: { v: typeof MOCK_VOUCHERS[number] }) => {
-    const status = rowStatus(v.code, v.type)
-    const disc   = v.calcDiscount(subtotal, deliveryFee)
+  const VoucherRow = ({ v }: { v: DbVoucher }) => {
+    const vType  = dbVoucherType(v)
+    const status = rowStatus(v.code, vType)
+    const disc   = calcVoucherDiscount(v, subtotal, deliveryFee)
     return (
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
@@ -664,26 +671,26 @@ function VoucherPickerSheet({
       }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-          background: v.type === "shop" ? "rgba(74,143,245,0.12)" : "rgba(255,107,0,0.12)",
-          border: `1px solid ${v.type === "shop" ? "rgba(74,143,245,0.25)" : "rgba(255,107,0,0.25)"}`,
+          background: vType === "shop" ? "rgba(74,143,245,0.12)" : "rgba(255,107,0,0.12)",
+          border: `1px solid ${vType === "shop" ? "rgba(74,143,245,0.25)" : "rgba(255,107,0,0.25)"}`,
           display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
         }}>
-          {v.type === "shop" ? "🏪" : "🏷️"}
+          {vType === "shop" ? "🏪" : "🏷️"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ color: v.type === "shop" ? "#4a8ff5" : "#FF8C00", fontSize: 11, fontWeight: 800, letterSpacing: 0.8 }}>
+            <span style={{ color: vType === "shop" ? "#4a8ff5" : "#FF8C00", fontSize: 11, fontWeight: 800, letterSpacing: 0.8 }}>
               {v.code}
             </span>
             <span style={{
               fontSize: 7, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
-              background: v.type === "shop" ? "rgba(74,143,245,0.12)" : "rgba(255,107,0,0.12)",
-              color: v.type === "shop" ? "#4a8ff5" : "#FF8C00",
+              background: vType === "shop" ? "rgba(74,143,245,0.12)" : "rgba(255,107,0,0.12)",
+              color: vType === "shop" ? "#4a8ff5" : "#FF8C00",
             }}>
-              {v.type === "shop" ? "Quán" : "App"}
+              {vType === "shop" ? "Quán" : "App"}
             </span>
           </div>
-          <div style={{ color: "#b0956a", fontSize: 9.5, marginTop: 2 }}>{v.label}</div>
+          <div style={{ color: "#b0956a", fontSize: 9.5, marginTop: 2 }}>{v.title}</div>
           <div style={{ color: "#3ecf6e", fontSize: 9, marginTop: 1, fontWeight: 700 }}>
             Giảm {disc.toLocaleString("vi-VN")}đ
           </div>
@@ -1101,6 +1108,7 @@ export default function CheckoutPage() {
   const [showTimeSheet,    setShowTimeSheet]    = useState(false)
   const [voucherInput,     setVoucherInput]     = useState("")
   const [appliedVouchers,  setAppliedVouchers]  = useState<AppliedVoucher[]>([])
+  const [dbVouchers,       setDbVouchers]       = useState<DbVoucher[]>([])
   const [showVoucherPicker,setShowVoucherPicker] = useState(false)
   const [driverNote,       setDriverNote]       = useState("")
   const [loading,          setLoading]          = useState(false)
@@ -1126,10 +1134,12 @@ export default function CheckoutPage() {
       if (!user) return
       setUserId(user.id)
 
-      const [{ data: addrs }, { data: wallet }] = await Promise.all([
+      const [{ data: addrs }, { data: wallet }, { data: voucherData }] = await Promise.all([
         supabase.from("saved_addresses").select("id, label, address, lat, lng, is_default").eq("user_id", user.id).order("is_default", { ascending: false }),
         supabase.from("wallets").select("id, balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
+        supabase.from("vouchers").select("id,code,title,discount_type,discount_value,min_order,max_discount,valid_to,shop_id,is_active").eq("is_active", true).gte("valid_to", new Date().toISOString()).limit(30),
       ])
+      if (voucherData) setDbVouchers(voucherData as DbVoucher[])
 
       if (addrs && addrs.length > 0) {
         const mapped: AddrOption[] = addrs.map(a => ({
@@ -1194,16 +1204,17 @@ export default function CheckoutPage() {
     if (appliedVouchers.some(v => v.code === code)) {
       fireToast("Mã này đã được áp dụng rồi!"); return
     }
-    const found = MOCK_VOUCHERS.find(v => v.code === code)
+    const found = dbVouchers.find(v => v.code === code)
     if (!found) { fireToast("Mã voucher không hợp lệ ❌"); return }
-    const conflict = appliedVouchers.find(v => v.type === found.type)
+    const foundType = dbVoucherType(found)
+    const conflict = appliedVouchers.find(v => v.type === foundType)
     if (conflict) {
-      fireToast(`Chỉ được dùng 1 voucher ${found.type === "app" ? "ứng dụng" : "quán"} mỗi đơn`); return
+      fireToast(`Chỉ được dùng 1 voucher ${foundType === "app" ? "ứng dụng" : "quán"} mỗi đơn`); return
     }
-    const disc = found.calcDiscount(subtotal, deliveryFee)
-    setAppliedVouchers(prev => [...prev, { code, type: found.type, label: found.label, discount: disc }])
+    const disc = calcVoucherDiscount(found, subtotal, deliveryFee)
+    setAppliedVouchers(prev => [...prev, { code, type: foundType, label: found.title, discount: disc }])
     if (!fromPicker) setVoucherInput("")
-    fireToast(`🎉 ${found.label} · Giảm ${fmt(disc)}`)
+    fireToast(`🎉 ${found.title} · Giảm ${fmt(disc)}`)
   }
 
   const applyVoucher = () => applyVoucherCode(voucherInput)
@@ -1399,6 +1410,7 @@ export default function CheckoutPage() {
             subtotal={subtotal} deliveryFee={deliveryFee}
             onApply={code => applyVoucherCode(code, true)}
             onClose={() => setShowVoucherPicker(false)}
+            vouchers={dbVouchers}
           />
         )}
       </AnimatePresence>
