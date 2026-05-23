@@ -144,7 +144,16 @@ export default function MerchantProfilePage() {
     setPwErr("")
     if (pwStep === 1) {
       if (!pwOld.trim()) { setPwErr("Vui lòng nhập mật khẩu hiện tại"); return }
-      setPwStep(2)
+      setPwLoading(true)
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user?.email) { setPwErr("Không tìm thấy tài khoản"); return }
+        const { error } = await supabase.auth.signInWithPassword({ email: user.email, password: pwOld })
+        if (error) { setPwErr("Mật khẩu hiện tại không đúng"); return }
+        setPwStep(2)
+      } catch { setPwErr("Lỗi xác thực, vui lòng thử lại") }
+      finally { setPwLoading(false) }
+      return
     } else if (pwStep === 2) {
       if (pwNew.length < 6) { setPwErr("Mật khẩu mới phải ít nhất 6 ký tự"); return }
       if (pwNew === pwOld)   { setPwErr("Mật khẩu mới phải khác mật khẩu cũ"); return }

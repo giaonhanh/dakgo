@@ -6,11 +6,20 @@ import { createClient } from "@/lib/supabase/client"
 
 type UserStatus = "active" | "blacklisted" | "inactive"
 type TierLevel  = "bronze" | "silver" | "gold" | "platinum"
+type UserRole   = "customer" | "merchant" | "driver" | "admin"
+
+const ROLE_CFG: Record<UserRole, { label: string; color: string; bg: string }> = {
+  customer: { label: "Khách hàng", color: "#f0eaff", bg: "rgba(255,255,255,0.08)" },
+  merchant: { label: "Cửa hàng",  color: "#FFB347", bg: "rgba(255,179,71,0.12)"  },
+  driver:   { label: "Tài xế",    color: "#4a8ff5", bg: "rgba(74,143,245,0.12)"  },
+  admin:    { label: "Admin",     color: "#b464ff", bg: "rgba(180,100,255,0.15)" },
+}
 
 interface AppUser {
   id: string
   fullName: string
   phone: string
+  role: UserRole
   status: UserStatus
   registeredDate: string
   totalOrders: number
@@ -55,6 +64,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<AppUser[]>([])
   const [filterStatus, setFilterStatus] = useState<"all" | UserStatus>("all")
   const [filterTier, setFilterTier] = useState<"all" | TierLevel>("all")
+  const [filterRole, setFilterRole] = useState<"all" | UserRole>("all")
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState<AppUser | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ type: "lock" | "unlock"; id: string } | null>(null)
@@ -68,10 +78,9 @@ export default function AdminUsersPage() {
 
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id, full_name, phone, is_active, created_at")
-      .eq("role", "customer")
+      .select("id, full_name, phone, role, is_active, created_at")
       .order("created_at", { ascending: false })
-      .limit(200)
+      .limit(500)
 
     if (!profiles || profiles.length === 0) { setLoading(false); return }
 
@@ -117,6 +126,7 @@ export default function AdminUsersPage() {
         id: p.id,
         fullName: p.full_name ?? "Người dùng",
         phone: p.phone,
+        role: (p.role ?? "customer") as UserRole,
         status,
         registeredDate: new Date(p.created_at).toLocaleDateString("vi-VN"),
         totalOrders: ord.count,
@@ -169,6 +179,7 @@ export default function AdminUsersPage() {
   const shown = users
     .filter(u => filterStatus === "all" || u.status === filterStatus)
     .filter(u => filterTier === "all" || u.tier === filterTier)
+    .filter(u => filterRole === "all" || u.role === filterRole)
     .filter(u => !search || u.fullName.toLowerCase().includes(search.toLowerCase()) || u.phone.includes(search))
 
   return (
@@ -267,6 +278,17 @@ export default function AdminUsersPage() {
                   <button key={tab.key} onClick={() => setFilterStatus(tab.key)} style={{ padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "Lexend", fontSize: 9, fontWeight: filterStatus === tab.key ? 700 : 400, background: filterStatus === tab.key ? `${tab.c}18` : "rgba(255,255,255,0.04)", border: `1px solid ${filterStatus === tab.key ? tab.c + "55" : "rgba(255,255,255,0.07)"}`, color: filterStatus === tab.key ? tab.c : "rgba(144,128,176,0.6)" }}>{tab.label}</button>
                 ))}
               </div>
+              <div style={{ display: "flex", gap: 5, marginBottom: 6 }}>
+                <span style={{ color: "rgba(144,128,176,0.4)", fontSize: 8, alignSelf: "center", marginRight: 2 }}>Vai trò:</span>
+                {(["all", "customer", "merchant", "driver", "admin"] as const).map(r => {
+                  const cfg = r === "all" ? null : ROLE_CFG[r]
+                  return (
+                    <button key={r} onClick={() => setFilterRole(r)} style={{ padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Lexend", fontSize: 8, fontWeight: filterRole === r ? 700 : 400, background: filterRole === r ? (cfg?.bg ?? "rgba(255,107,0,0.1)") : "rgba(255,255,255,0.04)", border: `1px solid ${filterRole === r ? (cfg?.color ?? "#FF8C00") + "55" : "rgba(255,255,255,0.07)"}`, color: filterRole === r ? (cfg?.color ?? "#FF8C00") : "rgba(144,128,176,0.55)" }}>
+                      {r === "all" ? "Tất cả" : cfg!.label}
+                    </button>
+                  )
+                })}
+              </div>
               <div style={{ display: "flex", gap: 5 }}>
                 <span style={{ color: "rgba(144,128,176,0.4)", fontSize: 8, alignSelf: "center", marginRight: 2 }}>Tier:</span>
                 {(["all", "bronze", "silver", "gold", "platinum"] as const).map(t => {
@@ -302,7 +324,10 @@ export default function AdminUsersPage() {
                       {u.status === "blacklisted" && <div style={{ position: "absolute", bottom: -2, right: -2, width: 14, height: 14, borderRadius: "50%", background: "#ff4040", border: "1.5px solid #06050a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7 }}>🔒</div>}
                     </div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ color: "#f0eaff", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.fullName}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <div style={{ color: "#f0eaff", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.fullName}</div>
+                        <span style={{ fontSize: 7, fontWeight: 700, padding: "2px 5px", borderRadius: 4, background: ROLE_CFG[u.role]?.bg, color: ROLE_CFG[u.role]?.color, flexShrink: 0 }}>{ROLE_CFG[u.role]?.label}</span>
+                      </div>
                       <div style={{ color: "rgba(144,128,176,0.4)", fontSize: 8, marginTop: 2 }}>Đăng ký {u.registeredDate}</div>
                     </div>
                     <div style={{ color: "rgba(240,234,255,0.65)", fontSize: 10 }}>{u.phone}</div>
