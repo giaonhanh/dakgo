@@ -90,18 +90,36 @@ function PwSheet({ onClose }: { onClose: () => void }) {
 }
 
 /* ── hours sheet ── */
+const HOURS_KEY = "merchant_shop_hours"
+const DAYS_LABEL = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"]
+const DEFAULT_HOURS = DAYS_LABEL.map(d => ({ day: d, open: true, from: "07:00", to: "21:00" }))
+
+export type DayHours = { day: string; open: boolean; from: string; to: string }
+
+function loadHours(): DayHours[] {
+  try {
+    const s = typeof window !== "undefined" ? localStorage.getItem(HOURS_KEY) : null
+    if (s) return JSON.parse(s)
+  } catch { /* ignore */ }
+  return DEFAULT_HOURS
+}
+
+/* ── hours sheet ── */
 function HoursSheet({ onClose }: { onClose: () => void }) {
-  const DAYS = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"]
-  const [hours, setHours] = useState(
-    DAYS.map(d => ({ day: d, open: true, from: "07:00", to: "21:00" }))
-  )
+  const [hours, setHours] = useState<DayHours[]>(loadHours)
   const toggle = (i: number) => setHours(h => h.map((x, j) => j === i ? { ...x, open: !x.open } : x))
+
+  const handleSave = () => {
+    localStorage.setItem(HOURS_KEY, JSON.stringify(hours))
+    onClose()
+  }
+
   return (
     <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 26, stiffness: 280 }}
       style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
       <div style={{ background: "#0e0b07", borderTop: "1px solid rgba(255,107,0,0.3)", borderRadius: "22px 22px 0 0", padding: "20px 20px calc(env(safe-area-inset-bottom) + 20px)", maxHeight: "88dvh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 18 }}>
-          <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🕐 Giờ hoạt động</div>
+          <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🕐 Giờ hoạt động từng ngày</div>
           <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
         </div>
         {hours.map((h, i) => (
@@ -121,7 +139,7 @@ function HoursSheet({ onClose }: { onClose: () => void }) {
             )}
           </div>
         ))}
-        <button onClick={onClose} style={{ width: "100%", height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend", marginTop: 16 }}>✓ Lưu giờ hoạt động</button>
+        <button onClick={handleSave} style={{ width: "100%", height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend", marginTop: 16 }}>✓ Lưu giờ hoạt động</button>
       </div>
     </motion.div>
   )

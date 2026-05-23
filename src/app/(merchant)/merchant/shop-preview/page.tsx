@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
 interface Product { id: string; name: string; price: number; originalPrice?: number; category: string; imagePreview: string | null; available: boolean; badge: "hot" | "bigsale" | "bestseller" | null }
@@ -26,11 +26,26 @@ export default function ShopPreviewPage() {
   const [shopName] = useState("Bún Bò Huế Ngon")
   const [category] = useState("🍜 Bún / Phở")
   const [address]  = useState("22 Lê Hồng Phong, Phước An, Krông Pắc")
-  const [rating]   = useState(4.8)
-  const [isOpen]   = useState(true)
-  const [openTime] = useState("07:00")
-  const [closeTime] = useState("21:00")
-  const [prepTime] = useState("10–15")
+  const [rating]    = useState(4.8)
+  const [isOpen]    = useState(true)
+  const [prepTime]  = useState("10–15")
+  const [todayLabel, setTodayLabel] = useState("07:00–21:00")
+  const [todayClosed, setTodayClosed] = useState(false)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("merchant_shop_hours")
+      if (!saved) return
+      const arr: { day: string; open: boolean; from: string; to: string }[] = JSON.parse(saved)
+      // JS getDay(): 0=Sun,1=Mon..6=Sat → convert to index Mon=0..Sun=6
+      const jsDay = new Date().getDay()
+      const idx = jsDay === 0 ? 6 : jsDay - 1
+      const today = arr[idx]
+      if (!today) return
+      if (!today.open) { setTodayClosed(true) }
+      else { setTodayLabel(`${today.from}–${today.to}`) }
+    } catch { /* ignore */ }
+  }, [])
   const [activeTab, setActiveTab] = useState("Tất cả")
   const [toast, setToast]         = useState("")
 
@@ -150,11 +165,16 @@ export default function ShopPreviewPage() {
 
           {/* Info chips */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
-            {([["🕐", `${openTime}–${closeTime}`], ["⏱️", `Chuẩn bị ${prepTime} phút`]] as [string,string][]).map(([icon,txt]) => (
-              <span key={txt} style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"4px 10px",color:"#b0956a",fontSize:9}}>
-                {icon} {txt}
-              </span>
-            ))}
+            <span style={{
+              background: todayClosed ? "rgba(255,64,64,0.08)" : "rgba(255,255,255,0.05)",
+              border: `1px solid ${todayClosed ? "rgba(255,64,64,0.2)" : "rgba(255,255,255,0.08)"}`,
+              borderRadius:8, padding:"4px 10px",
+              color: todayClosed ? "#ff4040" : "#b0956a", fontSize:9 }}>
+              🕐 {todayClosed ? "Hôm nay nghỉ" : todayLabel}
+            </span>
+            <span style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"4px 10px",color:"#b0956a",fontSize:9}}>
+              ⏱️ Chuẩn bị {prepTime} phút
+            </span>
           </div>
         </div>
 
