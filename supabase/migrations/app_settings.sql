@@ -1,6 +1,6 @@
 -- ============================================================
 -- App-wide settings table (key-value, JSONB)
--- Run in Supabase SQL Editor
+-- Idempotent: safe to run multiple times
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS app_settings (
@@ -11,19 +11,23 @@ CREATE TABLE IF NOT EXISTS app_settings (
 
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
 
--- Admin-only read/write
+-- Drop before recreate to avoid duplicate policy error
+DROP POLICY IF EXISTS "settings_admin_all"   ON app_settings;
+DROP POLICY IF EXISTS "settings_public_read" ON app_settings;
+
+-- Admin-only write
 CREATE POLICY "settings_admin_all" ON app_settings
   FOR ALL
   USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
--- Public read-only for features the app needs to check (e.g. maintenance_mode)
+-- Public read-only for keys the app needs client-side
 CREATE POLICY "settings_public_read" ON app_settings
   FOR SELECT
   USING (key IN ('features', 'app_hours', 'weather_surcharge', 'night_surcharge'));
 
--- Seed defaults so the first load always has values
+-- Seed defaults (only if row doesn't exist yet)
 INSERT INTO app_settings (key, value) VALUES
   ('pricing',    '{"food":{"rows":["15000","12000","10000","9000","8000","7500","7000","6500","6000","5500"],"extra":"5000"},"delivery_pkg":{"rows":["18000","15000","12000","10000","9000","8500","8000","7500","7000","6500"],"extra":"6000"},"errand":{"rows":["20000","17000","14000","12000","11000","10000","9000","8500","8000","7500"],"extra":"7000"},"motorbike":{"rows":["10000","8000","7000","6500","6000","5500","5000","4800","4600","4500"],"extra":"4000"},"taxi":{"rows":["15000","13000","11000","10000","9500","9000","8500","8000","7500","7000"],"extra":"6500"}}'),
   ('commission', '{"defaultRate":"15","minRate":"10","maxRate":"25","driverSharePercent":"80","platformSharePercent":"20","loyaltyPointsRate":"1"}'),
