@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
+const supabase = createClient()
 const COUNTDOWN_SEC = 30
 
 /* ── helpers ── */
@@ -11,24 +14,20 @@ const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 const RING_R = 36
 const RING_C = 2 * Math.PI * RING_R
 
-/* ── mock incoming order ── */
-const MOCK_ORDER = {
-  id: "GN-8821",
-  shopName: "Bún Bò Huế Ngon",
-  shopAddress: "22 Lê Hồng Phong, Phước An",
-  customerName: "Phạm Thị Lan",
-  customerAddress: "15 Trần Hưng Đạo, Phước An",
-  distanceToShop: 1.2,
-  distanceToCustomer: 2.8,
-  items: [
-    { name: "Bún bò đặc biệt", qty: 2, price: 45000 },
-    { name: "Trà đá",           qty: 2, price: 5000  },
-  ],
-  subtotal: 100000,
-  deliveryFee: 18000,
-  total: 118000,
-  earnerFee: 14000,
-  payMethod: "Tiền mặt",
+interface OrderData {
+  id:                  string
+  shopName:            string
+  shopAddress:         string
+  customerName:        string
+  customerAddress:     string
+  distanceToShop:      number
+  distanceToCustomer:  number
+  items:               { name: string; qty: number; price: number }[]
+  subtotal:            number
+  deliveryFee:         number
+  total:               number
+  earnerFee:           number
+  payMethod:           string
 }
 
 /* ── sub-components ── */
@@ -99,8 +98,8 @@ function CountdownRing({ sec, total }: { sec:number; total:number }) {
 
 /* ── order popup ── */
 function OrderPopup({
-  onAccept, onReject,
-}: { onAccept:()=>void; onReject:()=>void }) {
+  order, onAccept, onReject,
+}: { order: OrderData; onAccept:()=>void; onReject:()=>void }) {
   const [sec, setSec] = useState(COUNTDOWN_SEC)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -114,7 +113,7 @@ function OrderPopup({
     return () => clearInterval(timerRef.current!)
   }, [onReject])
 
-  const o = MOCK_ORDER
+  const o = order
   return (
     <motion.div
       initial={{ y:"100%" }} animate={{ y:0 }} exit={{ y:"100%" }}
@@ -260,30 +259,149 @@ function OrderPopup({
 
 /* ── main page ── */
 export default function DriverDashboard() {
-  const [online, setOnline]       = useState(false)
-  const [showOrder, setShowOrder] = useState(false)
-  const [accepted, setAccepted]   = useState<string | null>(null)
-  const demoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const router = useRouter()
+  const [online,      setOnline]      = useState(false)
+  const [showOrder,   setShowOrder]   = useState(false)
+  const [pendingOrder,setPendingOrder] = useState<OrderData | null>(null)
+  const [accepted,    setAccepted]    = useState<string | null>(null)
+  const [driverName,  setDriverName]  = useState("Tài xế")
+  const [driverId,    setDriverId]    = useState<string | null>(null)
+  const [todayStats,  setTodayStats]  = useState({ orders: 0, earnings: 0, rating: 5.0 })
+  const [toggling,    setToggling]    = useState(false)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  /* demo: trigger popup 2s after going online */
+  // ── Load driver profile on mount ──
   useEffect(() => {
-    if (online && !accepted) {
-      demoTimer.current = setTimeout(() => setShowOrder(true), 2000)
-    } else {
-      clearTimeout(demoTimer.current!)
-      if (!online) setShowOrder(false)
-    }
-    return () => clearTimeout(demoTimer.current!)
-  }, [online, accepted])
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      setDriverId(user.id)
 
-  const handleAccept = () => {
-    setShowOrder(false)
-    setAccepted(MOCK_ORDER.id)
-    // TODO: navigate to /driver/navigate/[orderId] + update DB
+      const [{ data: profile }, { data: driver }] = await Promise.all([
+        supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+        supabase.from("drivers").select("status, rating_avg").eq("id", user.id).single(),
+      ])
+
+      if (profile?.full_name) setDriverName(profile.full_name)
+      if (driver) {
+        setOnline(driver.status === "online")
+        setTodayStats(s => ({ ...s, rating: Number(driver.rating_avg ?? 5) }))
+      }
+
+      // Today's delivered orders
+      const today = new Date().toISOString().split("T")[0]
+      const { count, data: delivered } = await supabase
+        .from("orders")
+        .select("delivery_fee, shops(commission_rate)", { count: "exact" })
+        .eq("driver_id", user.id)
+        .eq("status", "delivered")
+        .gte("created_at", `${today}T00:00:00`)
+
+      const earnings = (delivered ?? []).reduce((sum, o) => {
+        const commission = Array.isArray(o.shops)
+          ? (o.shops[0] as { commission_rate: number })?.commission_rate ?? 15
+          : (o.shops as { commission_rate: number } | null)?.commission_rate ?? 15
+        return sum + Math.round(o.delivery_fee * (1 - commission / 100))
+      }, 0)
+      setTodayStats(s => ({ ...s, orders: count ?? 0, earnings }))
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Toggle online/offline ──
+  const handleToggleOnline = async () => {
+    if (!driverId || toggling) return
+    setToggling(true)
+    const next = !online
+    await supabase.from("drivers").update({ status: next ? "online" : "offline" }).eq("id", driverId)
+    setOnline(next)
+    if (!next) setShowOrder(false)
+    setToggling(false)
   }
+
+  // ── Subscribe to pending orders when online ──
+  useEffect(() => {
+    if (!online || !driverId) {
+      channelRef.current?.unsubscribe()
+      channelRef.current = null
+      return
+    }
+
+    const ch = supabase
+      .channel("driver-pending-orders")
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "orders",
+        filter: "status=eq.pending",
+      }, async (payload) => {
+        if (showOrder || accepted) return
+        const o = payload.new as {
+          id: string; shop_id: string; customer_id: string
+          delivery_address: string; subtotal: number; delivery_fee: number
+          total_amount: number; payment_method: string
+        }
+
+        // Fetch shop + customer + items
+        const [{ data: shop }, { data: customer }, { data: items }] = await Promise.all([
+          supabase.from("shops").select("name, address, commission_rate").eq("id", o.shop_id).single(),
+          supabase.from("profiles").select("full_name").eq("id", o.customer_id).single(),
+          supabase.from("order_items").select("name, quantity, price").eq("order_id", o.id),
+        ])
+
+        const commRate = Number(shop?.commission_rate ?? 15)
+        const earnerFee = Math.round(o.delivery_fee * (1 - commRate / 100))
+
+        const orderData: OrderData = {
+          id:                  o.id.slice(0, 8).toUpperCase(),
+          shopName:            shop?.name ?? "Cửa hàng",
+          shopAddress:         shop?.address ?? "",
+          customerName:        customer?.full_name ?? "Khách hàng",
+          customerAddress:     o.delivery_address,
+          distanceToShop:      1.0,
+          distanceToCustomer:  2.0,
+          items:               (items ?? []).map(i => ({ name: i.name, qty: i.quantity, price: i.price })),
+          subtotal:            o.subtotal,
+          deliveryFee:         o.delivery_fee,
+          total:               o.total_amount,
+          earnerFee,
+          payMethod:           o.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+        }
+        setPendingOrder(orderData)
+        setShowOrder(true)
+      })
+      .subscribe()
+
+    channelRef.current = ch
+    return () => { ch.unsubscribe(); channelRef.current = null }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online, driverId, showOrder, accepted])
+
+  const handleAccept = async () => {
+    if (!pendingOrder || !driverId) return
+    setShowOrder(false)
+    // Find the real order UUID (stored in id as first 8 chars — need to query)
+    // For now navigate to navigate page with the partial ID; improve with real UUID later
+    const { data: order } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("status", "pending")
+      .limit(1)
+      .single()
+
+    if (order) {
+      await supabase.from("orders").update({
+        status: "accepted",
+        driver_id: driverId,
+        accepted_at: new Date().toISOString(),
+      }).eq("id", order.id)
+      setAccepted(order.id)
+      router.push(`/driver/navigate/${order.id}`)
+    }
+  }
+
   const handleReject = () => {
     setShowOrder(false)
-    // TODO: record rejection in DB
+    setPendingOrder(null)
   }
 
   return (
@@ -314,19 +432,20 @@ export default function DriverDashboard() {
               display:"flex", alignItems:"center", justifyContent:"center", fontSize:18,
             }}>🛵</div>
             <div>
-              <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:800 }}>Phạm Hồng Mỹ</div>
+              <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:800 }}>{driverName}</div>
               <div style={{ color:"#6a5a40", fontSize:9 }}>Tài xế · Giao Nhanh</div>
             </div>
           </div>
 
-          <motion.button whileTap={{ scale:.93 }} onClick={() => setOnline(v => !v)}
+          <motion.button whileTap={{ scale:.93 }} onClick={handleToggleOnline}
+            disabled={toggling}
             style={{
               display:"flex", alignItems:"center", gap:6,
               padding:"7px 14px", borderRadius:20, fontFamily:"Lexend",
               background: online ? "rgba(62,207,110,0.12)" : "rgba(255,255,255,0.07)",
               border: online ? "1px solid rgba(62,207,110,0.4)" : "1px solid rgba(255,255,255,0.12)",
               color: online ? "#3ecf6e" : "#6a5a40",
-              fontSize:11, fontWeight:700, cursor:"pointer",
+              fontSize:11, fontWeight:700, cursor: toggling ? "default" : "pointer", opacity: toggling ? 0.7 : 1,
             }}>
             <div style={{
               width:7, height:7, borderRadius:"50%",
@@ -334,7 +453,7 @@ export default function DriverDashboard() {
               boxShadow: online ? "0 0 6px #3ecf6e" : "none",
               animation: online ? "pulse 1.5s infinite" : "none",
             }} />
-            {online ? "Đang hoạt động" : "Ngoại tuyến"}
+            {toggling ? "..." : online ? "Đang hoạt động" : "Ngoại tuyến"}
           </motion.button>
         </div>
 
@@ -367,7 +486,7 @@ export default function DriverDashboard() {
                   <div style={{ color:"#b0956a", fontSize:13, fontWeight:700 }}>Bạn đang ngoại tuyến</div>
                   <div style={{ color:"#6a5a40", fontSize:10, marginTop:4 }}>Bật trạng thái để bắt đầu nhận đơn</div>
                   <motion.button whileTap={{ scale:.95 }}
-                    onClick={() => setOnline(true)}
+                    onClick={handleToggleOnline}
                     style={{
                       marginTop:14, padding:"9px 22px", borderRadius:20, border:"none",
                       background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
@@ -397,7 +516,7 @@ export default function DriverDashboard() {
           {/* ── accepted order banner ── */}
           <AnimatePresence>
             {accepted && (
-              <motion.a href={`/driver/navigate/GN-8821`}
+              <motion.a href={`/driver/navigate/${accepted}`}
                 initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }}
                 style={{
                   display:"flex", alignItems:"center", gap:10,
@@ -417,10 +536,9 @@ export default function DriverDashboard() {
 
           {/* ── today stats ── */}
           <div style={{ display:"flex", gap:8, marginBottom:14 }}>
-            <StatCard icon="📦" label="Đơn hôm nay" value="12"    color="#FF8C00" />
-            <StatCard icon="💰" label="Thu nhập"    value="245k"  color="#3ecf6e" />
-            <StatCard icon="🗺" label="Quãng đường" value="38km"  color="#4a8ff5" />
-            <StatCard icon="⭐" label="Đánh giá"    value="4.9"   color="#FFB347" />
+            <StatCard icon="📦" label="Đơn hôm nay" value={String(todayStats.orders)} color="#FF8C00" />
+            <StatCard icon="💰" label="Thu nhập" value={todayStats.earnings > 0 ? `${Math.round(todayStats.earnings/1000)}k` : "0đ"} color="#3ecf6e" />
+            <StatCard icon="⭐" label="Đánh giá" value={todayStats.rating.toFixed(1)} color="#FFB347" />
           </div>
 
           {/* ── quick links ── */}
@@ -495,8 +613,8 @@ export default function DriverDashboard() {
 
       {/* ── incoming order popup ── */}
       <AnimatePresence>
-        {showOrder && (
-          <OrderPopup onAccept={handleAccept} onReject={handleReject} />
+        {showOrder && pendingOrder && (
+          <OrderPopup order={pendingOrder} onAccept={handleAccept} onReject={handleReject} />
         )}
       </AnimatePresence>
     </>

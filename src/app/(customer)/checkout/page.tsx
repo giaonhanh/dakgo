@@ -17,11 +17,7 @@ const supabase = createClient()
 type ScheduledRange   = { start: string; end: string }
 type ScheduleConflict = { level: "error" | "warn"; icon: string; title: string; detail: string }
 
-interface AddrOption { id: string; label: string; address: string; isDefault: boolean }
-const SAVED_ADDRESSES: AddrOption[] = [
-  { id: "a1", label: "🏠 Nhà",     address: "22 Lê Hồng Phong, Phước An", isDefault: true  },
-  { id: "a2", label: "🏢 Cơ quan", address: "45 Trần Phú, Phước An",      isDefault: false },
-]
+interface AddrOption { id: string; label: string; address: string; isDefault: boolean; lat?: number; lng?: number }
 
 const PAYMENT_METHODS = [
   { id: "cash",   label: "Tiền mặt",      icon: "💵", desc: "Trả tiền mặt khi nhận hàng"                  },
@@ -87,7 +83,6 @@ const MOCK_DRIVER_BANK = {
   accountName:   "TRAN VAN BINH",
 }
 
-const MOCK_XU_BALANCE = 185000  // xu (1 xu = 1đ) — thay bằng query Supabase wallets
 const APP_COMMISSION  = 0.15    // 15% — từ shops.commission_rate
 
 type Payment = "cash" | "vietqr"
@@ -1093,7 +1088,11 @@ export default function CheckoutPage() {
   const router = useRouter()
   const { items: cartItems, clearCart } = useCartStore()
 
-  const [selectedAddr,     setSelectedAddr]     = useState("a1")
+  const [selectedAddr,     setSelectedAddr]     = useState("")
+  const [savedAddrs,       setSavedAddrs]       = useState<AddrOption[]>([])
+  const [xuBalance,        setXuBalance]        = useState(0)
+  const [xuWalletId,       setXuWalletId]       = useState<string | null>(null)
+  const [userId,           setUserId]           = useState<string | null>(null)
   const [payment,          setPayment]          = useState<Payment>("cash")
   const [deliveryNow,      setDeliveryNow]      = useState(true)
   const [scheduledTime,    setScheduledTime]    = useState<ScheduledRange | null>(null)
@@ -1109,7 +1108,7 @@ export default function CheckoutPage() {
   const [payosData,        setPayosData]        = useState<PayOSData | null>(null)
   const [useXu,            setUseXu]            = useState(false)
   const [payosLoading,     setPayosLoading]     = useState(false)
-  const [mapAddress,       setMapAddress]       = useState<{ address: string } | null>(null)
+  const [mapAddress,       setMapAddress]       = useState<{ address: string; lat: number; lng: number } | null>(null)
   const [showAddressSheet, setShowAddressSheet] = useState(false)
   const [orderCode]                             = useState(() => Date.now() % 100_000_000)
   const [nowDate]                               = useState(() => new Date())
@@ -1118,14 +1117,44 @@ export default function CheckoutPage() {
   const [refLoading, setRefLoading]             = useState(false)
   const [refMsg,     setRefMsg]                 = useState<{ ok: boolean; text: string } | null>(null)
 
+  // ── Load user, saved addresses, xu balance ──
+  useEffect(() => {
+    async function loadData() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      setUserId(user.id)
+
+      const [{ data: addrs }, { data: wallet }] = await Promise.all([
+        supabase.from("saved_addresses").select("id, label, address, lat, lng, is_default").eq("user_id", user.id).order("is_default", { ascending: false }),
+        supabase.from("wallets").select("id, balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
+      ])
+
+      if (addrs && addrs.length > 0) {
+        const mapped: AddrOption[] = addrs.map(a => ({
+          id: a.id, label: a.label, address: a.address,
+          isDefault: a.is_default, lat: a.lat, lng: a.lng,
+        }))
+        setSavedAddrs(mapped)
+        const def = mapped.find(a => a.isDefault) ?? mapped[0]
+        setSelectedAddr(def.id)
+      }
+
+      if (wallet) {
+        setXuBalance(wallet.balance)
+        setXuWalletId(wallet.id)
+      }
+    }
+    loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Address helpers ──
   const tempAddr: AddrOption | null = mapAddress
-    ? { id: "map", label: "📍 Bản đồ", address: mapAddress.address, isDefault: false }
+    ? { id: "map", label: "📍 Bản đồ", address: mapAddress.address, isDefault: false, lat: mapAddress.lat, lng: mapAddress.lng }
     : null
-  const allAddrs: AddrOption[] = [...SAVED_ADDRESSES, ...(tempAddr ? [tempAddr] : [])]
+  const allAddrs: AddrOption[] = [...savedAddrs, ...(tempAddr ? [tempAddr] : [])]
   const currentAddr = allAddrs.find(a => a.id === selectedAddr) ?? allAddrs[0]
-  const TIER_ADDR_LIMIT = 2
+  const TIER_ADDR_LIMIT = 3
 
   // ── Shop hours (mock — replace from shops.opening_hours[weekday]) ──
   const shopOpenH = 7, shopCloseH = 21
@@ -1208,12 +1237,77 @@ export default function CheckoutPage() {
   const handleOrder = async () => {
     if (cartItems.length === 0) { fireToast("Giỏ hàng trống!"); return }
     if (!deliveryNow && !scheduledTime) { fireToast("Vui lòng chọn giờ giao hàng"); return }
+    if (!currentAddr) { fireToast("Vui lòng chọn địa chỉ giao hàng"); return }
+
     setLoading(true)
     try {
-      await new Promise(r => setTimeout(r, 1600))
+      const uid = userId
+      if (!uid) { fireToast("Vui lòng đăng nhập lại"); setLoading(false); return }
+
+      const shopId = cartItems[0]?.shopId
+      if (!shopId) { fireToast("Lỗi giỏ hàng"); setLoading(false); return }
+
+      const deliveryLat = currentAddr.lat ?? 12.683
+      const deliveryLng = currentAddr.lng ?? 108.480
+
+      const scheduledAt = (!deliveryNow && scheduledTime)
+        ? `${new Date().toISOString().split("T")[0]}T${scheduledTime.start}:00`
+        : null
+
+      const { data: order, error: orderErr } = await supabase
+        .from("orders")
+        .insert({
+          customer_id:     uid,
+          shop_id:         shopId,
+          status:          "pending",
+          delivery_address: currentAddr.address,
+          delivery_lat:    deliveryLat,
+          delivery_lng:    deliveryLng,
+          note:            driverNote || null,
+          subtotal,
+          delivery_fee:    deliveryFee,
+          discount_amount: discount,
+          total_amount:    total,
+          payment_method:  payment,
+          payment_status:  "pending",
+          scheduled_at:    scheduledAt,
+        })
+        .select("id")
+        .single()
+
+      if (orderErr) throw orderErr
+
+      await supabase.from("order_items").insert(
+        cartItems.map(item => ({
+          order_id:   order.id,
+          product_id: item.id,
+          name:       item.name,
+          price:      item.price,
+          quantity:   item.qty,
+          subtotal:   item.price * item.qty,
+          note:       item.note ?? null,
+        }))
+      )
+
+      // Trừ xu nếu dùng
+      if (useXu && xuUsed > 0 && xuWalletId) {
+        const newBal = Math.max(0, xuBalance - xuUsed)
+        await supabase.from("wallets").update({ balance: newBal, updated_at: new Date().toISOString() }).eq("id", xuWalletId)
+        await supabase.from("transactions").insert({
+          wallet_id:    xuWalletId,
+          type:         "payment",
+          amount:       xuUsed,
+          balance_after: newBal,
+          ref_type:     "order",
+          ref_id:       order.id,
+          note:         "Thanh toán bằng xu Giao Nhanh",
+        })
+      }
+
       clearCart()
-      router.push("/order-success")
-    } catch {
+      router.push(`/order-success?orderId=${order.id}`)
+    } catch (err) {
+      console.error(err)
       fireToast("Có lỗi xảy ra, vui lòng thử lại")
       setLoading(false)
     }
@@ -1255,7 +1349,7 @@ export default function CheckoutPage() {
     }
   }
 
-  const xuUsed      = useXu ? Math.min(MOCK_XU_BALANCE, total) : 0
+  const xuUsed      = useXu ? Math.min(xuBalance, total) : 0
   const remaining   = total - xuUsed
   const ctaBlocked  = loading || (!deliveryNow && !scheduledTime)
 
@@ -1276,7 +1370,7 @@ export default function CheckoutPage() {
           <AddressPicker height="100dvh"
             onClose={() => setShowMapPicker(false)}
             onConfirm={(result: AddressPickerResult) => {
-              setMapAddress({ address: result.address })
+              setMapAddress({ address: result.address, lat: result.lat, lng: result.lng })
               setSelectedAddr("map")
               setShowMapPicker(false)
             }}
@@ -1300,7 +1394,7 @@ export default function CheckoutPage() {
       <AnimatePresence>
         {showAddressSheet && (
           <AddressSheet
-            savedAddrs={SAVED_ADDRESSES} tempAddr={tempAddr}
+            savedAddrs={savedAddrs} tempAddr={tempAddr}
             selectedId={selectedAddr} tierLimit={TIER_ADDR_LIMIT}
             onSelect={setSelectedAddr}
             onMapPick={() => setShowMapPicker(true)}
@@ -1583,7 +1677,7 @@ export default function CheckoutPage() {
                       WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
                       backgroundClip: "text", fontWeight: 700,
                     } as React.CSSProperties}>
-                      {MOCK_XU_BALANCE.toLocaleString("vi-VN")} xu
+                      {xuBalance.toLocaleString("vi-VN")} xu
                     </span>
                   </div>
                 </div>
@@ -1615,14 +1709,14 @@ export default function CheckoutPage() {
                     {[
                       { label: "Xu sử dụng",         val: `${xuUsed.toLocaleString("vi-VN")} xu`,                      color: "#FFD700" },
                       { label: "Còn phải trả",        val: remaining > 0 ? fmt(remaining) : "Miễn phí 🎉",             color: remaining > 0 ? "#f8f0e0" : "#3ecf6e" },
-                      { label: "Xu còn lại trong ví", val: `${(MOCK_XU_BALANCE - xuUsed).toLocaleString("vi-VN")} xu`, color: "#b0956a" },
+                      { label: "Xu còn lại trong ví", val: `${(xuBalance - xuUsed).toLocaleString("vi-VN")} xu`, color: "#b0956a" },
                     ].map(r => (
                       <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
                         <span style={{ color: "#6a5a40", fontSize: 11 }}>{r.label}</span>
                         <span style={{ color: r.color, fontSize: 11, fontWeight: 700 }}>{r.val}</span>
                       </div>
                     ))}
-                    {MOCK_XU_BALANCE < total && (
+                    {xuBalance < total && (
                       <div style={{ marginTop: 8, padding: "6px 9px", borderRadius: 8,
                         background: "rgba(245,197,66,0.07)", border: "1px solid rgba(245,197,66,0.2)" }}>
                         <span style={{ color: "#f5c542", fontSize: 11 }}>

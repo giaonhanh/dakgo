@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useRef, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
+import { createClient } from "@/lib/supabase/client"
+
+const supabase = createClient()
 
 // --- Types ---
 interface ShopResult {
@@ -33,23 +36,6 @@ interface ProductResult {
 
 type SearchResult = ShopResult | ProductResult
 
-// --- Mock data ---
-const SHOPS_MOCK: ShopResult[] = [
-  { id: "s1", type: "shop", name: "Bún Bò Huế Cô Ba", category: "Bún/Phở", logo_url: "", rating_avg: 4.8, distance_km: 0.4, delivery_fee: 10000, is_open: true, promo: "Giảm 15%" },
-  { id: "s2", type: "shop", name: "Cơm Gà Xối Mỡ Tuấn", category: "Cơm hộp", logo_url: "", rating_avg: 4.6, distance_km: 0.9, delivery_fee: 15000, is_open: true },
-  { id: "s3", type: "shop", name: "Trà Sữa Mộc", category: "Đồ uống", logo_url: "", rating_avg: 4.9, distance_km: 1.2, delivery_fee: 0, is_open: false },
-  { id: "s4", type: "shop", name: "Bánh Mì Phước An", category: "Bánh", logo_url: "", rating_avg: 4.5, distance_km: 0.7, delivery_fee: 10000, is_open: true, promo: "Free ship" },
-  { id: "s5", type: "shop", name: "Gà Rán KFC Style", category: "Gà rán", logo_url: "", rating_avg: 4.7, distance_km: 1.5, delivery_fee: 15000, is_open: true },
-]
-
-const PRODUCTS_MOCK: ProductResult[] = [
-  { id: "p1", type: "product", name: "Bún Bò Huế đặc biệt", shop_name: "Bún Bò Huế Cô Ba", shop_id: "s1", image_url: "", price: 45000, original_price: 55000, rating: 4.9, sold_count: 382 },
-  { id: "p2", type: "product", name: "Cơm Gà xối mỡ", shop_name: "Cơm Gà Xối Mỡ Tuấn", shop_id: "s2", image_url: "", price: 40000, rating: 4.7, sold_count: 210 },
-  { id: "p3", type: "product", name: "Trà sữa trân châu đường đen", shop_name: "Trà Sữa Mộc", shop_id: "s3", image_url: "", price: 35000, original_price: 40000, rating: 4.8, sold_count: 516 },
-  { id: "p4", type: "product", name: "Bánh mì thịt nướng", shop_name: "Bánh Mì Phước An", shop_id: "s4", image_url: "", price: 25000, rating: 4.6, sold_count: 741 },
-  { id: "p5", type: "product", name: "Gà rán giòn (4 miếng)", shop_name: "Gà Rán KFC Style", shop_id: "s5", image_url: "", price: 75000, rating: 4.7, sold_count: 198 },
-]
-
 const POPULAR_TAGS = ["🍜 Bún/Phở", "🥤 Đồ uống", "🍗 Gà rán", "🍱 Cơm hộp", "🧁 Bánh", "🍕 Pizza"]
 const LS_KEY = "gn_search_history"
 const MAX_HISTORY = 10
@@ -63,13 +49,46 @@ function saveHistory(list: string[]) {
 
 const formatPrice = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
-// Simple fuzzy search
-function searchItems(query: string): SearchResult[] {
-  const q = query.toLowerCase().trim()
+async function searchSupabase(query: string): Promise<SearchResult[]> {
+  const q = query.trim()
   if (!q) return []
-  const shops    = SHOPS_MOCK.filter(s => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q))
-  const products = PRODUCTS_MOCK.filter(p => p.name.toLowerCase().includes(q) || p.shop_name.toLowerCase().includes(q))
-  return [...shops, ...products]
+  const [{ data: shops }, { data: products }] = await Promise.all([
+    supabase
+      .from("shops")
+      .select("id, name, category, logo_url, rating_avg, is_open")
+      .eq("status", "approved")
+      .or(`name.ilike.%${q}%,category.ilike.%${q}%`)
+      .limit(20),
+    supabase
+      .from("products")
+      .select("id, name, price, original_price, image_url, sold_count, shop_id, shops(name)")
+      .eq("is_available", true)
+      .ilike("name", `%${q}%`)
+      .limit(20),
+  ])
+  const shopResults: ShopResult[] = (shops ?? []).map(s => ({
+    id: s.id, type: "shop" as const,
+    name: s.name, category: s.category,
+    logo_url: s.logo_url ?? "",
+    rating_avg: Number(s.rating_avg ?? 5),
+    distance_km: 0, delivery_fee: 15000,
+    is_open: s.is_open,
+  }))
+  const productResults: ProductResult[] = (products ?? []).map(p => {
+    const shopName = Array.isArray(p.shops) ? (p.shops[0] as { name: string })?.name : (p.shops as { name: string } | null)?.name
+    return {
+      id: p.id, type: "product" as const,
+      name: p.name,
+      shop_name: shopName ?? "",
+      shop_id: p.shop_id,
+      image_url: p.image_url ?? "",
+      price: p.price,
+      original_price: p.original_price ?? undefined,
+      rating: 5,
+      sold_count: p.sold_count ?? 0,
+    }
+  })
+  return [...shopResults, ...productResults]
 }
 
 type SortKey = "relevant" | "rating" | "distance" | "price_asc" | "price_desc"
@@ -131,8 +150,9 @@ function SearchContent() {
   const doSearch = useCallback((q: string) => {
     setLoading(true)
     if (searchTimeout.current) clearTimeout(searchTimeout.current)
-    searchTimeout.current = setTimeout(() => {
-      setResults(searchItems(q))
+    searchTimeout.current = setTimeout(async () => {
+      const data = await searchSupabase(q)
+      setResults(data)
       setLoading(false)
     }, 400)
   }, [])
