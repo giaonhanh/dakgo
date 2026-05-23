@@ -92,9 +92,36 @@ export default function AdminSettingsPage() {
 
   /* ── Delivery adjustments ── */
   const [deliverySettings, setDeliverySettings] = useState({
-    freeShipRadius: "1.5", maxRadius: "10",
-    rushHourMultiplier: "1.3", rainMultiplier: "1.2", minDriverRating: "4.0",
+    maxRadius: "10", rushHourMultiplier: "1.3", rainMultiplier: "1.2", minDriverRating: "4.0",
   })
+
+  /* ── New: hours, weather, night surcharge ── */
+  const [appHours,        setAppHours]        = useState({ open: "07:00", close: "21:00" })
+  const [weatherSurcharge, setWeatherSurcharge] = useState<{ enabled: boolean; type: "percent"|"fixed"; value: string }>({ enabled: false, type: "percent", value: "20" })
+  const [nightSurcharge,  setNightSurcharge]  = useState<{ enabled: boolean; start: string; end: string; fee: string }>({ enabled: false, start: "22:00", end: "05:00", fee: "5000" })
+
+  /* ── Load all settings from Supabase on mount ── */
+  useEffect(() => {
+    async function loadSettings() {
+      const supabase = createClient()
+      const { data } = await supabase.from("app_settings").select("key, value")
+      if (!data) return
+      const map = Object.fromEntries(data.map(r => [r.key, r.value]))
+      if (map.pricing)          setPricing(map.pricing)
+      if (map.commission)       setCommissionSettings(map.commission)
+      if (map.features) {
+        const f = map.features as Record<string, boolean>
+        setFeatures(prev => prev.map(item => ({ ...item, value: f[item.key] ?? item.value })))
+      }
+      if (map.area)             setAreaSettings(map.area)
+      if (map.delivery)         setDeliverySettings(map.delivery)
+      if (map.app_hours)        setAppHours(map.app_hours)
+      if (map.weather_surcharge) setWeatherSurcharge(map.weather_surcharge)
+      if (map.night_surcharge)  setNightSurcharge(map.night_surcharge)
+    }
+    loadSettings()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* ── Commission ── */
   const [commissionSettings, setCommissionSettings] = useState({
@@ -130,6 +157,8 @@ export default function AdminSettingsPage() {
     setSaving(true)
     try {
       const supabase = createClient()
+
+      // Persist profile
       if (adminId) {
         await supabase.from("profiles")
           .update({ full_name: adminName, phone: adminPhone })
@@ -137,6 +166,22 @@ export default function AdminSettingsPage() {
       }
       if (adminContactLink) localStorage.setItem("admin_contact_link", adminContactLink)
       else localStorage.removeItem("admin_contact_link")
+
+      // Persist all app settings to Supabase
+      const featuresMap = Object.fromEntries(features.map(f => [f.key, f.value]))
+      const upsertRows = [
+        { key: "pricing",           value: pricing },
+        { key: "commission",        value: commissionSettings },
+        { key: "features",          value: featuresMap },
+        { key: "area",              value: areaSettings },
+        { key: "delivery",          value: deliverySettings },
+        { key: "app_hours",         value: appHours },
+        { key: "weather_surcharge", value: weatherSurcharge },
+        { key: "night_surcharge",   value: nightSurcharge },
+      ]
+      await supabase.from("app_settings")
+        .upsert(upsertRows.map(r => ({ ...r, updated_at: new Date().toISOString() })), { onConflict: "key" })
+
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } finally {
@@ -286,11 +331,110 @@ export default function AdminSettingsPage() {
 
               <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
                 <div style={{ padding:"12px 0 4px", color:"#f0eaff", fontSize:12, fontWeight:700 }}>🛵 Điều chỉnh & hệ số</div>
-                {renderInput("Bán kính miễn phí",      "Phí km 1, không tính thêm trong bán kính này",       deliverySettings.freeShipRadius,     v => setDeliverySettings(p=>({...p,freeShipRadius:v})),     "km")}
                 {renderInput("Bán kính tối đa",         "Khoảng cách tối đa hệ thống chấp nhận đơn",          deliverySettings.maxRadius,          v => setDeliverySettings(p=>({...p,maxRadius:v})),          "km")}
                 {renderInput("Hệ số giờ cao điểm",      "Nhân phí trong giờ cao điểm (7-9h, 11-13h, 17-19h)",deliverySettings.rushHourMultiplier, v => setDeliverySettings(p=>({...p,rushHourMultiplier:v})), "x")}
                 {renderInput("Hệ số trời mưa",          "Nhân phí khi thời tiết xấu",                         deliverySettings.rainMultiplier,     v => setDeliverySettings(p=>({...p,rainMultiplier:v})),     "x")}
                 {renderInput("Rating tài xế tối thiểu", "Điểm đánh giá tối thiểu để nhận đơn",                deliverySettings.minDriverRating,    v => setDeliverySettings(p=>({...p,minDriverRating:v})),    "⭐")}
+              </div>
+
+              {/* App hours */}
+              <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
+                <div style={{ padding:"12px 0 4px", color:"#f0eaff", fontSize:12, fontWeight:700 }}>🕐 Khung giờ hoạt động app</div>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 0", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600, marginBottom:2 }}>Giờ mở cửa</div>
+                    <div style={{ color:"#6a5a40", fontSize:10 }}>App bắt đầu nhận đơn từ giờ này</div>
+                  </div>
+                  <input type="time" value={appHours.open} onChange={e => setAppHours(p=>({...p, open: e.target.value}))}
+                    style={{ padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark" }} />
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 0" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600, marginBottom:2 }}>Giờ đóng cửa</div>
+                    <div style={{ color:"#6a5a40", fontSize:10 }}>App ngừng nhận đơn sau giờ này</div>
+                  </div>
+                  <input type="time" value={appHours.close} onChange={e => setAppHours(p=>({...p, close: e.target.value}))}
+                    style={{ padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark" }} />
+                </div>
+              </div>
+
+              {/* Weather surcharge */}
+              <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 0 8px" }}>
+                  <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>⛈️ Phụ phí thời tiết xấu</div>
+                  <button onClick={() => setWeatherSurcharge(p=>({...p, enabled: !p.enabled}))}
+                    style={{ width:48, height:26, borderRadius:13, background: weatherSurcharge.enabled ? "#3ecf6e" : "rgba(255,255,255,0.08)", border:"none", cursor:"pointer", position:"relative", flexShrink:0, transition:"background .2s" }}>
+                    <div style={{ width:20, height:20, borderRadius:"50%", background:"#fff", position:"absolute", top:3, left: weatherSurcharge.enabled ? 25 : 3, transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,0.4)" }} />
+                  </button>
+                </div>
+                {weatherSurcharge.enabled && (
+                  <>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                      <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600 }}>Loại phụ phí</div>
+                      <div style={{ display:"flex", gap:6 }}>
+                        {(["percent","fixed"] as const).map(t => (
+                          <button key={t} onClick={() => setWeatherSurcharge(p=>({...p, type: t}))}
+                            style={{ padding:"5px 14px", borderRadius:8, border: weatherSurcharge.type===t ? "1.5px solid rgba(255,107,0,0.5)" : "1.5px solid rgba(255,255,255,0.1)", background: weatherSurcharge.type===t ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.03)", color: weatherSurcharge.type===t ? "#FF8C00" : "#6a5a40", fontSize:11, fontWeight: weatherSurcharge.type===t ? 700 : 400, cursor:"pointer", fontFamily:"Lexend" }}>
+                            {t === "percent" ? "%" : "Tiền cố định"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 14px", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                      <div>
+                        <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600, marginBottom:2 }}>Giá trị phụ phí</div>
+                        <div style={{ color:"#6a5a40", fontSize:10 }}>{weatherSurcharge.type === "percent" ? "Phần trăm cộng thêm vào cước" : "Số tiền cộng thêm cố định"}</div>
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <input type="number" value={weatherSurcharge.value} onChange={e => setWeatherSurcharge(p=>({...p, value: e.target.value}))}
+                          style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right" }} />
+                        <span style={{ color:"#6a5a40", fontSize:11, minWidth:24 }}>{weatherSurcharge.type === "percent" ? "%" : "đ"}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Night surcharge */}
+              <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 0 8px" }}>
+                  <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>🌙 Phụ phí đêm khuya</div>
+                  <button onClick={() => setNightSurcharge(p=>({...p, enabled: !p.enabled}))}
+                    style={{ width:48, height:26, borderRadius:13, background: nightSurcharge.enabled ? "#3ecf6e" : "rgba(255,255,255,0.08)", border:"none", cursor:"pointer", position:"relative", flexShrink:0, transition:"background .2s" }}>
+                    <div style={{ width:20, height:20, borderRadius:"50%", background:"#fff", position:"absolute", top:3, left: nightSurcharge.enabled ? 25 : 3, transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,0.4)" }} />
+                  </button>
+                </div>
+                {nightSurcharge.enabled && (
+                  <>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                      <div>
+                        <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600, marginBottom:2 }}>Bắt đầu từ</div>
+                        <div style={{ color:"#6a5a40", fontSize:10 }}>Giờ bắt đầu tính phụ phí đêm</div>
+                      </div>
+                      <input type="time" value={nightSurcharge.start} onChange={e => setNightSurcharge(p=>({...p, start: e.target.value}))}
+                        style={{ padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark" }} />
+                    </div>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                      <div>
+                        <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600, marginBottom:2 }}>Đến hết</div>
+                        <div style={{ color:"#6a5a40", fontSize:10 }}>Giờ kết thúc phụ phí đêm (hôm sau)</div>
+                      </div>
+                      <input type="time" value={nightSurcharge.end} onChange={e => setNightSurcharge(p=>({...p, end: e.target.value}))}
+                        style={{ padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark" }} />
+                    </div>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 14px", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                      <div>
+                        <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600, marginBottom:2 }}>Phụ phí thêm</div>
+                        <div style={{ color:"#6a5a40", fontSize:10 }}>Số tiền cộng thêm vào mỗi đơn trong khung giờ này</div>
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <input type="number" value={nightSurcharge.fee} onChange={e => setNightSurcharge(p=>({...p, fee: e.target.value}))}
+                          style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right" }} />
+                        <span style={{ color:"#6a5a40", fontSize:11, minWidth:24 }}>đ</span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"16px 20px" }}>
