@@ -23,6 +23,7 @@ interface MOrder {
   status: OrderStatus
   time: string
   note?: string
+  scheduledAt?: string | null
 }
 
 const STATUS_CFG: Record<OrderStatus, { label: string; color: string; bg: string; bd: string }> = {
@@ -95,7 +96,7 @@ export default function MerchantDashboard() {
     const { data: rows } = await supabase
       .from("orders")
       .select(`
-        id, status, total_amount, subtotal, discount_amount, payment_method, note, created_at, customer_id,
+        id, status, total_amount, subtotal, discount_amount, payment_method, note, created_at, scheduled_at, customer_id,
         order_items(name, price, quantity)
       `)
       .eq("shop_id", sid)
@@ -138,6 +139,7 @@ export default function MerchantDashboard() {
         status: (o.status === "delivered" ? "ready" : o.status === "cancelled" ? "rejected" : o.status) as OrderStatus,
         time: fmtTime(o.created_at),
         note: o.note ?? undefined,
+        scheduledAt: o.scheduled_at ?? null,
       }
     })
     setOrders(mapped)
@@ -352,6 +354,13 @@ export default function MerchantDashboard() {
                         )}
                         <div style={{ color: "#FF8C00", fontSize: 12, fontWeight: 800 }}>#{order.shortId}</div>
                         <div style={{ color: "#6a5a40", fontSize: 9 }}>{order.time}</div>
+                        {order.scheduledAt && (
+                          <div style={{ fontSize: 8, padding: "1px 6px", borderRadius: 5, fontWeight: 600,
+                            background: "rgba(245,197,66,0.12)", border: "1px solid rgba(245,197,66,0.3)",
+                            color: "#f5c542", display: "flex", alignItems: "center", gap: 2 }}>
+                            🕐 {fmtTime(order.scheduledAt)}
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0,
                         background: cfg.bg, border: `1px solid ${cfg.bd}`, borderRadius: 7, padding: "2px 8px" }}>

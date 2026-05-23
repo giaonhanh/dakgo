@@ -117,7 +117,7 @@ export default function HomePage() {
   const [activeMealTime,  setActiveMealTime]  = useState(getDefaultMealTime)
   const [savedVoucherIds, setSavedVoucherIds] = useState<string[]>([])
   const [bannerIdx,     setBannerIdx]     = useState(0)
-  const [countdown,     setCountdown]     = useState({ h:2, m:15, s:0 })
+  const [countdown,     setCountdown]     = useState({ h:0, m:0, s:0 })
   const [activeTab,     setActiveTab]     = useState("home")
   const [conflictItem,  setConflictItem]  = useState<PendingItem | null>(null)
   const [location,      setLocation]      = useState("Phước An, Krông Pắc")
@@ -242,26 +242,31 @@ export default function HomePage() {
     )
   }, [])
 
-  // Banner auto-slide
+  // Banner auto-slide — cycle through real vouchers
   useEffect(() => {
-    const t = setInterval(() => setBannerIdx(i => (i+1)%3), 3500)
+    if (vouchers.length <= 1) return
+    const t = setInterval(() => setBannerIdx(i => (i + 1) % vouchers.length), 3500)
     return () => clearInterval(t)
-  }, [])
+  }, [vouchers])
 
-  // Countdown flash sale
+  // Countdown — computed from current deal's valid_to
   useEffect(() => {
-    const t = setInterval(() => {
-      setCountdown(c => {
-        let { h, m, s } = c
-        s--
-        if (s < 0) { s = 59; m-- }
-        if (m < 0) { m = 59; h-- }
-        if (h < 0) { h = 0; m = 0; s = 0 }
-        return { h, m, s }
+    if (!vouchers.length) return
+    const update = () => {
+      const deal = vouchers[bannerIdx % vouchers.length]
+      if (!deal) return
+      const diff = Math.max(0, new Date(deal.valid_to).getTime() - Date.now())
+      const totalSecs = Math.floor(diff / 1000)
+      setCountdown({
+        h: Math.floor(totalSecs / 3600),
+        m: Math.floor((totalSecs % 3600) / 60),
+        s: totalSecs % 60,
       })
-    }, 1000)
+    }
+    update()
+    const t = setInterval(update, 1000)
     return () => clearInterval(t)
-  }, [])
+  }, [vouchers, bannerIdx])
 
   // Particle effect
   const spawnParticle = (btnEl: HTMLElement) => {
@@ -525,69 +530,85 @@ export default function HomePage() {
           </AnimatePresence>
 
           {/* ──────────────────────────────────────
-              S4 — FlashSaleBanner
+              S4 — FlashSaleBanner (real vouchers)
           ────────────────────────────────────── */}
-          <div style={{ margin:"0 16px 8px" }}>
-            <div style={{
-              height:110, borderRadius:16, overflow:"hidden",
-              border:"1px solid rgba(255,107,0,0.35)",
-              position:"relative",
-              background:"linear-gradient(135deg,#1a0d00,#2d1500,#0d0900)",
-            }}>
-              {/* Glow */}
-              <div style={{ position:"absolute", top:-20, right:-15,
-                width:130, height:130,
-                background:"radial-gradient(circle,rgba(255,107,0,0.32) 0%,transparent 65%)" }} />
-              <div style={{ position:"absolute", bottom:-15, left:10,
-                width:80, height:80,
-                background:"radial-gradient(circle,rgba(255,179,71,0.12) 0%,transparent 65%)" }} />
-              {/* Shine */}
-              <div style={{ position:"absolute", top:0, left:"-100%", width:"50%", height:"100%",
-                background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)",
-                animation:"logoShine 3.5s infinite" }} />
-              {/* Content */}
-              <div style={{ position:"relative", zIndex:1, padding:"13px 15px" }}>
+          {(() => {
+            const DEAL_EMOJI: Record<string, string> = { percent:"🔥", fixed:"💰", freeship:"🛵" }
+            const deal = vouchers.length > 0 ? vouchers[bannerIdx % vouchers.length] : null
+            const dealEmoji   = deal ? (DEAL_EMOJI[deal.discount_type] ?? "⚡") : "⚡"
+            const dealTitle   = deal?.title ?? "Ưu đãi hôm nay"
+            const dealSubLine = deal
+              ? deal.discount_type === "percent"  ? `Giảm ${deal.discount_value}% · Áp dụng ngay`
+              : deal.discount_type === "fixed"    ? `Giảm ${fmt(deal.discount_value)} · Đặt ngay`
+              : "Miễn phí giao hàng · Đơn từ bất kỳ"
+              : "Khuyến mãi đặc biệt dành cho bạn"
+            const dotCount = Math.max(vouchers.length, 1)
+            return (
+              <div style={{ margin:"0 16px 8px" }}>
                 <div style={{
-                  display:"inline-block",
-                  background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
-                  borderRadius:8, padding:"2px 9px", marginBottom:5,
-                  color:"#000", fontSize:8, fontWeight:700, letterSpacing:.4,
+                  height:110, borderRadius:16, overflow:"hidden",
+                  border:"1px solid rgba(255,107,0,0.35)",
+                  position:"relative",
+                  background:"linear-gradient(135deg,#1a0d00,#2d1500,#0d0900)",
                 }}>
-                  ⚡ FLASH SALE · {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
+                  {/* Glow */}
+                  <div style={{ position:"absolute", top:-20, right:-15,
+                    width:130, height:130,
+                    background:"radial-gradient(circle,rgba(255,107,0,0.32) 0%,transparent 65%)" }} />
+                  <div style={{ position:"absolute", bottom:-15, left:10,
+                    width:80, height:80,
+                    background:"radial-gradient(circle,rgba(255,179,71,0.12) 0%,transparent 65%)" }} />
+                  {/* Shine */}
+                  <div style={{ position:"absolute", top:0, left:"-100%", width:"50%", height:"100%",
+                    background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)",
+                    animation:"logoShine 3.5s infinite" }} />
+                  {/* Content */}
+                  <div style={{ position:"relative", zIndex:1, padding:"13px 15px" }}>
+                    <div style={{
+                      display:"inline-block",
+                      background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
+                      borderRadius:8, padding:"2px 9px", marginBottom:5,
+                      color:"#000", fontSize:8, fontWeight:700, letterSpacing:.4,
+                    }}>
+                      ⚡ FLASH SALE · {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
+                    </div>
+                    <div style={{ color:"#fff", fontSize:14, fontWeight:700, lineHeight:1.25,
+                      maxWidth:"62%", wordBreak:"break-word" }}>
+                      {dealTitle}
+                    </div>
+                    <div style={{ color:"rgba(255,255,255,0.4)", fontSize:9, marginTop:3 }}>
+                      {dealSubLine}
+                    </div>
+                    <div onClick={() => router.push(deal?.shop_id ? `/shop/${deal.shop_id}` : "/vouchers")}
+                      style={{
+                        display:"inline-block", marginTop:6, cursor:"pointer",
+                        background:"rgba(255,255,255,0.12)",
+                        border:"1px solid rgba(255,255,255,0.2)",
+                        borderRadius:6, padding:"3px 9px",
+                        color:"#fff", fontSize:8.5, fontWeight:600,
+                      }}>Đặt ngay →</div>
+                  </div>
+                  {/* Big emoji */}
+                  <div style={{ position:"absolute", right:14, top:"50%",
+                    transform:"translateY(-50%)", fontSize:52, zIndex:1,
+                    filter:"drop-shadow(0 0 14px rgba(255,107,0,0.5))" }}>
+                    {dealEmoji}
+                  </div>
                 </div>
-                <div style={{ color:"#fff", fontSize:14, fontWeight:700, lineHeight:1.25 }}>
-                  Trà sữa Ding Tea<br/>Chỉ 15.000đ!
+                {/* Dots */}
+                <div style={{ display:"flex", gap:4, justifyContent:"center", padding:"7px 0 8px" }}>
+                  {Array.from({ length: dotCount }).map((_,i) => (
+                    <div key={i} onClick={() => setBannerIdx(i)} style={{
+                      width: bannerIdx===i ? 18 : 5, height:5, borderRadius:3, cursor:"pointer",
+                      background: bannerIdx===i ? "#FF6B00" : "rgba(255,255,255,0.08)",
+                      transition:"all .3s",
+                      boxShadow: bannerIdx===i ? "0 0 5px #FF6B00" : "none",
+                    }} />
+                  ))}
                 </div>
-                <div style={{ color:"rgba(255,255,255,0.4)", fontSize:9, marginTop:3 }}>
-                  Giảm 57% · Miễn phí ship
-                </div>
-                <div style={{
-                  display:"inline-block", marginTop:6,
-                  background:"rgba(255,255,255,0.12)",
-                  border:"1px solid rgba(255,255,255,0.2)",
-                  borderRadius:6, padding:"3px 9px",
-                  color:"#fff", fontSize:8.5, fontWeight:600,
-                }}>Đặt ngay →</div>
               </div>
-              {/* Big emoji */}
-              <div style={{ position:"absolute", right:14, top:"50%",
-                transform:"translateY(-50%)", fontSize:52, zIndex:1,
-                filter:"drop-shadow(0 0 14px rgba(255,107,0,0.5))" }}>
-                🧋
-              </div>
-            </div>
-            {/* Dots */}
-            <div style={{ display:"flex", gap:4, justifyContent:"center", padding:"7px 0 8px" }}>
-              {[0,1,2].map(i=>(
-                <div key={i} style={{
-                  width: bannerIdx===i ? 18 : 5, height:5, borderRadius:3,
-                  background: bannerIdx===i ? "#FF6B00" : "rgba(255,255,255,0.08)",
-                  transition:"all .3s",
-                  boxShadow: bannerIdx===i ? "0 0 5px #FF6B00" : "none",
-                }} />
-              ))}
-            </div>
-          </div>
+            )
+          })()}
 
           {/* ──────────────────────────────────────
               S5 — ServiceGrid (4 dịch vụ nhanh)

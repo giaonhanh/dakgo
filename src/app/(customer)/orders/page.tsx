@@ -13,6 +13,7 @@ type Status = "delivering" | "preparing" | "pending" | "accepted" | "ready" | "c
 interface Topping { name: string; price: number }
 interface Item {
   emoji: string; name: string; qty: number; price: number
+  productId?: string
   size?: string; sugar?: string; ice?: string; toppings?: Topping[]
 }
 interface Order {
@@ -168,7 +169,7 @@ export default function OrdersPage() {
           id, status, delivery_address, note, subtotal, delivery_fee, discount_amount,
           payment_method, cancel_reason, created_at, driver_id, shop_id,
           shops(id, name, category),
-          order_items(id, name, price, quantity, note),
+          order_items(id, product_id, name, price, quantity, note),
           drivers(id, license_plate, rating_avg)
         `)
         .eq("customer_id", user.id)
@@ -209,7 +210,7 @@ export default function OrdersPage() {
         const shop = Array.isArray(o.shops) ? o.shops[0] : o.shops
         const driverRow = Array.isArray(o.drivers) ? o.drivers[0] : o.drivers
         const driverProfile = driverProfiles.find(p => p.id === o.driver_id)
-        const items = (o.order_items ?? []) as { id: string; name: string; price: number; quantity: number; note: string | null }[]
+        const items = (o.order_items ?? []) as { id: string; product_id: string | null; name: string; price: number; quantity: number; note: string | null }[]
 
         return {
           id: o.id,
@@ -223,6 +224,7 @@ export default function OrdersPage() {
             name: i.name,
             qty: i.quantity,
             price: i.price,
+            productId: i.product_id ?? i.id,
           })),
           subtotal: o.subtotal,
           deliveryFee: o.delivery_fee,
@@ -305,11 +307,11 @@ export default function OrdersPage() {
     clearCart()
     order.items.forEach(item => {
       addItem({
-        id: `${order.id}-${item.name}`,
-        name: item.name,
-        price: item.price,
-        shop: order.shopName,
-        shopId: order.shopId,
+        id:      item.productId ?? `${order.shopId}-${item.name}`,
+        name:    item.name,
+        price:   item.price,
+        shop:    order.shopName,
+        shopId:  order.shopId,
       })
     })
     fireToast("Đã thêm vào giỏ hàng!")
