@@ -23,15 +23,17 @@ interface Product {
 }
 
 interface ShopInfo {
-  name:         string
-  description:  string | null
-  address:      string
-  rating:       number | null
-  rating_count: number | null
-  is_open:      boolean
-  avatar_url:   string | null
-  cover_url:    string | null
-  phone:        string | null
+  name:          string
+  description:   string | null
+  address:       string
+  rating:        number | null
+  rating_count:  number | null
+  is_open:       boolean
+  avatar_url:    string | null
+  cover_url:     string | null
+  phone:         string | null
+  opening_hours: { open?: string; close?: string } | null
+  prep_time:     string | null
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"

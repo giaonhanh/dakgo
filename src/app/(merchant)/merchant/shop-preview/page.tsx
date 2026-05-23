@@ -28,6 +28,9 @@ export default function ShopPreviewPage() {
   const [address]  = useState("22 Lê Hồng Phong, Phước An, Krông Pắc")
   const [rating]   = useState(4.8)
   const [isOpen]   = useState(true)
+  const [openTime] = useState("07:00")
+  const [closeTime] = useState("21:00")
+  const [prepTime] = useState("10–15")
   const [activeTab, setActiveTab] = useState("Tất cả")
   const [toast, setToast]         = useState("")
 
@@ -147,7 +150,7 @@ export default function ShopPreviewPage() {
 
           {/* Info chips */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
-            {[["🚀","Giao ~20 phút"],["🛵","Phí 15.000đ"],["⭐","Đánh giá cao"]].map(([icon,txt]) => (
+            {([["🕐", `${openTime}–${closeTime}`], ["⏱️", `Chuẩn bị ${prepTime} phút`]] as [string,string][]).map(([icon,txt]) => (
               <span key={txt} style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"4px 10px",color:"#b0956a",fontSize:9}}>
                 {icon} {txt}
               </span>

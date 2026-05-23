@@ -127,6 +127,42 @@ function HoursSheet({ onClose }: { onClose: () => void }) {
   )
 }
 
+/* ── prep time sheet ── */
+function PrepTimeSheet({ value, onSelect, onClose }: { value: string; onSelect: (v: string) => void; onClose: () => void }) {
+  const OPTIONS = ["5–10", "10–15", "15–20", "20–30", "30–45"]
+  return (
+    <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 26, stiffness: 280 }}
+      style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div style={{ background: "#0e0b07", borderTop: "1px solid rgba(255,107,0,0.3)", borderRadius: "22px 22px 0 0", padding: "20px 20px calc(env(safe-area-inset-bottom) + 24px)" }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+          <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>⏱️ Thời gian chuẩn bị đơn</div>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
+        </div>
+        <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.6, marginBottom: 18 }}>
+          Thời gian từ khi nhận đơn đến khi tài xế đến lấy hàng. Thông tin này hiển thị cho khách hàng trên trang quán.
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+          {OPTIONS.map(o => (
+            <button key={o} onClick={() => { onSelect(o); onClose() }}
+              style={{ padding: "10px 18px", borderRadius: 12,
+                background: value === o ? "rgba(255,107,0,0.14)" : "rgba(255,255,255,0.04)",
+                border: `1.5px solid ${value === o ? "rgba(255,107,0,0.45)" : "rgba(255,255,255,0.08)"}`,
+                color: value === o ? "#FF8C00" : "#b0956a",
+                fontSize: 13, fontWeight: value === o ? 700 : 400, cursor: "pointer", fontFamily: "Lexend" }}>
+              {o} phút
+            </button>
+          ))}
+        </div>
+        <div style={{ padding: "10px 12px", background: "rgba(255,107,0,0.06)", border: "1px solid rgba(255,107,0,0.15)", borderRadius: 10 }}>
+          <div style={{ color: "#6a5a40", fontSize: 9.5 }}>
+            💡 Đang chọn: <strong style={{ color: "#FF8C00" }}>{value} phút</strong> — khách thấy chip này trên trang quán của bạn.
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 /* ── main ── */
 export default function MerchantSettingsPage() {
   /* shop settings */
@@ -156,8 +192,10 @@ export default function MerchantSettingsPage() {
   })
 
   /* sheets */
-  const [showPw,    setShowPw]    = useState(false)
-  const [showHours, setShowHours] = useState(false)
+  const [prepTime,      setPrepTime]      = useState("10–15")
+  const [showPw,        setShowPw]        = useState(false)
+  const [showHours,     setShowHours]     = useState(false)
+  const [showPrepSheet, setShowPrepSheet] = useState(false)
   const [toast, setToast]           = useState("")
   const [adminContactLink, setAdminContactLink] = useState("mailto:giaonhanh.phuocan@gmail.com")
   const [adminPhone,       setAdminPhone]       = useState("")
@@ -243,9 +281,10 @@ export default function MerchantSettingsPage() {
             <Row icon="⭐" label="Hiện đánh giá trên shop" sub="Hiển thị sao và nhận xét khách hàng">
               <Toggle on={shop.showRating} onToggle={() => sw("showRating")} />
             </Row>
-            <Row icon="🔥" label="Hiện số lượng đã bán" sub="Hiển thị 'Đã bán X' trên từng món" last>
+            <Row icon="🔥" label="Hiện số lượng đã bán" sub="Hiển thị 'Đã bán X' trên từng món">
               <Toggle on={shop.showSoldCount} onToggle={() => sw("showSoldCount")} />
             </Row>
+            <Row icon="⏱️" label="Thời gian chuẩn bị đơn" sub={`${prepTime} phút · hiển thị cho khách trên trang quán`} onClick={() => setShowPrepSheet(true)} arrow last />
           </Section>
 
           {/* hours */}
@@ -395,8 +434,9 @@ export default function MerchantSettingsPage() {
 
       {/* sheets */}
       <AnimatePresence>
-        {showPw    && <PwSheet    onClose={() => setShowPw(false)}    />}
-        {showHours && <HoursSheet onClose={() => setShowHours(false)} />}
+        {showPw        && <PwSheet      onClose={() => setShowPw(false)}        />}
+        {showHours     && <HoursSheet   onClose={() => setShowHours(false)}     />}
+        {showPrepSheet && <PrepTimeSheet value={prepTime} onSelect={setPrepTime} onClose={() => setShowPrepSheet(false)} />}
       </AnimatePresence>
     </>
   )
