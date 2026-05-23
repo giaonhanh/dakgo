@@ -152,7 +152,6 @@ export default function MerchantSettingsPage() {
   /* privacy */
   const [priv, setPriv] = useState({
     showAddress:    true,
-    showPhone:      false,
     analytics:      true,
   })
 
@@ -291,9 +290,6 @@ export default function MerchantSettingsPage() {
             <Row icon="📍" label="Hiện địa chỉ cụ thể" sub="Khách thấy số nhà, tên đường">
               <Toggle on={priv.showAddress} onToggle={() => sp("showAddress")} />
             </Row>
-            <Row icon="📞" label="Hiện số điện thoại" sub="Khách có thể gọi trực tiếp cho quán">
-              <Toggle on={priv.showPhone} onToggle={() => sp("showPhone")} />
-            </Row>
             <Row icon="📊" label="Chia sẻ dữ liệu phân tích" sub="Giúp tối ưu đề xuất món & quảng cáo" last>
               <Toggle on={priv.analytics} onToggle={() => sp("analytics")} color="#4a8ff5" />
             </Row>
@@ -384,31 +380,16 @@ export default function MerchantSettingsPage() {
           {/* support */}
           <Section title="Hỗ trợ">
             <Row icon="❓" label="Câu hỏi thường gặp" sub="Hướng dẫn chủ cửa hàng" onClick={() => fire("Đang mở FAQ...")} arrow />
-            <Row icon="💬" label="Chat với hỗ trợ" sub="Phản hồi trong vòng 30 phút" onClick={() => { if (adminContactLink) window.open(adminContactLink, "_blank"); else fire("Đang kết nối...") }} arrow />
+            <Row icon="📞" label="Liên hệ admin" sub="Hỗ trợ, xóa tài khoản / cửa hàng" onClick={() => { if (adminContactLink) window.open(adminContactLink, "_blank"); else fire("Đang kết nối...") }} arrow />
             <Row icon="⚠️" label="Báo cáo vấn đề" sub="Đơn hàng sai, tài xế vi phạm..." onClick={() => fire("Đang mở form...")} arrow />
-            <Row icon="📝" label="Quy tắc merchant" sub="Chính sách, điều khoản đối tác" onClick={() => fire("Đang mở tài liệu...")} arrow last />
+            <Row icon="⚖️" label="Quy tắc & Chính sách" sub="Điều khoản, chính sách đối tác" onClick={() => fire("Đang mở tài liệu...")} arrow last />
           </Section>
 
-          {/* about */}
-          <Section title="Về ứng dụng">
+          {/* about + account merged */}
+          <Section title="Về ứng dụng & Tài khoản">
             <Row icon="🚀" label="Giao Nhanh Merchant" sub="Phiên bản 1.0.0" />
-            <Row icon="⚖️" label="Điều khoản & Chính sách" onClick={() => fire("Đang mở...")} arrow />
-            <Row icon="📬" label="Liên hệ" sub="giaonhanh.phuocan@gmail.com" last />
+            <Row icon="🚪" label="Đăng xuất" sub="Đăng xuất khỏi thiết bị này" danger onClick={() => fire("Đang đăng xuất...")} arrow last />
           </Section>
-
-          {/* account / danger */}
-          <Section title="Tài khoản">
-            <Row icon="🚪" label="Đăng xuất" sub="Đăng xuất khỏi thiết bị này" danger onClick={() => fire("Đang đăng xuất...")} arrow />
-            <Row icon="📞" label="Liên hệ admin để xóa tài khoản / shop" sub="Việc xóa cần được xác nhận bởi quản trị viên" onClick={() => { window.open(adminContactLink, "_blank") }} arrow last />
-          </Section>
-
-          {/* contact admin info */}
-          <div style={{ marginBottom: 20, padding: "12px 14px", background: "rgba(74,143,245,0.06)", border: "1px solid rgba(74,143,245,0.18)", borderRadius: 14, display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <span style={{ fontSize: 18, flexShrink: 0 }}>ℹ️</span>
-            <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.6 }}>
-              Để <strong style={{ color: "#4a8ff5" }}>xóa tài khoản hoặc cửa hàng</strong>, vui lòng liên hệ admin{adminPhone ? <> qua số <strong style={{ color: "#f8f0e0" }}>{adminPhone}</strong></> : ""}. Admin sẽ xử lý trong vòng 24h sau khi xác minh danh tính.
-            </div>
-          </div>
         </div>
       </div>
 
