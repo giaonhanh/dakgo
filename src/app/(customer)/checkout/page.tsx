@@ -1355,6 +1355,17 @@ export default function CheckoutPage() {
   const remaining   = total - xuUsed
   const ctaBlocked  = loading || (!deliveryNow && !scheduledTime)
 
+  // Guard: currentAddr is undefined during SSR (savedAddrs not yet loaded)
+  if (!currentAddr) return (
+    <div style={{ minHeight:"100dvh", background:"#080806", display:"flex",
+      alignItems:"center", justifyContent:"center" }}>
+      <div style={{ width:28, height:28, borderRadius:"50%",
+        border:"2px solid rgba(255,107,0,0.2)", borderTopColor:"#FF8C00",
+        animation:"spin .8s linear infinite" }} />
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
+
   return (
     <>
       <style>{`
