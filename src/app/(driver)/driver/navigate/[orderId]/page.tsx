@@ -9,7 +9,10 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import dynamic from "next/dynamic"
+import { useParams } from "next/navigation"
 import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "@/lib/supabase/client"
+import { ChatDrawer } from "@/components/chat/ChatDrawer"
 
 // ─── Leaflet map — no SSR ──────────────────────────────────
 const NavMap = dynamic(() => import("@/components/map/NavMap"), {
@@ -414,14 +417,25 @@ function DeliveryPhase({ onDone, onCall, onChat, paymentPaid }: {
 
 // ─────────────────────────────────────────────────────────
 export default function DriverNavigatePage() {
+  const { orderId }  = useParams<{ orderId: string }>()
+  const supabaseAuth = createClient()
+
   const [phase,         setPhase]         = useState<Phase>("pickup")
   const [toast,         setToast]         = useState("")
   const [paymentPaid,   setPaymentPaid]   = useState(false)
+  const [showChat,      setShowChat]      = useState(false)
+  const [currentUserId, setCurrentUserId] = useState("")
   const speed = useSpeed()
 
   const fireToast = (msg: string) => {
     setToast(msg); setTimeout(() => setToast(""), 2400)
   }
+
+  useEffect(() => {
+    supabaseAuth.auth.getUser().then(({ data }) => {
+      if (data.user) setCurrentUserId(data.user.id)
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Subscribe Realtime — nhận thông báo khi khách TT VietQR thành công
   useEffect(() => {
@@ -582,14 +596,14 @@ export default function DriverNavigatePage() {
               <PickupPhase
                 onDone={() => { setPhase("delivery"); fireToast("Đã lấy hàng → bắt đầu giao!") }}
                 onCall={() => fireToast("Đang gọi cho quán...")}
-                onChat={() => fireToast("Mở chat...")}
+                onChat={() => setShowChat(true)}
                 fireToast={fireToast}
               />
             ) : (
               <DeliveryPhase
                 onDone={() => { window.location.href = `/driver/confirm/${ORDER.id}` }}
                 onCall={() => fireToast("Đang gọi cho khách...")}
-                onChat={() => fireToast("Mở chat với khách...")}
+                onChat={() => setShowChat(true)}
                 paymentPaid={paymentPaid}
               />
             )}
@@ -636,6 +650,16 @@ export default function DriverNavigatePage() {
           ))}
         </div>
       </div>
+
+      {/* Chat drawer — driver ↔ customer */}
+      <ChatDrawer
+        orderId={orderId ?? ORDER.id}
+        currentUserId={currentUserId}
+        currentRole="driver"
+        partnerName={ORDER.custName}
+        isOpen={showChat}
+        onClose={() => setShowChat(false)}
+      />
     </>
   )
 }

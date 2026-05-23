@@ -31,6 +31,7 @@ type ProductRow = { id: string; name: string; price: number; sold_count: number;
 type OrderRow   = { id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null }
 type LiveOrderRow = { id: string; shops: { name: string } | { name: string }[] | null }
+type RecoRow = { id: string; name: string; price: number; original_price: number | null; image_url: string | null; sold_count: number; shop_id: string; shop_name: string; order_count: number }
 
 const MEAL_TIMES = [
   { icon:"☀️",  label:"Buổi sáng",  value:"buoi-sang"  },
@@ -134,6 +135,7 @@ export default function HomePage() {
   const [bestSellers,  setBestSellers]  = useState<ProductRow[]>([])
   const [reorders,     setReorders]     = useState<OrderRow[]>([])
   const [promos,       setPromos]       = useState<ProductRow[]>([])
+  const [recos,        setRecos]        = useState<RecoRow[]>([])
 
   // ─── Fetch real data from Supabase ────────────────────────
   useEffect(() => {
@@ -210,6 +212,37 @@ export default function HomePage() {
         .order("created_at", { ascending: false })
         .limit(5)
       setReorders((orderData ?? []) as OrderRow[])
+
+      // Smart recommendations via RPC (falls back gracefully if not deployed)
+      const { data: recoData } = await supabase.rpc("get_recommendations", { uid: user.id, lim: 10 })
+      if (recoData && Array.isArray(recoData) && recoData.length > 0) {
+        setRecos(recoData as RecoRow[])
+      } else {
+        // Fallback: top products from shops the user ordered from
+        const { data: histShops } = await supabase
+          .from("orders")
+          .select("shop_id")
+          .eq("customer_id", user.id)
+          .eq("status", "delivered")
+          .order("created_at", { ascending: false })
+          .limit(8)
+        const shopIds = [...new Set((histShops ?? []).map(o => o.shop_id as string))]
+        if (shopIds.length > 0) {
+          const { data: recFallback } = await supabase
+            .from("products")
+            .select("id, name, price, original_price, image_url, sold_count, shop_id, shops(name)")
+            .in("shop_id", shopIds)
+            .eq("is_available", true)
+            .order("sold_count", { ascending: false })
+            .limit(10)
+          setRecos((recFallback ?? []).map(p => {
+            const sn = Array.isArray(p.shops) ? (p.shops[0] as { name: string })?.name : (p.shops as { name: string } | null)?.name
+            return { id: p.id, name: p.name, price: p.price, original_price: p.original_price,
+              image_url: p.image_url, sold_count: p.sold_count, shop_id: p.shop_id,
+              shop_name: sn ?? "", order_count: 1 }
+          }))
+        }
+      }
     }
     loadData()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -946,6 +979,52 @@ export default function HomePage() {
               </a>
             ))}
           </div>
+
+          {/* ──────────────────────────────────────
+              S10a — Smart Recommendations
+          ────────────────────────────────────── */}
+          {recos.length > 0 && (
+            <>
+              <SectionHeader title="✨ Gợi ý cho bạn" more="Xem thêm →" href="/search" />
+              <HScroll>
+                {recos.map(p => (
+                  <a key={p.id} href={`/shop/${p.shop_id}`}
+                    style={{ textDecoration:"none", flexShrink:0,
+                      width:110, display:"flex", flexDirection:"column",
+                      background:"rgba(255,255,255,0.04)",
+                      border:"1px solid rgba(255,107,0,0.12)",
+                      borderRadius:13, overflow:"hidden" }}>
+                    {p.image_url ? (
+                      <img src={p.image_url} alt={p.name}
+                        style={{ width:110, height:78, objectFit:"cover" }} />
+                    ) : (
+                      <div style={{ width:110, height:78,
+                        background:"linear-gradient(135deg,rgba(255,107,0,0.07),rgba(255,179,71,0.04))",
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        fontSize:30 }}>🍽️</div>
+                    )}
+                    <div style={{ padding:"7px 8px 8px" }}>
+                      <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600,
+                        lineHeight:1.3, marginBottom:3,
+                        display:"-webkit-box", WebkitLineClamp:2,
+                        WebkitBoxOrient:"vertical", overflow:"hidden" }}>
+                        {p.name}
+                      </div>
+                      <div style={{ color:"#6a5a40", fontSize:8.5, marginBottom:4,
+                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                        {p.shop_name}
+                      </div>
+                      <div style={{ background:"linear-gradient(90deg,#FF6B00,#FFB347)",
+                        WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                        backgroundClip:"text", fontSize:11, fontWeight:700 }}>
+                        {fmt(p.price)}
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </HScroll>
+            </>
+          )}
 
           {/* ──────────────────────────────────────
               S10 — BestSellers

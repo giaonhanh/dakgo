@@ -49,9 +49,45 @@ function saveHistory(list: string[]) {
 
 const formatPrice = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
+// Types returned by search_catalog RPC
+interface RpcProduct {
+  id: string; name: string; price: number; original_price: number | null
+  image_url: string | null; sold_count: number; shop_id: string; shop_name: string; score?: number
+}
+interface RpcShop {
+  id: string; name: string; category: string; logo_url: string | null
+  rating_avg: number; is_open: boolean; score?: number
+}
+interface RpcResult { products: RpcProduct[] | null; shops: RpcShop[] | null }
+
 async function searchSupabase(query: string): Promise<SearchResult[]> {
   const q = query.trim()
   if (!q) return []
+
+  // Try pg_trgm RPC first (fuzzy + ranked), fall back to ILIKE if not available
+  const { data: rpc, error } = await supabase.rpc("search_catalog", { query: q }) as
+    { data: RpcResult | null; error: unknown }
+
+  if (!error && rpc) {
+    const shopResults: ShopResult[] = (rpc.shops ?? []).map(s => ({
+      id: s.id, type: "shop" as const,
+      name: s.name, category: s.category,
+      logo_url: s.logo_url ?? "",
+      rating_avg: Number(s.rating_avg ?? 5),
+      distance_km: 0, delivery_fee: 15000,
+      is_open: s.is_open,
+    }))
+    const productResults: ProductResult[] = (rpc.products ?? []).map(p => ({
+      id: p.id, type: "product" as const,
+      name: p.name, shop_name: p.shop_name ?? "", shop_id: p.shop_id,
+      image_url: p.image_url ?? "", price: p.price,
+      original_price: p.original_price ?? undefined,
+      rating: 5, sold_count: p.sold_count ?? 0,
+    }))
+    return [...shopResults, ...productResults]
+  }
+
+  // Fallback: plain ILIKE queries (works without pg_trgm)
   const [{ data: shops }, { data: products }] = await Promise.all([
     supabase
       .from("shops")
@@ -75,17 +111,15 @@ async function searchSupabase(query: string): Promise<SearchResult[]> {
     is_open: s.is_open,
   }))
   const productResults: ProductResult[] = (products ?? []).map(p => {
-    const shopName = Array.isArray(p.shops) ? (p.shops[0] as { name: string })?.name : (p.shops as { name: string } | null)?.name
+    const shopName = Array.isArray(p.shops)
+      ? (p.shops[0] as { name: string })?.name
+      : (p.shops as { name: string } | null)?.name
     return {
       id: p.id, type: "product" as const,
-      name: p.name,
-      shop_name: shopName ?? "",
-      shop_id: p.shop_id,
-      image_url: p.image_url ?? "",
-      price: p.price,
+      name: p.name, shop_name: shopName ?? "", shop_id: p.shop_id,
+      image_url: p.image_url ?? "", price: p.price,
       original_price: p.original_price ?? undefined,
-      rating: 5,
-      sold_count: p.sold_count ?? 0,
+      rating: 5, sold_count: p.sold_count ?? 0,
     }
   })
   return [...shopResults, ...productResults]

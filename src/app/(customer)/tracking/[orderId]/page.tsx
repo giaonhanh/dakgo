@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import dynamic from "next/dynamic"
 import { useParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { ChatDrawer } from "@/components/chat/ChatDrawer"
 
 const LiveTrackMap = dynamic(() => import("@/components/map/LiveTrackMap"), {
   ssr: false,
@@ -74,6 +75,8 @@ export default function TrackingPage() {
   const [loading,       setLoading]       = useState(true)
   const [showCancel,    setShowCancel]    = useState(false)
   const [showContact,   setShowContact]   = useState(false)
+  const [showChat,      setShowChat]      = useState(false)
+  const [currentUserId, setCurrentUserId] = useState("")
   const [toast,         setToast]         = useState("")
   const [mapExpanded,   setMapExpanded]   = useState(false)
   const [paymentStatus, setPaymentStatus] = useState<"pending"|"paid">("pending")
@@ -86,6 +89,9 @@ export default function TrackingPage() {
   useEffect(() => {
     if (!orderId) return
     async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) setCurrentUserId(user.id)
+
       const { data: order } = await supabase
         .from("orders")
         .select(`
@@ -468,9 +474,9 @@ export default function TrackingPage() {
                             display:"flex",alignItems:"center",justifyContent:"center",
                             textDecoration:"none",fontSize:18 }}>📞</a>
                       )}
-                      <button onClick={() => fireToast("Tính năng chat sắp ra mắt")}
-                        style={{ width:40,height:40,borderRadius:11,background:"rgba(255,255,255,0.05)",
-                          border:"1px solid rgba(255,255,255,0.1)",display:"flex",alignItems:"center",
+                      <button onClick={() => setShowChat(true)}
+                        style={{ width:40,height:40,borderRadius:11,background:"rgba(255,107,0,0.08)",
+                          border:"1px solid rgba(255,107,0,0.25)",display:"flex",alignItems:"center",
                           justifyContent:"center",fontSize:18,cursor:"pointer" }}>💬</button>
                     </div>
                   </div>
@@ -594,6 +600,16 @@ export default function TrackingPage() {
           ))}
         </div>
       </div>
+
+      {/* Chat drawer — customer ↔ driver */}
+      <ChatDrawer
+        orderId={orderId}
+        currentUserId={currentUserId}
+        currentRole="customer"
+        partnerName={driverData?.name ?? "Tài xế"}
+        isOpen={showChat}
+        onClose={() => setShowChat(false)}
+      />
     </>
   )
 }
