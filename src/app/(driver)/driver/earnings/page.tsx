@@ -1,40 +1,89 @@
 ﻿"use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 
-const WEEKLY = [
-  { day:"T2", amount:185000, trips:8 },
-  { day:"T3", amount:242000, trips:11 },
-  { day:"T4", amount:165000, trips:7 },
-  { day:"T5", amount:310000, trips:14 },
-  { day:"T6", amount:280000, trips:12 },
-  { day:"T7", amount:420000, trips:18 },
-  { day:"CN", amount:198000, trips:9 },
-]
-
-const TRIPS = [
-  { id:"T001", from:"Quán Bún Bò Huế Ngon", to:"22 Lê Hồng Phong", time:"15:32", amount:25000, type:"food" },
-  { id:"T002", from:"Chợ Phước An", to:"18 Trần Phú", time:"14:10", amount:18000, type:"errand" },
-  { id:"T003", from:"Quán Cơm Tấm Sài Gòn", to:"5 Nguyễn Văn Cừ", time:"12:45", amount:32000, type:"food" },
-  { id:"T004", from:"10 Hùng Vương → Trường THPT", to:"Phường 2", time:"11:20", amount:22000, type:"ride" },
-  { id:"T005", from:"Quán Phở 24 Ngon", to:"44 Phan Đình Phùng", time:"10:05", amount:28000, type:"food" },
-]
+const DAY_LABELS = ["CN","T2","T3","T4","T5","T6","T7"]
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
-const maxAmt = Math.max(...WEEKLY.map(d => d.amount))
 
 const TYPE_ICON: Record<string, string> = { food:"🍜", errand:"🛍️", ride:"🛵" }
 const TYPE_COLOR: Record<string, string> = { food:"255,140,0", errand:"62,207,110", ride:"74,143,245" }
 
-export default function DriverEarningsPage() {
-  const [period, setPeriod] = useState<"today"|"week"|"month">("week")
+interface WeekDay { day: string; amount: number; trips: number }
+interface Trip { id: string; from: string; to: string; time: string; amount: number; type: string }
 
-  const earnings = {
-    today: WEEKLY[6].amount,
-    week:  WEEKLY.reduce((s,d) => s+d.amount, 0),
-    month: WEEKLY.reduce((s,d) => s+d.amount, 0) * 4 + 125000,
-  }
-  const trips = { today:9, week:79, month:312 }
+export default function DriverEarningsPage() {
+  const supabase = createClient()
+  const [period, setPeriod] = useState<"today"|"week"|"month">("week")
+  const [weekly, setWeekly] = useState<WeekDay[]>(
+    DAY_LABELS.map(d => ({ day: d, amount: 0, trips: 0 }))
+  )
+  const [trips, setTrips] = useState<Trip[]>([])
+  const [earnings, setEarnings] = useState({ today: 0, week: 0, month: 0 })
+  const [tripCount, setTripCount] = useState({ today: 0, week: 0, month: 0 })
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const now = new Date()
+      const startOfDay = new Date(now); startOfDay.setHours(0,0,0,0)
+      const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - 6); startOfWeek.setHours(0,0,0,0)
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+      const { data: orders } = await supabase
+        .from("orders")
+        .select("id, delivery_fee, status, delivery_address, created_at, shop_id")
+        .eq("driver_id", user.id)
+        .eq("status", "delivered")
+        .gte("created_at", startOfMonth.toISOString())
+        .order("created_at", { ascending: false })
+
+      if (!orders) return
+
+      const todayRevenue = orders.filter(o => new Date(o.created_at) >= startOfDay).reduce((s, o) => s + (o.delivery_fee ?? 0), 0)
+      const weekRevenue  = orders.filter(o => new Date(o.created_at) >= startOfWeek).reduce((s, o) => s + (o.delivery_fee ?? 0), 0)
+      const monthRevenue = orders.reduce((s, o) => s + (o.delivery_fee ?? 0), 0)
+      const todayTrips   = orders.filter(o => new Date(o.created_at) >= startOfDay).length
+      const weekTrips    = orders.filter(o => new Date(o.created_at) >= startOfWeek).length
+
+      setEarnings({ today: todayRevenue, week: weekRevenue, month: monthRevenue })
+      setTripCount({ today: todayTrips, week: weekTrips, month: orders.length })
+
+      // Build weekly chart (last 7 days)
+      const weekMap: Record<string, WeekDay> = {}
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now); d.setDate(now.getDate() - i)
+        const label = DAY_LABELS[d.getDay()]
+        const key = d.toDateString()
+        weekMap[key] = { day: label, amount: 0, trips: 0 }
+      }
+      for (const o of orders) {
+        const key = new Date(o.created_at).toDateString()
+        if (weekMap[key]) {
+          weekMap[key].amount += o.delivery_fee ?? 0
+          weekMap[key].trips++
+        }
+      }
+      setWeekly(Object.values(weekMap))
+
+      // Recent trips
+      setTrips(orders.slice(0, 10).map(o => ({
+        id: o.id.slice(0, 6).toUpperCase(),
+        from: "Cửa hàng",
+        to: o.delivery_address ?? "—",
+        time: new Date(o.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+        amount: o.delivery_fee ?? 0,
+        type: "food",
+      })))
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const maxAmt = Math.max(...weekly.map(d => d.amount), 1)
 
   return (
     <>
@@ -74,11 +123,11 @@ export default function DriverEarningsPage() {
               {period==="today"?"Thu nhập hôm nay":period==="week"?"Thu nhập tuần này":"Thu nhập tháng này"}
             </div>
             <div style={{ background:"linear-gradient(90deg,#FF6B00,#FFB347)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontSize:32,fontWeight:800,marginBottom:12 }}>
-              {fmt(earnings[period])}
+              {fmt(earnings[period] ?? 0)}
             </div>
             <div style={{ display:"flex",justifyContent:"center",gap:20 }}>
               <div style={{ textAlign:"center" }}>
-                <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>{trips[period]}</div>
+                <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>{tripCount[period]}</div>
                 <div style={{ color:"#6a5a40",fontSize:8 }}>Chuyến</div>
               </div>
               <div style={{ width:1,background:"rgba(255,255,255,0.07)" }} />
@@ -98,9 +147,9 @@ export default function DriverEarningsPage() {
           <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,marginBottom:12 }}>
             <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:14 }}>📊 Thu nhập theo ngày (tuần này)</div>
             <div style={{ display:"flex",gap:5,alignItems:"flex-end",height:80 }}>
-              {WEEKLY.map((d, i) => {
+              {weekly.map((d, i) => {
                 const h = Math.max(4, Math.round((d.amount / maxAmt) * 72))
-                const isToday = i === 6
+                const isToday = i === weekly.length - 1
                 return (
                   <div key={d.day} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4 }}>
                     <div style={{ width:"100%",height:h,borderRadius:"4px 4px 0 0",background:isToday?"linear-gradient(180deg,#FF6B00,#FF8C00)":"rgba(255,107,0,0.2)",transition:"height .3s" }} />
@@ -120,10 +169,12 @@ export default function DriverEarningsPage() {
             <div style={{ padding:"14px 14px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
               <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:700 }}>🧾 Chuyến gần đây</div>
             </div>
-            {TRIPS.map((trip, i) => (
-              <div key={trip.id} style={{ padding:"10px 14px",borderBottom:i<TRIPS.length-1?"1px solid rgba(255,255,255,0.04)":"none",display:"flex",gap:10,alignItems:"center" }}>
-                <div style={{ width:36,height:36,borderRadius:10,flexShrink:0,background:`rgba(${TYPE_COLOR[trip.type]},0.1)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18 }}>
-                  {TYPE_ICON[trip.type]}
+            {trips.length === 0
+              ? <div style={{ padding:"24px 14px",textAlign:"center",color:"#6a5a40",fontSize:11 }}>Chưa có chuyến nào</div>
+              : trips.map((trip, i) => (
+              <div key={trip.id} style={{ padding:"10px 14px",borderBottom:i<trips.length-1?"1px solid rgba(255,255,255,0.04)":"none",display:"flex",gap:10,alignItems:"center" }}>
+                <div style={{ width:36,height:36,borderRadius:10,flexShrink:0,background:`rgba(${TYPE_COLOR[trip.type] ?? "255,140,0"},0.1)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18 }}>
+                  {TYPE_ICON[trip.type] ?? "🛵"}
                 </div>
                 <div style={{ flex:1,minWidth:0 }}>
                   <div style={{ color:"#f8f0e0",fontSize:10.5,fontWeight:600,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{trip.from}</div>

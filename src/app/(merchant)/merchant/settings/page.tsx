@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { getAdminContact } from "@/lib/adminContact"
+import { createClient } from "@/lib/supabase/client"
 
 /* ── helpers ── */
 function Toggle({ on, onToggle, color = "#3ecf6e" }: { on: boolean; onToggle: () => void; color?: string }) {
@@ -295,11 +296,27 @@ export default function MerchantSettingsPage() {
   const [toast, setToast]           = useState("")
   const [adminContactLink, setAdminContactLink] = useState("mailto:giaonhanh.phuocan@gmail.com")
   const [adminPhone,       setAdminPhone]       = useState("")
+  const [shopName,         setShopName]         = useState("")
+  const [shopAddress,      setShopAddress]      = useState("")
+  const [shopIsOpen,       setShopIsOpen]       = useState(false)
+  const [shopRating,       setShopRating]       = useState<number | null>(null)
 
   useEffect(() => {
     getAdminContact().then(c => {
       setAdminContactLink(c.contactLink)
       setAdminPhone(c.phone)
+    })
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from("shops").select("name, address, is_open, rating_avg").eq("owner_id", user.id).single()
+        .then(({ data }) => {
+          if (!data) return
+          setShopName(data.name ?? "")
+          setShopAddress(data.address ?? "")
+          setShopIsOpen(data.is_open ?? false)
+          setShopRating(data.rating_avg ?? null)
+        })
     })
   }, [])
 
@@ -341,11 +358,11 @@ export default function MerchantSettingsPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, background: "rgba(255,107,0,0.07)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 16, marginBottom: 18 }}>
             <div style={{ width: 52, height: 52, borderRadius: 15, background: "rgba(255,107,0,0.15)", border: "2px solid rgba(255,107,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0 }}>🍜</div>
             <div style={{ flex: 1 }}>
-              <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 800 }}>Bún Bò Huế Ngon</div>
-              <div style={{ color: "#6a5a40", fontSize: 10, marginTop: 2 }}>22 Lê Hồng Phong, Phước An</div>
+              <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 800 }}>{shopName || "Cửa hàng"}</div>
+              <div style={{ color: "#6a5a40", fontSize: 10, marginTop: 2 }}>{shopAddress || "Chưa cập nhật địa chỉ"}</div>
               <div style={{ display: "flex", gap: 6, marginTop: 5 }}>
-                <span style={{ background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 5, padding: "1px 8px", color: "#3ecf6e", fontSize: 8, fontWeight: 700 }}>🟢 Đang mở</span>
-                <span style={{ background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 5, padding: "1px 8px", color: "#FF8C00", fontSize: 8, fontWeight: 700 }}>⭐ 4.8</span>
+                <span style={{ background: shopIsOpen ? "rgba(62,207,110,0.1)" : "rgba(255,64,64,0.08)", border: `1px solid ${shopIsOpen ? "rgba(62,207,110,0.25)" : "rgba(255,64,64,0.2)"}`, borderRadius: 5, padding: "1px 8px", color: shopIsOpen ? "#3ecf6e" : "#ff4040", fontSize: 8, fontWeight: 700 }}>{shopIsOpen ? "🟢 Đang mở" : "🔴 Đóng cửa"}</span>
+                {shopRating && <span style={{ background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 5, padding: "1px 8px", color: "#FF8C00", fontSize: 8, fontWeight: 700 }}>⭐ {shopRating.toFixed(1)}</span>}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

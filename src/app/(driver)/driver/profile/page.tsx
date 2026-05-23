@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { createClient } from "@/lib/supabase/client"
 
 /* ── helpers ── */
 function Toggle({ on, onToggle, color = "#3ecf6e" }: { on: boolean; onToggle: () => void; color?: string }) {
@@ -214,11 +215,27 @@ function DocSheet({ onClose }: { onClose: () => void }) {
 
 /* ── main ── */
 export default function DriverProfilePage() {
-  const [name, setName]       = useState("Phạm Hồng Mỹ")
-  const [phone]               = useState("0848 612 712")
+  const supabase = createClient()
+  const [name, setName]       = useState("")
+  const [phone, setPhone]     = useState("")
+  const [userId, setUserId]   = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [avatar, setAvatar]   = useState<string | null>(null)
   const avatarRef             = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      setUserId(user.id)
+      supabase.from("profiles").select("full_name, phone").eq("id", user.id).single()
+        .then(({ data }) => {
+          if (!data) return
+          setName(data.full_name ?? "")
+          setPhone(data.phone ?? "")
+        })
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* work settings */
   const [work, setWork] = useState({
@@ -275,7 +292,13 @@ export default function DriverProfilePage() {
         <div style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(8,8,6,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 16px", height: 56, display: "flex", alignItems: "center", gap: 12 }}>
           <a href="/driver" style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", color: "#f8f0e0", fontSize: 15 }}>←</a>
           <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>Hồ sơ & Cài đặt</div>
-          <button onClick={() => { if (editing) fire("Đã lưu thông tin!"); setEditing(e => !e) }}
+          <button onClick={async () => {
+            if (editing && userId) {
+              const { error } = await supabase.from("profiles").update({ full_name: name }).eq("id", userId)
+              fire(error ? "❌ Lỗi lưu thông tin" : "Đã lưu thông tin!")
+            }
+            setEditing(e => !e)
+          }}
             style={{ padding: "7px 14px", borderRadius: 9, background: editing ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.06)", border: editing ? "1px solid rgba(255,107,0,0.3)" : "1px solid rgba(255,255,255,0.1)", color: editing ? "#FF8C00" : "#6a5a40", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
             {editing ? "💾 Lưu" : "✏️ Sửa"}
           </button>
