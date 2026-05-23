@@ -102,8 +102,9 @@ export default function ProfilePage() {
   const [avatarUrl,   setAvatarUrl]   = useState("")
   const [tier,        setTier]        = useState("bronze")
   const [points,      setPoints]      = useState(0)
-  const [walletXu,    setWalletXu]    = useState(0)
-  const [totalOrders, setTotalOrders] = useState(0)
+  const [walletXu,         setWalletXu]         = useState(0)
+  const [totalOrders,      setTotalOrders]      = useState(0)
+  const [activeOrderCount, setActiveOrderCount] = useState(0)
   const [joinYear,    setJoinYear]    = useState("")
   const [notif,       setNotif]       = useState<NotifSettings>({ order: true, promo: false, system: true, driver: true })
   const [showPw,      setShowPw]      = useState(false)
@@ -128,11 +129,13 @@ export default function ProfilePage() {
         { data: loyalty },
         { data: wallet },
         { data: orderCount },
+        { data: activeCount },
       ] = await Promise.all([
         supabase.from("profiles").select("full_name, phone, avatar_url, created_at").eq("id", user.id).single(),
         supabase.from("loyalty_points").select("total_points, tier").eq("user_id", user.id).maybeSingle(),
         supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
         supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", user.id).neq("status", "cancelled"),
+        supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", user.id).in("status", ["pending","accepted","preparing","ready","delivering"]),
       ])
 
       setName(profile?.full_name ?? "")
@@ -143,6 +146,7 @@ export default function ProfilePage() {
       setPoints(loyalty?.total_points ?? 0)
       setWalletXu(wallet?.balance ?? 0)
       setTotalOrders((orderCount as { count?: number } | null)?.count ?? 0)
+      setActiveOrderCount((activeCount as { count?: number } | null)?.count ?? 0)
       setLoading(false)
     }
     load()
@@ -301,9 +305,37 @@ export default function ProfilePage() {
                 <div style={{ color: "#ff6060", fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Xóa tài khoản?</div>
                 <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.6 }}>Toàn bộ lịch sử đơn hàng, điểm tích lũy và thông tin<br />của bạn sẽ bị xóa vĩnh viễn. Không thể khôi phục.</div>
               </div>
+
+              {/* Cảnh báo đơn đang chạy */}
+              {activeOrderCount > 0 && (
+                <div style={{ background: "rgba(255,64,64,0.08)", border: "1px solid rgba(255,64,64,0.25)", borderRadius: 12, padding: "10px 14px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span style={{ fontSize: 16, flexShrink: 0 }}>🚫</span>
+                  <div>
+                    <div style={{ color: "#ff6060", fontSize: 11, fontWeight: 700, marginBottom: 3 }}>Đang có {activeOrderCount} đơn hàng đang xử lý</div>
+                    <div style={{ color: "#6a5a40", fontSize: 9, lineHeight: 1.5 }}>Vui lòng chờ đơn hoàn thành hoặc hủy đơn trước khi xóa tài khoản.</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Cảnh báo xu còn trong ví */}
+              {walletXu > 0 && (
+                <div style={{ background: "rgba(255,179,71,0.08)", border: "1px solid rgba(255,179,71,0.25)", borderRadius: 12, padding: "10px 14px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span style={{ fontSize: 16, flexShrink: 0 }}>🪙</span>
+                  <div>
+                    <div style={{ color: "#FFB347", fontSize: 11, fontWeight: 700, marginBottom: 3 }}>Còn {walletXu.toLocaleString("vi-VN")}đ xu trong ví</div>
+                    <div style={{ color: "#6a5a40", fontSize: 9, lineHeight: 1.5 }}>Xu sẽ <strong style={{ color: "#ff6060" }}>không được hoàn trả</strong> khi xóa tài khoản. Vui lòng dùng hết xu trước khi thực hiện.</div>
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => setShowDelete(false)} style={{ flex: 1, height: 44, borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "#b0956a", fontSize: 12, fontWeight: 600, fontFamily: "Lexend", cursor: "pointer" }}>Giữ lại</button>
-                <button onClick={() => { fireToast("Đã gửi yêu cầu xóa tài khoản"); setShowDelete(false) }} style={{ flex: 1, height: 44, borderRadius: 12, border: "none", background: "linear-gradient(90deg,#ff4040,#ff6060)", color: "#fff", fontSize: 12, fontWeight: 700, fontFamily: "Lexend", cursor: "pointer" }}>Xóa tài khoản</button>
+                <button
+                  disabled={activeOrderCount > 0}
+                  onClick={() => { fireToast("Đã gửi yêu cầu xóa tài khoản"); setShowDelete(false) }}
+                  style={{ flex: 1, height: 44, borderRadius: 12, border: "none", background: activeOrderCount > 0 ? "rgba(255,64,64,0.2)" : "linear-gradient(90deg,#ff4040,#ff6060)", color: activeOrderCount > 0 ? "#6a5a40" : "#fff", fontSize: 12, fontWeight: 700, fontFamily: "Lexend", cursor: activeOrderCount > 0 ? "not-allowed" : "pointer" }}>
+                  {activeOrderCount > 0 ? "Không thể xóa" : "Xóa tài khoản"}
+                </button>
               </div>
             </motion.div>
           </>
@@ -466,6 +498,7 @@ export default function ProfilePage() {
           <div style={CARD_STYLE}>
             <SettingRow icon="📍" label="Địa chỉ lưu" sub="Quản lý địa chỉ nhà, công ty" onClick={() => router.push("/addresses")} />
             <SettingRow icon="🎟️" label="Voucher của tôi" onClick={() => router.push("/vouchers")} />
+            <SettingRow icon="🎁" label="Mời bạn bè" sub="Chia sẻ mã — cả 2 nhận 10.000đ xu" onClick={() => router.push("/invite")} />
             <SettingRow icon="💼" label="Ví của tôi" sub={`${walletXu.toLocaleString("vi-VN")} xu · ${points.toLocaleString("vi-VN")} điểm`} onClick={() => router.push("/wallet")} />
             <SettingRow icon="🌐" label="Ngôn ngữ" right={<span style={{ color: "#b0956a", fontSize: 10 }}>Tiếng Việt</span>} />
           </div>

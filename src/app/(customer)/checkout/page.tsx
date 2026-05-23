@@ -8,6 +8,9 @@ import type { CartItem } from "@/store/cartStore"
 import AddressPicker from "@/components/map/AddressPicker"
 import type { AddressPickerResult } from "@/types"
 import { formatPrice } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
+
+const supabase = createClient()
 
 // ─── Types & Constants ────────────────────────────────────────
 
@@ -1110,6 +1113,10 @@ export default function CheckoutPage() {
   const [showAddressSheet, setShowAddressSheet] = useState(false)
   const [orderCode]                             = useState(() => Date.now() % 100_000_000)
   const [nowDate]                               = useState(() => new Date())
+  const [refInput,   setRefInput]               = useState("")
+  const [refApplied, setRefApplied]             = useState(false)
+  const [refLoading, setRefLoading]             = useState(false)
+  const [refMsg,     setRefMsg]                 = useState<{ ok: boolean; text: string } | null>(null)
 
 
   // ── Address helpers ──
@@ -1169,6 +1176,32 @@ export default function CheckoutPage() {
   }
 
   const applyVoucher = () => applyVoucherCode(voucherInput)
+
+  const handleApplyRef = async () => {
+    const code = refInput.trim().toUpperCase()
+    if (!code || refApplied) return
+    setRefLoading(true)
+    setRefMsg(null)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setRefMsg({ ok: false, text: "Vui lòng đăng nhập lại" }); return }
+      const { data, error } = await supabase.rpc("apply_referral_code", {
+        p_code: code, p_referee_id: user.id,
+      })
+      if (error) throw error
+      const result = data as { ok: boolean; error?: string }
+      if (result.ok) {
+        setRefApplied(true)
+        setRefMsg({ ok: true, text: "Mã hợp lệ! Bạn sẽ nhận 10.000đ xu vào ví sau khi hoàn thành đơn đầu." })
+      } else {
+        setRefMsg({ ok: false, text: result.error ?? "Mã không hợp lệ" })
+      }
+    } catch {
+      setRefMsg({ ok: false, text: "Lỗi kết nối, vui lòng thử lại" })
+    } finally {
+      setRefLoading(false)
+    }
+  }
 
   const payosAbortRef = useRef<AbortController | null>(null)
 
@@ -1743,6 +1776,64 @@ export default function CheckoutPage() {
               }} />
           </SectionCard>
 
+          {/* 5.5 Mã giới thiệu */}
+          {!refApplied && (
+            <SectionCard title="Mã giới thiệu" icon="🎁">
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  value={refInput}
+                  onChange={e => { setRefInput(e.target.value.toUpperCase()); setRefMsg(null) }}
+                  onKeyDown={e => e.key === "Enter" && handleApplyRef()}
+                  placeholder="Nhập mã GNxxxxxx (nếu có)"
+                  maxLength={8}
+                  style={{
+                    flex: 1, height: 40, borderRadius: 10,
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                    color: "#f8f0e0", fontSize: 12, padding: "0 12px",
+                    fontFamily: "Lexend", letterSpacing: 2, outline: "none",
+                  }}
+                />
+                <button type="button" onClick={handleApplyRef} disabled={refLoading || !refInput.trim()}
+                  style={{
+                    height: 40, padding: "0 14px", borderRadius: 10, border: "none",
+                    background: refLoading || !refInput.trim() ? "rgba(255,255,255,0.06)" : "rgba(255,107,0,0.15)",
+                    color: refLoading || !refInput.trim() ? "#6a5a40" : "#FF8C00",
+                    fontSize: 11, fontWeight: 700, fontFamily: "Lexend",
+                    cursor: refLoading || !refInput.trim() ? "default" : "pointer", flexShrink: 0,
+                  }}>
+                  {refLoading ? "..." : "Áp dụng"}
+                </button>
+              </div>
+              {refMsg && (
+                <div style={{
+                  marginTop: 8, padding: "8px 11px", borderRadius: 9,
+                  background: refMsg.ok ? "rgba(62,207,110,0.08)" : "rgba(255,64,64,0.08)",
+                  border: `1px solid ${refMsg.ok ? "rgba(62,207,110,0.25)" : "rgba(255,64,64,0.25)"}`,
+                  color: refMsg.ok ? "#3ecf6e" : "#ff4040", fontSize: 10.5,
+                }}>
+                  {refMsg.ok ? "✓" : "✗"} {refMsg.text}
+                </div>
+              )}
+            </SectionCard>
+          )}
+
+          {refApplied && (
+            <div style={{
+              marginBottom: 10, padding: "10px 14px", borderRadius: 14,
+              background: "rgba(62,207,110,0.07)", border: "1px solid rgba(62,207,110,0.25)",
+              display: "flex", alignItems: "center", gap: 10,
+            }}>
+              <span style={{ fontSize: 18 }}>🎁</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>Mã giới thiệu đã đăng ký</div>
+                <div style={{ color: "#6a5a40", fontSize: 9.5, marginTop: 1 }}>
+                  10.000đ xu sẽ vào ví sau khi đơn hoàn thành
+                </div>
+              </div>
+              <span style={{ color: "#3ecf6e", fontSize: 14 }}>✓</span>
+            </div>
+          )}
+
           {/* 6. Tóm tắt */}
           <SectionCard title="Tóm tắt đơn hàng" icon="📋">
             {cartItems.length === 0 && (
@@ -1773,9 +1864,9 @@ export default function CheckoutPage() {
               {[
                 { label: "Tạm tính",  val: fmt(subtotal),    color: "#b0956a" },
                 { label: "Phí giao",  val: fmt(deliveryFee), color: "#b0956a" },
-                ...(discount > 0 ? [{
+                ...(appliedVouchers.reduce((s, v) => s + v.discount, 0) > 0 ? [{
                   label: appliedVouchers.length > 1 ? `Giảm giá (${appliedVouchers.length} voucher)` : "Giảm giá",
-                  val: `-${fmt(discount)}`, color: "#3ecf6e",
+                  val: `-${fmt(appliedVouchers.reduce((s, v) => s + v.discount, 0))}`, color: "#3ecf6e",
                 }] : []),
                 ...(useXu && xuUsed > 0 ? [{
                   label: "🪙 Xu Giao Nhanh",

@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { getAdminContact } from "@/lib/adminContact"
 
 /* ── helpers ── */
 function Toggle({ on, onToggle, color = "#3ecf6e" }: { on: boolean; onToggle: () => void; color?: string }) {
@@ -158,8 +159,16 @@ export default function MerchantSettingsPage() {
   /* sheets */
   const [showPw,    setShowPw]    = useState(false)
   const [showHours, setShowHours] = useState(false)
-  const [showDelete, setShowDelete] = useState(false)
   const [toast, setToast]           = useState("")
+  const [adminContactLink, setAdminContactLink] = useState("mailto:giaonhanh.phuocan@gmail.com")
+  const [adminPhone,       setAdminPhone]       = useState("")
+
+  useEffect(() => {
+    getAdminContact().then(c => {
+      setAdminContactLink(c.contactLink)
+      setAdminPhone(c.phone)
+    })
+  }, [])
 
   const fire = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2200) }
   const sw = (k: keyof typeof shop)  => setShop(p => ({ ...p, [k]: !p[k] }))
@@ -375,7 +384,7 @@ export default function MerchantSettingsPage() {
           {/* support */}
           <Section title="Hỗ trợ">
             <Row icon="❓" label="Câu hỏi thường gặp" sub="Hướng dẫn chủ cửa hàng" onClick={() => fire("Đang mở FAQ...")} arrow />
-            <Row icon="💬" label="Chat với hỗ trợ" sub="Phản hồi trong vòng 30 phút" onClick={() => fire("Đang kết nối...")} arrow />
+            <Row icon="💬" label="Chat với hỗ trợ" sub="Phản hồi trong vòng 30 phút" onClick={() => { if (adminContactLink) window.open(adminContactLink, "_blank"); else fire("Đang kết nối...") }} arrow />
             <Row icon="⚠️" label="Báo cáo vấn đề" sub="Đơn hàng sai, tài xế vi phạm..." onClick={() => fire("Đang mở form...")} arrow />
             <Row icon="📝" label="Quy tắc merchant" sub="Chính sách, điều khoản đối tác" onClick={() => fire("Đang mở tài liệu...")} arrow last />
           </Section>
@@ -390,8 +399,16 @@ export default function MerchantSettingsPage() {
           {/* account / danger */}
           <Section title="Tài khoản">
             <Row icon="🚪" label="Đăng xuất" sub="Đăng xuất khỏi thiết bị này" danger onClick={() => fire("Đang đăng xuất...")} arrow />
-            <Row icon="🗑" label="Xóa tài khoản merchant" sub="Xóa shop và dữ liệu vĩnh viễn" danger onClick={() => setShowDelete(true)} arrow last />
+            <Row icon="📞" label="Liên hệ admin để xóa tài khoản / shop" sub="Việc xóa cần được xác nhận bởi quản trị viên" onClick={() => { window.open(adminContactLink, "_blank") }} arrow last />
           </Section>
+
+          {/* contact admin info */}
+          <div style={{ marginBottom: 20, padding: "12px 14px", background: "rgba(74,143,245,0.06)", border: "1px solid rgba(74,143,245,0.18)", borderRadius: 14, display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <span style={{ fontSize: 18, flexShrink: 0 }}>ℹ️</span>
+            <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.6 }}>
+              Để <strong style={{ color: "#4a8ff5" }}>xóa tài khoản hoặc cửa hàng</strong>, vui lòng liên hệ admin{adminPhone ? <> qua số <strong style={{ color: "#f8f0e0" }}>{adminPhone}</strong></> : ""}. Admin sẽ xử lý trong vòng 24h sau khi xác minh danh tính.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -399,27 +416,6 @@ export default function MerchantSettingsPage() {
       <AnimatePresence>
         {showPw    && <PwSheet    onClose={() => setShowPw(false)}    />}
         {showHours && <HoursSheet onClose={() => setShowHours(false)} />}
-      </AnimatePresence>
-
-      {/* delete confirm */}
-      <AnimatePresence>
-        {showDelete && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ position: "fixed", inset: 0, zIndex: 95, background: "rgba(8,8,6,0.85)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-            <motion.div initial={{ scale: .9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              style={{ background: "#0e0b07", border: "1px solid rgba(255,64,64,0.3)", borderRadius: 20, padding: 24, maxWidth: 340, width: "100%" }}>
-              <div style={{ fontSize: 36, textAlign: "center", marginBottom: 12 }}>⚠️</div>
-              <div style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 800, textAlign: "center", marginBottom: 8 }}>Xóa cửa hàng?</div>
-              <div style={{ color: "#6a5a40", fontSize: 11, textAlign: "center", lineHeight: 1.6, marginBottom: 20 }}>
-                Toàn bộ thực đơn, lịch sử đơn hàng và đánh giá sẽ bị xóa vĩnh viễn. <strong style={{ color: "#ff4040" }}>Không thể hoàn tác.</strong>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <button onClick={() => setShowDelete(false)} style={{ height: 44, borderRadius: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#b0956a", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>Hủy</button>
-                <button style={{ height: 44, borderRadius: 12, background: "rgba(255,64,64,0.12)", border: "1px solid rgba(255,64,64,0.3)", color: "#ff4040", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>Xóa cửa hàng</button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
       </AnimatePresence>
     </>
   )

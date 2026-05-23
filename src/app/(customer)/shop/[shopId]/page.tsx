@@ -360,12 +360,24 @@ export default function ShopPage() {
                   animation: favoured ? "shopBounce .4s" : "none" }}>
                 {favoured ? "❤️" : "🤍"}
               </button>
-              <button style={{ width:32, height:32, borderRadius:9,
-                background:"rgba(0,0,0,0.35)",
-                border:"1px solid rgba(255,255,255,0.12)",
-                backdropFilter:"blur(8px)",
-                display:"flex", alignItems:"center", justifyContent:"center",
-                fontSize:15, cursor:"pointer" }}>
+              <button
+                onClick={async () => {
+                  const url = `${window.location.origin}/shop/${shopId}`
+                  const title = shop?.name ?? "Giao Nhanh"
+                  const text  = `Đặt đồ ăn tại ${title} trên Giao Nhanh!`
+                  if (navigator.share) {
+                    try { await navigator.share({ title, text, url }) } catch { /* user dismissed */ }
+                  } else {
+                    await navigator.clipboard.writeText(url)
+                    fireToast("Đã sao chép link quán!")
+                  }
+                }}
+                style={{ width:32, height:32, borderRadius:9,
+                  background:"rgba(0,0,0,0.35)",
+                  border:"1px solid rgba(255,255,255,0.12)",
+                  backdropFilter:"blur(8px)",
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:15, cursor:"pointer" }}>
                 🔗
               </button>
             </div>
