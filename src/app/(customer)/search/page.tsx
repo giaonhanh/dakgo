@@ -55,7 +55,7 @@ interface RpcProduct {
   image_url: string | null; sold_count: number; shop_id: string; shop_name: string; score?: number
 }
 interface RpcShop {
-  id: string; name: string; category: string; logo_url: string | null
+  id: string; name: string; category?: string; logo_url: string | null
   rating_avg: number; is_open: boolean; score?: number
 }
 interface RpcResult { products: RpcProduct[] | null; shops: RpcShop[] | null }
@@ -71,7 +71,7 @@ async function searchSupabase(query: string): Promise<SearchResult[]> {
   if (!error && rpc) {
     const shopResults: ShopResult[] = (rpc.shops ?? []).map(s => ({
       id: s.id, type: "shop" as const,
-      name: s.name, category: s.category,
+      name: s.name, category: s.category ?? "",
       logo_url: s.logo_url ?? "",
       rating_avg: Number(s.rating_avg ?? 5),
       distance_km: 0, delivery_fee: 15000,
@@ -91,9 +91,9 @@ async function searchSupabase(query: string): Promise<SearchResult[]> {
   const [{ data: shops }, { data: products }] = await Promise.all([
     supabase
       .from("shops")
-      .select("id, name, category, logo_url, rating_avg, is_open")
+      .select("id, name, logo_url, rating_avg, is_open")
       .eq("status", "approved")
-      .or(`name.ilike.%${q}%,category.ilike.%${q}%`)
+      .ilike("name", `%${q}%`)
       .limit(20),
     supabase
       .from("products")
@@ -104,7 +104,7 @@ async function searchSupabase(query: string): Promise<SearchResult[]> {
   ])
   const shopResults: ShopResult[] = (shops ?? []).map(s => ({
     id: s.id, type: "shop" as const,
-    name: s.name, category: s.category,
+    name: s.name, category: "",
     logo_url: s.logo_url ?? "",
     rating_avg: Number(s.rating_avg ?? 5),
     distance_km: 0, delivery_fee: 15000,
