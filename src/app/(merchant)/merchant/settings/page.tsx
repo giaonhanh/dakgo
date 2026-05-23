@@ -92,22 +92,54 @@ function PwSheet({ onClose }: { onClose: () => void }) {
 /* ── hours sheet ── */
 const HOURS_KEY = "merchant_shop_hours"
 const DAYS_LABEL = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"]
-const DEFAULT_HOURS = DAYS_LABEL.map(d => ({ day: d, open: true, from: "07:00", to: "21:00" }))
 
-export type DayHours = { day: string; open: boolean; from: string; to: string }
+export type TimeSlot  = { from: string; to: string }
+export type DayHours  = { day: string; open: boolean; slots: TimeSlot[] }
+
+const DEFAULT_HOURS: DayHours[] = DAYS_LABEL.map(d => ({
+  day: d, open: true, slots: [{ from: "07:00", to: "21:00" }],
+}))
 
 function loadHours(): DayHours[] {
   try {
     const s = typeof window !== "undefined" ? localStorage.getItem(HOURS_KEY) : null
-    if (s) return JSON.parse(s)
+    if (s) {
+      const parsed = JSON.parse(s)
+      // backward compat: old format used {from, to} directly
+      return parsed.map((d: DayHours & { from?: string; to?: string }) => ({
+        day:   d.day,
+        open:  d.open,
+        slots: d.slots ?? [{ from: d.from ?? "07:00", to: d.to ?? "21:00" }],
+      }))
+    }
   } catch { /* ignore */ }
   return DEFAULT_HOURS
+}
+
+const timeInputStyle: React.CSSProperties = {
+  flex: 1, height: 34, padding: "0 8px",
+  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)",
+  borderRadius: 8, color: "#f8f0e0", fontSize: 11, fontFamily: "Lexend", colorScheme: "dark",
 }
 
 /* ── hours sheet ── */
 function HoursSheet({ onClose }: { onClose: () => void }) {
   const [hours, setHours] = useState<DayHours[]>(loadHours)
-  const toggle = (i: number) => setHours(h => h.map((x, j) => j === i ? { ...x, open: !x.open } : x))
+
+  const toggle    = (i: number) =>
+    setHours(h => h.map((x, j) => j === i ? { ...x, open: !x.open } : x))
+
+  const addSlot   = (i: number) =>
+    setHours(h => h.map((x, j) => j === i
+      ? { ...x, slots: [...x.slots, { from: "14:00", to: "21:00" }] } : x))
+
+  const removeSlot = (i: number, si: number) =>
+    setHours(h => h.map((x, j) => j === i
+      ? { ...x, slots: x.slots.filter((_, k) => k !== si) } : x))
+
+  const updateSlot = (i: number, si: number, field: keyof TimeSlot, val: string) =>
+    setHours(h => h.map((x, j) => j === i
+      ? { ...x, slots: x.slots.map((s, k) => k === si ? { ...s, [field]: val } : s) } : x))
 
   const handleSave = () => {
     localStorage.setItem(HOURS_KEY, JSON.stringify(hours))
@@ -115,31 +147,75 @@ function HoursSheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 26, stiffness: 280 }}
-      style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-      <div style={{ background: "#0e0b07", borderTop: "1px solid rgba(255,107,0,0.3)", borderRadius: "22px 22px 0 0", padding: "20px 20px calc(env(safe-area-inset-bottom) + 20px)", maxHeight: "88dvh", overflowY: "auto" }}>
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 18 }}>
+    <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+      transition={{ type: "spring", damping: 26, stiffness: 280 }}
+      style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)",
+        backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div style={{ background: "#0e0b07", borderTop: "1px solid rgba(255,107,0,0.3)",
+        borderRadius: "22px 22px 0 0", padding: "20px 20px calc(env(safe-area-inset-bottom) + 20px)",
+        maxHeight: "88dvh", overflowY: "auto" }}>
+
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
           <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🕐 Giờ hoạt động từng ngày</div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none",
+            borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
         </div>
+        <div style={{ color: "#6a5a40", fontSize: 9, marginBottom: 16 }}>
+          Mỗi ngày có thể có 2 khung giờ — VD: 07:00–11:00 và 14:00–21:00 (nghỉ trưa).
+        </div>
+
         {hours.map((h, i) => (
-          <div key={h.day} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: i < hours.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-            <div style={{ width: 56, color: h.open ? "#f8f0e0" : "#6a5a40", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{h.day}</div>
-            <Toggle on={h.open} onToggle={() => toggle(i)} />
-            {h.open ? (
-              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
-                <input type="time" value={h.from} onChange={e => setHours(a => a.map((x, j) => j === i ? { ...x, from: e.target.value } : x))}
-                  style={{ flex: 1, height: 34, padding: "0 8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 8, color: "#f8f0e0", fontSize: 11, fontFamily: "Lexend", colorScheme: "dark" }} />
-                <span style={{ color: "#6a5a40", fontSize: 10 }}>–</span>
-                <input type="time" value={h.to} onChange={e => setHours(a => a.map((x, j) => j === i ? { ...x, to: e.target.value } : x))}
-                  style={{ flex: 1, height: 34, padding: "0 8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 8, color: "#f8f0e0", fontSize: 11, fontFamily: "Lexend", colorScheme: "dark" }} />
+          <div key={h.day} style={{ padding: "10px 0",
+            borderBottom: i < hours.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+
+            {/* Day header row */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: h.open ? 8 : 0 }}>
+              <div style={{ width: 56, color: h.open ? "#f8f0e0" : "#6a5a40",
+                fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{h.day}</div>
+              <Toggle on={h.open} onToggle={() => toggle(i)} />
+              {!h.open && <div style={{ color: "#6a5a40", fontSize: 10 }}>Nghỉ cả ngày</div>}
+            </div>
+
+            {/* Time slots */}
+            {h.open && (
+              <div style={{ paddingLeft: 66 }}>
+                {h.slots.map((slot, si) => (
+                  <div key={si} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                    <span style={{ color: "#6a5a40", fontSize: 9, width: 12 }}>{si + 1}</span>
+                    <input type="time" value={slot.from}
+                      onChange={e => updateSlot(i, si, "from", e.target.value)}
+                      style={timeInputStyle} />
+                    <span style={{ color: "#6a5a40", fontSize: 10 }}>–</span>
+                    <input type="time" value={slot.to}
+                      onChange={e => updateSlot(i, si, "to", e.target.value)}
+                      style={timeInputStyle} />
+                    {h.slots.length > 1 && (
+                      <button onClick={() => removeSlot(i, si)}
+                        style={{ width: 26, height: 26, borderRadius: 7, border: "none",
+                          background: "rgba(255,64,64,0.1)", color: "#ff4040",
+                          fontSize: 13, cursor: "pointer", flexShrink: 0 }}>×</button>
+                    )}
+                  </div>
+                ))}
+                {h.slots.length < 2 && (
+                  <button onClick={() => addSlot(i)}
+                    style={{ marginTop: 2, padding: "4px 10px", borderRadius: 7, border: "none",
+                      background: "rgba(255,255,255,0.04)", color: "#6a5a40",
+                      fontSize: 9, cursor: "pointer", fontFamily: "Lexend" }}>
+                    + Thêm khung giờ 2 (có nghỉ trưa)
+                  </button>
+                )}
               </div>
-            ) : (
-              <div style={{ flex: 1, color: "#6a5a40", fontSize: 10 }}>Đóng cửa</div>
             )}
           </div>
         ))}
-        <button onClick={handleSave} style={{ width: "100%", height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend", marginTop: 16 }}>✓ Lưu giờ hoạt động</button>
+
+        <button onClick={handleSave}
+          style={{ width: "100%", height: 48, borderRadius: 14, border: "none",
+            background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff",
+            fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend", marginTop: 16 }}>
+          ✓ Lưu giờ hoạt động
+        </button>
       </div>
     </motion.div>
   )
@@ -210,7 +286,9 @@ export default function MerchantSettingsPage() {
   })
 
   /* sheets */
-  const [prepTime,      setPrepTime]      = useState("10–15")
+  const [prepTime,      setPrepTime]      = useState(() => {
+    try { return localStorage.getItem("merchant_prep_time") ?? "10–15" } catch { return "10–15" }
+  })
   const [showPw,        setShowPw]        = useState(false)
   const [showHours,     setShowHours]     = useState(false)
   const [showPrepSheet, setShowPrepSheet] = useState(false)
@@ -454,7 +532,7 @@ export default function MerchantSettingsPage() {
       <AnimatePresence>
         {showPw        && <PwSheet      onClose={() => setShowPw(false)}        />}
         {showHours     && <HoursSheet   onClose={() => setShowHours(false)}     />}
-        {showPrepSheet && <PrepTimeSheet value={prepTime} onSelect={setPrepTime} onClose={() => setShowPrepSheet(false)} />}
+        {showPrepSheet && <PrepTimeSheet value={prepTime} onSelect={v => { setPrepTime(v); try { localStorage.setItem("merchant_prep_time", v) } catch { /* ignore */ } }} onClose={() => setShowPrepSheet(false)} />}
       </AnimatePresence>
     </>
   )

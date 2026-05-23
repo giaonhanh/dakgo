@@ -28,22 +28,35 @@ export default function ShopPreviewPage() {
   const [address]  = useState("22 Lê Hồng Phong, Phước An, Krông Pắc")
   const [rating]    = useState(4.8)
   const [isOpen]    = useState(true)
-  const [prepTime]  = useState("10–15")
+  const [prepTime, setPrepTime] = useState("10–15")
   const [todayLabel, setTodayLabel] = useState("07:00–21:00")
   const [todayClosed, setTodayClosed] = useState(false)
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem("merchant_shop_hours")
-      if (!saved) return
-      const arr: { day: string; open: boolean; from: string; to: string }[] = JSON.parse(saved)
-      // JS getDay(): 0=Sun,1=Mon..6=Sat → convert to index Mon=0..Sun=6
-      const jsDay = new Date().getDay()
-      const idx = jsDay === 0 ? 6 : jsDay - 1
-      const today = arr[idx]
-      if (!today) return
-      if (!today.open) { setTodayClosed(true) }
-      else { setTodayLabel(`${today.from}–${today.to}`) }
+      if (saved) {
+        const arr = JSON.parse(saved)
+        const jsDay = new Date().getDay()
+        const idx = jsDay === 0 ? 6 : jsDay - 1
+        const today = arr[idx]
+        if (today) {
+          if (!today.open) {
+            setTodayClosed(true)
+          } else {
+            // new format: slots[]; old format: from/to directly
+            if (Array.isArray(today.slots) && today.slots.length > 0) {
+              setTodayLabel(today.slots.map((s: { from: string; to: string }) => `${s.from}–${s.to}`).join(" · "))
+            } else if (today.from) {
+              setTodayLabel(`${today.from}–${today.to}`)
+            }
+          }
+        }
+      }
+    } catch { /* ignore */ }
+    try {
+      const pt = localStorage.getItem("merchant_prep_time")
+      if (pt) setPrepTime(pt)
     } catch { /* ignore */ }
   }, [])
   const [activeTab, setActiveTab] = useState("Tất cả")

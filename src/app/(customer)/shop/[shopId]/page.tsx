@@ -386,6 +386,50 @@ export default function ShopPage() {
           </div>
         </div>
 
+        {/* ── Closed shop overlay ── */}
+        {!loading && shop && !shop.is_open && (
+          <div style={{ position:"absolute", inset:0, zIndex:200,
+            background:"rgba(8,8,6,0.96)", backdropFilter:"blur(10px)",
+            display:"flex", flexDirection:"column", alignItems:"center",
+            justifyContent:"center", padding:"32px 24px", gap:0 }}>
+            {/* Back button */}
+            <div style={{ position:"absolute", top:"max(44px,env(safe-area-inset-top))", left:16 }}>
+              <a href="/" style={{ width:36, height:36, borderRadius:10,
+                background:"rgba(255,255,255,0.07)",
+                border:"1px solid rgba(255,255,255,0.12)",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                textDecoration:"none", color:"#f8f0e0", fontSize:16 }}>←</a>
+            </div>
+            {/* Icon */}
+            <div style={{ fontSize:64, marginBottom:20, opacity:.85 }}>🔒</div>
+            <div style={{ color:"#f8f0e0", fontSize:20, fontWeight:800,
+              textAlign:"center", marginBottom:8 }}>
+              {shop.name}
+            </div>
+            <div style={{ background:"rgba(255,64,64,0.12)",
+              border:"1px solid rgba(255,64,64,0.3)",
+              borderRadius:10, padding:"6px 16px", marginBottom:20 }}>
+              <span style={{ color:"#ff4040", fontSize:12, fontWeight:700 }}>
+                🔴 Quán đang nghỉ
+              </span>
+            </div>
+            <div style={{ color:"#6a5a40", fontSize:12, textAlign:"center",
+              lineHeight:1.8, maxWidth:280 }}>
+              Cửa hàng hiện chưa nhận đơn.
+              <br />Bạn có thể quay lại sau hoặc chọn quán khác.
+            </div>
+            <button onClick={() => router.back()}
+              style={{ marginTop:28, height:48, padding:"0 32px",
+                borderRadius:14, border:"none",
+                background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
+                color:"#fff", fontSize:13, fontWeight:700,
+                cursor:"pointer", fontFamily:"Lexend",
+                boxShadow:"0 4px 18px rgba(255,107,0,0.35)" }}>
+              ← Quay lại
+            </button>
+          </div>
+        )}
+
         {/* ── Scrollable content ── */}
         <div ref={containerRef}
           style={{ flex:1, overflowY:"auto",
