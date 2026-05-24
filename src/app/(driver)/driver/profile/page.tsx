@@ -157,20 +157,26 @@ function VehicleSheet({ onClose }: { onClose: () => void }) {
 }
 
 /* ── bank sheet ── */
+const BANK_LIST = ["Vietcombank","Techcombank","MB Bank","BIDV","VPBank","Agribank","ACB","VietinBank","TPBank","HDBank","Sacombank","MSB","SHB","OCB","Eximbank","Nam A Bank"]
+
+function maskAcct(s: string) {
+  if (s.length <= 5) return s
+  return s.slice(0, 2) + "••••" + s.slice(-3)
+}
+
 function BankSheet({ onClose, onSaved }: { onClose: () => void; onSaved?: () => void }) {
   const supabase = createClient()
-  const BANKS = ["Vietcombank", "BIDV", "Agribank", "Techcombank", "MB Bank", "VPBank", "ACB", "VietinBank"]
   const [bank,    setBank]    = useState("Vietcombank")
   const [acct,    setAcct]    = useState("")
   const [name,    setName]    = useState("")
   const [saving,  setSaving]  = useState(false)
   const [loading, setLoading] = useState(true)
   const [err,     setErr]     = useState("")
+  const [editing, setEditing] = useState(false)
 
-  // Load dữ liệu đã lưu từ DB
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) { setLoading(false); return }
+      if (!user) { setLoading(false); setEditing(true); return }
       supabase.from("drivers")
         .select("bank_name, bank_account_number, bank_account_name")
         .eq("id", user.id).single()
@@ -178,6 +184,7 @@ function BankSheet({ onClose, onSaved }: { onClose: () => void; onSaved?: () => 
           if (data?.bank_name)           setBank(data.bank_name)
           if (data?.bank_account_number) setAcct(data.bank_account_number)
           if (data?.bank_account_name)   setName(data.bank_account_name)
+          setEditing(!data?.bank_account_number)
           setLoading(false)
         })
     })
@@ -198,55 +205,91 @@ function BankSheet({ onClose, onSaved }: { onClose: () => void; onSaved?: () => 
     }).eq("id", user.id)
     setSaving(false)
     if (error) return setErr("Lưu thất bại, thử lại sau")
-    localStorage.setItem("driver_bank_linked", "true")
+    setEditing(false)
     onSaved?.()
-    onClose()
   }
 
   return (
     <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 26, stiffness: 280 }}
       style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
       <div style={{ background: "#0e0b07", borderTop: "1px solid rgba(255,107,0,0.3)", borderRadius: "22px 22px 0 0", padding: "20px 20px calc(env(safe-area-inset-bottom) + 20px)", maxHeight: "85dvh", overflowY: "auto" }}>
+
+        {/* header */}
         <div style={{ display: "flex", alignItems: "center", marginBottom: 18 }}>
           <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🏦 Tài khoản ngân hàng</div>
           <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
         </div>
-        <div style={{ background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 12, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 10 }}>
-          <span style={{ fontSize: 16 }}>💰</span>
-          <span style={{ color: "#FF8C00", fontSize: 10, lineHeight: 1.5 }}>Tiền sẽ nhận được khi hoàn thành đơn hàng và trừ chiết khấu nền tảng.</span>
-        </div>
 
         {loading ? (
           <div style={{ textAlign: "center", padding: "24px 0", color: "#6a5a40", fontSize: 12 }}>Đang tải...</div>
-        ) : (
+        ) : !editing ? (
+          /* ── VIEW MODE ── */
           <>
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 8 }}>Ngân hàng</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                {BANKS.map(b => (
-                  <button key={b} onClick={() => setBank(b)} style={{ padding: "6px 12px", borderRadius: 9, background: bank === b ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.05)", border: `1px solid ${bank === b ? "rgba(255,107,0,0.35)" : "rgba(255,255,255,0.08)"}`, color: bank === b ? "#FF8C00" : "#6a5a40", fontSize: 10, fontWeight: bank === b ? 700 : 400, cursor: "pointer", fontFamily: "Lexend" }}>{b}</button>
-                ))}
+            <div style={{ background: "rgba(62,207,110,0.07)", border: "1px solid rgba(62,207,110,0.2)", borderRadius: 16, padding: "18px 16px", marginBottom: 16 }}>
+              <div style={{ color: "#6a5a40", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>Thông tin tài khoản nhận tiền</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#6a5a40", fontSize: 11 }}>Ngân hàng</span>
+                  <span style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 700 }}>{bank}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#6a5a40", fontSize: 11 }}>Số tài khoản</span>
+                  <span style={{ color: "#3ecf6e", fontSize: 13, fontWeight: 800, letterSpacing: 1 }}>{maskAcct(acct)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#6a5a40", fontSize: 11 }}>Chủ tài khoản</span>
+                  <span style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600 }}>{name}</span>
+                </div>
               </div>
             </div>
+            <div style={{ background: "rgba(255,107,0,0.07)", border: "1px solid rgba(255,107,0,0.18)", borderRadius: 12, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 10, alignItems: "center" }}>
+              <span style={{ fontSize: 15 }}>💰</span>
+              <span style={{ color: "#FF8C00", fontSize: 10, lineHeight: 1.5, flex: 1 }}>Tiền nhận sau khi hoàn thành đơn và trừ chiết khấu nền tảng.</span>
+            </div>
+            <button onClick={() => setEditing(true)}
+              style={{ width: "100%", height: 46, borderRadius: 13, border: "1px solid rgba(255,107,0,0.3)", background: "rgba(255,107,0,0.08)", color: "#FF8C00", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>
+              ✏️ Sửa tài khoản
+            </button>
+          </>
+        ) : (
+          /* ── EDIT MODE ── */
+          <>
+            {acct && (
+              <div style={{ background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)", borderRadius: 11, padding: "9px 13px", marginBottom: 14, display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ fontSize: 14 }}>⚠️</span>
+                <span style={{ color: "#f5c542", fontSize: 10, lineHeight: 1.5 }}>Đang sửa tài khoản. Hãy kiểm tra kỹ trước khi lưu.</span>
+              </div>
+            )}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 8 }}>Ngân hàng</div>
+              <select value={bank} onChange={e => setBank(e.target.value)}
+                style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", appearance: "auto" }}>
+                {BANK_LIST.map(b => <option key={b} value={b} style={{ background: "#0e0b07" }}>{b}</option>)}
+              </select>
+            </div>
             {[
-              { label: "Số tài khoản", value: acct, set: setAcct, ph: "VD: 1234567890", type: "text" },
-              { label: "Tên chủ tài khoản (IN HOA)", value: name, set: setName, ph: "VD: PHAM HONG MY", type: "text" },
+              { label: "Số tài khoản", value: acct, set: setAcct, ph: "VD: 1234567890" },
+              { label: "Tên chủ tài khoản (IN HOA)", value: name, set: setName, ph: "VD: PHAM HONG MY" },
             ].map(f => (
               <div key={f.label} style={{ marginBottom: 12 }}>
                 <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 6 }}>{f.label}</div>
-                <input
-                  value={f.value} onChange={e => f.set(e.target.value)}
-                  placeholder={f.ph} type={f.type}
-                  style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend" }}
-                />
+                <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.ph}
+                  style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", boxSizing: "border-box" }} />
               </div>
             ))}
-            {err && (
-              <div style={{ color: "#ff4040", fontSize: 11, marginBottom: 10 }}>⚠ {err}</div>
-            )}
-            <button onClick={save} disabled={saving} style={{ width: "100%", height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: saving ? "default" : "pointer", fontFamily: "Lexend", marginTop: 8, opacity: saving ? 0.7 : 1 }}>
-              {saving ? "Đang lưu..." : "✓ Lưu tài khoản"}
-            </button>
+            {err && <div style={{ color: "#ff4040", fontSize: 11, marginBottom: 10 }}>⚠ {err}</div>}
+            <div style={{ display: "flex", gap: 8 }}>
+              {acct && (
+                <button onClick={() => setEditing(false)}
+                  style={{ flex: 1, height: 48, borderRadius: 13, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#6a5a40", fontSize: 12, cursor: "pointer", fontFamily: "Lexend" }}>
+                  Huỷ
+                </button>
+              )}
+              <button onClick={save} disabled={saving}
+                style={{ flex: 2, height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: saving ? "default" : "pointer", fontFamily: "Lexend", opacity: saving ? 0.7 : 1 }}>
+                {saving ? "Đang lưu..." : "✓ Lưu tài khoản"}
+              </button>
+            </div>
           </>
         )}
       </div>

@@ -328,13 +328,40 @@ function SetupGate({
 /* ── topup sheet ── */
 const PRESET_AMOUNTS = [50000, 100000, 200000, 500000]
 
+const VN_BANKS = [
+  { name: "Vietcombank",  scheme: "vcbmobile://" },
+  { name: "Techcombank",  scheme: "techcombank://" },
+  { name: "MB Bank",      scheme: "mbmobile://" },
+  { name: "BIDV",         scheme: "bidv://" },
+  { name: "VPBank",       scheme: "vpbank://" },
+  { name: "Agribank",     scheme: "agribank://" },
+  { name: "ACB",          scheme: "acb://" },
+  { name: "VietinBank",   scheme: "vietinbank://" },
+  { name: "TPBank",       scheme: "tpbank://" },
+  { name: "HDBank",       scheme: "hdbank://" },
+  { name: "Sacombank",    scheme: "sacombank://" },
+  { name: "MSB",          scheme: "msb://" },
+  { name: "SHB",          scheme: "shb://" },
+  { name: "OCB",          scheme: "ocb://" },
+  { name: "Nam A Bank",   scheme: "namabank://" },
+]
+
+interface PayInfo {
+  bin: string
+  accountNumber: string
+  accountName: string
+  bankName: string
+  qrCode: string
+  description: string
+}
+
 function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (amount: number) => void }) {
   const [amount,    setAmount]    = useState(200000)
   const [custom,    setCustom]    = useState("")
   const [useCustom, setUseCustom] = useState(false)
   const [step,      setStep]      = useState<"pick"|"qr">("pick")
-  const [qrImg,     setQrImg]     = useState("")
-  const [bankInfo,  setBankInfo]  = useState({ accountNumber: "", accountName: "", bin: "" })
+  const [payInfo,   setPayInfo]   = useState<PayInfo | null>(null)
+  const [selBank,   setSelBank]   = useState(VN_BANKS[0].name)
   const [loading,   setLoading]   = useState(false)
   const [err,       setErr]       = useState("")
   const [paid,      setPaid]      = useState(false)
@@ -343,61 +370,81 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
 
   const finalAmount = useCustom ? (parseInt(custom.replace(/\D/g, "")) || 0) : amount
 
+  // VietQR image URL từ thông tin ngân hàng nền tảng (bin + STK + tên)
+  const vietQrUrl = payInfo
+    ? `https://img.vietqr.io/image/${payInfo.bin}-${payInfo.accountNumber}-compact2.png` +
+      `?amount=${finalAmount}&addInfo=${encodeURIComponent(payInfo.description)}&accountName=${encodeURIComponent(payInfo.accountName)}`
+    : ""
+
   async function createQR() {
     if (finalAmount < 10000) return setErr("Số tiền tối thiểu 10,000đ")
-    setLoading(true)
-    setErr("")
+    setLoading(true); setErr("")
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("not-auth")
+      if (!user) throw new Error("Chưa đăng nhập")
 
       const payCode = Math.floor(10000000 + Math.random() * 90000000)
       payCodeRef.current = payCode
+      const desc = `NAPVI ${payCode}`
 
-      // Lưu vào wallet_topups để webhook nhận diện
       const { error: dbErr } = await supabase.from("wallet_topups").insert({
         user_id: user.id, wallet_type: "driver",
         payment_code: payCode, amount: finalAmount, status: "pending",
       })
       if (dbErr) throw new Error(dbErr.message)
 
-      // Tạo QR PayOS
       const res = await fetch("/api/payment/payos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderCode:   payCode,
-          amount:      finalAmount,
-          description: `NAP VI TAI XE`,
-          returnUrl:   `${window.location.origin}/driver`,
-          cancelUrl:   `${window.location.origin}/driver`,
+          orderCode: payCode, amount: finalAmount,
+          description: desc,
+          returnUrl: `${window.location.origin}/driver`,
+          cancelUrl: `${window.location.origin}/driver`,
         }),
       })
       const json = await res.json()
-      if (!res.ok || json.error) throw new Error(json.error ?? "PayOS error")
+      if (!res.ok || json.error) throw new Error(json.error ?? "Không thể kết nối cổng thanh toán")
 
-      setQrImg(json.qrCode ?? "")
-      setBankInfo({ accountNumber: json.accountNumber ?? "", accountName: json.accountName ?? "", bin: json.bin ?? "" })
+      setPayInfo({
+        bin:           json.bin ?? "",
+        accountNumber: json.accountNumber ?? "",
+        accountName:   json.accountName ?? "",
+        bankName:      json.bankName ?? "",
+        qrCode:        json.qrCode ?? "",
+        description:   desc,
+      })
       setStep("qr")
 
-      // Poll wallet balance mỗi 5s để phát hiện khi webhook cộng tiền
       intervalRef.current = setInterval(async () => {
         const { data: topup } = await supabase
-          .from("wallet_topups")
-          .select("status")
-          .eq("payment_code", payCode)
-          .single()
+          .from("wallet_topups").select("status")
+          .eq("payment_code", payCode).single()
         if (topup?.status === "paid") {
           clearInterval(intervalRef.current!)
           setPaid(true)
-          setTimeout(() => onSuccess(finalAmount), 1200)
+          setTimeout(() => onSuccess(finalAmount), 1500)
         }
       }, 5000)
     } catch (e) {
-      setErr((e as Error).message || "Không thể tạo QR, thử lại sau")
+      setErr((e as Error).message || "Lỗi không xác định, thử lại sau")
     } finally {
       setLoading(false)
     }
+  }
+
+  function openBankApp() {
+    const bank = VN_BANKS.find(b => b.name === selBank)
+    if (!bank) return
+    // Thử mở app qua scheme; nếu app không cài thì trình duyệt bỏ qua
+    window.location.href = bank.scheme
+  }
+
+  function goBack() {
+    setStep("pick")
+    setPayInfo(null)
+    setPaid(false)
+    if (intervalRef.current) clearInterval(intervalRef.current)
   }
 
   useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current) }, [])
@@ -406,93 +453,117 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
     <motion.div
       initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
       transition={{ type: "spring", damping: 26, stiffness: 280 }}
-      style={{ position:"fixed", inset:0, zIndex:101, background:"rgba(8,8,6,0.88)", backdropFilter:"blur(8px)", display:"flex", flexDirection:"column", justifyContent:"flex-end" }}
+      style={{ position:"fixed", inset:0, zIndex:101, background:"rgba(8,8,6,0.9)", backdropFilter:"blur(8px)", display:"flex", flexDirection:"column", justifyContent:"flex-end" }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div style={{ background:"linear-gradient(180deg,#0e0b07,#080806)", borderTop:"1px solid rgba(62,207,110,0.3)", borderRadius:"24px 24px 0 0", padding:"20px 20px calc(env(safe-area-inset-bottom) + 24px)" }}>
+      <div style={{ background:"linear-gradient(180deg,#0e0b07,#080806)", borderTop:"1px solid rgba(62,207,110,0.3)", borderRadius:"24px 24px 0 0", maxHeight:"92dvh", overflowY:"auto", padding:"20px 20px calc(env(safe-area-inset-bottom) + 24px)" }}>
 
         {/* header */}
         <div style={{ display:"flex", alignItems:"center", marginBottom:20 }}>
           <div style={{ flex:1 }}>
             <div style={{ color:"#3ecf6e", fontSize:15, fontWeight:800 }}>💳 Nạp tiền vào ví</div>
-            <div style={{ color:"#6a5a40", fontSize:10, marginTop:2 }}>Quét QR để nạp tiền ngay lập tức</div>
+            <div style={{ color:"#6a5a40", fontSize:10, marginTop:2 }}>
+              {step === "pick" ? "Chọn số tiền muốn nạp" : "Quét QR hoặc mở app ngân hàng"}
+            </div>
           </div>
           <button onClick={onClose} style={{ width:30, height:30, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
         </div>
 
-        {step === "pick" ? (
+        {/* ── STEP 1: chọn số tiền ── */}
+        {step === "pick" && (
           <>
-            {/* preset amounts */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:12 }}>
               {PRESET_AMOUNTS.map(a => (
                 <button key={a} onClick={() => { setAmount(a); setUseCustom(false) }}
-                  style={{ padding:"10px 0", borderRadius:12, border:`1px solid ${!useCustom && amount===a ? "rgba(62,207,110,0.6)" : "rgba(255,255,255,0.08)"}`, background: !useCustom && amount===a ? "rgba(62,207,110,0.1)" : "rgba(255,255,255,0.04)", color: !useCustom && amount===a ? "#3ecf6e" : "#f8f0e0", fontSize:11, fontWeight:!useCustom && amount===a ? 700 : 500, cursor:"pointer", fontFamily:"Lexend" }}>
+                  style={{ padding:"12px 0", borderRadius:12, border:`1px solid ${!useCustom && amount===a ? "rgba(62,207,110,0.6)" : "rgba(255,255,255,0.08)"}`, background: !useCustom && amount===a ? "rgba(62,207,110,0.1)" : "rgba(255,255,255,0.04)", color: !useCustom && amount===a ? "#3ecf6e" : "#f8f0e0", fontSize:13, fontWeight:!useCustom && amount===a ? 800 : 500, cursor:"pointer", fontFamily:"Lexend" }}>
                   {(a/1000).toFixed(0)}k
                 </button>
               ))}
             </div>
-
-            {/* custom amount */}
-            <div style={{ marginBottom:16 }}>
-              <input
-                type="tel"
-                placeholder="Hoặc nhập số tiền khác..."
-                value={custom}
-                onFocus={() => setUseCustom(true)}
-                onChange={e => { setUseCustom(true); setCustom(e.target.value) }}
-                style={{ width:"100%", boxSizing:"border-box", padding:"10px 14px", borderRadius:12, border:`1px solid ${useCustom ? "rgba(62,207,110,0.4)" : "rgba(255,255,255,0.08)"}`, background:"rgba(255,255,255,0.04)", color:"#f8f0e0", fontSize:12, fontFamily:"Lexend", outline:"none" }}
-              />
-              {useCustom && finalAmount > 0 && (
-                <div style={{ color:"#6a5a40", fontSize:9, marginTop:4, paddingLeft:4 }}>= {finalAmount.toLocaleString("vi-VN")}đ</div>
-              )}
-            </div>
-
+            <input type="tel" placeholder="Hoặc nhập số tiền khác..." value={custom}
+              onFocus={() => setUseCustom(true)}
+              onChange={e => { setUseCustom(true); setCustom(e.target.value) }}
+              style={{ width:"100%", boxSizing:"border-box", height:44, padding:"0 14px", borderRadius:12, border:`1px solid ${useCustom ? "rgba(62,207,110,0.4)" : "rgba(255,255,255,0.08)"}`, background:"rgba(255,255,255,0.04)", color:"#f8f0e0", fontSize:13, fontFamily:"Lexend", outline:"none", marginBottom:6 }}
+            />
+            {useCustom && finalAmount > 0 && (
+              <div style={{ color:"#6a5a40", fontSize:9, marginBottom:12, paddingLeft:4 }}>= {finalAmount.toLocaleString("vi-VN")}đ</div>
+            )}
             {err && <div style={{ color:"#ff4040", fontSize:10, marginBottom:10, textAlign:"center" }}>{err}</div>}
-
             <button onClick={createQR} disabled={loading || finalAmount < 10000}
-              style={{ width:"100%", height:50, borderRadius:14, border:"none", background:"linear-gradient(90deg,#3ecf6e,#2db55d)", color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer", fontFamily:"Lexend", opacity: loading || finalAmount < 10000 ? 0.5 : 1 }}>
-              {loading ? "Đang tạo QR..." : `Tạo QR · ${finalAmount >= 10000 ? finalAmount.toLocaleString("vi-VN") + "đ" : "chọn số tiền"}`}
+              style={{ width:"100%", height:50, borderRadius:14, border:"none", background:"linear-gradient(90deg,#3ecf6e,#2db55d)", color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer", fontFamily:"Lexend", opacity: loading || finalAmount < 10000 ? 0.5 : 1, marginTop:4 }}>
+              {loading ? "Đang tạo QR..." : `Tạo mã QR · ${finalAmount >= 10000 ? finalAmount.toLocaleString("vi-VN") + "đ" : "chọn số tiền"}`}
             </button>
           </>
-        ) : paid ? (
-          <div style={{ textAlign:"center", padding:"20px 0" }}>
-            <div style={{ fontSize:56, marginBottom:12 }}>🎉</div>
-            <div style={{ color:"#3ecf6e", fontSize:18, fontWeight:800, marginBottom:6 }}>Nạp tiền thành công!</div>
-            <div style={{ color:"#6a5a40", fontSize:11 }}>+{finalAmount.toLocaleString("vi-VN")}đ đã vào ví</div>
-          </div>
-        ) : (
+        )}
+
+        {/* ── STEP 2: QR + bank deep link ── */}
+        {step === "qr" && !paid && payInfo && (
           <>
-            {/* QR code */}
-            {qrImg ? (
-              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:12 }}>
-                <div style={{ background:"#fff", borderRadius:16, padding:12 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={qrImg} alt="QR thanh toán" width={200} height={200} style={{ display:"block" }} />
-                </div>
-                <div style={{ textAlign:"center" }}>
-                  <div style={{ color:"#3ecf6e", fontSize:20, fontWeight:800 }}>{finalAmount.toLocaleString("vi-VN")}đ</div>
-                  <div style={{ color:"#6a5a40", fontSize:9, marginTop:4 }}>Mở app ngân hàng quét mã QR để nạp tiền</div>
-                </div>
-                {bankInfo.accountNumber && (
-                  <div style={{ width:"100%", padding:"10px 14px", borderRadius:12, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", fontSize:10 }}>
-                    <div style={{ color:"#6a5a40", marginBottom:4 }}>Hoặc chuyển khoản thủ công:</div>
-                    <div style={{ color:"#f8f0e0", fontWeight:600 }}>STK: {bankInfo.accountNumber}</div>
-                    <div style={{ color:"#f8f0e0" }}>Tên: {bankInfo.accountName}</div>
-                  </div>
-                )}
-                <div style={{ display:"flex", alignItems:"center", gap:6, color:"#6a5a40", fontSize:9 }}>
-                  <div style={{ width:6, height:6, borderRadius:"50%", background:"#3ecf6e", animation:"pulse 1.5s infinite" }} />
-                  Đang chờ xác nhận thanh toán...
-                </div>
+            {/* VietQR image */}
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:16 }}>
+              <div style={{ background:"#fff", borderRadius:18, padding:14, boxShadow:"0 8px 32px rgba(62,207,110,0.2)" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={vietQrUrl} alt="VietQR" width={190} height={190}
+                  style={{ display:"block", borderRadius:8 }}
+                  onError={e => { (e.target as HTMLImageElement).style.display="none" }}
+                />
               </div>
-            ) : (
-              <div style={{ textAlign:"center", color:"#6a5a40", fontSize:11, padding:"20px 0" }}>Đang tải QR...</div>
-            )}
-            <button onClick={() => { setStep("pick"); if (intervalRef.current) clearInterval(intervalRef.current) }}
-              style={{ width:"100%", marginTop:16, height:44, borderRadius:12, border:"1px solid rgba(255,255,255,0.1)", background:"transparent", color:"#6a5a40", fontSize:11, cursor:"pointer", fontFamily:"Lexend" }}>
+              <div style={{ marginTop:10, color:"#3ecf6e", fontSize:22, fontWeight:800 }}>
+                {finalAmount.toLocaleString("vi-VN")}đ
+              </div>
+            </div>
+
+            {/* thông tin chuyển khoản */}
+            <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, padding:"12px 14px", marginBottom:14 }}>
+              <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px", marginBottom:10 }}>Thông tin chuyển khoản</div>
+              {[
+                { label:"Số tài khoản", value: payInfo.accountNumber, highlight: true },
+                { label:"Ngân hàng",    value: payInfo.bankName || "Theo QR" },
+                { label:"Chủ tài khoản", value: payInfo.accountName },
+                { label:"Nội dung",     value: payInfo.description },
+                { label:"Số tiền",      value: finalAmount.toLocaleString("vi-VN") + "đ", highlight: true },
+              ].map(row => (
+                <div key={row.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", paddingBottom:6, marginBottom:6, borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
+                  <span style={{ color:"#6a5a40", fontSize:10 }}>{row.label}</span>
+                  <span style={{ color: row.highlight ? "#3ecf6e" : "#f8f0e0", fontSize:11, fontWeight: row.highlight ? 700 : 500 }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* mở app ngân hàng */}
+            <div style={{ background:"rgba(74,143,245,0.07)", border:"1px solid rgba(74,143,245,0.2)", borderRadius:14, padding:"12px 14px", marginBottom:14 }}>
+              <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px", marginBottom:10 }}>Mở app ngân hàng của bạn</div>
+              <select value={selBank} onChange={e => setSelBank(e.target.value)}
+                style={{ width:"100%", height:42, padding:"0 12px", borderRadius:10, border:"1px solid rgba(74,143,245,0.3)", background:"rgba(74,143,245,0.08)", color:"#f8f0e0", fontSize:12, fontFamily:"Lexend", marginBottom:10, appearance:"auto", boxSizing:"border-box" }}>
+                {VN_BANKS.map(b => <option key={b.name} value={b.name} style={{ background:"#0e0b07" }}>{b.name}</option>)}
+              </select>
+              <button onClick={openBankApp}
+                style={{ width:"100%", height:44, borderRadius:12, border:"none", background:"linear-gradient(90deg,#4a8ff5,#3a7ae4)", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
+                🚀 Mở {selBank} · Chuyển khoản
+              </button>
+              <div style={{ color:"#6a5a40", fontSize:9, textAlign:"center", marginTop:8 }}>Sau khi mở app → vào mục Quét QR → quét mã trên</div>
+            </div>
+
+            {/* trạng thái chờ */}
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, color:"#6a5a40", fontSize:10, marginBottom:14 }}>
+              <div style={{ width:7, height:7, borderRadius:"50%", background:"#3ecf6e", animation:"pulse 1.5s ease-in-out infinite" }} />
+              Đang chờ xác nhận thanh toán tự động...
+            </div>
+
+            <button onClick={goBack}
+              style={{ width:"100%", height:42, borderRadius:12, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#6a5a40", fontSize:11, cursor:"pointer", fontFamily:"Lexend" }}>
               ← Chọn lại số tiền
             </button>
           </>
+        )}
+
+        {/* ── PAID ── */}
+        {paid && (
+          <div style={{ textAlign:"center", padding:"24px 0" }}>
+            <div style={{ fontSize:60, marginBottom:14 }}>🎉</div>
+            <div style={{ color:"#3ecf6e", fontSize:20, fontWeight:800, marginBottom:6 }}>Nạp tiền thành công!</div>
+            <div style={{ color:"#6a5a40", fontSize:12 }}>+{finalAmount.toLocaleString("vi-VN")}đ đã vào ví của bạn</div>
+          </div>
         )}
       </div>
     </motion.div>
