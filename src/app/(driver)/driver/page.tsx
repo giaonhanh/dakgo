@@ -370,12 +370,14 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
   const [amount,    setAmount]    = useState(200000)
   const [custom,    setCustom]    = useState("")
   const [useCustom, setUseCustom] = useState(false)
-  const [step,      setStep]      = useState<"pick"|"qr">("pick")
+  const [step,      setStep]      = useState<"pick"|"pay">("pick")
   const [payInfo,   setPayInfo]   = useState<PayInfo | null>(null)
   const [selBank,   setSelBank]   = useState(VN_BANKS[0].name)
   const [loading,   setLoading]   = useState(false)
   const [err,       setErr]       = useState("")
   const [paid,      setPaid]      = useState(false)
+  const [copied,    setCopied]    = useState<string | null>(null)
+  const [showQR,    setShowQR]    = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const payCodeRef  = useRef<number>(0)
 
@@ -425,7 +427,7 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
         qrCode:        json.qrCode ?? "",
         description:   desc,
       })
-      setStep("qr")
+      setStep("pay")
 
       intervalRef.current = setInterval(async () => {
         const { data: topup } = await supabase
@@ -444,34 +446,39 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
     }
   }
 
-  function openBankApp() {
-    const bank = VN_BANKS.find(b => b.name === selBank)
-    if (!bank) return
-
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
-
-    if (isIOS) {
-      // iOS: chỉ mở app (không truyền QR data — Safari từ chối URL dài)
-      // Sau khi vào app, dùng camera quét QR hiện trên màn hình
-      window.location.href = `${bank.ios}://`
-    } else {
-      // Android: intent mở app, truyền QR data để pre-fill nếu app hỗ trợ
-      const qr = encodeURIComponent(payInfo?.qrCode ?? "")
-      window.location.href =
-        `intent://qr?data=${qr}#Intent;scheme=${bank.ios};package=${bank.pkg};end`
-    }
+  function copy(text: string, label: string) {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(label)
+      setTimeout(() => setCopied(null), 2000)
+    })
   }
 
-  function copyInfo() {
-    if (!payInfo) return
-    const text = `STK: ${payInfo.accountNumber}\nNgân hàng: ${payInfo.bankName}\nSố tiền: ${finalAmount.toLocaleString("vi-VN")}đ\nNội dung: ${payInfo.description}`
-    navigator.clipboard?.writeText(text)
+  function openBankApp() {
+    const bank = VN_BANKS.find(b => b.name === selBank)
+    if (!bank || !payInfo) return
+
+    // Copy STK vào clipboard trước khi mở app → dán vào ô chuyển khoản
+    navigator.clipboard?.writeText(payInfo.accountNumber).then(() => {
+      setCopied("stk-open")
+      setTimeout(() => setCopied(null), 3000)
+    })
+
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+    setTimeout(() => {
+      if (isIOS) {
+        window.location.href = `${bank.ios}://`
+      } else {
+        const qr = encodeURIComponent(payInfo.qrCode)
+        window.location.href = `intent://qr?data=${qr}#Intent;scheme=${bank.ios};package=${bank.pkg};end`
+      }
+    }, 100)
   }
 
   function goBack() {
     setStep("pick")
     setPayInfo(null)
     setPaid(false)
+    setShowQR(false)
     if (intervalRef.current) clearInterval(intervalRef.current)
   }
 
@@ -524,69 +531,77 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
           </>
         )}
 
-        {/* ── STEP 2: QR + bank deep link ── */}
-        {step === "qr" && !paid && payInfo && (
+        {/* ── STEP 2: thông tin CK + mở app ── */}
+        {step === "pay" && !paid && payInfo && (
           <>
-            {/* VietQR image */}
-            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:16 }}>
-              <div style={{ background:"#fff", borderRadius:18, padding:14, boxShadow:"0 8px 32px rgba(62,207,110,0.2)" }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={vietQrUrl} alt="VietQR" width={190} height={190}
-                  style={{ display:"block", borderRadius:8 }}
-                  onError={e => { (e.target as HTMLImageElement).style.display="none" }}
-                />
-              </div>
-              <div style={{ marginTop:10, color:"#3ecf6e", fontSize:22, fontWeight:800 }}>
-                {finalAmount.toLocaleString("vi-VN")}đ
-              </div>
+            {/* Số tiền nổi bật */}
+            <div style={{ textAlign:"center", marginBottom:16 }}>
+              <div style={{ color:"#3ecf6e", fontSize:28, fontWeight:800 }}>{finalAmount.toLocaleString("vi-VN")}đ</div>
+              <div style={{ color:"#6a5a40", fontSize:10, marginTop:2 }}>Chuyển khoản đến tài khoản bên dưới</div>
             </div>
 
-            {/* thông tin chuyển khoản */}
-            <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, padding:"12px 14px", marginBottom:14 }}>
-              <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px", marginBottom:10 }}>Thông tin chuyển khoản</div>
+            {/* Thông tin CK — từng dòng có nút copy */}
+            <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
               {[
-                { label:"Số tài khoản", value: payInfo.accountNumber, highlight: true },
-                { label:"Ngân hàng",    value: payInfo.bankName || "Theo QR" },
-                { label:"Chủ tài khoản", value: payInfo.accountName },
-                { label:"Nội dung",     value: payInfo.description },
-                { label:"Số tiền",      value: finalAmount.toLocaleString("vi-VN") + "đ", highlight: true },
-              ].map(row => (
-                <div key={row.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", paddingBottom:6, marginBottom:6, borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
-                  <span style={{ color:"#6a5a40", fontSize:10 }}>{row.label}</span>
-                  <span style={{ color: row.highlight ? "#3ecf6e" : "#f8f0e0", fontSize:11, fontWeight: row.highlight ? 700 : 500 }}>{row.value}</span>
+                { label:"Số tài khoản", value: payInfo.accountNumber,                     key:"stk",   big: true },
+                { label:"Ngân hàng",    value: payInfo.bankName || "Xem trong app",       key:"bank",  big: false },
+                { label:"Chủ TK",       value: payInfo.accountName,                        key:"name",  big: false },
+                { label:"Nội dung CK",  value: payInfo.description,                        key:"desc",  big: false },
+                { label:"Số tiền",      value: finalAmount.toLocaleString("vi-VN") + "đ", key:"amt",   big: true },
+              ].map((row, i, arr) => (
+                <div key={row.key} style={{ display:"flex", alignItems:"center", padding:"10px 14px", borderBottom: i < arr.length-1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:"#6a5a40", fontSize:9 }}>{row.label}</div>
+                    <div style={{ color: row.big ? "#3ecf6e" : "#f8f0e0", fontSize: row.big ? 14 : 12, fontWeight: row.big ? 800 : 500, marginTop:2 }}>{row.value}</div>
+                  </div>
+                  <button onClick={() => copy(row.value, row.key)}
+                    style={{ flexShrink:0, padding:"4px 10px", borderRadius:8, border:"1px solid rgba(255,255,255,0.1)", background: copied===row.key ? "rgba(62,207,110,0.12)" : "rgba(255,255,255,0.05)", color: copied===row.key ? "#3ecf6e" : "#6a5a40", fontSize:9, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
+                    {copied===row.key ? "✓ Đã copy" : "Copy"}
+                  </button>
                 </div>
               ))}
             </div>
 
-            {/* mở app ngân hàng */}
+            {/* Chọn ngân hàng + mở app */}
             <div style={{ background:"rgba(74,143,245,0.07)", border:"1px solid rgba(74,143,245,0.2)", borderRadius:14, padding:"12px 14px", marginBottom:14 }}>
-              <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px", marginBottom:10 }}>Chuyển khoản qua app ngân hàng</div>
+              <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px", marginBottom:10 }}>Mở app ngân hàng để chuyển khoản</div>
               <select value={selBank} onChange={e => setSelBank(e.target.value)}
                 style={{ width:"100%", height:44, padding:"0 12px", borderRadius:10, border:"1px solid rgba(74,143,245,0.3)", background:"rgba(255,255,255,0.05)", color:"#f8f0e0", fontSize:13, fontFamily:"Lexend", marginBottom:10, appearance:"auto", boxSizing:"border-box" }}>
                 {VN_BANKS.map(b => <option key={b.name} value={b.name} style={{ background:"#0e0b07" }}>{b.name}</option>)}
               </select>
               <button onClick={openBankApp}
-                style={{ width:"100%", height:46, borderRadius:12, border:"none", background:"linear-gradient(90deg,#4a8ff5,#3a7ae4)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", boxShadow:"0 4px 16px rgba(74,143,245,0.3)", marginBottom:8 }}>
-                🚀 Mở {selBank} · Chuyển khoản
+                style={{ width:"100%", height:48, borderRadius:12, border:"none", background:"linear-gradient(90deg,#4a8ff5,#3a7ae4)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", boxShadow:"0 4px 16px rgba(74,143,245,0.3)" }}>
+                {copied==="stk-open" ? "✓ Đã copy STK · Đang mở app..." : `🚀 Copy STK & Mở ${selBank}`}
               </button>
-              <button onClick={copyInfo}
-                style={{ width:"100%", height:38, borderRadius:10, border:"1px solid rgba(255,255,255,0.1)", background:"transparent", color:"#6a5a40", fontSize:11, cursor:"pointer", fontFamily:"Lexend" }}>
-                📋 Sao chép thông tin chuyển khoản
-              </button>
-              <div style={{ color:"#6a5a40", fontSize:9, textAlign:"center", marginTop:8, lineHeight:1.5 }}>
-                Sau khi mở app → vào mục <b style={{color:"#b0956a"}}>Quét QR</b> → quét mã phía trên.<br/>
-                Thông tin chuyển khoản sẽ được điền sẵn tự động.
+              <div style={{ color:"#6a5a40", fontSize:9, textAlign:"center", marginTop:8, lineHeight:1.6 }}>
+                STK sẽ tự động được copy → Dán vào ô <b style={{color:"#b0956a"}}>Số tài khoản</b> trong app → nhập số tiền & nội dung → xác nhận
               </div>
             </div>
 
-            {/* trạng thái chờ */}
+            {/* QR phụ — dùng điện thoại khác quét */}
+            <button onClick={() => setShowQR(v => !v)}
+              style={{ width:"100%", height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.07)", background:"transparent", color:"#6a5a40", fontSize:10, cursor:"pointer", fontFamily:"Lexend", marginBottom: showQR ? 10 : 14 }}>
+              {showQR ? "▲ Ẩn mã QR" : "▼ Hiện mã QR (dùng máy khác quét)"}
+            </button>
+            {showQR && (
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:14 }}>
+                <div style={{ background:"#fff", borderRadius:16, padding:12 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={vietQrUrl} alt="VietQR" width={180} height={180} style={{ display:"block", borderRadius:6 }}
+                    onError={e => { (e.target as HTMLImageElement).style.display="none" }} />
+                </div>
+                <div style={{ color:"#6a5a40", fontSize:9, marginTop:8 }}>Quét bằng điện thoại khác để chuyển khoản</div>
+              </div>
+            )}
+
+            {/* Trạng thái chờ */}
             <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, color:"#6a5a40", fontSize:10, marginBottom:14 }}>
               <div style={{ width:7, height:7, borderRadius:"50%", background:"#3ecf6e", animation:"pulse 1.5s ease-in-out infinite" }} />
               Đang chờ xác nhận thanh toán tự động...
             </div>
 
             <button onClick={goBack}
-              style={{ width:"100%", height:42, borderRadius:12, border:"1px solid rgba(255,255,255,0.08)", background:"transparent", color:"#6a5a40", fontSize:11, cursor:"pointer", fontFamily:"Lexend" }}>
+              style={{ width:"100%", height:40, borderRadius:11, border:"1px solid rgba(255,255,255,0.07)", background:"transparent", color:"#6a5a40", fontSize:11, cursor:"pointer", fontFamily:"Lexend" }}>
               ← Chọn lại số tiền
             </button>
           </>
