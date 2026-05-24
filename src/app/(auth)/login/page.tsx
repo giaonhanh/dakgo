@@ -221,15 +221,19 @@ function LoginContent() {
       if (err || !data.user) { setError("Số điện thoại hoặc mật khẩu không đúng"); return }
 
       // Đọc role từ DB ngay sau login — redirect thẳng đến đúng dashboard
-      const { data: profile } = await supabase
+      const { data: profile, error: profileErr } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", data.user.id)
         .single()
-      const dbRole = profile?.role ?? "customer"
-      const dest = dbRole === "driver"   ? "/driver"
-                 : dbRole === "merchant" ? "/merchant"
-                 : dbRole === "admin"    ? "/admin"
+      if (profileErr || !profile) {
+        setError("Đăng nhập thành công nhưng không tải được hồ sơ. Vui lòng thử lại.")
+        await supabase.auth.signOut()
+        return
+      }
+      const dest = profile.role === "driver"   ? "/driver"
+                 : profile.role === "merchant" ? "/merchant"
+                 : profile.role === "admin"    ? "/admin"
                  : "/"
       window.location.href = dest
     } finally {
