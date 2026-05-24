@@ -1,8 +1,9 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
+import AdminShell from "@/components/admin/AdminShell"
 
 type ShopStatus = "pending" | "approved" | "suspended"
 
@@ -41,19 +42,6 @@ const STATUS_CFG: Record<ShopStatus, { label: string; color: string; bg: string;
 
 const CATEGORIES = ["Bún/Phở","Cơm hộp","Gà rán","Đồ uống","Bánh mì","Pizza","Bánh/Kem","Cà phê","Hải sản","Lẩu","Khác"]
 
-const NAV_ITEMS = [
-  { icon: "🏠",  label: "Dashboard",    href: "/admin"               },
-  { icon: "🏍️", label: "Tài xế",       href: "/admin/drivers"       },
-  { icon: "🏪",  label: "Cửa hàng",     href: "/admin/merchants", active: true },
-  { icon: "📦",  label: "Đơn hàng",     href: "/admin/orders"        },
-  { icon: "👥",  label: "Khách hàng",   href: "/admin/users"         },
-  { icon: "💰",  label: "Tài chính",    href: "/admin/finance"       },
-  { icon: "🗺️", label: "Bản đồ live",  href: "/admin/map"           },
-  { icon: "🏷️", label: "Khuyến mãi",   href: "/admin/promotions"    },
-  { icon: "⚖️",  label: "Tranh chấp",   href: "/admin/disputes"      },
-  { icon: "📣",  label: "Thông báo",    href: "/admin/notifications" },
-  { icon: "⚙️",  label: "Cài đặt",      href: "/admin/settings"      },
-]
 
 function categoryIcon(cat: string): string {
   const map: Record<string, string> = { "Bún/Phở": "🍜", "Cơm hộp": "🍱", "Gà rán": "🍗", "Đồ uống": "🥤", "Bánh mì": "🥖", "Pizza": "🍕", "Bánh/Kem": "🧁", "Cà phê": "☕", "Hải sản": "🦐", "Lẩu": "🍲" }
@@ -68,7 +56,6 @@ const fmt      = (n: number) => n.toLocaleString("vi-VN") + "đ"
 const fmtShort = (n: number) => n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + "M" : n.toLocaleString("vi-VN")
 
 export default function AdminMerchantsPage() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [merchants, setMerchants] = useState<Merchant[]>([])
   const [filterStatus, setFilterStatus] = useState<"all" | ShopStatus>("all")
   const [search, setSearch] = useState("")
@@ -242,55 +229,8 @@ export default function AdminMerchantsPage() {
         )}
       </AnimatePresence>
 
-      <div style={{ display: "flex", height: "100vh", background: "#06050a", color: "#f0eaff", overflow: "hidden" }}>
-
-        {/* SIDEBAR */}
-        <div style={{ width: sidebarOpen ? 220 : 60, flexShrink: 0, background: "rgba(10,9,18,0.97)", backdropFilter: "blur(20px)", borderRight: "1px solid rgba(255,107,0,0.1)", display: "flex", flexDirection: "column", transition: "width 0.25s ease", overflow: "hidden", zIndex: 50 }}>
-          <div style={{ height: 56, display: "flex", alignItems: "center", padding: "0 14px", gap: 10, flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-            <div style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, background: "linear-gradient(135deg, #FF6B00, #FF8C00, #FFB347)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>🚀</div>
-            {sidebarOpen && (
-              <div>
-                <div style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700 }}>Giao Nhanh</div>
-                <div style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", background: "rgba(180,100,255,0.15)", border: "1px solid rgba(180,100,255,0.3)", borderRadius: 4, color: "#b464ff", display: "inline-block" }}>ADMIN</div>
-              </div>
-            )}
-          </div>
-          <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
-            {NAV_ITEMS.map(item => (
-              <a key={item.href} href={item.href} style={{ textDecoration: "none" }}>
-                <div className="sidebar-link" style={{ display: "flex", alignItems: "center", gap: 10, padding: sidebarOpen ? "8px 10px" : "8px", borderRadius: 10, marginBottom: 3, cursor: "pointer", transition: "all 0.2s", background: item.active ? "rgba(255,107,0,0.12)" : "transparent", borderLeft: item.active ? "2px solid #FF6B00" : "2px solid transparent", justifyContent: sidebarOpen ? "flex-start" : "center" }}>
-                  <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
-                  {sidebarOpen && <span style={{ fontSize: 11, whiteSpace: "nowrap", fontWeight: item.active ? 600 : 400, color: item.active ? "#FF8C00" : "rgba(144,128,176,0.8)" }}>{item.label}</span>}
-                  {sidebarOpen && item.active && counts.pending > 0 && (
-                    <span style={{ marginLeft: "auto", minWidth: 18, height: 18, borderRadius: 9, background: "#FF6B00", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: "#fff" }}>{counts.pending}</span>
-                  )}
-                </div>
-              </a>
-            ))}
-          </nav>
-          <div onClick={() => setSidebarOpen(!sidebarOpen)} style={{ height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", borderTop: "1px solid rgba(255,255,255,0.06)", color: "rgba(144,128,176,0.5)", fontSize: 14 }}>
-            {sidebarOpen ? "◀" : "▶"}
-          </div>
-        </div>
-
-        {/* MAIN */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <div style={{ height: 56, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", background: "rgba(10,9,18,0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-            <div>
-              <div style={{ color: "rgba(144,128,176,0.45)", fontSize: 9, textTransform: "uppercase", letterSpacing: 1 }}>Admin / Quản lý</div>
-              <div style={{ color: "#f0eaff", fontSize: 13, fontWeight: 700 }}>🏪 Cửa hàng &amp; Merchant</div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ color: "rgba(144,128,176,0.4)", fontSize: 9 }}>Phước An · {new Date().toLocaleDateString("vi-VN")}</div>
-              <div style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative" }}>
-                🔔
-                {counts.pending > 0 && <div style={{ position: "absolute", top: 5, right: 5, width: 7, height: 7, borderRadius: "50%", background: "#FF6B00", border: "1.5px solid #06050a", animation: "pulse 1.5s infinite" }} />}
-              </div>
-              <div style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(180,100,255,0.12)", border: "1px solid rgba(180,100,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, cursor: "pointer" }}>👤</div>
-            </div>
-          </div>
-
-          <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+      <AdminShell pageTitle="🏪 Cửa hàng & Merchant" pageSubtitle="Quản lý cửa hàng · Phê duyệt · Hoa hồng">
+        <div style={{ flex: 1, overflowY: "auto", padding: 16, height: "100%" }}>
 
             {/* KPI */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 14 }}>
@@ -397,9 +337,8 @@ export default function AdminMerchantsPage() {
                 <div style={{ color: "rgba(144,128,176,0.35)", fontSize: 8 }}>Hiển thị {shown.length} / {merchants.length} cửa hàng</div>
               </div>
             </div>
-          </div>
         </div>
-      </div>
+      </AdminShell>
 
       {/* ── DETAIL DRAWER ── */}
       <AnimatePresence>

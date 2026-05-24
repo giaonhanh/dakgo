@@ -3,19 +3,19 @@
 import { useState, useEffect, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
+import { createClient } from "@/lib/supabase/client"
 
 const NAV_ITEMS = [
   { icon: "🏠",  label: "Dashboard",    href: "/admin" },
-  { icon: "🏍️", label: "Tài xế",        href: "/admin/drivers" },
-  { icon: "🏪",  label: "Cửa hàng",      href: "/admin/merchants" },
-  { icon: "📦",  label: "Đơn hàng",      href: "/admin/orders" },
-  { icon: "👥",  label: "Khách hàng",    href: "/admin/users" },
-  { icon: "💰",  label: "Tài chính",     href: "/admin/finance" },
-  { icon: "🗺️", label: "Bản đồ live",   href: "/admin/map" },
-  { icon: "🏷️", label: "Khuyến mãi",    href: "/admin/promotions" },
-  { icon: "⚖️",  label: "Tranh chấp",    href: "/admin/disputes" },
-  { icon: "📣",  label: "Thông báo",     href: "/admin/notifications" },
-  { icon: "⚙️",  label: "Cài đặt",       href: "/admin/settings" },
+  { icon: "✅",  label: "Phê duyệt",   href: "/admin/approvals" },
+  { icon: "📦",  label: "Đơn hàng",    href: "/admin/orders" },
+  { icon: "👤",  label: "Tài khoản",  href: "/admin/users" },
+  { icon: "💰",  label: "Tài chính",   href: "/admin/finance" },
+  { icon: "🗺️", label: "Bản đồ live", href: "/admin/map" },
+  { icon: "🏷️", label: "Khuyến mãi",  href: "/admin/promotions" },
+  { icon: "⚖️",  label: "Tranh chấp",  href: "/admin/disputes" },
+  { icon: "📣",  label: "Thông báo",   href: "/admin/notifications" },
+  { icon: "⚙️",  label: "Cài đặt",     href: "/admin/settings" },
 ]
 
 interface AdminShellProps {
@@ -50,6 +50,12 @@ export default function AdminShell({ pageTitle, pageSubtitle, actions, children 
     setLaunching(true)
     await fetch("/api/admin/preview", { method: "POST" })
     window.location.href = "/"
+  }, [])
+
+  const handleSignout = useCallback(async () => {
+    const sb = createClient()
+    await sb.auth.signOut()
+    window.location.href = "/login"
   }, [])
 
   const PreviewBtn = ({ collapsed: c }: { collapsed: boolean }) => (
@@ -130,9 +136,14 @@ export default function AdminShell({ pageTitle, pageSubtitle, actions, children 
                   <NavLinks onClick={() => setDrawer(false)} />
                 </nav>
 
-                {/* Preview button — bottom of drawer */}
+                {/* Preview + Signout — bottom of drawer */}
                 <div style={{ padding: "6px 8px 24px", flexShrink: 0 }}>
                   <PreviewBtn collapsed={false} />
+                  <button onClick={handleSignout}
+                    style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", height: 48, borderRadius: 10, padding: "0 12px", justifyContent: "flex-start", background: "rgba(255,64,64,0.07)", border: "1px solid rgba(255,64,64,0.18)", color: "#ff4040", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend", marginTop: 4 }}>
+                    <span style={{ fontSize: 20 }}>🚪</span>
+                    <span>Đăng xuất</span>
+                  </button>
                 </div>
               </motion.div>
             </>
@@ -170,9 +181,14 @@ export default function AdminShell({ pageTitle, pageSubtitle, actions, children 
           <NavLinks />
         </nav>
 
-        {/* Preview button — bottom of sidebar */}
+        {/* Preview button + Signout — bottom of sidebar */}
         <div style={{ padding: "6px 8px 12px", flexShrink: 0 }}>
           <PreviewBtn collapsed={collapsed} />
+          <button onClick={handleSignout}
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", height: collapsed ? 36 : 40, borderRadius: 10, padding: collapsed ? "0" : "0 12px", justifyContent: collapsed ? "center" : "flex-start", background: "rgba(255,64,64,0.07)", border: "1px solid rgba(255,64,64,0.18)", color: "#ff4040", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend", whiteSpace: "nowrap", overflow: "hidden", transition: "all .2s", marginTop: 4 }}>
+            <span style={{ fontSize: 16, flexShrink: 0 }}>🚪</span>
+            {!collapsed && <span>Đăng xuất</span>}
+          </button>
         </div>
       </div>
 

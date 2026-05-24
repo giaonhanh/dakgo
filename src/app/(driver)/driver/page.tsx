@@ -258,17 +258,88 @@ function OrderPopup({
   )
 }
 
+/* ── setup gate ── */
+function SetupGate({
+  status, walletBalance, onClose,
+}: {
+  status: { bankLinked: boolean; vehicleDocs: boolean; depositDone: boolean }
+  walletBalance: number
+  onClose: () => void
+}) {
+  const items = [
+    { done: status.bankLinked,  icon: "🏦", label: "Tài khoản ngân hàng",   sub: status.bankLinked  ? "Đã liên kết"  : "Chưa liên kết tài khoản nhận tiền" },
+    { done: status.vehicleDocs, icon: "🛵", label: "Thông tin phương tiện",  sub: status.vehicleDocs ? "Đã cập nhật"  : "Cần cập nhật biển số và loại xe"   },
+    { done: status.depositDone, icon: "💰", label: "Nạp tiền cọc 200,000đ", sub: `Số dư hiện tại: ${walletBalance.toLocaleString("vi-VN")}đ` },
+  ]
+  const allDone = items.every(i => i.done)
+  return (
+    <motion.div
+      initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+      transition={{ type: "spring", damping: 26, stiffness: 280 }}
+      style={{ position:"fixed", inset:0, zIndex:100, background:"rgba(8,8,6,0.85)", backdropFilter:"blur(8px)", display:"flex", flexDirection:"column", justifyContent:"flex-end" }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{ background:"linear-gradient(180deg,#0e0b07,#080806)", borderTop:"1px solid rgba(255,107,0,0.35)", borderRadius:"24px 24px 0 0", padding:"20px 20px calc(env(safe-area-inset-bottom) + 20px)" }}>
+        <div style={{ display:"flex", alignItems:"center", marginBottom:4 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ color:"#FF8C00", fontSize:15, fontWeight:800 }}>⚠️ Hoàn thành hồ sơ tài xế</div>
+            <div style={{ color:"#6a5a40", fontSize:10, marginTop:2 }}>Cần hoàn thành các bước sau để bắt đầu nhận đơn</div>
+          </div>
+          <button onClick={onClose} style={{ width:30, height:30, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
+        </div>
+        <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
+          {items.map((item, i) => (
+            <a key={i} href="/driver/profile" style={{ textDecoration:"none" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:14, background: item.done ? "rgba(62,207,110,0.06)" : "rgba(255,255,255,0.04)", border:`1px solid ${item.done ? "rgba(62,207,110,0.2)" : "rgba(255,255,255,0.08)"}` }}>
+                <div style={{ width:40, height:40, borderRadius:12, background: item.done ? "rgba(62,207,110,0.12)" : "rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>{item.icon}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700 }}>{item.label}</div>
+                  <div style={{ color:"#6a5a40", fontSize:9, marginTop:2 }}>{item.sub}</div>
+                </div>
+                {item.done
+                  ? <span style={{ color:"#3ecf6e", fontSize:18 }}>✓</span>
+                  : <span style={{ color:"#FF8C00", fontSize:14 }}>›</span>
+                }
+              </div>
+            </a>
+          ))}
+        </div>
+        {!allDone && (
+          <div style={{ marginTop:14, padding:"10px 14px", borderRadius:12, background:"rgba(255,107,0,0.06)", border:"1px dashed rgba(255,107,0,0.2)", display:"flex", gap:10, alignItems:"flex-start" }}>
+            <span style={{ fontSize:16, flexShrink:0 }}>💡</span>
+            <span style={{ color:"#b0956a", fontSize:9, lineHeight:1.5 }}>Hoàn thành hồ sơ để bắt đầu nhận đơn và kiếm thu nhập. Liên hệ admin nếu cần hỗ trợ nạp tiền cọc.</span>
+          </div>
+        )}
+        <button
+          onClick={allDone ? onClose : () => { window.location.href = "/driver/profile" }}
+          style={{
+            width:"100%", marginTop:16, height:50, borderRadius:14, border:"none",
+            background: allDone ? "linear-gradient(90deg,#3ecf6e,#2db55d)" : "linear-gradient(90deg,#FF6B00,#FF8C00)",
+            color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer", fontFamily:"Lexend",
+            boxShadow: allDone ? "0 4px 16px rgba(62,207,110,0.3)" : "0 4px 16px rgba(255,107,0,0.35)",
+          }}>
+          {allDone ? "✓ Bắt đầu nhận đơn" : "📋 Cập nhật hồ sơ →"}
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
 /* ── main page ── */
 export default function DriverDashboard() {
   const router = useRouter()
-  const [online,      setOnline]      = useState(false)
-  const [showOrder,   setShowOrder]   = useState(false)
-  const [pendingOrder,setPendingOrder] = useState<OrderData | null>(null)
-  const [accepted,    setAccepted]    = useState<string | null>(null)
-  const [driverName,  setDriverName]  = useState("Tài xế")
-  const [driverId,    setDriverId]    = useState<string | null>(null)
-  const [todayStats,  setTodayStats]  = useState({ orders: 0, earnings: 0, rating: 5.0 })
-  const [toggling,    setToggling]    = useState(false)
+  const [online,        setOnline]        = useState(false)
+  const [showOrder,     setShowOrder]     = useState(false)
+  const [pendingOrder,  setPendingOrder]  = useState<OrderData | null>(null)
+  const [accepted,      setAccepted]      = useState<string | null>(null)
+  const [driverName,    setDriverName]    = useState("Tài xế")
+  const [driverId,      setDriverId]      = useState<string | null>(null)
+  const [todayStats,    setTodayStats]    = useState({ orders: 0, earnings: 0, rating: 5.0 })
+  const [toggling,      setToggling]      = useState(false)
+  const [walletBalance, setWalletBalance] = useState(0)
+  const [setupDone,     setSetupDone]     = useState(false)
+  const [setupStatus,   setSetupStatus]   = useState({ bankLinked: false, vehicleDocs: false, depositDone: false })
+  const [showSetupGate, setShowSetupGate] = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   // ── Load driver profile on mount ──
@@ -280,7 +351,7 @@ export default function DriverDashboard() {
 
       const [{ data: profile }, { data: driver }] = await Promise.all([
         supabase.from("profiles").select("full_name").eq("id", user.id).single(),
-        supabase.from("drivers").select("status, rating_avg").eq("id", user.id).single(),
+        supabase.from("drivers").select("status, rating_avg, license_plate").eq("id", user.id).single(),
       ])
 
       if (profile?.full_name) setDriverName(profile.full_name)
@@ -305,6 +376,19 @@ export default function DriverDashboard() {
         return sum + Math.round(o.delivery_fee * (1 - commission / 100))
       }, 0)
       setTodayStats(s => ({ ...s, orders: count ?? 0, earnings }))
+
+      // ── Setup gate checks ──
+      const bankLinked = typeof window !== "undefined" && localStorage.getItem("driver_bank_linked") === "true"
+      const vehicleDocs = !!((driver as { license_plate?: string } | null)?.license_plate)
+      const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "driver").maybeSingle()
+      const walletBal = (wallet as { balance: number } | null)?.balance ?? 0
+      const depositDone = walletBal >= 200000
+      setWalletBalance(walletBal)
+      const status = { bankLinked, vehicleDocs, depositDone }
+      setSetupStatus(status)
+      const done = bankLinked && vehicleDocs && depositDone
+      setSetupDone(done)
+      if (!done) setShowSetupGate(true)
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -313,6 +397,7 @@ export default function DriverDashboard() {
   // ── Toggle online/offline ──
   const handleToggleOnline = async () => {
     if (!driverId || toggling) return
+    if (!setupDone) { setShowSetupGate(true); return }
     setToggling(true)
     const next = !online
     await supabase.from("drivers").update({ status: next ? "online" : "offline" }).eq("id", driverId)
@@ -533,24 +618,26 @@ export default function DriverDashboard() {
             <StatCard icon="⭐" label="Đánh giá" value={todayStats.rating.toFixed(1)} color="#FFB347" />
           </div>
 
-          {/* ── quick links ── */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
-            {[
-              { href:"/driver/earnings", icon:"📊", label:"Thu nhập chi tiết", sub:"Xem báo cáo tuần/tháng", color:"#3ecf6e" },
-              { href:"/driver/reviews",  icon:"⭐", label:"Đánh giá của tôi",  sub:"Xem nhận xét từ khách",   color:"#f5c542" },
-              { href:"/driver/profile",  icon:"👤", label:"Hồ sơ & giấy tờ",  sub:"Cập nhật thông tin xe",   color:"#4a8ff5" },
-            ].map(l => (
-              <a key={l.href} href={l.href} style={{ textDecoration:"none" }}>
-                <div style={{
-                  background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)",
-                  borderRadius:14, padding:"12px 12px",
-                }}>
-                  <div style={{ fontSize:22, marginBottom:6 }}>{l.icon}</div>
-                  <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:700 }}>{l.label}</div>
-                  <div style={{ color:"#6a5a40", fontSize:9, marginTop:2 }}>{l.sub}</div>
-                </div>
-              </a>
-            ))}
+          {/* ── wallet balance ── */}
+          <div style={{
+            background:"linear-gradient(135deg,rgba(62,207,110,0.08),rgba(62,207,110,0.03))",
+            border:`1px solid ${walletBalance < 100000 ? "rgba(255,64,64,0.3)" : "rgba(62,207,110,0.2)"}`,
+            borderRadius:16, padding:"14px 16px", marginBottom:14,
+            display:"flex", alignItems:"center", gap:12,
+          }}>
+            <div style={{ width:44, height:44, borderRadius:13, background:"rgba(62,207,110,0.12)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>💳</div>
+            <div style={{ flex:1 }}>
+              <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px", marginBottom:2 }}>Số dư ví tài xế</div>
+              <div style={{ color:"#3ecf6e", fontSize:20, fontWeight:800 }}>{walletBalance.toLocaleString("vi-VN")}đ</div>
+              {walletBalance < 100000 && (
+                <div style={{ color:"#ff4040", fontSize:9, marginTop:2 }}>⚠ Số dư thấp — nạp thêm để nhận đơn thoải mái</div>
+              )}
+            </div>
+            <button onClick={() => setShowSetupGate(true)} style={{
+              padding:"8px 14px", borderRadius:10, border:"none",
+              background:"linear-gradient(90deg,#3ecf6e,#2db55d)",
+              color:"#fff", fontSize:10, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", whiteSpace:"nowrap",
+            }}>+ Nạp tiền</button>
           </div>
 
           {/* ── tips card ── */}
@@ -607,6 +694,17 @@ export default function DriverDashboard() {
       <AnimatePresence>
         {showOrder && pendingOrder && (
           <OrderPopup order={pendingOrder} onAccept={handleAccept} onReject={handleReject} />
+        )}
+      </AnimatePresence>
+
+      {/* ── setup gate ── */}
+      <AnimatePresence>
+        {showSetupGate && (
+          <SetupGate
+            status={setupStatus}
+            walletBalance={walletBalance}
+            onClose={() => setShowSetupGate(false)}
+          />
         )}
       </AnimatePresence>
     </>

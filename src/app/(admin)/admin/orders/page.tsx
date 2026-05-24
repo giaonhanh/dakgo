@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
+import AdminShell from "@/components/admin/AdminShell"
 
 type OrderStatus  = "pending" | "accepted" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled"
 type PayMethod    = "cash" | "vietqr" | "momo"
@@ -409,36 +410,33 @@ export default function AdminOrdersPage() {
         select option{background:#1a1208;color:#f8f0e0}
       `}</style>
 
-      <div style={{ position:"fixed", inset:0, background:"#080806", display:"flex", flexDirection:"column", overflow:"hidden" }}>
-
-        {/* ── Header ── */}
-        <div style={{ padding:"52px 16px 16px", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:12 }}>
-            <a href="/admin" style={{ width:36, height:36, borderRadius:10, background:"rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center", textDecoration:"none", color:"#f8f0e0", fontSize:16 }}>←</a>
-            <div style={{ flex:1 }}>
-              <div style={{ color:"#f8f0e0", fontSize:16, fontWeight:800 }}>Quản lý đơn hàng</div>
-              <div style={{ color:"#6a5a40", fontSize:9 }}>{loading ? "Đang tải..." : `${orders.length} đơn · ${fmt(todayTotal)}`}</div>
+      <AdminShell
+        pageTitle="📦 Quản lý đơn hàng"
+        pageSubtitle={loading ? "Đang tải..." : `${orders.length} đơn · ${fmt(todayTotal)}`}
+        actions={
+          <button onClick={() => { setShowCreate(true); loadShops() }}
+            style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg,#FF6B00,#FF8C00)", border:"none", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:800, color:"#fff", cursor:"pointer", boxShadow:"0 4px 14px rgba(255,107,0,0.4)" }}>
+            +
+          </button>
+        }
+      >
+        <div style={{ display:"flex", flexDirection:"column", height:"100%" }}>
+          {/* Search + Filters */}
+          <div style={{ padding:"12px 16px", borderBottom:"1px solid rgba(255,255,255,0.06)", flexShrink:0 }}>
+            <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:12, padding:"10px 14px", display:"flex", gap:8, alignItems:"center", marginBottom:10 }}>
+              <span style={{ color:"#6a5a40", fontSize:14 }}>🔍</span>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Tìm mã đơn, khách hàng, quán..." style={{ flex:1, background:"none", border:"none", color:"#f8f0e0", fontSize:11 }} />
             </div>
-            <button onClick={() => { setShowCreate(true); loadShops() }}
-              style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg,#FF6B00,#FF8C00)", border:"none", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:800, color:"#fff", cursor:"pointer", boxShadow:"0 4px 14px rgba(255,107,0,0.4)", flexShrink:0 }}>
-              +
-            </button>
-          </div>
 
-          <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:12, padding:"10px 14px", display:"flex", gap:8, alignItems:"center", marginBottom:10 }}>
-            <span style={{ color:"#6a5a40", fontSize:14 }}>🔍</span>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Tìm mã đơn, khách hàng, quán..." style={{ flex:1, background:"none", border:"none", color:"#f8f0e0", fontSize:11 }} />
+            <div style={{ display:"flex", gap:5, overflowX:"auto" }}>
+              {(["all","pending","accepted","preparing","ready","delivering","delivered","cancelled"] as const).map(f => (
+                <button key={f} onClick={()=>setFilter(f)}
+                  style={{ flexShrink:0, padding:"5px 10px", borderRadius:8, background:filter===f?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)", border:filter===f?"1px solid rgba(255,107,0,0.35)":"1px solid rgba(255,255,255,0.06)", color:filter===f?"#FF8C00":"#6a5a40", fontSize:9, fontWeight:filter===f?700:400, cursor:"pointer", fontFamily:"Lexend", whiteSpace:"nowrap" }}>
+                  {f==="all"?"Tất cả":STATUS_CFG[f].label}
+                </button>
+              ))}
+            </div>
           </div>
-
-          <div style={{ display:"flex", gap:5, overflowX:"auto" }}>
-            {(["all","pending","accepted","preparing","ready","delivering","delivered","cancelled"] as const).map(f => (
-              <button key={f} onClick={()=>setFilter(f)}
-                style={{ flexShrink:0, padding:"5px 10px", borderRadius:8, background:filter===f?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)", border:filter===f?"1px solid rgba(255,107,0,0.35)":"1px solid rgba(255,255,255,0.06)", color:filter===f?"#FF8C00":"#6a5a40", fontSize:9, fontWeight:filter===f?700:400, cursor:"pointer", fontFamily:"Lexend", whiteSpace:"nowrap" }}>
-                {f==="all"?"Tất cả":STATUS_CFG[f].label}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* ── Orders list ── */}
         <div style={{ flex:1, overflowY:"auto", padding:"10px 16px 100px" }}>
@@ -891,7 +889,8 @@ export default function AdminOrdersPage() {
             </>
           )}
         </AnimatePresence>
-      </div>
+        </div>
+      </AdminShell>
     </>
   )
 }

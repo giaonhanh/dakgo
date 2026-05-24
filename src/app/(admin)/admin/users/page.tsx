@@ -1,8 +1,9 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
+import AdminShell from "@/components/admin/AdminShell"
 
 type UserStatus = "active" | "blacklisted" | "inactive"
 type TierLevel  = "bronze" | "silver" | "gold" | "platinum"
@@ -42,25 +43,10 @@ const TIER_CFG: Record<TierLevel, { label: string; color: string; bg: string; ic
   platinum: { label: "Platinum", color: "#b464ff", bg: "rgba(180,100,255,0.15)", icon: "💎" },
 }
 
-const NAV_ITEMS = [
-  { icon: "🏠",  label: "Dashboard",   href: "/admin"               },
-  { icon: "🏍️", label: "Tài xế",      href: "/admin/drivers"       },
-  { icon: "🏪",  label: "Cửa hàng",    href: "/admin/merchants"     },
-  { icon: "📦",  label: "Đơn hàng",    href: "/admin/orders"        },
-  { icon: "👥",  label: "Khách hàng",  href: "/admin/users", active: true },
-  { icon: "💰",  label: "Tài chính",   href: "/admin/finance"       },
-  { icon: "🗺️", label: "Bản đồ live", href: "/admin/map"           },
-  { icon: "🏷️", label: "Khuyến mãi",  href: "/admin/promotions"    },
-  { icon: "⚖️",  label: "Tranh chấp",  href: "/admin/disputes"      },
-  { icon: "📣",  label: "Thông báo",   href: "/admin/notifications" },
-  { icon: "⚙️",  label: "Cài đặt",     href: "/admin/settings"      },
-]
-
 const fmt      = (n: number) => n.toLocaleString("vi-VN") + "đ"
 const fmtShort = (n: number) => n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + "M" : n.toLocaleString("vi-VN")
 
 export default function AdminUsersPage() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [users, setUsers] = useState<AppUser[]>([])
   const [filterStatus, setFilterStatus] = useState<"all" | UserStatus>("all")
   const [filterTier, setFilterTier] = useState<"all" | TierLevel>("all")
@@ -185,63 +171,16 @@ export default function AdminUsersPage() {
   return (
     <>
       <style>{`
-                *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { background: #06050a; font-family: 'Lexend', sans-serif; height: 100%; overflow: hidden; }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,107,0,0.25); border-radius: 2px; }
         input { outline: none; font-family: 'Lexend', sans-serif; }
         @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
         @keyframes pulse  { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
         .user-row:hover { background: rgba(255,107,0,0.04) !important; border-color: rgba(255,107,0,0.15) !important; }
-        .sidebar-link:hover { background: rgba(255,107,0,0.08) !important; }
         .kpi-card { animation: fadeUp 0.35s ease both; }
         .kpi-card:hover { transform: translateY(-2px); transition: all 0.2s; }
         .action-btn:hover { filter: brightness(1.15); transform: scale(1.02); transition: all 0.15s; }
       `}</style>
-
-      <div style={{ display: "flex", height: "100vh", background: "#06050a", color: "#f0eaff", overflow: "hidden" }}>
-
-        {/* SIDEBAR */}
-        <div style={{ width: sidebarOpen ? 220 : 60, flexShrink: 0, background: "rgba(10,9,18,0.97)", backdropFilter: "blur(20px)", borderRight: "1px solid rgba(255,107,0,0.1)", display: "flex", flexDirection: "column", transition: "width 0.25s ease", overflow: "hidden", zIndex: 50 }}>
-          <div style={{ height: 56, display: "flex", alignItems: "center", padding: "0 14px", gap: 10, flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-            <div style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, background: "linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>🚀</div>
-            {sidebarOpen && (
-              <div>
-                <div style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700 }}>Giao Nhanh</div>
-                <div style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", background: "rgba(180,100,255,0.15)", border: "1px solid rgba(180,100,255,0.3)", borderRadius: 4, color: "#b464ff", display: "inline-block" }}>ADMIN</div>
-              </div>
-            )}
-          </div>
-          <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
-            {NAV_ITEMS.map(item => (
-              <a key={item.href} href={item.href} style={{ textDecoration: "none" }}>
-                <div className="sidebar-link" style={{ display: "flex", alignItems: "center", gap: 10, padding: sidebarOpen ? "8px 10px" : "8px", borderRadius: 10, marginBottom: 3, cursor: "pointer", transition: "all 0.2s", background: item.active ? "rgba(255,107,0,0.12)" : "transparent", borderLeft: item.active ? "2px solid #FF6B00" : "2px solid transparent", justifyContent: sidebarOpen ? "flex-start" : "center" }}>
-                  <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
-                  {sidebarOpen && <span style={{ fontSize: 11, whiteSpace: "nowrap", fontWeight: item.active ? 600 : 400, color: item.active ? "#FF8C00" : "rgba(144,128,176,0.8)" }}>{item.label}</span>}
-                </div>
-              </a>
-            ))}
-          </nav>
-          <div onClick={() => setSidebarOpen(!sidebarOpen)} style={{ height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", borderTop: "1px solid rgba(255,255,255,0.06)", color: "rgba(144,128,176,0.5)", fontSize: 14 }}>
-            {sidebarOpen ? "◀" : "▶"}
-          </div>
-        </div>
-
-        {/* MAIN */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <div style={{ height: 56, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", background: "rgba(10,9,18,0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-            <div>
-              <div style={{ color: "rgba(144,128,176,0.45)", fontSize: 9, textTransform: "uppercase", letterSpacing: 1 }}>Admin / Quản lý</div>
-              <div style={{ color: "#f0eaff", fontSize: 13, fontWeight: 700 }}>👥 Khách hàng</div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ color: "rgba(144,128,176,0.4)", fontSize: 9 }}>Phước An · {new Date().toLocaleDateString("vi-VN")}</div>
-              <div style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(180,100,255,0.12)", border: "1px solid rgba(180,100,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, cursor: "pointer" }}>👤</div>
-            </div>
-          </div>
-
-          <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+      <AdminShell pageTitle="👤 Tài khoản" pageSubtitle="Quản lý người dùng · Blacklist · Hạng thành viên">
+        <div style={{ flex: 1, overflowY: "auto", padding: 16, height: "100%" }}>
 
             {/* KPI */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10, marginBottom: 14 }}>
@@ -357,9 +296,7 @@ export default function AdminUsersPage() {
                 <div style={{ color: "rgba(144,128,176,0.35)", fontSize: 8 }}>Tổng chi tiêu: <span style={{ color: "#FF8C00", fontWeight: 700 }}>{fmt(totalSpent)}</span></div>
               </div>
             </div>
-          </div>
         </div>
-      </div>
 
       {/* Detail Drawer */}
       <AnimatePresence>
@@ -451,6 +388,7 @@ export default function AdminUsersPage() {
           </>
         )}
       </AnimatePresence>
+      </AdminShell>
     </>
   )
 }

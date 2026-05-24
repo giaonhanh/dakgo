@@ -1,22 +1,9 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/client"
-
-const NAV_ITEMS = [
-  { icon: "🏠",  label: "Dashboard",    href: "/admin",               active: false },
-  { icon: "🏍️", label: "Tài xế",        href: "/admin/drivers",       active: false },
-  { icon: "🏪",  label: "Cửa hàng",      href: "/admin/merchants",     active: false },
-  { icon: "📦",  label: "Đơn hàng",      href: "/admin/orders",        active: false },
-  { icon: "👥",  label: "Khách hàng",    href: "/admin/users",         active: false },
-  { icon: "💰",  label: "Tài chính",     href: "/admin/finance",       active: false },
-  { icon: "🗺️", label: "Bản đồ live",   href: "/admin/map",           active: true  },
-  { icon: "🏷️", label: "Khuyến mãi",    href: "/admin/promotions",    active: false },
-  { icon: "⚖️",  label: "Tranh chấp",    href: "/admin/disputes",      active: false },
-  { icon: "📣",  label: "Thông báo",     href: "/admin/notifications", active: false },
-  { icon: "⚙️",  label: "Cài đặt",       href: "/admin/settings",      active: false },
-]
+import AdminShell from "@/components/admin/AdminShell"
 
 interface DriverMarker {
   id: string; name: string; vehicle: string
@@ -186,7 +173,6 @@ const AdminMapClient = dynamic(
 // ─── Main page ───────────────────────────────────────────────────────────────
 export default function AdminMapPage() {
   const supabase = createClient()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [layer, setLayer] = useState<"all"|"drivers"|"orders">("all")
   const [selected, setSelected] = useState<DriverMarker | null>(null)
   const [onlineDrivers, setOnlineDrivers] = useState<DriverMarker[]>([])
@@ -255,66 +241,30 @@ export default function AdminMapPage() {
   return (
     <>
       <style>{`
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { background: #06050a; font-family: 'Lexend', sans-serif; height: 100%; overflow: hidden; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,107,0,0.3); border-radius: 2px; }
         @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:0.4} }
         @keyframes spin   { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
         @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         .driver-row:hover { background: rgba(255,255,255,0.05) !important; cursor:pointer; }
         .order-row:hover  { background: rgba(255,255,255,0.04) !important; }
-        .sidebar-link:hover { background: rgba(255,107,0,0.08) !important; }
       `}</style>
-
-      <div style={{ display:"flex", height:"100vh", background:"#06050a", color:"#f0eaff", overflow:"hidden" }}>
-
-        {/* SIDEBAR */}
-        <div style={{ width: sidebarOpen ? 220 : 60, flexShrink:0, background:"rgba(10,9,18,0.98)", backdropFilter:"blur(20px)", borderRight:"1px solid rgba(255,107,0,0.12)", display:"flex", flexDirection:"column", transition:"width 0.25s ease", overflow:"hidden", zIndex:50 }}>
-          <div style={{ height:60, display:"flex", alignItems:"center", padding:"0 14px", borderBottom:"1px solid rgba(255,255,255,0.06)", gap:10, flexShrink:0 }}>
-            <div style={{ width:32, height:32, borderRadius:10, flexShrink:0, background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, boxShadow:"0 0 12px rgba(255,107,0,0.4)" }}>🚀</div>
-            {sidebarOpen && <div><div style={{ color:"#f8f0e0", fontSize:13, fontWeight:800 }}>GiaoNhanh</div><span style={{ fontSize:8, fontWeight:700, padding:"1px 6px", background:"rgba(180,100,255,0.15)", border:"1px solid rgba(180,100,255,0.3)", borderRadius:4, color:"#b464ff" }}>ADMIN</span></div>}
-          </div>
-          <nav style={{ flex:1, padding:"8px", overflowY:"auto" }}>
-            {NAV_ITEMS.map(item => (
-              <a key={item.href} href={item.href} className="sidebar-link" style={{ display:"flex", alignItems:"center", gap:10, height:40, borderRadius:10, padding:`0 ${sidebarOpen?10:0}px`, marginBottom:2, justifyContent:sidebarOpen?"flex-start":"center", textDecoration:"none", background: item.active?"rgba(255,107,0,0.12)":"transparent", borderLeft: item.active?"2px solid #FF6B00":"2px solid transparent", color: item.active?"#FF8C00":"#6a5a40", fontSize:11, fontWeight: item.active?700:400, transition:"all 0.2s" }}>
-                <span style={{ fontSize:17, flexShrink:0 }}>{item.icon}</span>
-                {sidebarOpen && <span style={{ whiteSpace:"nowrap" }}>{item.label}</span>}
-              </a>
+      <AdminShell
+        pageTitle="🗺️ Bản đồ tài xế live"
+        pageSubtitle="Phước An · Krông Pắc · Đắk Lắk · OSM"
+        actions={
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:8, background:"rgba(62,207,110,0.1)", border:"1px solid rgba(62,207,110,0.2)" }}>
+              <span style={{ width:7, height:7, borderRadius:"50%", background:"#3ecf6e", display:"inline-block", animation:"pulse 2s infinite", boxShadow:"0 0 5px #3ecf6e" }} />
+              <span style={{ color:"#3ecf6e", fontSize:10, fontWeight:700 }}>LIVE · cập nhật 5s</span>
+            </div>
+            {(["all","drivers","orders"] as const).map(l => (
+              <button key={l} onClick={() => setLayer(l)} style={{ padding:"6px 14px", borderRadius:8, background: layer===l?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)", border: layer===l?"1px solid rgba(255,107,0,0.35)":"1px solid rgba(255,255,255,0.08)", color: layer===l?"#FF8C00":"#6a5a40", fontSize:11, cursor:"pointer", fontFamily:"Lexend", fontWeight: layer===l?700:400 }}>
+                {l==="all"?"Tất cả":l==="drivers"?"Tài xế":"Đơn hàng"}
+              </button>
             ))}
-          </nav>
-          <button onClick={() => setSidebarOpen(p => !p)} style={{ margin:"8px", height:36, borderRadius:10, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", color:"#6a5a40", fontSize:14, cursor:"pointer", fontFamily:"Lexend" }}>
-            {sidebarOpen ? "◀" : "▶"}
-          </button>
-        </div>
-
-        {/* MAIN */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-
-          {/* Topbar */}
-          <div style={{ height:60, borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 20px", flexShrink:0 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <div>
-                <div style={{ color:"#f0eaff", fontSize:14, fontWeight:800 }}>🗺️ Bản đồ tài xế live</div>
-                <div style={{ color:"#6a5a40", fontSize:9 }}>Phước An · Krông Pắc · Đắk Lắk · OSM</div>
-              </div>
-              <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:8, background:"rgba(62,207,110,0.1)", border:"1px solid rgba(62,207,110,0.2)" }}>
-                <span style={{ width:7, height:7, borderRadius:"50%", background:"#3ecf6e", display:"inline-block", animation:"pulse 2s infinite", boxShadow:"0 0 5px #3ecf6e" }} />
-                <span style={{ color:"#3ecf6e", fontSize:10, fontWeight:700 }}>LIVE · cập nhật 5s</span>
-              </div>
-            </div>
-            <div style={{ display:"flex", gap:6 }}>
-              {(["all","drivers","orders"] as const).map(l => (
-                <button key={l} onClick={() => setLayer(l)} style={{ padding:"6px 14px", borderRadius:8, background: layer===l?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)", border: layer===l?"1px solid rgba(255,107,0,0.35)":"1px solid rgba(255,255,255,0.08)", color: layer===l?"#FF8C00":"#6a5a40", fontSize:11, cursor:"pointer", fontFamily:"Lexend", fontWeight: layer===l?700:400 }}>
-                  {l==="all"?"Tất cả":l==="drivers"?"Tài xế":"Đơn hàng"}
-                </button>
-              ))}
-            </div>
           </div>
-
-          {/* Map + Right panel */}
-          <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
+        }
+      >
+        <div style={{ flex:1, display:"flex", overflow:"hidden", height:"100%" }}>
 
             {/* Map */}
             <div style={{ flex:1, position:"relative", overflow:"hidden" }}>
@@ -444,9 +394,8 @@ export default function AdminMapPage() {
                 </div>
               </div>
             </div>
-          </div>
         </div>
-      </div>
+      </AdminShell>
     </>
   )
 }

@@ -170,9 +170,9 @@ function BankSheet({ onClose }: { onClose: () => void }) {
           <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🏦 Tài khoản ngân hàng</div>
           <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
         </div>
-        <div style={{ background: "rgba(74,143,245,0.08)", border: "1px solid rgba(74,143,245,0.2)", borderRadius: 12, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 10 }}>
-          <span style={{ fontSize: 16 }}>ℹ️</span>
-          <span style={{ color: "#4a8ff5", fontSize: 10, lineHeight: 1.5 }}>Thu nhập được chuyển khoản mỗi thứ 2 hàng tuần sau khi khấu trừ hoa hồng nền tảng.</span>
+        <div style={{ background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 12, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 10 }}>
+          <span style={{ fontSize: 16 }}>💰</span>
+          <span style={{ color: "#FF8C00", fontSize: 10, lineHeight: 1.5 }}>Tiền sẽ nhận được khi hoàn thành đơn hàng và trừ chiết khấu nền tảng.</span>
         </div>
         <div style={{ marginBottom: 12 }}>
           <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 8 }}>Ngân hàng</div>
@@ -188,7 +188,7 @@ function BankSheet({ onClose }: { onClose: () => void }) {
             <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend" }} />
           </div>
         ))}
-        <button onClick={onClose} style={{ width: "100%", height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend", marginTop: 8 }}>✓ Lưu tài khoản</button>
+        <button onClick={() => { localStorage.setItem("driver_bank_linked", "true"); onClose() }} style={{ width: "100%", height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend", marginTop: 8 }}>✓ Lưu tài khoản</button>
       </div>
     </motion.div>
   )

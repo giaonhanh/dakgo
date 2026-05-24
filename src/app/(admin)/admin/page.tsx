@@ -1,7 +1,8 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import AdminShell from "@/components/admin/AdminShell"
 
 interface DashOrder {
   id: string
@@ -47,19 +48,6 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string; bor
   ready:      { label: "Sẵn sàng",     color: "#3ecf6e", bg: "rgba(62,207,110,0.10)", border: "rgba(62,207,110,0.25)" },
 }
 
-const NAV_ITEMS = [
-  { icon: "🏠",  label: "Dashboard",    href: "/admin",               active: true  },
-  { icon: "🏍️", label: "Tài xế",        href: "/admin/drivers",       active: false },
-  { icon: "🏪",  label: "Cửa hàng",      href: "/admin/merchants",     active: false },
-  { icon: "📦",  label: "Đơn hàng",      href: "/admin/orders",        active: false },
-  { icon: "👥",  label: "Khách hàng",    href: "/admin/users",         active: false },
-  { icon: "💰",  label: "Tài chính",     href: "/admin/finance",       active: false },
-  { icon: "🗺️", label: "Bản đồ live",   href: "/admin/map",           active: false },
-  { icon: "🏷️", label: "Khuyến mãi",    href: "/admin/promotions",    active: false },
-  { icon: "⚖️",  label: "Tranh chấp",    href: "/admin/disputes",      active: false },
-  { icon: "📣",  label: "Thông báo",     href: "/admin/notifications", active: false },
-  { icon: "⚙️",  label: "Cài đặt",       href: "/admin/settings",      active: false },
-]
 
 const fmtShort = (n: number) =>
   n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + "M" : n >= 1000 ? (n / 1000).toFixed(0) + "k" : n.toString()
@@ -73,7 +61,6 @@ const timeAgo = (iso: string) => {
 
 
 export default function AdminDashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [orders, setOrders] = useState<DashOrder[]>([])
   const [lastRefresh, setLastRefresh] = useState(new Date())
   const [kpi, setKpi] = useState<Kpi>({
@@ -221,82 +208,29 @@ export default function AdminDashboard() {
         a { text-decoration: none; }
       `}</style>
 
-      <div style={{ display:"flex", height:"100vh", background:"#06050a", color:"#f0eaff", overflow:"hidden" }}>
-
-        {/* SIDEBAR */}
-        <div style={{ width: sidebarOpen ? 220 : 60, flexShrink:0, background:"rgba(10,9,18,0.98)", backdropFilter:"blur(20px)", borderRight:"1px solid rgba(255,107,0,0.12)", display:"flex", flexDirection:"column", transition:"width 0.25s ease", overflow:"hidden", zIndex:50 }}>
-          {/* Logo */}
-          <div style={{ height:60, display:"flex", alignItems:"center", padding:"0 14px", borderBottom:"1px solid rgba(255,255,255,0.06)", gap:10, flexShrink:0 }}>
-            <div style={{ width:32, height:32, borderRadius:10, flexShrink:0, background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, boxShadow:"0 0 12px rgba(255,107,0,0.4)" }}>🚀</div>
-            {sidebarOpen && (
-              <div>
-                <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:800, letterSpacing:-0.3 }}>GiaoNhanh</div>
-                <span style={{ fontSize:8, fontWeight:700, padding:"1px 6px", background:"rgba(180,100,255,0.15)", border:"1px solid rgba(180,100,255,0.3)", borderRadius:4, color:"#b464ff" }}>ADMIN PANEL</span>
-              </div>
-            )}
+      <AdminShell
+        pageTitle="🏠 Tổng quan hệ thống"
+        pageSubtitle="Giao Nhanh · Phước An · Tự động làm mới mỗi 30s"
+        actions={
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ padding:"5px 12px", borderRadius:8, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", color:"#6a5a40", fontSize:9 }}>
+              📍 Phước An · {new Date().toLocaleDateString("vi-VN", { weekday:"short", day:"2-digit", month:"2-digit" })}
+            </div>
+            <div style={{ position:"relative", cursor:"pointer" }}>
+              <div style={{ width:34, height:34, borderRadius:10, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>🔔</div>
+              {(kpi.pendingDrivers + kpi.pendingShops) > 0 && (
+                <div style={{ position:"absolute", top:-3, right:-3, minWidth:14, height:14, borderRadius:7, background:"#ff4040", border:"2px solid #06050a", display:"flex", alignItems:"center", justifyContent:"center", fontSize:7, fontWeight:800, color:"#fff", padding:"0 2px" }}>
+                  {kpi.pendingDrivers + kpi.pendingShops}
+                </div>
+              )}
+            </div>
+            <a href="/admin/settings">
+              <div style={{ width:34, height:34, borderRadius:10, background:"rgba(180,100,255,0.12)", border:"1px solid rgba(180,100,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, cursor:"pointer" }}>👤</div>
+            </a>
           </div>
-
-          {/* Nav */}
-          <nav style={{ flex:1, padding:"8px", overflowY:"auto" }}>
-            {NAV_ITEMS.map(item => (
-              <a key={item.href} href={item.href} className="sidebar-link" style={{ display:"flex", alignItems:"center", gap:10, height:40, borderRadius:10, padding:`0 ${sidebarOpen ? 10 : 0}px`, marginBottom:2, justifyContent: sidebarOpen ? "flex-start" : "center", background: item.active ? "rgba(255,107,0,0.12)" : "transparent", borderLeft: item.active ? "2px solid #FF6B00" : "2px solid transparent", color: item.active ? "#FF8C00" : "#6a5a40", fontSize:11, fontWeight: item.active ? 700 : 400, transition:"all 0.2s" }}>
-                <span style={{ fontSize:17, flexShrink:0 }}>{item.icon}</span>
-                {sidebarOpen && <span style={{ whiteSpace:"nowrap" }}>{item.label}</span>}
-              </a>
-            ))}
-          </nav>
-
-          {/* System status */}
-          {sidebarOpen && (
-            <div style={{ margin:"8px", padding:"10px 12px", background:"rgba(62,207,110,0.06)", border:"1px solid rgba(62,207,110,0.15)", borderRadius:10 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
-                <div style={{ width:6, height:6, borderRadius:"50%", background:"#3ecf6e", animation:"pulse 2s infinite", boxShadow:"0 0 5px #3ecf6e" }} />
-                <span style={{ color:"#3ecf6e", fontSize:9, fontWeight:700 }}>Hệ thống hoạt động</span>
-              </div>
-              <div style={{ color:"#6a5a40", fontSize:8 }}>Cập nhật: {lastRefresh.toLocaleTimeString("vi-VN")}</div>
-            </div>
-          )}
-
-          <button onClick={async () => { const sb = createClient(); await sb.auth.signOut(); window.location.href = "/login" }}
-            style={{ margin:"0 8px 4px", height:36, borderRadius:10, background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)", color:"#ff4040", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
-            <span style={{ fontSize:14 }}>🚪</span>
-            {sidebarOpen && <span>Đăng xuất</span>}
-          </button>
-
-          <button onClick={() => setSidebarOpen(p => !p)} style={{ margin:"0 8px 8px", height:36, borderRadius:10, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", color:"#6a5a40", fontSize:14, cursor:"pointer", fontFamily:"Lexend", transition:"all 0.2s" }}>
-            {sidebarOpen ? "◀" : "▶"}
-          </button>
-        </div>
-
-        {/* MAIN */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-
-          {/* Topbar */}
-          <div style={{ height:60, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 24px", background:"rgba(10,9,18,0.8)", backdropFilter:"blur(12px)", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
-            <div>
-              <div style={{ color:"#6a5a40", fontSize:9, textTransform:"uppercase", letterSpacing:1.5, marginBottom:2 }}>ADMIN · DASHBOARD</div>
-              <div style={{ color:"#f0eaff", fontSize:14, fontWeight:800 }}>Giao Nhanh — Tổng quan hệ thống</div>
-            </div>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <div style={{ padding:"5px 12px", borderRadius:8, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", color:"#6a5a40", fontSize:9 }}>
-                📍 Phước An, Krông Pắc · {new Date().toLocaleDateString("vi-VN", { weekday:"short", day:"2-digit", month:"2-digit" })}
-              </div>
-              <div style={{ position:"relative", cursor:"pointer" }}>
-                <div style={{ width:34, height:34, borderRadius:10, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>🔔</div>
-                {(kpi.pendingDrivers + kpi.pendingShops) > 0 && (
-                  <div style={{ position:"absolute", top:-3, right:-3, minWidth:14, height:14, borderRadius:7, background:"#ff4040", border:"2px solid #06050a", display:"flex", alignItems:"center", justifyContent:"center", fontSize:7, fontWeight:800, color:"#fff", padding:"0 2px" }}>
-                    {kpi.pendingDrivers + kpi.pendingShops}
-                  </div>
-                )}
-              </div>
-              <a href="/admin/settings">
-                <div style={{ width:34, height:34, borderRadius:10, background:"rgba(180,100,255,0.12)", border:"1px solid rgba(180,100,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, cursor:"pointer" }}>👤</div>
-              </a>
-            </div>
-          </div>
-
-          {/* Scrollable content */}
-          <div style={{ flex:1, overflowY:"auto", padding:"16px 20px", display:"flex", flexDirection:"column", gap:14 }}>
+        }
+      >
+        <div style={{ flex:1, overflowY:"auto", padding:"16px 20px", display:"flex", flexDirection:"column", gap:14, height:"100%" }}>
 
             {/* KPI Grid — 4 cols top, 4 cols bottom */}
             <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10 }}>
@@ -503,8 +437,7 @@ export default function AdminDashboard() {
               <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700, marginBottom:10 }}>⚡ Thao tác nhanh</div>
               <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                 {[
-                  { label:"✅ Duyệt tài xế",     href:"/admin/drivers",       c:"#3ecf6e", bg:"rgba(62,207,110,0.08)",   bd:"rgba(62,207,110,0.22)",   badge: kpi.pendingDrivers > 0 ? kpi.pendingDrivers : 0 },
-                  { label:"🏪 Duyệt cửa hàng",    href:"/admin/merchants",     c:"#FF8C00", bg:"rgba(255,107,0,0.08)",    bd:"rgba(255,107,0,0.22)",    badge: kpi.pendingShops > 0 ? kpi.pendingShops : 0 },
+                  { label:"✅ Phê duyệt",          href:"/admin/approvals",     c:"#3ecf6e", bg:"rgba(62,207,110,0.08)",   bd:"rgba(62,207,110,0.22)",   badge: kpi.pendingDrivers + kpi.pendingShops },
                   { label:"📦 Quản lý đơn",        href:"/admin/orders",        c:"#4a8ff5", bg:"rgba(74,143,245,0.08)",   bd:"rgba(74,143,245,0.22)",   badge: 0 },
                   { label:"⚖️ Tranh chấp",          href:"/admin/disputes",      c:"#ff4040", bg:"rgba(255,64,64,0.08)",    bd:"rgba(255,64,64,0.22)",    badge: 0 },
                   { label:"📣 Gửi thông báo",       href:"/admin/notifications", c:"#b464ff", bg:"rgba(180,100,255,0.08)",  bd:"rgba(180,100,255,0.22)",  badge: 0 },
@@ -543,9 +476,8 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-          </div>
         </div>
-      </div>
+      </AdminShell>
     </>
   )
 }
