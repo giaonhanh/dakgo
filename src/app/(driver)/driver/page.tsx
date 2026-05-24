@@ -446,16 +446,17 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
 
   function openBankApp() {
     const bank = VN_BANKS.find(b => b.name === selBank)
-    if (!bank || !payInfo?.qrCode) return
+    if (!bank) return
 
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
-    const qr = encodeURIComponent(payInfo.qrCode)
 
     if (isIOS) {
-      // iOS: truyền QR string vào scheme → app parse VietQR → điền sẵn form
-      window.location.href = `${bank.ios}://qr?data=${qr}`
+      // iOS: chỉ mở app (không truyền QR data — Safari từ chối URL dài)
+      // Sau khi vào app, dùng camera quét QR hiện trên màn hình
+      window.location.href = `${bank.ios}://`
     } else {
-      // Android: intent URL → mở đúng app, truyền QR data qua extra
+      // Android: intent mở app, truyền QR data để pre-fill nếu app hỗ trợ
+      const qr = encodeURIComponent(payInfo?.qrCode ?? "")
       window.location.href =
         `intent://qr?data=${qr}#Intent;scheme=${bank.ios};package=${bank.pkg};end`
     }
@@ -573,8 +574,8 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
                 📋 Sao chép thông tin chuyển khoản
               </button>
               <div style={{ color:"#6a5a40", fontSize:9, textAlign:"center", marginTop:8, lineHeight:1.5 }}>
-                App sẽ mở thẳng trang chuyển khoản đã điền sẵn thông tin.<br/>
-                Bạn chỉ cần xác nhận bảo mật là xong.
+                Sau khi mở app → vào mục <b style={{color:"#b0956a"}}>Quét QR</b> → quét mã phía trên.<br/>
+                Thông tin chuyển khoản sẽ được điền sẵn tự động.
               </div>
             </div>
 
