@@ -373,8 +373,8 @@ export default function AdminLiveMap() {
 ### Checklist
 
 ```
-□ 7.1  VietQR — generate URL, test quét thực tế với banking app
-□ 7.2  MoMo Business SDK — tích hợp, test sandbox, xử lý webhook /api/payment/webhook
+□ 7.1  PayOS — ✅ Đã tích hợp: QR chuyển khoản realtime, webhook xác nhận, cộng ví tài xế tự động
+□ 7.2  VietQR / MoMo — ❌ Không dùng. PayOS đã bao gồm QR ngân hàng + webhook, đủ cho production
 □ 7.3  FCM Push Notification — test Android Chrome + iOS Safari (Web Push)
 □ 7.4  PWA install prompt — hiển thị sau lần dùng thứ 2 (beforeinstallprompt event)
 □ 7.5  Offline mode — cache trang chủ + thực đơn + asset, toast "Đang offline"
@@ -385,18 +385,31 @@ export default function AdminLiveMap() {
 □ 7.10 Production deploy + Vercel Analytics + Supabase monitoring
 ```
 
-### VietQR — Không cần API key
+### PayOS — Thanh toán QR realtime ✅
 
-```typescript
-// src/lib/utils.ts
-export function generateVietQR(amount: number, orderId: string): string {
-  const BANK_ID = "BIDV"              // Thay bằng ngân hàng thực
-  const ACCOUNT = "1234567890"        // Thay bằng số TK thực
-  const addInfo = encodeURIComponent(`GN${orderId.slice(0,8).toUpperCase()}`)
-  return `https://img.vietqr.io/image/${BANK_ID}-${ACCOUNT}-qr_only.png?amount=${amount}&addInfo=${addInfo}`
-}
-// Dùng thẻ <img src={generateVietQR(amount, orderId)} /> — không cần fetch
+> Đã triển khai thay thế VietQR + MoMo. PayOS hỗ trợ tất cả ngân hàng VN qua QR chuyển khoản.
+
+**Flow thanh toán PayOS:**
 ```
+1. POST /api/orders → tạo đơn, sinh payment_code (8 chữ số ngẫu nhiên)
+2. Checkout gọi POST /api/payment/payos { orderCode: payment_code, amount, description }
+   → PayOS trả về { qrCode, checkoutUrl, accountNumber, accountName, bin }
+3. Hiển thị QR cho khách quét → chuyển khoản ngân hàng
+4. PayOS gọi POST /api/payment/webhook (đã verify chữ ký)
+   → Tìm orders.payment_code = orderCode
+   → UPDATE payment_status = "paid"
+   → Cộng ví tài xế (trừ 15% hoa hồng)
+   → Broadcast Realtime → badge "Đã thanh toán" cho khách + tài xế
+```
+
+**Env cần có:**
+- `PAYOS_CLIENT_ID` — từ dashboard PayOS
+- `PAYOS_API_KEY` — từ dashboard PayOS
+- `PAYOS_CHECKSUM_KEY` — để verify webhook signature
+
+**Nạp ví tài xế qua PayOS:**
+- Tạo row trong `wallet_topups` với `payment_code` mới
+- Webhook nhận → gọi `add_to_wallet` RPC
 
 ### next.config.ts — PWA Setup
 
@@ -444,9 +457,9 @@ export default withPWA({
 | POST | `/api/errands` | Tạo mua hộ/giao hộ | customer |
 | GET | `/api/shops/nearby` | Quán gần theo PostGIS | customer |
 | POST | `/api/dispatch` | Phân bổ đơn cho tài xế gần nhất | internal |
-| POST | `/api/payment/vietqr` | Generate VietQR URL | customer |
-| POST | `/api/payment/momo` | Khởi tạo MoMo payment | customer |
-| POST | `/api/payment/webhook` | Callback xác nhận TT từ MoMo | external |
+| POST | `/api/payment/payos` | Tạo PayOS QR + link thanh toán | customer |
+| POST | `/api/payment/payout` | Giải ngân ví merchant/tài xế | admin |
+| POST | `/api/payment/webhook` | Callback xác nhận TT từ PayOS (verify chữ ký) | external |
 | POST | `/api/notify/send` | Gửi FCM push notification | admin/internal |
 | POST | `/api/notify/register` | Đăng ký FCM token của device | any auth |
 
@@ -633,7 +646,7 @@ Khách:
 3. → /cart: xem lại, tăng/giảm, ghi chú, nhập voucher
 4. → /checkout: xác nhận địa chỉ (saved_addresses hoặc nhập + Nominatim)
    Chọn thời gian: Ngay / Hẹn giờ
-   Chọn TT: Tiền mặt / VietQR / MoMo
+   Chọn TT: Tiền mặt / PayOS (QR chuyển khoản)
 5. Nhấn CTAButton → POST /api/orders → INSERT orders + order_items
 6. API trigger POST /api/dispatch (background)
 7. → /order-success: Confetti + #GNXXXX + ETA + nút "Theo dõi đơn"
@@ -747,7 +760,7 @@ FUNCTIONAL
 □ Test hủy đơn + blacklist trigger (hủy 3 lần)
 □ Test dispatch: tài xế gần nhất nhận đơn đúng
 □ ESMS OTP hoạt động với số VN
-□ VietQR QR code generate đúng số tiền, quét được
+□ PayOS QR generate đúng số tiền, quét được bằng app ngân hàng, webhook nhận và cập nhật đúng
 □ Bản đồ Leaflet render đúng, không lỗi SSR
 □ Realtime: marker tài xế di chuyển đúng trên bản đồ
 

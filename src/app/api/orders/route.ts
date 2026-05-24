@@ -54,6 +54,11 @@ export async function POST(req: NextRequest) {
     const delivery_fee  = 15000
     const total_amount  = subtotal + delivery_fee
 
+    // payment_code: số nguyên 8 chữ số, dùng làm orderCode cho PayOS webhook
+    const payment_code = payment_method !== "cash"
+      ? Math.floor(10000000 + Math.random() * 90000000)
+      : null
+
     // Tạo đơn hàng
     const { data: order, error: orderErr } = await supabase
       .from("orders")
@@ -71,6 +76,7 @@ export async function POST(req: NextRequest) {
         total_amount,
         payment_method,
         payment_status:   "pending",
+        payment_code,
         voucher_id:       voucher_id ?? null,
         scheduled_at:     scheduled_at ?? null,
       })
@@ -94,7 +100,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Không thể lưu danh sách món" }, { status: 500 })
     }
 
-    return NextResponse.json({ orderId: order.id, total_amount }, { status: 201 })
+    return NextResponse.json({ orderId: order.id, total_amount, payment_code }, { status: 201 })
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Lỗi server"
     return NextResponse.json({ error: msg }, { status: 500 })

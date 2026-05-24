@@ -1,43 +1,128 @@
-const CACHE_NAME = 'giaonhanh-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/manifest.json',
-  '/banner1.svg',
-  '/banner2.svg',
-  '/banner3.svg',
-];
+const CACHE_NAME = 'giaonhanh-v2'
+const MAP_CACHE  = 'giaonhanh-maps-v1'
+const OFFLINE_URL = '/offline'
 
+const PRECACHE_URLS = [
+  '/',
+  '/offline',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+]
+
+// ── Install: precache critical URLs ──
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
-  self.skipWaiting();
-});
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(PRECACHE_URLS))
+      .then(() => self.skipWaiting())
+  )
+})
 
+// ── Activate: xóa cache cũ ──
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
-});
+      Promise.all(
+        keys
+          .filter((k) => k !== CACHE_NAME && k !== MAP_CACHE)
+          .map((k) => caches.delete(k))
+      )
+    ).then(() => self.clients.claim())
+  )
+})
 
+// ── Fetch ──
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  const url = new URL(event.request.url);
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/')) return;
+  const { request } = event
+  const url = new URL(request.url)
 
+  // Chỉ xử lý GET
+  if (request.method !== 'GET') return
+
+  // API calls: network only, không cache (dữ liệu realtime)
+  if (url.pathname.startsWith('/api/')) return
+
+  // Map tiles (CartoDB / OSM): cache-first 24h
+  if (url.hostname.includes('cartocdn.com') || url.hostname.includes('tile.openstreetmap.org')) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached
+        return fetch(request).then((res) => {
+          if (res.ok) {
+            const clone = res.clone()
+            caches.open(MAP_CACHE).then((c) => c.put(request, clone))
+          }
+          return res
+        })
+      })
+    )
+    return
+  }
+
+  // _next/static: immutable assets, cache-first mãi mãi
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached
+        return fetch(request).then((res) => {
+          if (res.ok) {
+            const clone = res.clone()
+            caches.open(CACHE_NAME).then((c) => c.put(request, clone))
+          }
+          return res
+        })
+      })
+    )
+    return
+  }
+
+  // Navigation (page loads): network-first, fallback offline page
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((res) => {
+          if (res.ok && (url.pathname === '/' || url.pathname === '/offline')) {
+            const clone = res.clone()
+            caches.open(CACHE_NAME).then((c) => c.put(request, clone))
+          }
+          return res
+        })
+        .catch(() => caches.match(OFFLINE_URL))
+    )
+    return
+  }
+
+  // Mặc định: network-first, fallback cache
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetchPromise = fetch(event.request).then((res) => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return res;
-      });
-      return cached || fetchPromise;
+    fetch(request).catch(() => caches.match(request))
+  )
+})
+
+// ── Push Notifications ──
+self.addEventListener('push', (event) => {
+  const data = event.data?.json() ?? {}
+  event.waitUntil(
+    self.registration.showNotification(data.title ?? 'Giao Nhanh', {
+      body:     data.body ?? '',
+      icon:     '/icon-192.png',
+      badge:    '/icon-192.png',
+      data:     data.data ?? {},
+      vibrate:  [200, 100, 200],
+      tag:      data.tag  ?? 'default',
+      renotify: true,
     })
-  );
-});
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const targetUrl = event.notification.data?.url ?? '/'
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      const existing = list.find((w) => w.url.includes(targetUrl) && 'focus' in w)
+      if (existing) return existing.focus()
+      return clients.openWindow(targetUrl)
+    })
+  )
+})

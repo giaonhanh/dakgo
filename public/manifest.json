@@ -1,15 +1,43 @@
-﻿{
-  "name": "Giao Nhanh Krông Pắc",
+{
+  "name": "Giao Nhanh — Phước An",
   "short_name": "GiaoNhanh",
-  "description": "Ứng dụng giao hàng, đặt xe địa phương tại Phước An, Krông Pắc",
-  "theme_color": "#0D0907",
-  "background_color": "#0D0907",
+  "description": "Giao hàng · Mua hộ · Xe ôm · Taxi tại Phước An, Krông Pắc, Đắk Lắk",
+  "theme_color": "#080806",
+  "background_color": "#080806",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "start_url": "/",
   "scope": "/",
+  "lang": "vi",
+  "categories": ["food", "shopping", "transportation"],
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Trang chủ Giao Nhanh"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Đặt đồ ăn",
+      "short_name": "Đặt ăn",
+      "url": "/",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Đặt xe",
+      "short_name": "Đặt xe",
+      "url": "/ride",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
   ]
 }
