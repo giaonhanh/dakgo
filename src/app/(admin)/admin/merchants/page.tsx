@@ -216,6 +216,7 @@ export default function AdminMerchantsPage() {
         @keyframes fadeUp  { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
         @keyframes pulse   { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
         @keyframes shimmer { 0% { left:-60%; } 100% { left:120%; } }
+        @keyframes editPing { 0%,100% { opacity:0.5; transform:scale(1); } 50% { opacity:1; transform:scale(1.15); } }
         .merchant-row:hover { background: rgba(255,107,0,0.04) !important; border-color: rgba(255,107,0,0.18) !important; }
         .sidebar-link:hover { background: rgba(255,107,0,0.08) !important; }
         .kpi-card { animation: fadeUp 0.35s ease both; }
@@ -224,6 +225,9 @@ export default function AdminMerchantsPage() {
         .edit-input:focus { border-color: rgba(255,107,0,0.5) !important; box-shadow: 0 0 0 3px rgba(255,107,0,0.08) !important; }
         .tab-btn { transition: all .2s; }
         .tab-btn:hover { color: #f0eaff !important; }
+        .comm-badge { transition: all .15s; }
+        .comm-badge:hover { background: rgba(180,100,255,0.22) !important; border-color: rgba(180,100,255,0.55) !important; transform: scale(1.04); }
+        .comm-ping { animation: editPing 2s ease-in-out infinite; }
       `}</style>
 
       {/* Toast */}
@@ -280,12 +284,26 @@ export default function AdminMerchantsPage() {
               </div>
             </div>
 
+            {/* Inline-edit tip banner */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, padding: "6px 12px", borderRadius: 8, background: "rgba(180,100,255,0.06)", border: "1px solid rgba(180,100,255,0.18)" }}>
+              <span style={{ fontSize: 13 }}>💡</span>
+              <span style={{ color: "rgba(180,100,255,0.8)", fontSize: 10 }}>
+                Click vào <strong style={{ color: "#b464ff" }}>% hoa hồng</strong> trong bảng để chỉnh trực tiếp — nhập số rồi nhấn <kbd style={{ background: "rgba(180,100,255,0.12)", border: "1px solid rgba(180,100,255,0.3)", borderRadius: 4, padding: "0 5px", fontSize: 9, color: "#b464ff" }}>Enter</kbd> để lưu, <kbd style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 4, padding: "0 5px", fontSize: 9, color: "rgba(144,128,176,0.6)" }}>Esc</kbd> để hủy.
+              </span>
+            </div>
+
             {/* Table */}
             <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 13, overflow: "hidden" }}>
               <div style={{ display: "grid", gridTemplateColumns: "52px 1.8fr 1.2fr 90px 80px 72px 68px 140px", gap: 8, padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
-                {["", "Cửa hàng", "Chủ / SĐT", "Danh mục", "Trạng thái", "Rating", "Hoa hồng", "Thao tác"].map(h => (
+                {["", "Cửa hàng", "Chủ / SĐT", "Danh mục", "Trạng thái", "Rating"].map(h => (
                   <div key={h} style={{ color: "rgba(144,128,176,0.4)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>{h}</div>
                 ))}
+                {/* Hoa hồng header with click hint */}
+                <div>
+                  <div style={{ color: "rgba(180,100,255,0.6)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>Hoa hồng</div>
+                  <div style={{ color: "rgba(180,100,255,0.4)", fontSize: 7, marginTop: 1 }}>👆 click để sửa</div>
+                </div>
+                <div style={{ color: "rgba(144,128,176,0.4)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>Thao tác</div>
               </div>
 
               {loading ? (
@@ -332,18 +350,24 @@ export default function AdminMerchantsPage() {
                               if (e.key === "Enter") saveInlineCommission(m.id, parseInt(inlineEdit.value) || 0)
                               if (e.key === "Escape") setInlineEdit(null)
                             }}
-                            style={{ width: 38, height: 22, borderRadius: 5, background: "rgba(180,100,255,0.12)", border: "1px solid rgba(180,100,255,0.5)", color: "#b464ff", fontSize: 10, textAlign: "center", padding: "0 3px", fontFamily: "Lexend" }} />
+                            style={{ width: 42, height: 24, borderRadius: 6, background: "rgba(180,100,255,0.14)", border: "1.5px solid rgba(180,100,255,0.6)", color: "#b464ff", fontSize: 11, textAlign: "center", padding: "0 3px", fontFamily: "Lexend", boxShadow: "0 0 0 3px rgba(180,100,255,0.1)" }} />
                           <button onClick={() => saveInlineCommission(m.id, parseInt(inlineEdit.value) || 0)}
-                            style={{ width: 20, height: 20, borderRadius: 4, background: "rgba(62,207,110,0.15)", border: "none", color: "#3ecf6e", fontSize: 9, cursor: "pointer" }}>✓</button>
+                            title="Lưu (Enter)"
+                            style={{ width: 22, height: 22, borderRadius: 5, background: "rgba(62,207,110,0.15)", border: "1px solid rgba(62,207,110,0.3)", color: "#3ecf6e", fontSize: 10, cursor: "pointer" }}>✓</button>
                           <button onClick={() => setInlineEdit(null)}
-                            style={{ width: 20, height: 20, borderRadius: 4, background: "rgba(255,64,64,0.1)", border: "none", color: "#ff4040", fontSize: 9, cursor: "pointer" }}>✕</button>
+                            title="Hủy (Esc)"
+                            style={{ width: 22, height: 22, borderRadius: 5, background: "rgba(255,64,64,0.1)", border: "1px solid rgba(255,64,64,0.2)", color: "#ff4040", fontSize: 10, cursor: "pointer" }}>✕</button>
                         </div>
                       ) : (
-                        <span onClick={() => setInlineEdit({ id: m.id, value: m.commissionRate.toString() })}
-                          title="Click để chỉnh hoa hồng"
-                          style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.25)", color: "#b464ff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                          {m.commissionRate}% <span style={{ fontSize: 7, opacity: 0.6 }}>✏️</span>
-                        </span>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                          <span className="comm-badge"
+                            onClick={() => setInlineEdit({ id: m.id, value: m.commissionRate.toString() })}
+                            title="Click để chỉnh hoa hồng inline"
+                            style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.3)", color: "#b464ff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, userSelect: "none" }}>
+                            {m.commissionRate}%
+                            <span className="comm-ping" style={{ fontSize: 8 }}>✏️</span>
+                          </span>
+                        </div>
                       )}
                     </div>
                     <div style={{ display: "flex", gap: 4 }} onClick={e => e.stopPropagation()}>
