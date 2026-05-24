@@ -355,6 +355,14 @@ export default function DriverProfilePage() {
   const [editing, setEditing] = useState(false)
   const [avatar, setAvatar]   = useState<string | null>(null)
   const avatarRef             = useRef<HTMLInputElement>(null)
+  const [bankInfo, setBankInfo] = useState<{ bank_name: string | null; bank_account_number: string | null } | null>(null)
+
+  const loadBankInfo = async (uid: string) => {
+    const { data } = await supabase.from("drivers")
+      .select("bank_name, bank_account_number")
+      .eq("id", uid).single()
+    setBankInfo(data ?? null)
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -366,6 +374,7 @@ export default function DriverProfilePage() {
           setName(data.full_name ?? "")
           setPhone(data.phone ?? "")
         })
+      loadBankInfo(user.id)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -491,8 +500,15 @@ export default function DriverProfilePage() {
           {/* earnings shortcut */}
           <Section title="Thu nhập">
             <Row icon="💰" label="Xem thu nhập chi tiết" sub="Tuần · Tháng · Lịch sử chuyến đi" onClick={() => { window.location.href = "/driver/earnings" }} arrow />
-            <Row icon="🏦" label="Tài khoản ngân hàng" sub="Vietcombank · Chưa liên kết" onClick={() => setShowBank(true)} arrow>
-              <span style={{ background: "rgba(255,64,64,0.1)", border: "1px solid rgba(255,64,64,0.2)", borderRadius: 5, padding: "2px 7px", color: "#ff4040", fontSize: 8, fontWeight: 700 }}>Chưa liên kết</span>
+            <Row icon="🏦" label="Tài khoản ngân hàng"
+              sub={bankInfo?.bank_account_number
+                ? `${bankInfo.bank_name ?? "Ngân hàng"} · Đã liên kết`
+                : "Chưa liên kết tài khoản nhận tiền"}
+              onClick={() => setShowBank(true)} arrow>
+              {bankInfo?.bank_account_number
+                ? <span style={{ background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 5, padding: "2px 7px", color: "#3ecf6e", fontSize: 8, fontWeight: 700 }}>Đã liên kết</span>
+                : <span style={{ background: "rgba(255,64,64,0.1)", border: "1px solid rgba(255,64,64,0.2)", borderRadius: 5, padding: "2px 7px", color: "#ff4040", fontSize: 8, fontWeight: 700 }}>Chưa liên kết</span>
+              }
             </Row>
           </Section>
 
@@ -576,7 +592,7 @@ export default function DriverProfilePage() {
       <AnimatePresence>
         {showPw      && <PwSheet      onClose={() => setShowPw(false)}      />}
         {showVehicle && <VehicleSheet onClose={() => setShowVehicle(false)} />}
-        {showBank    && <BankSheet    onClose={() => setShowBank(false)}    />}
+        {showBank    && <BankSheet    onClose={() => setShowBank(false)}    onSaved={() => userId && loadBankInfo(userId)} />}
         {showDocs    && <DocSheet     onClose={() => setShowDocs(false)}    />}
       </AnimatePresence>
     </>
