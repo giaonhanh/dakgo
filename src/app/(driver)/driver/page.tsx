@@ -526,7 +526,7 @@ export default function DriverDashboard() {
 
       const [{ data: profile }, { data: driver }] = await Promise.all([
         supabase.from("profiles").select("full_name").eq("id", user.id).single(),
-        supabase.from("drivers").select("status, rating_avg, license_plate").eq("id", user.id).single(),
+        supabase.from("drivers").select("status, rating_avg, license_plate, bank_account_number").eq("id", user.id).single(),
       ])
 
       if (profile?.full_name) setDriverName(profile.full_name)
@@ -553,7 +553,7 @@ export default function DriverDashboard() {
       setTodayStats(s => ({ ...s, orders: count ?? 0, earnings }))
 
       // ── Setup gate checks ──
-      const bankLinked = typeof window !== "undefined" && localStorage.getItem("driver_bank_linked") === "true"
+      const bankLinked = !!((driver as { bank_account_number?: string } | null)?.bank_account_number)
       const vehicleDocs = !!((driver as { license_plate?: string } | null)?.license_plate)
       const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "driver").maybeSingle()
       const walletBal = (wallet as { balance: number } | null)?.balance ?? 0
