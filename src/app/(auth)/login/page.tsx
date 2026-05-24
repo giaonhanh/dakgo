@@ -186,14 +186,11 @@ function LoginContent() {
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    // Xóa dev_role cookie cũ (nếu còn từ lần test trước)
     document.cookie = "dev_role=; path=/; max-age=0"
-    // Xóa session cũ khi vào login — tránh bị kẹt account cũ
-    supabase.auth.signOut()
-    const t = setTimeout(() => setPhase("auth"), 3000)
     if (params.get("error") === "suspended") {
       setError("Tài khoản của bạn đã bị tạm khóa. Liên hệ hỗ trợ để biết thêm.")
     }
+    const t = setTimeout(() => setPhase("auth"), 3000)
     return () => {
       clearTimeout(t)
       if (redirectTimer.current) clearTimeout(redirectTimer.current)
@@ -218,11 +215,23 @@ function LoginContent() {
     submitting.current = true
     setLoading(true); setError("")
     try {
-      const { error: err } = await supabase.auth.signInWithPassword({
+      const { data, error: err } = await supabase.auth.signInWithPassword({
         email: phoneToEmail(phone), password,
       })
-      if (err) { setError("Số điện thoại hoặc mật khẩu không đúng"); return }
-      window.location.href = "/"
+      if (err || !data.user) { setError("Số điện thoại hoặc mật khẩu không đúng"); return }
+
+      // Đọc role từ DB ngay sau login — redirect thẳng đến đúng dashboard
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single()
+      const dbRole = profile?.role ?? "customer"
+      const dest = dbRole === "driver"   ? "/driver"
+                 : dbRole === "merchant" ? "/merchant"
+                 : dbRole === "admin"    ? "/admin"
+                 : "/"
+      window.location.href = dest
     } finally {
       setLoading(false)
       submitting.current = false
