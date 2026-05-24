@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { payosCollect } from "@/lib/payos"
 import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
 import type { Webhook } from "@payos/node"
 
 export async function POST(req: NextRequest) {
@@ -16,11 +15,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ code: "00" })
     }
 
-    const cookieStore = await cookies()
+    // Service role để bypass RLS — webhook không có session user
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } },
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { cookies: { getAll: () => [], setAll: () => {} } },
     )
 
     // Tìm đơn hàng theo payment_code

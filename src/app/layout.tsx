@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Lexend } from "next/font/google"
 import "./globals.css"
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar"
+import { SessionProvider } from "@/components/SessionProvider"
 
 const lexend = Lexend({
   subsets: ["latin", "vietnamese"],
@@ -32,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="vi" className={lexend.className}>
       <body>
-        {children}
+        <SessionProvider>{children}</SessionProvider>
         <ServiceWorkerRegistrar />
       </body>
     </html>

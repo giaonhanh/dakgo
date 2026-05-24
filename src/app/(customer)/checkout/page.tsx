@@ -224,6 +224,22 @@ function VietQRSheet({
             </p>
           </div>
 
+          {/* Ghi chú tài khoản đại diện */}
+          <div style={{
+            background: "rgba(62,207,110,0.06)", border: "1px solid rgba(62,207,110,0.2)",
+            borderRadius: 12, padding: "11px 13px", marginBottom: 10,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
+              <span style={{ fontSize: 15 }}>🔒</span>
+              <span style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>Thanh toán an toàn qua Giao Nhanh</span>
+            </div>
+            <div style={{ color: "#b0956a", fontSize: 9.5, lineHeight: 1.7 }}>
+              • Tiền được giữ bởi <strong style={{ color: "#f8f0e0" }}>tài khoản đại diện Giao Nhanh</strong> — không phải tài khoản cá nhân tài xế.<br />
+              • Tài xế chỉ nhận tiền sau khi <strong style={{ color: "#f8f0e0" }}>giao hàng thành công</strong>.<br />
+              • Nếu đơn không được giao, <strong style={{ color: "#3ecf6e" }}>hoàn tiền 100%</strong> về nguồn trong vòng 24h.
+            </div>
+          </div>
+
           <div style={{
             background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.15)",
             borderRadius: 14, padding: "12px 14px", marginBottom: 18,
@@ -235,8 +251,9 @@ function VietQRSheet({
             {[
               { label: "Số tài khoản", val: payosData?.accountNumber ?? "—", hi: false },
               { label: "Tên tài khoản",val: payosData?.accountName   ?? "—", hi: false },
+              { label: "Vai trò",      val: "Đại diện Giao Nhanh",            hi: false },
               { label: "Số tiền",      val: fmt(total),                        hi: true  },
-              { label: "Nội dung",     val: content,                           hi: false },
+              { label: "Nội dung CK", val: content,                           hi: false },
             ].map(row => (
               <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
                 <span style={{ color: "#6a5a40", fontSize: 10 }}>{row.label}</span>
@@ -1283,6 +1300,7 @@ export default function CheckoutPage() {
           total_amount:    total,
           payment_method:  payment,
           payment_status:  "pending",
+          payment_code:    payment === "vietqr" ? orderCode : null,
           scheduled_at:    scheduledAt,
         })
         .select("id")
