@@ -329,21 +329,21 @@ function SetupGate({
 const PRESET_AMOUNTS = [50000, 100000, 200000, 500000]
 
 const VN_BANKS = [
-  { name: "Vietcombank",  scheme: "vcbmobile://" },
-  { name: "Techcombank",  scheme: "techcombank://" },
-  { name: "MB Bank",      scheme: "mbmobile://" },
-  { name: "BIDV",         scheme: "bidv://" },
-  { name: "VPBank",       scheme: "vpbank://" },
-  { name: "Agribank",     scheme: "agribank://" },
-  { name: "ACB",          scheme: "acb://" },
-  { name: "VietinBank",   scheme: "vietinbank://" },
-  { name: "TPBank",       scheme: "tpbank://" },
-  { name: "HDBank",       scheme: "hdbank://" },
-  { name: "Sacombank",    scheme: "sacombank://" },
-  { name: "MSB",          scheme: "msb://" },
-  { name: "SHB",          scheme: "shb://" },
-  { name: "OCB",          scheme: "ocb://" },
-  { name: "Nam A Bank",   scheme: "namabank://" },
+  { name: "Vietcombank", ios: "vcbmobile",   pkg: "com.VCB.digibank" },
+  { name: "Techcombank", ios: "techcombank", pkg: "vn.com.techcombank.tb" },
+  { name: "MB Bank",     ios: "mbmobile",    pkg: "com.mbmobile" },
+  { name: "BIDV",        ios: "bidv",        pkg: "com.BIDV.SmartBanking" },
+  { name: "VPBank",      ios: "vpbank",      pkg: "com.vpbank.vpbankneo" },
+  { name: "Agribank",    ios: "agribank",    pkg: "vn.agribank.ibanking" },
+  { name: "ACB",         ios: "acb",         pkg: "vn.acb.digital" },
+  { name: "VietinBank",  ios: "vietinbank",  pkg: "com.VietinBank.iBank" },
+  { name: "TPBank",      ios: "tpbank",      pkg: "vn.tpb.business" },
+  { name: "HDBank",      ios: "hdbank",      pkg: "vn.com.hdbank" },
+  { name: "Sacombank",   ios: "sacombank",   pkg: "vn.sacombank.mbanking" },
+  { name: "MSB",         ios: "msb",         pkg: "vn.msb.msb" },
+  { name: "SHB",         ios: "shb",         pkg: "vn.shb.mobile" },
+  { name: "OCB",         ios: "ocb",         pkg: "vn.ocb.om.android" },
+  { name: "Nam A Bank",  ios: "namabank",    pkg: "com.namabank.mobile" },
 ]
 
 interface PayInfo {
@@ -435,9 +435,25 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
 
   function openBankApp() {
     const bank = VN_BANKS.find(b => b.name === selBank)
-    if (!bank) return
-    // Thử mở app qua scheme; nếu app không cài thì trình duyệt bỏ qua
-    window.location.href = bank.scheme
+    if (!bank || !payInfo?.qrCode) return
+
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+    const qr = encodeURIComponent(payInfo.qrCode)
+
+    if (isIOS) {
+      // iOS: truyền QR string vào scheme → app parse VietQR → điền sẵn form
+      window.location.href = `${bank.ios}://qr?data=${qr}`
+    } else {
+      // Android: intent URL → mở đúng app, truyền QR data qua extra
+      window.location.href =
+        `intent://qr?data=${qr}#Intent;scheme=${bank.ios};package=${bank.pkg};end`
+    }
+  }
+
+  function copyInfo() {
+    if (!payInfo) return
+    const text = `STK: ${payInfo.accountNumber}\nNgân hàng: ${payInfo.bankName}\nSố tiền: ${finalAmount.toLocaleString("vi-VN")}đ\nNội dung: ${payInfo.description}`
+    navigator.clipboard?.writeText(text)
   }
 
   function goBack() {
@@ -532,16 +548,23 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
 
             {/* mở app ngân hàng */}
             <div style={{ background:"rgba(74,143,245,0.07)", border:"1px solid rgba(74,143,245,0.2)", borderRadius:14, padding:"12px 14px", marginBottom:14 }}>
-              <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px", marginBottom:10 }}>Mở app ngân hàng của bạn</div>
+              <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px", marginBottom:10 }}>Chuyển khoản qua app ngân hàng</div>
               <select value={selBank} onChange={e => setSelBank(e.target.value)}
-                style={{ width:"100%", height:42, padding:"0 12px", borderRadius:10, border:"1px solid rgba(74,143,245,0.3)", background:"rgba(74,143,245,0.08)", color:"#f8f0e0", fontSize:12, fontFamily:"Lexend", marginBottom:10, appearance:"auto", boxSizing:"border-box" }}>
+                style={{ width:"100%", height:44, padding:"0 12px", borderRadius:10, border:"1px solid rgba(74,143,245,0.3)", background:"rgba(255,255,255,0.05)", color:"#f8f0e0", fontSize:13, fontFamily:"Lexend", marginBottom:10, appearance:"auto", boxSizing:"border-box" }}>
                 {VN_BANKS.map(b => <option key={b.name} value={b.name} style={{ background:"#0e0b07" }}>{b.name}</option>)}
               </select>
               <button onClick={openBankApp}
-                style={{ width:"100%", height:44, borderRadius:12, border:"none", background:"linear-gradient(90deg,#4a8ff5,#3a7ae4)", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
+                style={{ width:"100%", height:46, borderRadius:12, border:"none", background:"linear-gradient(90deg,#4a8ff5,#3a7ae4)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", boxShadow:"0 4px 16px rgba(74,143,245,0.3)", marginBottom:8 }}>
                 🚀 Mở {selBank} · Chuyển khoản
               </button>
-              <div style={{ color:"#6a5a40", fontSize:9, textAlign:"center", marginTop:8 }}>Sau khi mở app → vào mục Quét QR → quét mã trên</div>
+              <button onClick={copyInfo}
+                style={{ width:"100%", height:38, borderRadius:10, border:"1px solid rgba(255,255,255,0.1)", background:"transparent", color:"#6a5a40", fontSize:11, cursor:"pointer", fontFamily:"Lexend" }}>
+                📋 Sao chép thông tin chuyển khoản
+              </button>
+              <div style={{ color:"#6a5a40", fontSize:9, textAlign:"center", marginTop:8, lineHeight:1.5 }}>
+                App sẽ mở thẳng trang chuyển khoản đã điền sẵn thông tin.<br/>
+                Bạn chỉ cần xác nhận bảo mật là xong.
+              </div>
             </div>
 
             {/* trạng thái chờ */}
