@@ -15,6 +15,7 @@ interface Driver {
   vehicle: string; plate: string; joinedDate: string
   status: DriverStatus; rating: number | null; trips: number
   idCardNumber: string | null; licenseNumber: string | null
+  commissionRate: number
 }
 
 interface Shop {
@@ -66,7 +67,7 @@ export default function ApprovalsPage() {
       const supabase = createClient()
       const { data: rows } = await supabase
         .from("drivers")
-        .select("id, vehicle_type, vehicle_model, license_plate, id_card_number, license_number, is_approved, rating_avg, total_trips, created_at, profiles(full_name, phone)")
+        .select("id, vehicle_type, vehicle_model, license_plate, id_card_number, license_number, is_approved, rating_avg, total_trips, commission_rate, created_at, profiles(full_name, phone)")
         .order("created_at", { ascending: false })
 
       if (!rows) { setDriverLoading(false); return }
@@ -80,11 +81,12 @@ export default function ApprovalsPage() {
           vehicle:       `${r.vehicle_type}${r.vehicle_model ? " · " + r.vehicle_model : ""}`,
           plate:         r.license_plate,
           joinedDate:    new Date(r.created_at).toLocaleDateString("vi-VN"),
-          status:        r.is_approved ? "approved" : "pending",
-          rating:        r.rating_avg,
-          trips:         r.total_trips,
-          idCardNumber:  r.id_card_number,
-          licenseNumber: r.license_number,
+          status:         r.is_approved ? "approved" : "pending",
+          rating:         r.rating_avg,
+          trips:          r.total_trips,
+          idCardNumber:   r.id_card_number,
+          licenseNumber:  r.license_number,
+          commissionRate: r.commission_rate ?? 20,
         }
       }))
       setDriverLoading(false)
@@ -127,14 +129,16 @@ export default function ApprovalsPage() {
   }, [])
 
   // ── Actions: Driver ──
-  async function approveDriver(id: string, approve: boolean, reason?: string) {
+  async function approveDriver(id: string, approve: boolean, reason?: string, commissionRate?: number) {
     setSaving(true)
     const supabase = createClient()
-    await supabase.from("drivers").update({
+    const updatePayload: Record<string, unknown> = {
       is_approved: approve,
       status: "offline",
       ...(approve ? { approved_at: new Date().toISOString() } : {}),
-    }).eq("id", id)
+    }
+    if (approve && commissionRate !== undefined) updatePayload.commission_rate = commissionRate
+    await supabase.from("drivers").update(updatePayload).eq("id", id)
 
     if (!approve && reason) {
       await supabase.from("notifications").insert({
@@ -160,12 +164,15 @@ export default function ApprovalsPage() {
   }
 
   // ── Actions: Shop ──
-  async function updateShopStatus(id: string, status: ShopStatus, reason?: string) {
+  async function updateShopStatus(id: string, status: ShopStatus, reason?: string, commissionRate?: number) {
     setSaving(true)
     const supabase = createClient()
-    await supabase.from("shops").update({ status }).eq("id", id)
+    const updatePayload: Record<string, unknown> = { status }
+    if (commissionRate !== undefined) updatePayload.commission_rate = commissionRate
+    await supabase.from("shops").update(updatePayload).eq("id", id)
 
     const shop = shops.find(s => s.id === id)
+    const effectiveRate = commissionRate ?? shop?.commissionRate ?? 15
     if (shop) {
       const ownerId = (await supabase.from("shops").select("owner_id").eq("id", id).single()).data?.owner_id
       if (ownerId) {
@@ -173,7 +180,7 @@ export default function ApprovalsPage() {
           await supabase.from("notifications").insert({
             user_id: ownerId, type: "system",
             title: "✅ Cửa hàng được duyệt",
-            body: `Cửa hàng "${shop.shopName}" đã được phê duyệt. Bạn có thể bắt đầu nhận đơn ngay.`,
+            body: `Cửa hàng "${shop.shopName}" đã được phê duyệt với phí hoa hồng ${effectiveRate}%. Bạn có thể bắt đầu nhận đơn ngay.`,
           })
         } else if (status === "suspended" && reason) {
           await supabase.from("notifications").insert({
@@ -185,8 +192,8 @@ export default function ApprovalsPage() {
       }
     }
 
-    setShops(prev => prev.map(s => s.id === id ? { ...s, status } : s))
-    setSelectedShop(prev => prev?.id === id ? { ...prev, status } : prev)
+    setShops(prev => prev.map(s => s.id === id ? { ...s, status, ...(commissionRate !== undefined ? { commissionRate } : {}) } : s))
+    setSelectedShop(prev => prev?.id === id ? { ...prev, status, ...(commissionRate !== undefined ? { commissionRate } : {}) } : prev)
     const msg = status === "approved" ? "✅ Đã duyệt cửa hàng" : status === "suspended" ? "🔒 Đã tạm khóa" : "⏳ Đã chuyển về chờ duyệt"
     fireToast(msg)
     setSaving(false)
@@ -251,7 +258,7 @@ export default function ApprovalsPage() {
               selected={selectedDriver} saving={saving}
               onFilterChange={setDriverFilter}
               onSelect={setSelectedDriver}
-              onApprove={(id) => approveDriver(id, true)}
+              onApprove={(id, commissionRate) => approveDriver(id, true, undefined, commissionRate)}
               onReject={(id, name) => { setRejectModal({ id, type: "driver", name }); setRejectReason("") }}
             />
           ) : (
@@ -340,9 +347,15 @@ function DriversTab({ drivers, filter, loading, selected, saving, onFilterChange
   selected: Driver | null; saving: boolean
   onFilterChange: (f: "all" | DriverStatus) => void
   onSelect: (d: Driver | null) => void
-  onApprove: (id: string) => void
+  onApprove: (id: string, commissionRate?: number) => void
   onReject: (id: string, name: string) => void
 }) {
+  const [pendingCommission, setPendingCommission] = useState(20)
+
+  useEffect(() => {
+    if (selected) setPendingCommission(selected.commissionRate)
+  }, [selected?.id])
+
   return (
     <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
       {/* List */}
@@ -422,8 +435,20 @@ function DriversTab({ drivers, filter, loading, selected, saving, onFilterChange
                 </div>
               ))}
               {selected.status === "pending" && (
-                <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                  <button onClick={() => onApprove(selected.id)} disabled={saving} style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: "linear-gradient(90deg,#3ecf6e,#2db85a)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✅ Duyệt</button>
+                <div style={{ marginTop: 12, padding: "10px 12px", background: "rgba(180,100,255,0.06)", border: "1px solid rgba(180,100,255,0.2)", borderRadius: 10, marginBottom: 10 }}>
+                  <div style={{ color: "rgba(180,100,255,0.8)", fontSize: 9, marginBottom: 6, fontWeight: 700 }}>💜 Phí hoa hồng khi duyệt (%)</div>
+                  <input type="number" min={0} max={50} value={pendingCommission}
+                    onChange={e => setPendingCommission(parseInt(e.target.value) || 0)}
+                    style={{ width: "100%", height: 36, borderRadius: 8, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.35)", color: "#b464ff", fontSize: 16, fontWeight: 800, textAlign: "center", padding: "0 8px", fontFamily: "Lexend" }} />
+                  <div style={{ color: "rgba(180,100,255,0.4)", fontSize: 8, marginTop: 4 }}>Mặc định: {selected.commissionRate}%</div>
+                </div>
+              )}
+              {selected.status === "pending" && (
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <button onClick={() => onApprove(selected.id, pendingCommission)} disabled={saving}
+                    style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: "linear-gradient(90deg,#3ecf6e,#2db85a)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                    ✅ Duyệt ({pendingCommission}%)
+                  </button>
                   <button onClick={() => onReject(selected.id, selected.name)} disabled={saving} style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: "rgba(255,64,64,0.15)", color: "#ff4040", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>❌ Từ chối</button>
                 </div>
               )}
@@ -447,9 +472,15 @@ function ShopsTab({ shops, filter, loading, selected, saving, onFilterChange, on
   selected: Shop | null; saving: boolean
   onFilterChange: (f: "all" | ShopStatus) => void
   onSelect: (s: Shop | null) => void
-  onUpdateStatus: (id: string, status: ShopStatus, reason?: string) => void
+  onUpdateStatus: (id: string, status: ShopStatus, reason?: string, commissionRate?: number) => void
   onReject: (id: string, name: string) => void
 }) {
+  const [pendingCommission, setPendingCommission] = useState(15)
+
+  useEffect(() => {
+    if (selected) setPendingCommission(selected.commissionRate)
+  }, [selected?.id])
+
   return (
     <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
       {/* List */}
@@ -537,9 +568,23 @@ function ShopsTab({ shops, filter, loading, selected, saving, onFilterChange, on
                   <span style={{ fontSize: 11, fontWeight: 600, maxWidth: 160, textAlign: "right" }}>{row.val}</span>
                 </div>
               ))}
-              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              {selected.status === "pending" && (
+                <div style={{ marginTop: 12, padding: "10px 12px", background: "rgba(180,100,255,0.06)", border: "1px solid rgba(180,100,255,0.2)", borderRadius: 10 }}>
+                  <div style={{ color: "rgba(180,100,255,0.8)", fontSize: 9, marginBottom: 6, fontWeight: 700 }}>💜 Phí hoa hồng khi duyệt (%)</div>
+                  <input type="number" min={0} max={50} value={pendingCommission}
+                    onChange={e => setPendingCommission(parseInt(e.target.value) || 0)}
+                    style={{ width: "100%", height: 36, borderRadius: 8, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.35)", color: "#b464ff", fontSize: 16, fontWeight: 800, textAlign: "center", padding: "0 8px", fontFamily: "Lexend" }} />
+                  <div style={{ color: "rgba(180,100,255,0.4)", fontSize: 8, marginTop: 4 }}>Mặc định hệ thống: {selected.commissionRate}%</div>
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                 {selected.status !== "approved" && (
-                  <button onClick={() => onUpdateStatus(selected.id, "approved")} disabled={saving} style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: "linear-gradient(90deg,#3ecf6e,#2db85a)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✅ Duyệt</button>
+                  <button
+                    onClick={() => onUpdateStatus(selected.id, "approved", undefined, selected.status === "pending" ? pendingCommission : undefined)}
+                    disabled={saving}
+                    style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: "linear-gradient(90deg,#3ecf6e,#2db85a)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                    ✅ Duyệt {selected.status === "pending" ? `(${pendingCommission}%)` : ""}
+                  </button>
                 )}
                 {selected.status !== "suspended" && (
                   <button onClick={() => onReject(selected.id, selected.shopName)} disabled={saving} style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: "rgba(255,64,64,0.15)", color: "#ff4040", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>🔒 {selected.status === "pending" ? "Từ chối" : "Khóa"}</button>

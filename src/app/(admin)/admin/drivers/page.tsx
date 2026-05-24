@@ -21,6 +21,7 @@ interface Driver {
   licenseNumber: string | null
   xuBalance: number
   xuWalletId: string | null
+  commissionRate: number
 }
 
 const STATUS_LABEL: Record<Driver["status"], string> = {
@@ -40,6 +41,7 @@ export default function AdminDriversPage() {
   const [selected, setSelected] = useState<Driver | null>(null)
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
+  const [inlineEdit, setInlineEdit] = useState<{ id: string; value: string } | null>(null)
 
   /* xu panel state */
   const [xuTab, setXuTab]     = useState<"topup" | "withdraw">("topup")
@@ -54,7 +56,7 @@ export default function AdminDriversPage() {
     const supabase = createClient()
     const { data: rows } = await supabase
       .from("drivers")
-      .select("id, vehicle_type, vehicle_model, license_plate, id_card_number, license_number, status, rating_avg, total_trips, is_approved, created_at")
+      .select("id, vehicle_type, vehicle_model, license_plate, id_card_number, license_number, status, rating_avg, total_trips, is_approved, commission_rate, created_at")
       .order("created_at", { ascending: false })
 
     if (!rows || rows.length === 0) { setLoading(false); return }
@@ -89,6 +91,7 @@ export default function AdminDriversPage() {
         licenseNumber: r.license_number ?? null,
         xuBalance:     wallet?.balance ?? 0,
         xuWalletId:    wallet?.id ?? null,
+        commissionRate: r.commission_rate ?? 20,
       }
     }))
     setLoading(false)
@@ -101,6 +104,14 @@ export default function AdminDriversPage() {
     setDrivers(p => p.map(d => d.id === id ? { ...d, status: "approved" } : d))
     if (selected?.id === id) setSelected(p => p ? { ...p, status: "approved" } : p)
     setSaving(false)
+  }
+
+  const saveInlineCommission = async (id: string, rate: number) => {
+    const supabase = createClient()
+    await supabase.from("drivers").update({ commission_rate: rate }).eq("id", id)
+    setDrivers(ps => ps.map(d => d.id === id ? { ...d, commissionRate: rate } : d))
+    if (selected?.id === id) setSelected(p => p ? { ...p, commissionRate: rate } : p)
+    setInlineEdit(null)
   }
 
   const reject = async (id: string) => {
@@ -234,12 +245,33 @@ export default function AdminDriversPage() {
                     </span>
                   </div>
                   <div style={{ color: "#6a5a40", fontSize: 9 }}>{driver.vehicle} · {driver.plate}</div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
                     <span style={{ color: driver.idCardNumber ? "#3ecf6e" : "#ff4040", fontSize: 8 }}>{driver.idCardNumber ? "✅ CMND" : "❌ CMND"}</span>
                     <span style={{ color: driver.licenseNumber ? "#3ecf6e" : "#ff4040", fontSize: 8 }}>{driver.licenseNumber ? "✅ Bằng lái" : "❌ Bằng lái"}</span>
                     {driver.rating && <span style={{ color: "#FF8C00", fontSize: 8 }}>⭐ {driver.rating} · {driver.trips} chuyến</span>}
                     <span style={{ color: "#b464ff", fontSize: 8 }}>🪙 {fmt(driver.xuBalance)}</span>
+                    <span onClick={e => { e.stopPropagation(); setInlineEdit({ id: driver.id, value: driver.commissionRate.toString() }) }}
+                      style={{ color: "#b464ff", fontSize: 8, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.25)", borderRadius: 4, padding: "1px 5px", cursor: "pointer" }}>
+                      HH {driver.commissionRate}% ✏️
+                    </span>
                   </div>
+                  {inlineEdit?.id === driver.id && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8 }} onClick={e => e.stopPropagation()}>
+                      <span style={{ color: "#6a5a40", fontSize: 9 }}>Hoa hồng:</span>
+                      <input type="number" min={0} max={50} value={inlineEdit.value} autoFocus
+                        onChange={e => setInlineEdit(ie => ie ? { ...ie, value: e.target.value } : ie)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") saveInlineCommission(driver.id, parseInt(inlineEdit.value) || 0)
+                          if (e.key === "Escape") setInlineEdit(null)
+                        }}
+                        style={{ width: 50, height: 26, borderRadius: 6, background: "rgba(180,100,255,0.12)", border: "1px solid rgba(180,100,255,0.5)", color: "#b464ff", fontSize: 11, textAlign: "center", padding: "0 4px", fontFamily: "Lexend" }} />
+                      <span style={{ color: "#6a5a40", fontSize: 9 }}>%</span>
+                      <button onClick={() => saveInlineCommission(driver.id, parseInt(inlineEdit.value) || 0)}
+                        style={{ height: 26, padding: "0 8px", borderRadius: 6, background: "rgba(62,207,110,0.15)", border: "none", color: "#3ecf6e", fontSize: 10, cursor: "pointer" }}>✓</button>
+                      <button onClick={() => setInlineEdit(null)}
+                        style={{ height: 26, padding: "0 8px", borderRadius: 6, background: "rgba(255,64,64,0.1)", border: "none", color: "#ff4040", fontSize: 10, cursor: "pointer" }}>✕</button>
+                    </div>
+                  )}
                 </div>
               </div>
               {driver.status === "pending" && (
@@ -366,6 +398,38 @@ export default function AdminDriversPage() {
                     {xuToast && (
                       <div style={{ marginTop: 8, textAlign: "center", color: xuToast.startsWith("✅") ? "#3ecf6e" : "#ff4040", fontSize: 11, fontWeight: 600 }}>
                         {xuToast}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Commission inline edit in sheet */}
+                  <div style={{ background: "rgba(180,100,255,0.05)", border: "1px solid rgba(180,100,255,0.18)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <span style={{ color: "#b464ff", fontSize: 10, fontWeight: 700 }}>💜 Phí hoa hồng tài xế</span>
+                      <span style={{ color: "rgba(180,100,255,0.5)", fontSize: 8 }}>% nền tảng hưởng / chuyến</span>
+                    </div>
+                    {inlineEdit?.id === selected.id ? (
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <input type="number" min={0} max={50} value={inlineEdit.value} autoFocus
+                          onChange={e => setInlineEdit(ie => ie ? { ...ie, value: e.target.value } : ie)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") saveInlineCommission(selected.id, parseInt(inlineEdit.value) || 0)
+                            if (e.key === "Escape") setInlineEdit(null)
+                          }}
+                          style={{ flex: 1, height: 40, borderRadius: 9, background: "rgba(180,100,255,0.12)", border: "1px solid rgba(180,100,255,0.5)", color: "#b464ff", fontSize: 16, fontWeight: 800, textAlign: "center", padding: "0 8px", fontFamily: "Lexend" }} />
+                        <span style={{ color: "#b464ff", fontSize: 14, fontWeight: 700 }}>%</span>
+                        <button onClick={() => saveInlineCommission(selected.id, parseInt(inlineEdit.value) || 0)}
+                          style={{ height: 40, padding: "0 12px", borderRadius: 9, background: "rgba(62,207,110,0.15)", border: "1px solid rgba(62,207,110,0.35)", color: "#3ecf6e", fontSize: 12, cursor: "pointer" }}>✓</button>
+                        <button onClick={() => setInlineEdit(null)}
+                          style={{ height: 40, padding: "0 12px", borderRadius: 9, background: "rgba(255,64,64,0.1)", border: "1px solid rgba(255,64,64,0.2)", color: "#ff4040", fontSize: 12, cursor: "pointer" }}>✕</button>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: "#b464ff", fontSize: 22, fontWeight: 800 }}>{selected.commissionRate}%</span>
+                        <button onClick={() => setInlineEdit({ id: selected.id, value: selected.commissionRate.toString() })}
+                          style={{ height: 30, padding: "0 12px", borderRadius: 8, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.3)", color: "#b464ff", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>
+                          ✏️ Chỉnh sửa
+                        </button>
                       </div>
                     )}
                   </div>

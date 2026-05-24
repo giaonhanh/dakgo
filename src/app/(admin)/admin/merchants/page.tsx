@@ -67,6 +67,7 @@ export default function AdminMerchantsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
+  const [inlineEdit, setInlineEdit] = useState<{ id: string; value: string } | null>(null)
   const [toast, setToast] = useState("")
   const [toastOk, setToastOk] = useState(true)
 
@@ -152,6 +153,16 @@ export default function AdminMerchantsPage() {
     setMerchants(p => p.map(m => m.id === selected.id ? { ...m, ...updated } : m))
     setSelected(p => p ? { ...p, ...updated } : p)
     fireToast("✅ Đã cập nhật thông tin cửa hàng")
+  }
+
+  const saveInlineCommission = async (id: string, rate: number) => {
+    const supabase = createClient()
+    const { error } = await supabase.from("shops").update({ commission_rate: rate }).eq("id", id)
+    if (error) { fireToast("❌ Lỗi cập nhật hoa hồng", false); return }
+    setMerchants(ps => ps.map(m => m.id === id ? { ...m, commissionRate: rate } : m))
+    if (selected?.id === id) setSelected(p => p ? { ...p, commissionRate: rate } : p)
+    setInlineEdit(null)
+    fireToast(`✅ Hoa hồng cập nhật thành ${rate}%`)
   }
 
   const deleteShop = async () => {
@@ -312,8 +323,28 @@ export default function AdminMerchantsPage() {
                         </div>
                       ) : <span style={{ color: "rgba(144,128,176,0.3)", fontSize: 9 }}>—</span>}
                     </div>
-                    <div>
-                      <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.25)", color: "#b464ff" }}>{m.commissionRate}%</span>
+                    <div onClick={e => e.stopPropagation()}>
+                      {inlineEdit?.id === m.id ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                          <input type="number" min={0} max={50} value={inlineEdit.value} autoFocus
+                            onChange={e => setInlineEdit(ie => ie ? { ...ie, value: e.target.value } : ie)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") saveInlineCommission(m.id, parseInt(inlineEdit.value) || 0)
+                              if (e.key === "Escape") setInlineEdit(null)
+                            }}
+                            style={{ width: 38, height: 22, borderRadius: 5, background: "rgba(180,100,255,0.12)", border: "1px solid rgba(180,100,255,0.5)", color: "#b464ff", fontSize: 10, textAlign: "center", padding: "0 3px", fontFamily: "Lexend" }} />
+                          <button onClick={() => saveInlineCommission(m.id, parseInt(inlineEdit.value) || 0)}
+                            style={{ width: 20, height: 20, borderRadius: 4, background: "rgba(62,207,110,0.15)", border: "none", color: "#3ecf6e", fontSize: 9, cursor: "pointer" }}>✓</button>
+                          <button onClick={() => setInlineEdit(null)}
+                            style={{ width: 20, height: 20, borderRadius: 4, background: "rgba(255,64,64,0.1)", border: "none", color: "#ff4040", fontSize: 9, cursor: "pointer" }}>✕</button>
+                        </div>
+                      ) : (
+                        <span onClick={() => setInlineEdit({ id: m.id, value: m.commissionRate.toString() })}
+                          title="Click để chỉnh hoa hồng"
+                          style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.25)", color: "#b464ff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                          {m.commissionRate}% <span style={{ fontSize: 7, opacity: 0.6 }}>✏️</span>
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: "flex", gap: 4 }} onClick={e => e.stopPropagation()}>
                       {m.status === "pending" && (
