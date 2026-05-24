@@ -31,6 +31,9 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user) {
+    // /login: cho qua ngay — tránh loop khi profile null redirect về /login
+    if (pathname.startsWith("/login")) return response;
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("role, is_active")
@@ -42,19 +45,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/login?error=suspended", request.url));
     }
 
-    // Profile không tồn tại (trigger thất bại hoặc RLS chặn) → đăng xuất + về login
+    // Profile không tồn tại → cho qua, trang sẽ tự xử lý
     if (!profile) {
-      console.error("[Middleware] profile null for user", user.id, "— check RLS policies on profiles table")
-      return NextResponse.redirect(new URL("/login?error=no_profile", request.url));
+      return response;
     }
 
     const role = profile.role;
 
     // Normalize: DB có thể dùng "shop" hoặc "merchant" — đều vào /merchant
     const isMerchant = role === "merchant" || role === "shop";
-
-    // /login: cho qua dù đã đăng nhập (để đổi account)
-    if (pathname === "/login") return response;
 
     // Admin Preview Mode: admin xem giao diện khách mà không cần đăng xuất
     const adminPreview = request.cookies.get("admin_preview")?.value === "1";
