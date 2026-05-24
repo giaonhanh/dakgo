@@ -398,7 +398,9 @@ export default function MerchantMenuPage() {
       setGroups(gs => gs.map(g => g.id === gModal.id ? {...gModal, sortOrder:g.sortOrder} as MenuGroup : g))
       fire("Đã cập nhật nhóm menu")
     } else {
-      setGroups(gs => [...gs, {...gModal, sortOrder:gs.length} as MenuGroup])
+      const newId = gModal.name.trim()
+      if (groups.find(g => g.id === newId)) { fire("❌ Nhóm này đã tồn tại"); return }
+      setGroups(gs => [...gs, {...gModal, id: newId, sortOrder:gs.length} as MenuGroup])
       fire("Đã tạo nhóm menu mới")
     }
     setGModal(null)
@@ -631,7 +633,7 @@ export default function MerchantMenuPage() {
           <>
             {/* Filter chips */}
             <div style={{display:"flex",gap:6,padding:"10px 16px",overflowX:"auto",flexShrink:0} as React.CSSProperties}>
-              {[{id:"all",name:"Tất cả"}, ...CATEGORY_LIST.map(c => ({id:c,name:c}))].map(g => (
+              {[{id:"all",name:"Tất cả"}, ...sortedGroups].map(g => (
                 <button key={g.id} onClick={() => setFilterGid(g.id)}
                   style={{flexShrink:0,padding:"5px 14px",borderRadius:20,
                     background:filterGid===g.id?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
@@ -888,7 +890,7 @@ export default function MerchantMenuPage() {
                     <select value={pModal.menuGroupId} onChange={e => setPModal(m => m ? {...m,menuGroupId:e.target.value} : m)}
                       style={{width:"100%",height:42,borderRadius:11,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:pModal.menuGroupId?"#f8f0e0":"#6a5a40",fontSize:11,padding:"0 10px",marginBottom:10,colorScheme:"dark",fontFamily:"Lexend"} as React.CSSProperties}>
                       <option value="" style={{background:"#0e0c09"}}>-- Không chọn --</option>
-                      {CATEGORY_LIST.map(c => <option key={c} value={c} style={{background:"#0e0c09"}}>{c}</option>)}
+                      {groups.map(g => <option key={g.id} value={g.id} style={{background:"#0e0c09"}}>{g.name}</option>)}
                     </select>
                   </div>
                 </div>
