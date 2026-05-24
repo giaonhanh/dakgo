@@ -216,7 +216,6 @@ export default function AdminMerchantsPage() {
         @keyframes fadeUp  { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
         @keyframes pulse   { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
         @keyframes shimmer { 0% { left:-60%; } 100% { left:120%; } }
-        @keyframes editPing { 0%,100% { opacity:0.5; transform:scale(1); } 50% { opacity:1; transform:scale(1.15); } }
         .merchant-row:hover { background: rgba(255,107,0,0.04) !important; border-color: rgba(255,107,0,0.18) !important; }
         .sidebar-link:hover { background: rgba(255,107,0,0.08) !important; }
         .kpi-card { animation: fadeUp 0.35s ease both; }
@@ -284,26 +283,12 @@ export default function AdminMerchantsPage() {
               </div>
             </div>
 
-            {/* Inline-edit tip banner */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, padding: "6px 12px", borderRadius: 8, background: "rgba(180,100,255,0.06)", border: "1px solid rgba(180,100,255,0.18)" }}>
-              <span style={{ fontSize: 13 }}>💡</span>
-              <span style={{ color: "rgba(180,100,255,0.8)", fontSize: 10 }}>
-                Click vào <strong style={{ color: "#b464ff" }}>% hoa hồng</strong> trong bảng để chỉnh trực tiếp — nhập số rồi nhấn <kbd style={{ background: "rgba(180,100,255,0.12)", border: "1px solid rgba(180,100,255,0.3)", borderRadius: 4, padding: "0 5px", fontSize: 9, color: "#b464ff" }}>Enter</kbd> để lưu, <kbd style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 4, padding: "0 5px", fontSize: 9, color: "rgba(144,128,176,0.6)" }}>Esc</kbd> để hủy.
-              </span>
-            </div>
-
             {/* Table */}
             <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 13, overflow: "hidden" }}>
               <div style={{ display: "grid", gridTemplateColumns: "52px 1.8fr 1.2fr 90px 80px 72px 68px 140px", gap: 8, padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
-                {["", "Cửa hàng", "Chủ / SĐT", "Danh mục", "Trạng thái", "Rating"].map(h => (
+                {["", "Cửa hàng", "Chủ / SĐT", "Danh mục", "Trạng thái", "Rating", "Hoa hồng", "Thao tác"].map(h => (
                   <div key={h} style={{ color: "rgba(144,128,176,0.4)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>{h}</div>
                 ))}
-                {/* Hoa hồng header with click hint */}
-                <div>
-                  <div style={{ color: "rgba(180,100,255,0.6)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>Hoa hồng</div>
-                  <div style={{ color: "rgba(180,100,255,0.4)", fontSize: 7, marginTop: 1 }}>👆 click để sửa</div>
-                </div>
-                <div style={{ color: "rgba(144,128,176,0.4)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>Thao tác</div>
               </div>
 
               {loading ? (
@@ -365,7 +350,7 @@ export default function AdminMerchantsPage() {
                             title="Click để chỉnh hoa hồng inline"
                             style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.3)", color: "#b464ff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, userSelect: "none" }}>
                             {m.commissionRate}%
-                            <span className="comm-ping" style={{ fontSize: 8 }}>✏️</span>
+                            <span style={{ fontSize: 8 }}>✏️</span>
                           </span>
                         </div>
                       )}
