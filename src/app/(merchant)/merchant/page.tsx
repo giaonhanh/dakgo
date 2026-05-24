@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Power, ShoppingBag, TrendingUp, Star } from "lucide-react"
+import Link from "next/link"
 import { formatPrice } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 
@@ -58,6 +59,8 @@ export default function MerchantDashboard() {
   const [dispatchStatus, setDispatchStatus] = useState<Record<string, "dispatching" | "sent" | "none">>({})
   const [shopLat, setShopLat] = useState(12.6521)
   const [shopLng, setShopLng] = useState(108.5073)
+  const [shopStatus, setShopStatus] = useState<"pending" | "approved" | "suspended" | null>(null)
+  const [unreadNotif, setUnreadNotif] = useState(0)
 
   const fireToast = (msg: string, ok = true) => {
     setToast(msg); setToastOk(ok); setTimeout(() => setToast(""), 3000)
@@ -72,17 +75,26 @@ export default function MerchantDashboard() {
       // Get merchant's shop
       const { data: shop } = await supabase
         .from("shops")
-        .select("id, name, is_open, rating_avg, total_reviews")
+        .select("id, name, is_open, rating_avg, total_reviews, status")
         .eq("owner_id", user.id)
         .single()
 
       if (!shop) { setLoading(false); return }
+      setShopStatus((shop as { status?: "pending" | "approved" | "suspended" }).status ?? "pending")
+      if ((shop as { status?: string }).status !== "approved") { setLoading(false); return }
       setShopId(shop.id)
       setShopName(shop.name)
       setOpen(shop.is_open)
       setRating(shop.rating_avg ?? null)
 
       await fetchOrders(shop.id)
+
+      // Unread notifications count
+      const { count } = await supabase.from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id).eq("is_read", false)
+      setUnreadNotif(count ?? 0)
+
       setLoading(false)
     }
     load()
@@ -236,6 +248,77 @@ export default function MerchantDashboard() {
   const activeOrders  = orders.filter(o => !["rejected"].includes(o.status))
   const pendingCount  = orders.filter(o => o.status === "pending").length
 
+  // ── Pending / Suspended gate ──
+  if (shopStatus === "pending") {
+    return (
+      <div style={{ minHeight:"100dvh", background:"#080806", display:"flex",
+        alignItems:"center", justifyContent:"center", padding:24,
+        fontFamily:"'Lexend',sans-serif" }}>
+        <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,107,0,0.2)",
+          borderRadius:20, padding:32, maxWidth:340, textAlign:"center" }}>
+          <div style={{ fontSize:56, marginBottom:16 }}>⏳</div>
+          <div style={{ color:"#f8f0e0", fontSize:18, fontWeight:800, marginBottom:8 }}>
+            Cửa hàng đang chờ duyệt
+          </div>
+          <div style={{ color:"#b0956a", fontSize:13, lineHeight:1.6, marginBottom:24 }}>
+            Đơn đăng ký cửa hàng của bạn đang được admin xem xét. Bạn sẽ nhận được thông báo khi được phê duyệt.
+          </div>
+          <button onClick={async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            const { data: s } = await supabase.from("shops").select("status").eq("owner_id", user.id).single()
+            const st = (s as { status?: string } | null)?.status
+            if (st === "approved") setShopStatus("approved")
+          }} style={{
+            background:"rgba(255,107,0,0.12)", border:"1px solid rgba(255,107,0,0.3)",
+            color:"#FF8C00", borderRadius:12, padding:"10px 24px",
+            fontFamily:"'Lexend',sans-serif", fontSize:12, fontWeight:700,
+            cursor:"pointer", marginBottom:12, display:"block", width:"100%",
+          }}>
+            🔄 Kiểm tra lại trạng thái
+          </button>
+          <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/login" }}
+            style={{
+              background:"transparent", border:"1px solid rgba(255,255,255,0.08)",
+              color:"#6a5a40", borderRadius:12, padding:"10px 24px",
+              fontFamily:"'Lexend',sans-serif", fontSize:12, fontWeight:600,
+              cursor:"pointer", display:"block", width:"100%",
+            }}>
+            Đăng xuất
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (shopStatus === "suspended") {
+    return (
+      <div style={{ minHeight:"100dvh", background:"#080806", display:"flex",
+        alignItems:"center", justifyContent:"center", padding:24,
+        fontFamily:"'Lexend',sans-serif" }}>
+        <div style={{ background:"rgba(255,64,64,0.06)", border:"1px solid rgba(255,64,64,0.2)",
+          borderRadius:20, padding:32, maxWidth:340, textAlign:"center" }}>
+          <div style={{ fontSize:56, marginBottom:16 }}>🚫</div>
+          <div style={{ color:"#ff6060", fontSize:18, fontWeight:800, marginBottom:8 }}>
+            Cửa hàng bị tạm khóa
+          </div>
+          <div style={{ color:"#b0956a", fontSize:13, lineHeight:1.6, marginBottom:24 }}>
+            Cửa hàng của bạn đã bị tạm khóa. Vui lòng liên hệ admin để biết thêm thông tin.
+          </div>
+          <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/login" }}
+            style={{
+              background:"rgba(255,64,64,0.12)", border:"1px solid rgba(255,64,64,0.3)",
+              color:"#ff6060", borderRadius:12, padding:"10px 24px",
+              fontFamily:"'Lexend',sans-serif", fontSize:12, fontWeight:700,
+              cursor:"pointer", display:"block", width:"100%",
+            }}>
+            Đăng xuất
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <style>{`
@@ -272,11 +355,24 @@ export default function MerchantDashboard() {
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* Notification bell */}
+              <Link href="/merchant/notifications" style={{ position:"relative", display:"block" }}>
+                <div style={{ width:36, height:36, borderRadius:10,
+                  background: unreadNotif > 0 ? "rgba(255,107,0,0.1)" : "rgba(255,255,255,0.05)",
+                  border: `1px solid ${unreadNotif > 0 ? "rgba(255,107,0,0.3)" : "rgba(255,255,255,0.08)"}`,
+                  display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>🔔</div>
+                {unreadNotif > 0 && (
+                  <div style={{ position:"absolute", top:-4, right:-4, minWidth:18, height:18,
+                    borderRadius:9, background:"#ff4040", padding:"0 4px",
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    fontSize:9, fontWeight:800, color:"#fff", animation:"mPulse 1.5s infinite" }}>{unreadNotif}</div>
+                )}
+              </Link>
               {pendingCount > 0 && (
                 <div style={{ position: "relative" }}>
                   <div style={{ width: 36, height: 36, borderRadius: 10,
                     background: "rgba(245,197,66,0.1)", border: "1px solid rgba(245,197,66,0.3)",
-                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🔔</div>
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>📦</div>
                   <div style={{ position: "absolute", top: -4, right: -4, width: 18, height: 18,
                     borderRadius: "50%", background: "#ff4040",
                     display: "flex", alignItems: "center", justifyContent: "center",

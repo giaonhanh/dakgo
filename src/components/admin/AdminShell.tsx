@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { icon: "✅",  label: "Phê duyệt",   href: "/admin/approvals" },
   { icon: "📦",  label: "Đơn hàng",    href: "/admin/orders" },
   { icon: "👤",  label: "Tài khoản",  href: "/admin/users" },
+  { icon: "💳",  label: "Rút/Nạp",    href: "/admin/wallet-history" },
   { icon: "💰",  label: "Tài chính",   href: "/admin/finance" },
   { icon: "🗺️", label: "Bản đồ live", href: "/admin/map" },
   { icon: "🏷️", label: "Khuyến mãi",  href: "/admin/promotions" },

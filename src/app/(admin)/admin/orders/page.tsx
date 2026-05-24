@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import AdminShell from "@/components/admin/AdminShell"
@@ -38,6 +38,64 @@ const SVC_META: Record<ServiceType, { label: string; icon: string; color: string
   taxi:           { label:"Taxi",        icon:"🚗", color:"#f5c542", desc:"Đặt taxi 4-7 chỗ",              pricingKey:"taxi"         },
   buy_for_me:     { label:"Mua hộ",     icon:"🛒", color:"#3ecf6e", desc:"Tài xế mua và giao",             pricingKey:"errand"       },
   deliver_for_me: { label:"Giao hộ",    icon:"📦", color:"#4a8ff5", desc:"Giao bưu kiện, hàng hoá",        pricingKey:"errand"       },
+}
+
+const PHUOC_AN_LAT = 12.6521
+const PHUOC_AN_LNG = 108.5073
+
+interface NominatimResult { display_name: string; lat: string; lon: string }
+
+function AddrInput({ label, value, onChange, onSelect, placeholder, required = false }: {
+  label: string; value: string; required?: boolean
+  onChange: (v: string) => void
+  onSelect: (addr: string, lat: number, lng: number) => void
+  placeholder: string
+}) {
+  const [sugs, setSugs] = useState<NominatimResult[]>([])
+  const [open, setOpen]  = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const fetchSugs = (q: string) => {
+    if (timer.current) clearTimeout(timer.current)
+    if (q.length < 3) { setSugs([]); setOpen(false); return }
+    timer.current = setTimeout(async () => {
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + " Krông Pắc Đắk Lắk")}&format=json&limit=5&countrycodes=vn`
+        const res  = await fetch(url, { headers: { "Accept-Language": "vi" } })
+        const data: NominatimResult[] = await res.json()
+        setSugs(data); setOpen(data.length > 0)
+      } catch { /* ignore */ }
+    }, 420)
+  }
+
+  return (
+    <div style={{ position:"relative", marginBottom:12 }}>
+      <div style={{ color:"#6a5a40", fontSize:10, marginBottom:6 }}>
+        {label}{required && <span style={{ color:"#ff4040" }}> *</span>}
+      </div>
+      <input value={value}
+        onChange={e => { onChange(e.target.value); fetchSugs(e.target.value) }}
+        onFocus={() => sugs.length > 0 && setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 180)}
+        placeholder={placeholder}
+        style={{ width:"100%", padding:"10px 13px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#f0eaff", fontSize:12 }}
+      />
+      {open && sugs.length > 0 && (
+        <div style={{ position:"absolute", top:"100%", left:0, right:0, marginTop:3, background:"#151210", border:"1px solid rgba(255,107,0,0.25)", borderRadius:10, zIndex:200, maxHeight:180, overflowY:"auto" }}>
+          {sugs.map((s, i) => (
+            <div key={i}
+              onMouseDown={() => { onSelect(s.display_name, parseFloat(s.lat), parseFloat(s.lon)); onChange(s.display_name); setOpen(false) }}
+              style={{ padding:"9px 13px", borderBottom:i<sugs.length-1?"1px solid rgba(255,255,255,0.04)":"none", cursor:"pointer", color:"#f0eaff", fontSize:9, lineHeight:1.5 }}
+              onMouseEnter={e=>(e.currentTarget.style.background="rgba(255,107,0,0.07)")}
+              onMouseLeave={e=>(e.currentTarget.style.background="transparent")}
+            >
+              {s.display_name}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // Tính phí theo bảng cước — giống hàm calcExampleFare trong settings page
@@ -86,9 +144,19 @@ export default function AdminOrdersPage() {
   const [searching,  setSearching]  = useState(false)
   const [custMsg,    setCustMsg]    = useState("")
 
-  // Addresses
+  // Addresses + coordinates
   const [delivAddr,  setDelivAddr]  = useState("")
   const [pickupAddr, setPickupAddr] = useState("")
+  const [delivLat,   setDelivLat]   = useState(0)
+  const [delivLng,   setDelivLng]   = useState(0)
+  const [pickupLat,  setPickupLat]  = useState(0)
+  const [pickupLng,  setPickupLng]  = useState(0)
+
+  // Contact info for deliver_for_me
+  const [pickupName,  setPickupName]  = useState("")
+  const [pickupPhone, setPickupPhone] = useState("")
+  const [delivName,   setDelivName]   = useState("")
+  const [delivPhone,  setDelivPhone]  = useState("")
 
   // Distance → fee calculation
   const [distKm,     setDistKm]     = useState("2")     // admin inputs km
@@ -174,6 +242,25 @@ export default function AdminOrdersPage() {
     supabase.from("app_settings").select("value").eq("key","pricing").maybeSingle()
       .then(({ data }) => { if (data?.value) setPricing(data.value as PricingMap) })
   }, [load])
+
+  // Auto-calculate distance via OSRM when lat/lng are set
+  useEffect(() => {
+    if (feeOverride) return
+    const fromLat = service === "food" ? PHUOC_AN_LAT : pickupLat
+    const fromLng = service === "food" ? PHUOC_AN_LNG : pickupLng
+    if (!delivLat || !delivLng) return
+    if (service !== "food" && (!fromLat || !fromLng)) return
+    const ctrl = new AbortController()
+    fetch(
+      `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${delivLng},${delivLat}?overview=false`,
+      { signal: ctrl.signal }
+    ).then(r => r.json()).then(data => {
+      const meters = data.routes?.[0]?.distance
+      if (meters) { setDistKm((meters / 1000).toFixed(1)); setFeeOverride("") }
+    }).catch(() => {})
+    return () => ctrl.abort()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [delivLat, delivLng, pickupLat, pickupLng, service])
 
   /* ── Helpers ── */
   const searchCustomer = async () => {
@@ -263,7 +350,7 @@ export default function AdminOrdersPage() {
           const fee  = i === 0 ? baseFee : EXTRA_SHOP
           const { data: order, error: oe } = await supabase.from("orders").insert({
             customer_id: eid, shop_id: slot.shopId, status: "pending",
-            delivery_address: delivAddr, delivery_lat: 12.6521, delivery_lng: 108.5073,
+            delivery_address: delivAddr, delivery_lat: delivLat || PHUOC_AN_LAT, delivery_lng: delivLng || PHUOC_AN_LNG,
             subtotal: sub, delivery_fee: fee, discount_amount: 0,
             total_amount: sub + fee, payment_method: payment,
             note: ((i > 0 ? `[+quán ${i+1}/${filledSlots.length}] ` : "") + (note || "")) || null,
@@ -281,8 +368,8 @@ export default function AdminOrdersPage() {
         await supabase.from("rides").insert({
           customer_id: eid, status: "searching",
           vehicle_type: service === "taxi" ? "car" : "motorbike",
-          pickup_address: pickupAddr, pickup_lat: 12.6521, pickup_lng: 108.5073,
-          dropoff_address: delivAddr, dropoff_lat: 12.6521, dropoff_lng: 108.5073,
+          pickup_address: pickupAddr, pickup_lat: pickupLat || PHUOC_AN_LAT, pickup_lng: pickupLng || PHUOC_AN_LNG,
+          dropoff_address: delivAddr, dropoff_lat: delivLat || PHUOC_AN_LAT, dropoff_lng: delivLng || PHUOC_AN_LNG,
           estimated_fare: baseFee || null, payment_method: payment,
         })
         setCreateMsg(`✅ Đã tạo yêu cầu ${SVC_META[service].label} · ${fmt(baseFee)}`)
@@ -291,8 +378,8 @@ export default function AdminOrdersPage() {
         if (!pickupAddr.trim() || !delivAddr.trim()) throw new Error("Chưa nhập địa chỉ")
         await supabase.from("errands").insert({
           customer_id: eid, type: "buy_for_me", status: "pending",
-          pickup_address: pickupAddr, pickup_lat: 12.6521, pickup_lng: 108.5073,
-          delivery_address: delivAddr, delivery_lat: 12.6521, delivery_lng: 108.5073,
+          pickup_address: pickupAddr, pickup_lat: pickupLat || PHUOC_AN_LAT, pickup_lng: pickupLng || PHUOC_AN_LNG,
+          delivery_address: delivAddr, delivery_lat: delivLat || PHUOC_AN_LAT, delivery_lng: delivLng || PHUOC_AN_LNG,
           items_description: itemsDesc || null,
           estimated_items_cost: parseInt(estCost) || null,
           service_fee: baseFee, payment_method: payment, note: note || null,
@@ -301,12 +388,17 @@ export default function AdminOrdersPage() {
 
       } else {
         if (!pickupAddr.trim() || !delivAddr.trim()) throw new Error("Chưa nhập địa chỉ")
+        const contactNote = [
+          pickupName && `Lấy hàng: ${pickupName}${pickupPhone ? " - " + pickupPhone : ""}`,
+          delivName  && `Giao hàng: ${delivName}${delivPhone  ? " - " + delivPhone  : ""}`,
+          note,
+        ].filter(Boolean).join("\n")
         await supabase.from("errands").insert({
           customer_id: eid, type: "deliver_for_me", status: "pending",
-          pickup_address: pickupAddr, pickup_lat: 12.6521, pickup_lng: 108.5073,
-          delivery_address: delivAddr, delivery_lat: 12.6521, delivery_lng: 108.5073,
+          pickup_address: pickupAddr, pickup_lat: pickupLat || PHUOC_AN_LAT, pickup_lng: pickupLng || PHUOC_AN_LNG,
+          delivery_address: delivAddr, delivery_lat: delivLat || PHUOC_AN_LAT, delivery_lng: delivLng || PHUOC_AN_LNG,
           package_description: pkgDesc || null,
-          service_fee: baseFee, payment_method: payment, note: note || null,
+          service_fee: baseFee, payment_method: payment, note: contactNote || null,
         })
         setCreateMsg(`✅ Đã tạo yêu cầu Giao hộ · phí ${fmt(baseFee)}`)
       }
@@ -322,6 +414,8 @@ export default function AdminOrdersPage() {
     setShowCreate(false); setStep(1); setService("food")
     setCustPhone(""); setCustId(""); setCustName(""); setCustMsg("")
     setDelivAddr(""); setPickupAddr("")
+    setDelivLat(0); setDelivLng(0); setPickupLat(0); setPickupLng(0)
+    setPickupName(""); setPickupPhone(""); setDelivName(""); setDelivPhone("")
     setDistKm("2"); setFeeOverride("")
     setVehicleType("motorbike")
     setItemsDesc(""); setEstCost(""); setPkgDesc("")
@@ -592,10 +686,9 @@ export default function AdminOrdersPage() {
                       {/* FOOD */}
                       {service === "food" && (
                         <>
-                          <div style={{ color:"#6a5a40", fontSize:10, marginBottom:6 }}>Địa chỉ giao hàng <span style={{color:"#ff4040"}}>*</span></div>
-                          <textarea value={delivAddr} onChange={e=>setDelivAddr(e.target.value)} rows={2}
-                            placeholder="Số nhà, đường, thôn/xã..."
-                            style={{ width:"100%", padding:"10px 13px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#f0eaff", fontSize:12, resize:"none", marginBottom:14 }} />
+                          <AddrInput label="Địa chỉ giao hàng" value={delivAddr} onChange={setDelivAddr}
+                            onSelect={(_,lat,lng)=>{setDelivLat(lat);setDelivLng(lng)}}
+                            placeholder="Số nhà, đường, thôn/xã..." required />
 
                           {/* Fee calculator */}
                           <FeeRow />
@@ -708,17 +801,12 @@ export default function AdminOrdersPage() {
                               </div>
                             </div>
                           )}
-                          {[
-                            { label:"Điểm đón *", val:pickupAddr, set:setPickupAddr, ph:"Địa chỉ đón khách" },
-                            { label:"Điểm đến *", val:delivAddr,  set:setDelivAddr,  ph:"Địa chỉ đến" },
-                          ].map(f=>(
-                            <div key={f.label} style={{ marginBottom:12 }}>
-                              <div style={{ color:"#6a5a40", fontSize:10, marginBottom:6 }}>{f.label}</div>
-                              <input value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph}
-                                style={{ width:"100%", padding:"10px 13px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#f0eaff", fontSize:12 }} />
-                            </div>
-                          ))}
-                          {/* Fee from pricing */}
+                          <AddrInput label="Điểm đón" value={pickupAddr} onChange={setPickupAddr}
+                            onSelect={(_,lat,lng)=>{setPickupLat(lat);setPickupLng(lng)}}
+                            placeholder="Địa chỉ đón khách" required />
+                          <AddrInput label="Điểm đến" value={delivAddr} onChange={setDelivAddr}
+                            onSelect={(_,lat,lng)=>{setDelivLat(lat);setDelivLng(lng)}}
+                            placeholder="Địa chỉ đến" required />
                           <FeeRow />
                           <div style={{ padding:"8px 12px", borderRadius:9, background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", fontSize:9, color:"#6a5a40" }}>
                             💡 Giá hiển thị là ước tính theo bảng cước. Admin có thể ghi đè ô bên phải.
@@ -729,16 +817,12 @@ export default function AdminOrdersPage() {
                       {/* MUA HỘ */}
                       {service === "buy_for_me" && (
                         <>
-                          {[
-                            { label:"Địa chỉ cần mua *", val:pickupAddr, set:setPickupAddr, ph:"Chợ / cửa hàng cần đến" },
-                            { label:"Địa chỉ giao đến *", val:delivAddr, set:setDelivAddr, ph:"Địa chỉ nhận hàng" },
-                          ].map(f=>(
-                            <div key={f.label} style={{ marginBottom:12 }}>
-                              <div style={{ color:"#6a5a40", fontSize:10, marginBottom:6 }}>{f.label}</div>
-                              <input value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph}
-                                style={{ width:"100%", padding:"10px 13px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#f0eaff", fontSize:12 }} />
-                            </div>
-                          ))}
+                          <AddrInput label="Địa chỉ cần mua" value={pickupAddr} onChange={setPickupAddr}
+                            onSelect={(_,lat,lng)=>{setPickupLat(lat);setPickupLng(lng)}}
+                            placeholder="Chợ / cửa hàng cần đến" required />
+                          <AddrInput label="Địa chỉ giao đến" value={delivAddr} onChange={setDelivAddr}
+                            onSelect={(_,lat,lng)=>{setDelivLat(lat);setDelivLng(lng)}}
+                            placeholder="Địa chỉ nhận hàng" required />
                           <FeeRow />
                           <div style={{ marginBottom:12 }}>
                             <div style={{ color:"#6a5a40", fontSize:10, marginBottom:6 }}>Danh sách đồ cần mua</div>
@@ -760,16 +844,44 @@ export default function AdminOrdersPage() {
                       {/* GIAO HỘ */}
                       {service === "deliver_for_me" && (
                         <>
-                          {[
-                            { label:"Địa chỉ lấy hàng *", val:pickupAddr, set:setPickupAddr, ph:"Nơi tài xế đến lấy" },
-                            { label:"Địa chỉ giao đến *", val:delivAddr,  set:setDelivAddr,  ph:"Nơi cần giao" },
-                          ].map(f=>(
-                            <div key={f.label} style={{ marginBottom:12 }}>
-                              <div style={{ color:"#6a5a40", fontSize:10, marginBottom:6 }}>{f.label}</div>
-                              <input value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph}
-                                style={{ width:"100%", padding:"10px 13px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#f0eaff", fontSize:12 }} />
+                          {/* Pickup contact */}
+                          <div style={{ marginBottom:12, padding:"12px 14px", borderRadius:11, background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)" }}>
+                            <div style={{ color:"#FF8C00", fontSize:10, fontWeight:700, marginBottom:10 }}>📦 Điểm lấy hàng</div>
+                            <div style={{ display:"flex", gap:8, marginBottom:8 }}>
+                              <div style={{ flex:1 }}>
+                                <div style={{ color:"#6a5a40", fontSize:9, marginBottom:5 }}>Tên người giao</div>
+                                <input value={pickupName} onChange={e=>setPickupName(e.target.value)} placeholder="Họ tên"
+                                  style={{ width:"100%", padding:"8px 11px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:9, color:"#f0eaff", fontSize:11 }} />
+                              </div>
+                              <div style={{ flex:1 }}>
+                                <div style={{ color:"#6a5a40", fontSize:9, marginBottom:5 }}>Số điện thoại</div>
+                                <input value={pickupPhone} onChange={e=>setPickupPhone(e.target.value)} placeholder="0901..."
+                                  style={{ width:"100%", padding:"8px 11px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:9, color:"#f0eaff", fontSize:11 }} />
+                              </div>
                             </div>
-                          ))}
+                            <AddrInput label="Địa chỉ lấy hàng" value={pickupAddr} onChange={setPickupAddr}
+                              onSelect={(_,lat,lng)=>{setPickupLat(lat);setPickupLng(lng)}}
+                              placeholder="Nơi tài xế đến lấy" required />
+                          </div>
+                          {/* Delivery contact */}
+                          <div style={{ marginBottom:14, padding:"12px 14px", borderRadius:11, background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)" }}>
+                            <div style={{ color:"#4a8ff5", fontSize:10, fontWeight:700, marginBottom:10 }}>🏠 Điểm giao hàng</div>
+                            <div style={{ display:"flex", gap:8, marginBottom:8 }}>
+                              <div style={{ flex:1 }}>
+                                <div style={{ color:"#6a5a40", fontSize:9, marginBottom:5 }}>Tên người nhận</div>
+                                <input value={delivName} onChange={e=>setDelivName(e.target.value)} placeholder="Họ tên"
+                                  style={{ width:"100%", padding:"8px 11px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:9, color:"#f0eaff", fontSize:11 }} />
+                              </div>
+                              <div style={{ flex:1 }}>
+                                <div style={{ color:"#6a5a40", fontSize:9, marginBottom:5 }}>Số điện thoại</div>
+                                <input value={delivPhone} onChange={e=>setDelivPhone(e.target.value)} placeholder="0901..."
+                                  style={{ width:"100%", padding:"8px 11px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:9, color:"#f0eaff", fontSize:11 }} />
+                              </div>
+                            </div>
+                            <AddrInput label="Địa chỉ giao đến" value={delivAddr} onChange={setDelivAddr}
+                              onSelect={(_,lat,lng)=>{setDelivLat(lat);setDelivLng(lng)}}
+                              placeholder="Nơi cần giao" required />
+                          </div>
                           <FeeRow />
                           <div>
                             <div style={{ color:"#6a5a40", fontSize:10, marginBottom:6 }}>Mô tả kiện hàng</div>

@@ -361,7 +361,8 @@ export default function AdminPromotionsPage() {
           {showCreate && (
             <>
               <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} onClick={() => setShowCreate(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:100, backdropFilter:"blur(4px)" }} />
-              <motion.div initial={{ opacity:0, scale:0.92 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.92 }} transition={{ type:"spring", damping:24, stiffness:300 }} style={{ position:"fixed", top:"50%", left:"50%", transform:"translate(-50%,-50%)", width:"min(480px, calc(100vw - 24px))", maxHeight:"calc(100dvh - 80px)", background:"#0d0b12", borderRadius:18, border:"1px solid rgba(255,107,0,0.2)", zIndex:101, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+              <motion.div initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.95 }} transition={{ type:"spring", damping:24, stiffness:300 }} style={{ position:"fixed", inset:0, display:"flex", alignItems:"center", justifyContent:"center", padding:12, zIndex:101, pointerEvents:"none" }}>
+              <div style={{ width:"min(480px, calc(100vw - 24px))", maxHeight:"calc(100dvh - 24px)", background:"#0d0b12", borderRadius:18, border:"1px solid rgba(255,107,0,0.2)", display:"flex", flexDirection:"column", overflow:"hidden", pointerEvents:"auto" }}>
                 <div style={{ padding:"16px 20px", borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
                   <div style={{ color:"#f0eaff", fontSize:15, fontWeight:800 }}>+ Tạo voucher mới</div>
                   <button onClick={() => setShowCreate(false)} style={{ width:32, height:32, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
@@ -405,6 +406,7 @@ export default function AdminPromotionsPage() {
                     {saving ? "Đang tạo..." : "🏷️ Tạo voucher"}
                   </button>
                 </div>
+              </div>
               </motion.div>
             </>
           )}

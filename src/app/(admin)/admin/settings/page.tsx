@@ -141,6 +141,27 @@ export default function AdminSettingsPage() {
     defaultRate: "15", minRate: "10", maxRate: "25",
     driverSharePercent: "80", platformSharePercent: "20", loyaltyPointsRate: "1",
   })
+  const [applyingCommission, setApplyingCommission] = useState(false)
+  const [applyCommissionMsg, setApplyCommissionMsg] = useState("")
+
+  const handleApplyCommissionToAllShops = async () => {
+    const rate = parseInt(commissionSettings.defaultRate)
+    if (!rate || rate <= 0 || rate > 100) { setApplyCommissionMsg("⚠️ Tỉ lệ không hợp lệ"); return }
+    setApplyingCommission(true); setApplyCommissionMsg("")
+    const supabase = createClient()
+    const { data: updatedShops, error } = await supabase.from("shops")
+      .update({ commission_rate: rate, updated_at: new Date().toISOString() })
+      .eq("status", "approved")
+      .select("id")
+    const count = updatedShops?.length ?? 0
+    if (error) {
+      setApplyCommissionMsg("❌ Lỗi: " + error.message)
+    } else {
+      setApplyCommissionMsg(`✅ Đã cập nhật ${count ?? 0} cửa hàng → ${rate}%`)
+    }
+    setApplyingCommission(false)
+    setTimeout(() => setApplyCommissionMsg(""), 4000)
+  }
 
   /* ── Features ── */
   const [features, setFeatures] = useState<ToggleSetting[]>([
@@ -192,8 +213,13 @@ export default function AdminSettingsPage() {
         { key: "weather_surcharge", value: weatherSurcharge },
         { key: "night_surcharge",   value: nightSurcharge },
       ]
-      await supabase.from("app_settings")
+      const { error: saveErr } = await supabase.from("app_settings")
         .upsert(upsertRows.map(r => ({ ...r, updated_at: new Date().toISOString() })), { onConflict: "key" })
+
+      if (saveErr) {
+        alert(`Lỗi lưu cài đặt: ${saveErr.message}`)
+        return
+      }
 
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -500,6 +526,15 @@ export default function AdminSettingsPage() {
                 {renderInput("Phần tài xế hưởng",           "% từ phí giao hàng thuộc về tài xế",                      commissionSettings.driverSharePercent,   v => setCommissionSettings(p=>({...p,driverSharePercent:v})),   "%")}
                 {renderInput("Phần nền tảng",                "% từ phí giao hàng thuộc về nền tảng",                    commissionSettings.platformSharePercent, v => setCommissionSettings(p=>({...p,platformSharePercent:v})), "%")}
                 {renderInput("Tích điểm",                    "Số điểm thưởng cho mỗi 10.000đ chi tiêu",                 commissionSettings.loyaltyPointsRate,    v => setCommissionSettings(p=>({...p,loyaltyPointsRate:v})),    "điểm/10k")}
+              </div>
+              <div style={{ marginTop:14, padding:"14px 16px", background:"rgba(255,107,0,0.05)", border:"1px solid rgba(255,107,0,0.15)", borderRadius:12 }}>
+                <div style={{ color:"#FF8C00", fontSize:11, fontWeight:700, marginBottom:6 }}>⚡ Áp dụng hoa hồng cho cửa hàng</div>
+                <div style={{ color:"#6a5a40", fontSize:10, marginBottom:12 }}>Cập nhật tỉ lệ hoa hồng mặc định ({commissionSettings.defaultRate}%) cho tất cả cửa hàng đang hoạt động. Đây sẽ là mức hiển thị trong phần cài đặt của từng cửa hàng.</div>
+                <button onClick={handleApplyCommissionToAllShops} disabled={applyingCommission}
+                  style={{ height:34, padding:"0 18px", borderRadius:9, border:"none", background:"linear-gradient(90deg,#FF6B00,#FF8C00)", color:"#fff", fontSize:11, fontWeight:700, cursor:applyingCommission?"not-allowed":"pointer", opacity:applyingCommission?0.6:1 }}>
+                  {applyingCommission ? "Đang cập nhật..." : `Áp dụng ${commissionSettings.defaultRate}% cho tất cả cửa hàng`}
+                </button>
+                {applyCommissionMsg && <div style={{ marginTop:8, fontSize:10, color: applyCommissionMsg.startsWith("✅") ? "#3ecf6e" : "#ff4040" }}>{applyCommissionMsg}</div>}
               </div>
             </div>
           )}

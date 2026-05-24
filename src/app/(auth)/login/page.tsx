@@ -220,22 +220,8 @@ function LoginContent() {
       })
       if (err || !data.user) { setError("Số điện thoại hoặc mật khẩu không đúng"); return }
 
-      // Đọc role từ DB ngay sau login — redirect thẳng đến đúng dashboard
-      const { data: profile, error: profileErr } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .single()
-      if (profileErr || !profile) {
-        setError("Đăng nhập thành công nhưng không tải được hồ sơ. Vui lòng thử lại.")
-        await supabase.auth.signOut()
-        return
-      }
-      const dest = profile.role === "driver"   ? "/driver"
-                 : profile.role === "merchant" ? "/merchant"
-                 : profile.role === "admin"    ? "/admin"
-                 : "/"
-      window.location.href = dest
+      // Để middleware server-side đọc profile và redirect đúng dashboard
+      window.location.href = "/"
     } finally {
       setLoading(false)
       submitting.current = false
@@ -294,10 +280,37 @@ function LoginContent() {
           setError("Tạo tài khoản thất bại. Vui lòng thử lại.")
           return
         }
+
+        // Tạo hàng drivers nếu đăng ký tài xế
+        if (dbRole === "driver") {
+          await supabase.from("drivers").upsert({
+            id:            data.user.id,
+            vehicle_type:  role === "driver_taxi" ? "car" : (vehicleType || "motorbike"),
+            license_plate: plate.trim() || "—",
+            vehicle_model: role === "driver_taxi" ? (carModel.trim() || null) : null,
+            is_approved:   false,
+            status:        "offline",
+          }, { onConflict: "id" })
+        }
+
+        // Tạo hàng shops nếu đăng ký merchant
+        if (dbRole === "merchant") {
+          await supabase.from("shops").insert({
+            owner_id: data.user.id,
+            name:     shopName.trim() || `Cửa hàng của ${name.trim()}`,
+            address:  shopAddr.trim() || "Phước An, Krông Pắc",
+            category: shopCat.replace(/^[^\s]+ /, "").trim() || "Đồ ăn",
+            status:   "pending",
+            is_open:  false,
+          })
+        }
       }
 
+      const successDest = dbRole === "driver" ? "/driver"
+                        : dbRole === "merchant" ? "/merchant"
+                        : "/"
       setSuccess("Đăng ký thành công! Đang chuyển hướng...")
-      redirectTimer.current = setTimeout(() => { window.location.href = "/" }, 1200)
+      redirectTimer.current = setTimeout(() => { window.location.href = successDest }, 1200)
     } finally {
       setLoading(false)
       submitting.current = false

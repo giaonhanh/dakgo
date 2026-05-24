@@ -69,7 +69,7 @@ export default function AdminReviewsPage() {
       .from("reviews")
       .select(`
         id, food_rating, driver_rating, comment, images, tip_amount, created_at,
-        shops!inner(id, name, logo_url),
+        shops!inner(id, name, logo_url, owner_id),
         profiles!reviewer_id(full_name),
         orders!inner(id, total_amount)
       `)
@@ -84,7 +84,7 @@ export default function AdminReviewsPage() {
         const order  = (r.orders  as unknown as Record<string, unknown>)
         return {
           id:           r.id,
-          targetId:     (shop?.id as string) ?? "",
+          targetId:     (shop?.owner_id as string) ?? (shop?.id as string) ?? "",
           targetName:   (shop?.name as string) ?? "Cửa hàng",
           targetAvatar: (shop?.logo_url as string) ?? "",
           reviewerName: (rev?.full_name as string) ?? "Khách hàng",

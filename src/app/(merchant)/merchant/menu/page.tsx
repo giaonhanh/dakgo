@@ -4,6 +4,14 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
 import * as XLSX from "xlsx"
+import {
+  DndContext, DragEndEvent, closestCenter,
+  KeyboardSensor, PointerSensor, useSensor, useSensors,
+} from "@dnd-kit/core"
+import {
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface MenuGroup {
@@ -26,8 +34,8 @@ interface Product {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const CATEGORY_LIST = [
-  "Món chính","Món phụ","Đồ uống","Tráng miệng",
-  "Bún / Phở","Cơm","Gà","Bánh","Salad","Combo","Đặc biệt","Khác",
+  "Buổi sáng","Buổi trưa","Buổi tối",
+  "Đồ uống","Đồ nhậu","Ăn vặt","Khác",
 ]
 const BADGE_LIST = [
   { key:"hot"        as const, label:"🔥 HOT",      color:"#ff4040", bg:"rgba(255,64,64,0.15)",    border:"rgba(255,64,64,0.4)"    },
@@ -52,6 +60,89 @@ const blankProduct = (): Product => ({
 
 // ── CSV Import types ───────────────────────────────────────────────────────
 interface ImportRow { name: string; description: string; price: number; promoPrice: number | null; category: string; badge: Product["badge"] }
+
+// ── Drag-and-drop product card ─────────────────────────────────────────────
+interface ProductCardProps {
+  p: Product; groups: MenuGroup[]
+  onEdit: (p: Product) => void; onToggle: (id: string) => void; onDelete: (id: string) => void
+}
+function SortableProductCard({ p, groups, onEdit, onToggle, onDelete }: ProductCardProps) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: p.id })
+  const bc = BADGE_LIST.find(x => x.key === p.badge)
+  const gName = groups.find(g => g.id === p.menuGroupId)?.name ?? ""
+  return (
+    <div ref={setNodeRef} style={{ transform:CSS.Transform.toString(transform), transition,
+      background:"rgba(255,255,255,0.04)", border:`1px solid ${p.available?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.04)"}`,
+      borderRadius:14, padding:11, marginBottom:8, display:"flex", gap:10, alignItems:"center",
+      opacity: isDragging ? 0.5 : p.available ? 1 : 0.6 }}>
+      {/* Drag handle */}
+      <div ref={setActivatorNodeRef} {...attributes} {...listeners}
+        style={{ cursor:isDragging?"grabbing":"grab", touchAction:"none", flexShrink:0,
+          color:"#3a2a15", fontSize:14, display:"flex", alignItems:"center", padding:"0 2px", userSelect:"none" as React.CSSProperties["userSelect"] }}>⠿</div>
+      {/* Image */}
+      <div style={{width:54,height:54,borderRadius:12,flexShrink:0,background:"rgba(255,107,0,0.07)",border:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,overflow:"hidden",position:"relative"}}>
+        {p.imagePreview ? <img src={p.imagePreview} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}} /> : <span>🍽️</span>}
+        {bc && <div style={{position:"absolute",top:2,left:2,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:4,padding:"1px 4px",fontSize:7,fontWeight:800,color:bc.color,lineHeight:1.3}}>{bc.label.split(" ")[0]}</div>}
+      </div>
+      {/* Info */}
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:2}}>
+          <div style={{color:"#f8f0e0",fontSize:11,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1,minWidth:0}}>{p.name}</div>
+          {!p.available && <span style={{background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"1px 5px",color:"#ff4040",fontSize:7,fontWeight:700,flexShrink:0}}>ẨN</span>}
+        </div>
+        <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:4}}>
+          <span style={{background:"linear-gradient(90deg,#FF6B00,#FFB347)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontSize:12,fontWeight:800}}>{fmt(p.price)}</span>
+          {p.promoEnabled && p.promoPrice && p.promoPrice < p.price && (
+            <span style={{background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"1px 6px",color:"#ff4040",fontSize:9,fontWeight:700}}>{fmt(p.promoPrice)}</span>
+          )}
+        </div>
+        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+          {gName && <span style={{background:"rgba(74,143,245,0.1)",border:"1px solid rgba(74,143,245,0.2)",borderRadius:4,padding:"1px 5px",color:"#4a8ff5",fontSize:7}}>{gName}</span>}
+          {p.categories.slice(0,2).map(c => (
+            <span key={c} style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:4,padding:"1px 5px",color:"#6a5a40",fontSize:7}}>{c}</span>
+          ))}
+          {p.toppings.length > 0 && <span style={{background:"rgba(180,100,255,0.08)",border:"1px solid rgba(180,100,255,0.2)",borderRadius:4,padding:"1px 5px",color:"#b464ff",fontSize:7}}>{p.toppings.length} topping</span>}
+          {p.sizes.length > 0 && <span style={{background:"rgba(62,207,110,0.08)",border:"1px solid rgba(62,207,110,0.2)",borderRadius:4,padding:"1px 5px",color:"#3ecf6e",fontSize:7}}>{p.sizes.length} size</span>}
+        </div>
+      </div>
+      {/* Actions */}
+      <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
+        <button onClick={() => onEdit(p)} style={{width:34,height:28,borderRadius:8,background:"rgba(255,107,0,0.08)",border:"1px solid rgba(255,107,0,0.2)",color:"#FF8C00",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✏️</button>
+        <button onClick={() => onToggle(p.id)} style={{width:34,height:28,borderRadius:8,background:p.available?"rgba(62,207,110,0.08)":"rgba(255,255,255,0.04)",border:p.available?"1px solid rgba(62,207,110,0.25)":"1px solid rgba(255,255,255,0.06)",color:p.available?"#3ecf6e":"#6a5a40",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>
+          {p.available?"👁":"🙈"}
+        </button>
+        <button onClick={() => onDelete(p.id)} style={{width:34,height:28,borderRadius:8,background:"rgba(255,64,64,0.06)",border:"1px solid rgba(255,64,64,0.15)",color:"#ff4040",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>🗑</button>
+      </div>
+    </div>
+  )
+}
+
+// ── Drag-and-drop group card ────────────────────────────────────────────────
+interface GroupCardProps {
+  g: MenuGroup; productCount: number
+  onEdit: (g: MenuGroup) => void; onDelete: (id: string) => void
+}
+function SortableGroupCard({ g, productCount, onEdit, onDelete }: GroupCardProps) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: g.id })
+  return (
+    <div ref={setNodeRef} style={{ transform:CSS.Transform.toString(transform), transition,
+      background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)",
+      borderRadius:14, padding:"12px 14px", marginBottom:8, display:"flex", alignItems:"center", gap:12,
+      opacity: isDragging ? 0.5 : 1 }}>
+      {/* Drag handle */}
+      <div ref={setActivatorNodeRef} {...attributes} {...listeners}
+        style={{ cursor:isDragging?"grabbing":"grab", touchAction:"none", flexShrink:0,
+          color:"#3a2a15", fontSize:14, display:"flex", alignItems:"center", padding:"0 2px", userSelect:"none" as React.CSSProperties["userSelect"] }}>⠿</div>
+      <div style={{width:40,height:40,borderRadius:10,background:"rgba(255,107,0,0.08)",border:"1px solid rgba(255,107,0,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📋</div>
+      <div style={{flex:1}}>
+        <div style={{color:"#f8f0e0",fontSize:12,fontWeight:700}}>{g.name}</div>
+        <div style={{color:"#6a5a40",fontSize:9,marginTop:2}}>{productCount} món · {g.allDay?"Cả ngày":`${g.startHour} – ${g.endHour}`}</div>
+      </div>
+      <button onClick={() => onEdit(g)} style={{width:34,height:34,borderRadius:9,background:"rgba(255,107,0,0.08)",border:"1px solid rgba(255,107,0,0.2)",color:"#FF8C00",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✏️</button>
+      <button onClick={() => onDelete(g.id)} style={{width:34,height:34,borderRadius:9,background:"rgba(255,64,64,0.06)",border:"1px solid rgba(255,64,64,0.15)",color:"#ff4040",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>🗑</button>
+    </div>
+  )
+}
 
 // ── Main component ─────────────────────────────────────────────────────────
 export default function MerchantMenuPage() {
@@ -82,6 +173,45 @@ export default function MerchantMenuPage() {
   const csvRef   = useRef<HTMLInputElement>(null)
 
   const fire = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2400) }
+
+  // ── Drag-and-drop sensors & handlers ──────────────────────────────────────
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  )
+
+  const saveProdOrderToDb = useCallback(async (ordered: Product[]) => {
+    for (const p of ordered) {
+      await supabase.from("products").update({ sort_order: p.sortOrder }).eq("id", p.id)
+    }
+  }, [supabase])
+
+  const handleProductDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setProducts(ps => {
+      const sorted = [...ps].sort((a,b) => a.sortOrder - b.sortOrder)
+      const oldIdx = sorted.findIndex(p => p.id === active.id)
+      const newIdx = sorted.findIndex(p => p.id === over.id)
+      if (oldIdx === -1 || newIdx === -1) return ps
+      const reordered = arrayMove(sorted, oldIdx, newIdx)
+      const updated = reordered.map((p, i) => ({ ...p, sortOrder: i }))
+      saveProdOrderToDb(updated)
+      return updated
+    })
+  }, [saveProdOrderToDb])
+
+  const handleGroupDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setGroups(gs => {
+      const sorted = [...gs].sort((a,b) => a.sortOrder - b.sortOrder)
+      const oldIdx = sorted.findIndex(g => g.id === active.id)
+      const newIdx = sorted.findIndex(g => g.id === over.id)
+      if (oldIdx === -1 || newIdx === -1) return gs
+      return arrayMove(sorted, oldIdx, newIdx).map((g, i) => ({ ...g, sortOrder: i }))
+    })
+  }, [])
 
   // ── Load from Supabase ─────────────────────────────────────────────────
   const loadProducts = useCallback(async (sid: string) => {
@@ -298,7 +428,7 @@ export default function MerchantMenuPage() {
   const openEditProduct = (p: Product) => { setPModal({...p}); setPEditing(true) }
 
   const saveProduct = async () => {
-    if (!pModal?.name.trim() || pModal.price <= 0) return
+    if (!pModal?.name.trim() || pModal.price <= 0) { fire("❌ Vui lòng nhập tên món và giá bán"); return }
     const category = pModal.categories[0] || pModal.menuGroupId || null
 
     // Upload image if new file selected
@@ -331,7 +461,7 @@ export default function MerchantMenuPage() {
         : p))
       fire("Đã cập nhật món")
     } else {
-      if (!shopId) return
+      if (!shopId) { fire("❌ Không tìm thấy cửa hàng. Vui lòng tải lại trang."); return }
       const { data, error } = await supabase.from("products")
         .insert({ ...payload, shop_id: shopId, sold_count: 0 })
         .select("id").single()
@@ -501,7 +631,7 @@ export default function MerchantMenuPage() {
           <>
             {/* Filter chips */}
             <div style={{display:"flex",gap:6,padding:"10px 16px",overflowX:"auto",flexShrink:0} as React.CSSProperties}>
-              {[{id:"all",name:"Tất cả"}, ...sortedGroups].map(g => (
+              {[{id:"all",name:"Tất cả"}, ...CATEGORY_LIST.map(c => ({id:c,name:c}))].map(g => (
                 <button key={g.id} onClick={() => setFilterGid(g.id)}
                   style={{flexShrink:0,padding:"5px 14px",borderRadius:20,
                     background:filterGid===g.id?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
@@ -523,64 +653,16 @@ export default function MerchantMenuPage() {
                     + Thêm món đầu tiên
                   </button>
                 </div>
-              ) : filteredProds.map((p, idx) => {
-                const bc = badgeCfg(p.badge)
-                const gName = groups.find(g => g.id === p.menuGroupId)?.name ?? ""
-                const isFirst = idx === 0
-                const isLast  = idx === filteredProds.length - 1
-                return (
-                  <div key={p.id} style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${p.available?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.04)"}`,borderRadius:14,padding:11,marginBottom:8,opacity:p.available?1:0.6,display:"flex",gap:10,alignItems:"center"}}>
-
-                    {/* Sort arrows */}
-                    <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
-                      <button onClick={() => moveProduct(p.id,-1)} disabled={isFirst}
-                        style={{width:20,height:20,borderRadius:5,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.06)",color:isFirst?"rgba(255,255,255,0.12)":"#6a5a40",fontSize:9,cursor:isFirst?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▲</button>
-                      <button onClick={() => moveProduct(p.id,1)} disabled={isLast}
-                        style={{width:20,height:20,borderRadius:5,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.06)",color:isLast?"rgba(255,255,255,0.12)":"#6a5a40",fontSize:9,cursor:isLast?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▼</button>
-                    </div>
-
-                    {/* Image */}
-                    <div style={{width:54,height:54,borderRadius:12,flexShrink:0,background:"rgba(255,107,0,0.07)",border:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,overflow:"hidden",position:"relative"}}>
-                      {p.imagePreview ? <img src={p.imagePreview} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}} /> : <span>🍽️</span>}
-                      {bc && <div style={{position:"absolute",top:2,left:2,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:4,padding:"1px 4px",fontSize:7,fontWeight:800,color:bc.color,lineHeight:1.3}}>{bc.label.split(" ")[0]}</div>}
-                    </div>
-
-                    {/* Info */}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:2}}>
-                        <div style={{color:"#f8f0e0",fontSize:11,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1,minWidth:0}}>{p.name}</div>
-                        {!p.available && <span style={{background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"1px 5px",color:"#ff4040",fontSize:7,fontWeight:700,flexShrink:0}}>ẨN</span>}
-                      </div>
-                      <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:4}}>
-                        <span style={{background:"linear-gradient(90deg,#FF6B00,#FFB347)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontSize:12,fontWeight:800}}>{fmt(p.price)}</span>
-                        {p.promoEnabled && p.promoPrice && p.promoPrice < p.price && (
-                          <span style={{background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"1px 6px",color:"#ff4040",fontSize:9,fontWeight:700}}>{fmt(p.promoPrice)}</span>
-                        )}
-                      </div>
-                      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                        {gName && <span style={{background:"rgba(74,143,245,0.1)",border:"1px solid rgba(74,143,245,0.2)",borderRadius:4,padding:"1px 5px",color:"#4a8ff5",fontSize:7}}>{gName}</span>}
-                        {p.categories.slice(0,2).map(c => (
-                          <span key={c} style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:4,padding:"1px 5px",color:"#6a5a40",fontSize:7}}>{c}</span>
-                        ))}
-                        {p.toppings.length > 0 && <span style={{background:"rgba(180,100,255,0.08)",border:"1px solid rgba(180,100,255,0.2)",borderRadius:4,padding:"1px 5px",color:"#b464ff",fontSize:7}}>{p.toppings.length} topping</span>}
-                        {p.sizes.length > 0 && <span style={{background:"rgba(62,207,110,0.08)",border:"1px solid rgba(62,207,110,0.2)",borderRadius:4,padding:"1px 5px",color:"#3ecf6e",fontSize:7}}>{p.sizes.length} size</span>}
-                      </div>
-                    </div>
-
-                    {/* Action buttons */}
-                    <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
-                      <button onClick={() => openEditProduct(p)}
-                        style={{width:34,height:28,borderRadius:8,background:"rgba(255,107,0,0.08)",border:"1px solid rgba(255,107,0,0.2)",color:"#FF8C00",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✏️</button>
-                      <button onClick={() => toggleAvail(p.id)}
-                        style={{width:34,height:28,borderRadius:8,background:p.available?"rgba(62,207,110,0.08)":"rgba(255,255,255,0.04)",border:p.available?"1px solid rgba(62,207,110,0.25)":"1px solid rgba(255,255,255,0.06)",color:p.available?"#3ecf6e":"#6a5a40",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>
-                        {p.available?"👁":"🙈"}
-                      </button>
-                      <button onClick={() => delProduct(p.id)}
-                        style={{width:34,height:28,borderRadius:8,background:"rgba(255,64,64,0.06)",border:"1px solid rgba(255,64,64,0.15)",color:"#ff4040",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>🗑</button>
-                    </div>
-                  </div>
-                )
-              })}
+              ) : (
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}>
+                  <SortableContext items={filteredProds.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                    {filteredProds.map(p => (
+                      <SortableProductCard key={p.id} p={p} groups={groups}
+                        onEdit={openEditProduct} onToggle={toggleAvail} onDelete={delProduct} />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              )}
             </div>
           </>
         )}
@@ -597,37 +679,17 @@ export default function MerchantMenuPage() {
                   + Tạo nhóm đầu tiên
                 </button>
               </div>
-            ) : sortedGroups.map((g, idx) => {
-              const count = products.filter(p => p.menuGroupId === g.id).length
-              return (
-                <div key={g.id} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
-                  {/* Sort */}
-                  <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
-                    <button onClick={() => moveGroup(g.id,-1)} disabled={idx===0}
-                      style={{width:20,height:20,borderRadius:5,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.06)",color:idx===0?"rgba(255,255,255,0.12)":"#6a5a40",fontSize:9,cursor:idx===0?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▲</button>
-                    <button onClick={() => moveGroup(g.id,1)} disabled={idx===sortedGroups.length-1}
-                      style={{width:20,height:20,borderRadius:5,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.06)",color:idx===sortedGroups.length-1?"rgba(255,255,255,0.12)":"#6a5a40",fontSize:9,cursor:idx===sortedGroups.length-1?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▼</button>
-                  </div>
-
-                  {/* Icon */}
-                  <div style={{width:40,height:40,borderRadius:10,background:"rgba(255,107,0,0.08)",border:"1px solid rgba(255,107,0,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📋</div>
-
-                  {/* Info */}
-                  <div style={{flex:1}}>
-                    <div style={{color:"#f8f0e0",fontSize:12,fontWeight:700}}>{g.name}</div>
-                    <div style={{color:"#6a5a40",fontSize:9,marginTop:2}}>
-                      {count} món · {g.allDay ? "Cả ngày" : `${g.startHour} – ${g.endHour}`}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <button onClick={() => openEditGroup(g)}
-                    style={{width:34,height:34,borderRadius:9,background:"rgba(255,107,0,0.08)",border:"1px solid rgba(255,107,0,0.2)",color:"#FF8C00",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✏️</button>
-                  <button onClick={() => delGroup(g.id)}
-                    style={{width:34,height:34,borderRadius:9,background:"rgba(255,64,64,0.06)",border:"1px solid rgba(255,64,64,0.15)",color:"#ff4040",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>🗑</button>
-                </div>
-              )
-            })}
+            ) : (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGroupDragEnd}>
+                <SortableContext items={sortedGroups.map(g => g.id)} strategy={verticalListSortingStrategy}>
+                  {sortedGroups.map(g => (
+                    <SortableGroupCard key={g.id} g={g}
+                      productCount={products.filter(p => p.menuGroupId === g.id).length}
+                      onEdit={openEditGroup} onDelete={delGroup} />
+                  ))}
+                </SortableContext>
+              </DndContext>
+            )}
           </div>
         )}
       </div>
@@ -826,7 +888,7 @@ export default function MerchantMenuPage() {
                     <select value={pModal.menuGroupId} onChange={e => setPModal(m => m ? {...m,menuGroupId:e.target.value} : m)}
                       style={{width:"100%",height:42,borderRadius:11,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:pModal.menuGroupId?"#f8f0e0":"#6a5a40",fontSize:11,padding:"0 10px",marginBottom:10,colorScheme:"dark",fontFamily:"Lexend"} as React.CSSProperties}>
                       <option value="" style={{background:"#0e0c09"}}>-- Không chọn --</option>
-                      {sortedGroups.map(g => <option key={g.id} value={g.id} style={{background:"#0e0c09"}}>{g.name}</option>)}
+                      {CATEGORY_LIST.map(c => <option key={c} value={c} style={{background:"#0e0c09"}}>{c}</option>)}
                     </select>
                   </div>
                 </div>

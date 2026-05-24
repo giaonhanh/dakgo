@@ -222,6 +222,26 @@ export default function ShopPreviewPage() {
           </div>
         </div>
 
+        {/* ── Image size guidelines ── */}
+        <div style={{padding:"10px 16px",background:"rgba(74,143,245,0.05)",borderBottom:"1px solid rgba(74,143,245,0.1)"}}>
+          <div style={{color:"#4a8ff5",fontSize:9,fontWeight:800,marginBottom:6}}>📐 Kích thước ảnh tối ưu</div>
+          <div style={{display:"flex",gap:6,overflowX:"auto"} as React.CSSProperties}>
+            {[
+              {icon:"🖼️", label:"Ảnh bìa",  size:"800×400px", note:"Tỉ lệ 2:1"},
+              {icon:"🏪", label:"Logo",      size:"300×300px", note:"Tỉ lệ 1:1"},
+              {icon:"🍽️", label:"Ảnh món",  size:"400×400px", note:"Tỉ lệ 1:1"},
+            ].map(t => (
+              <div key={t.label} style={{flexShrink:0,display:"flex",alignItems:"center",gap:5,padding:"5px 10px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8}}>
+                <span style={{fontSize:14}}>{t.icon}</span>
+                <div>
+                  <div style={{color:"#f8f0e0",fontSize:9,fontWeight:700}}>{t.label}: <span style={{color:"#FF8C00"}}>{t.size}</span></div>
+                  <div style={{color:"#6a5a40",fontSize:8}}>{t.note} · JPG/PNG/WEBP</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* ── Cover image ── */}
         <div style={{position:"relative",height:200,background:"linear-gradient(135deg,#1a0a00,#2d1200,#0d0600)",overflow:"hidden",cursor:"pointer"}}
           onClick={() => coverRef.current?.click()}>
@@ -231,6 +251,7 @@ export default function ShopPreviewPage() {
               <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8}}>
                 <div style={{fontSize:36,opacity:0.3}}>🖼</div>
                 <div style={{color:"rgba(255,255,255,0.25)",fontSize:11,fontWeight:600}}>Nhấn để tải ảnh bìa</div>
+                <div style={{color:"rgba(255,107,0,0.5)",fontSize:9,fontWeight:700}}>Kích thước tối ưu: 800 × 400 px</div>
               </div>
             )
           }
@@ -245,7 +266,7 @@ export default function ShopPreviewPage() {
               style={{width:76,height:76,borderRadius:18,border:"3px solid rgba(255,107,0,0.4)",background:"rgba(8,8,6,0.9)",flexShrink:0,cursor:"pointer",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,boxShadow:"0 4px 20px rgba(0,0,0,0.5)"}}>
               {logoUrl
                 ? <img src={logoUrl} alt="Logo" style={{width:"100%",height:"100%",objectFit:"cover"}} />
-                : <span>🏪</span>
+                : <div style={{textAlign:"center"}}><div style={{fontSize:28}}>🏪</div><div style={{color:"#FF8C00",fontSize:7,fontWeight:700}}>300×300px</div></div>
               }
             </div>
 
@@ -326,7 +347,7 @@ export default function ShopPreviewPage() {
                   <div style={{height:100,background:"rgba(255,107,0,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,position:"relative",overflow:"hidden"}}>
                     {p.imagePreview
                       ? <img src={p.imagePreview} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}} />
-                      : <span>🍽️</span>}
+                      : <div style={{textAlign:"center"}}><div>🍽️</div><div style={{color:"#FF8C00",fontSize:7,fontWeight:700,marginTop:2}}>400×400px</div></div>}
                     {bc && (
                       <div style={{position:"absolute",top:6,left:6,background:bc.bg,borderRadius:6,padding:"2px 6px",fontSize:8,fontWeight:800,color:bc.color}}>{bc.label}</div>
                     )}

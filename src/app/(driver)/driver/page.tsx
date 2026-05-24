@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 
 const supabase = createClient()
@@ -785,6 +786,8 @@ export default function DriverDashboard() {
   const [setupStatus,   setSetupStatus]   = useState({ bankLinked: false, vehicleDocs: false, depositDone: false })
   const [showSetupGate, setShowSetupGate] = useState(false)
   const [showTopup,     setShowTopup]     = useState(false)
+  const [isApproved,    setIsApproved]    = useState<boolean | null>(null)
+  const [unreadNotif,   setUnreadNotif]   = useState(0)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   // ── Load driver profile on mount ──
@@ -796,13 +799,16 @@ export default function DriverDashboard() {
 
       const [{ data: profile }, { data: driver }] = await Promise.all([
         supabase.from("profiles").select("full_name").eq("id", user.id).single(),
-        supabase.from("drivers").select("status, rating_avg, license_plate, bank_account_number").eq("id", user.id).single(),
+        supabase.from("drivers").select("status, rating_avg, license_plate, bank_account_number, is_approved").eq("id", user.id).single(),
       ])
 
       if (profile?.full_name) setDriverName(profile.full_name)
       if (driver) {
+        setIsApproved((driver as { is_approved?: boolean }).is_approved ?? false)
         setOnline(driver.status === "online")
         setTodayStats(s => ({ ...s, rating: Number(driver.rating_avg ?? 5) }))
+      } else {
+        setIsApproved(false)
       }
 
       // Today's delivered orders
@@ -834,6 +840,12 @@ export default function DriverDashboard() {
       const done = bankLinked && vehicleDocs && depositDone
       setSetupDone(done)
       if (!done) setShowSetupGate(true)
+
+      // Unread notifications
+      const { count: notifCount } = await supabase
+        .from("notifications").select("id", { count: "exact", head: true })
+        .eq("user_id", user.id).eq("is_read", false)
+      setUnreadNotif(notifCount ?? 0)
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -937,7 +949,51 @@ export default function DriverDashboard() {
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
       `}</style>
 
-      <div style={{ minHeight:"100dvh", background:"#080806", paddingBottom:80 }}>
+      {/* ── Chưa được duyệt ── */}
+      {isApproved === false && (
+        <div style={{
+          minHeight:"100dvh", background:"#080806", display:"flex",
+          alignItems:"center", justifyContent:"center", padding:24,
+          fontFamily:"'Lexend',sans-serif",
+        }}>
+          <div style={{
+            background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,107,0,0.2)",
+            borderRadius:20, padding:32, maxWidth:340, textAlign:"center",
+          }}>
+            <div style={{ fontSize:56, marginBottom:16 }}>⏳</div>
+            <div style={{ color:"#f8f0e0", fontSize:18, fontWeight:800, marginBottom:8 }}>
+              Đang chờ duyệt
+            </div>
+            <div style={{ color:"#b0956a", fontSize:13, lineHeight:1.6, marginBottom:24 }}>
+              Tài khoản tài xế của bạn đang được admin xem xét. Bạn sẽ nhận được thông báo khi được phê duyệt.
+            </div>
+            <button onClick={async () => {
+              const { data: { user } } = await supabase.auth.getUser()
+              if (!user) return
+              const { data: d } = await supabase.from("drivers").select("is_approved").eq("id", user.id).single()
+              if ((d as { is_approved?: boolean } | null)?.is_approved) setIsApproved(true)
+            }} style={{
+              background:"rgba(255,107,0,0.12)", border:"1px solid rgba(255,107,0,0.3)",
+              color:"#FF8C00", borderRadius:12, padding:"10px 24px",
+              fontFamily:"'Lexend',sans-serif", fontSize:12, fontWeight:700,
+              cursor:"pointer", marginBottom:12, display:"block", width:"100%",
+            }}>
+              🔄 Kiểm tra lại trạng thái
+            </button>
+            <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/login" }}
+              style={{
+                background:"transparent", border:"1px solid rgba(255,255,255,0.08)",
+                color:"#6a5a40", borderRadius:12, padding:"10px 24px",
+                fontFamily:"'Lexend',sans-serif", fontSize:12, fontWeight:600,
+                cursor:"pointer", display:"block", width:"100%",
+              }}>
+              Đăng xuất
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isApproved !== false && <div style={{ minHeight:"100dvh", background:"#080806", paddingBottom:80 }}>
 
         {/* ── header ── */}
         <div style={{
@@ -959,6 +1015,25 @@ export default function DriverDashboard() {
             </div>
           </div>
 
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          {/* Bell */}
+          <Link href="/driver/notifications" style={{ position:"relative", display:"block", textDecoration:"none" }}>
+            <div style={{
+              width:36, height:36, borderRadius:10,
+              background: unreadNotif > 0 ? "rgba(255,107,0,0.1)" : "rgba(255,255,255,0.05)",
+              border: `1px solid ${unreadNotif > 0 ? "rgba(255,107,0,0.3)" : "rgba(255,255,255,0.08)"}`,
+              display:"flex", alignItems:"center", justifyContent:"center", fontSize:16,
+            }}>🔔</div>
+            {unreadNotif > 0 && (
+              <div style={{
+                position:"absolute", top:-4, right:-4, minWidth:18, height:18,
+                borderRadius:9, background:"#ff4040", padding:"0 4px",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:9, fontWeight:800, color:"#fff",
+              }}>{unreadNotif}</div>
+            )}
+          </Link>
+
           <motion.button whileTap={{ scale:.93 }} onClick={handleToggleOnline}
             disabled={toggling}
             style={{
@@ -977,6 +1052,7 @@ export default function DriverDashboard() {
             }} />
             {toggling ? "..." : online ? "Đang hoạt động" : "Ngoại tuyến"}
           </motion.button>
+          </div>
         </div>
 
         <div style={{ padding:"0 16px" }}>
@@ -1136,7 +1212,7 @@ export default function DriverDashboard() {
             </a>
           ))}
         </nav>
-      </div>
+      </div>}
 
       {/* ── incoming order popup ── */}
       <AnimatePresence>

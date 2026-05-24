@@ -54,6 +54,8 @@ export default function ApprovalsPage() {
   const [shopLoading, setShopLoading]     = useState(true)
 
   const [saving, setSaving] = useState(false)
+  const [rejectModal, setRejectModal] = useState<{ id: string; type: "driver" | "shop"; name: string } | null>(null)
+  const [rejectReason, setRejectReason] = useState("")
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
 
@@ -125,14 +127,31 @@ export default function ApprovalsPage() {
   }, [])
 
   // ── Actions: Driver ──
-  async function approveDriver(id: string, approve: boolean) {
+  async function approveDriver(id: string, approve: boolean, reason?: string) {
     setSaving(true)
     const supabase = createClient()
     await supabase.from("drivers").update({
       is_approved: approve,
-      status: approve ? "offline" : "offline",
+      status: "offline",
       ...(approve ? { approved_at: new Date().toISOString() } : {}),
     }).eq("id", id)
+
+    if (!approve && reason) {
+      await supabase.from("notifications").insert({
+        user_id: id,
+        type: "system",
+        title: "❌ Đơn đăng ký tài xế bị từ chối",
+        body: reason,
+      })
+    }
+    if (approve) {
+      await supabase.from("notifications").insert({
+        user_id: id,
+        type: "system",
+        title: "✅ Đơn đăng ký tài xế được duyệt",
+        body: "Chúc mừng! Tài khoản tài xế của bạn đã được phê duyệt. Bạn có thể bắt đầu nhận đơn ngay.",
+      })
+    }
 
     setDrivers(prev => prev.map(d => d.id === id ? { ...d, status: approve ? "approved" : "pending" } : d))
     setSelectedDriver(prev => prev?.id === id ? { ...prev, status: approve ? "approved" : "pending" } : prev)
@@ -141,10 +160,30 @@ export default function ApprovalsPage() {
   }
 
   // ── Actions: Shop ──
-  async function updateShopStatus(id: string, status: ShopStatus) {
+  async function updateShopStatus(id: string, status: ShopStatus, reason?: string) {
     setSaving(true)
     const supabase = createClient()
     await supabase.from("shops").update({ status }).eq("id", id)
+
+    const shop = shops.find(s => s.id === id)
+    if (shop) {
+      const ownerId = (await supabase.from("shops").select("owner_id").eq("id", id).single()).data?.owner_id
+      if (ownerId) {
+        if (status === "approved") {
+          await supabase.from("notifications").insert({
+            user_id: ownerId, type: "system",
+            title: "✅ Cửa hàng được duyệt",
+            body: `Cửa hàng "${shop.shopName}" đã được phê duyệt. Bạn có thể bắt đầu nhận đơn ngay.`,
+          })
+        } else if (status === "suspended" && reason) {
+          await supabase.from("notifications").insert({
+            user_id: ownerId, type: "system",
+            title: "❌ Cửa hàng bị từ chối / tạm khóa",
+            body: reason,
+          })
+        }
+      }
+    }
 
     setShops(prev => prev.map(s => s.id === id ? { ...s, status } : s))
     setSelectedShop(prev => prev?.id === id ? { ...prev, status } : prev)
@@ -213,7 +252,7 @@ export default function ApprovalsPage() {
               onFilterChange={setDriverFilter}
               onSelect={setSelectedDriver}
               onApprove={(id) => approveDriver(id, true)}
-              onReject={(id) => approveDriver(id, false)}
+              onReject={(id, name) => { setRejectModal({ id, type: "driver", name }); setRejectReason("") }}
             />
           ) : (
             <ShopsTab
@@ -222,6 +261,7 @@ export default function ApprovalsPage() {
               onFilterChange={setShopFilter}
               onSelect={setSelectedShop}
               onUpdateStatus={updateShopStatus}
+              onReject={(id, name) => { setRejectModal({ id, type: "shop", name }); setRejectReason("") }}
             />
           )}
         </div>
@@ -236,6 +276,59 @@ export default function ApprovalsPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Rejection reason modal */}
+      <AnimatePresence>
+        {rejectModal && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setRejectModal(null)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 200, backdropFilter: "blur(6px)" }} />
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: "spring", damping: 22, stiffness: 350 }}
+              style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 380, background: "#0d0b12", borderRadius: 18, padding: "22px 20px", zIndex: 201, border: "1px solid rgba(255,64,64,0.25)" }}>
+              <div style={{ fontSize: 36, textAlign: "center", marginBottom: 8 }}>❌</div>
+              <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>
+                Từ chối {rejectModal.type === "driver" ? "tài xế" : "cửa hàng"}
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, textAlign: "center", marginBottom: 14,
+                background: "rgba(255,64,64,0.08)", border: "1px solid rgba(255,64,64,0.2)",
+                borderRadius: 7, padding: "5px 10px", color: "#ff4040" }}>
+                {rejectModal.name}
+              </div>
+              <div style={{ color: "#6a5a40", fontSize: 9.5, marginBottom: 6 }}>Lý do từ chối (bắt buộc)</div>
+              <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
+                placeholder="VD: Hồ sơ chưa đầy đủ, biển số xe không khớp với đăng ký..."
+                style={{ width: "100%", minHeight: 80, background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,64,64,0.2)", borderRadius: 11,
+                  color: "#f8f0e0", fontSize: 10, padding: "8px 12px",
+                  resize: "none", fontFamily: "Lexend", marginBottom: 14 }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setRejectModal(null)}
+                  style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend",
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)",
+                    color: "#6a5a40", fontSize: 11, fontWeight: 600 }}>Hủy</button>
+                <button
+                  disabled={!rejectReason.trim() || saving}
+                  onClick={async () => {
+                    if (rejectModal.type === "driver") {
+                      await approveDriver(rejectModal.id, false, rejectReason.trim())
+                    } else {
+                      await updateShopStatus(rejectModal.id, "suspended", rejectReason.trim())
+                    }
+                    setRejectModal(null); setRejectReason("")
+                  }}
+                  style={{ flex: 2, height: 40, borderRadius: 10, border: "none", cursor: rejectReason.trim() ? "pointer" : "not-allowed",
+                    fontFamily: "Lexend", background: rejectReason.trim() ? "rgba(255,64,64,0.18)" : "rgba(255,255,255,0.04)",
+                    outline: rejectReason.trim() ? "1px solid rgba(255,64,64,0.4)" : "none",
+                    color: rejectReason.trim() ? "#ff4040" : "#6a5a40", fontSize: 12, fontWeight: 800, opacity: saving ? 0.6 : 1 }}>
+                  {saving ? "Đang xử lý..." : "❌ Xác nhận từ chối"}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </AdminShell>
   )
 }
@@ -248,7 +341,7 @@ function DriversTab({ drivers, filter, loading, selected, saving, onFilterChange
   onFilterChange: (f: "all" | DriverStatus) => void
   onSelect: (d: Driver | null) => void
   onApprove: (id: string) => void
-  onReject: (id: string) => void
+  onReject: (id: string, name: string) => void
 }) {
   return (
     <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
@@ -291,7 +384,7 @@ function DriversTab({ drivers, filter, loading, selected, saving, onFilterChange
                   {d.status === "pending" && (
                     <div style={{ display: "flex", gap: 5 }} onClick={e => e.stopPropagation()}>
                       <button onClick={() => onApprove(d.id)} disabled={saving} style={{ height: 26, padding: "0 10px", borderRadius: 7, border: "none", background: "rgba(62,207,110,0.15)", color: "#3ecf6e", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Duyệt</button>
-                      <button onClick={() => onReject(d.id)} disabled={saving} style={{ height: 26, padding: "0 10px", borderRadius: 7, border: "none", background: "rgba(255,64,64,0.12)", color: "#ff4040", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Từ chối</button>
+                      <button onClick={() => onReject(d.id, d.name)} disabled={saving} style={{ height: 26, padding: "0 10px", borderRadius: 7, border: "none", background: "rgba(255,64,64,0.12)", color: "#ff4040", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Từ chối</button>
                     </div>
                   )}
                 </div>
@@ -331,7 +424,7 @@ function DriversTab({ drivers, filter, loading, selected, saving, onFilterChange
               {selected.status === "pending" && (
                 <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
                   <button onClick={() => onApprove(selected.id)} disabled={saving} style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: "linear-gradient(90deg,#3ecf6e,#2db85a)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✅ Duyệt</button>
-                  <button onClick={() => onReject(selected.id)} disabled={saving} style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: "rgba(255,64,64,0.15)", color: "#ff4040", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>❌ Từ chối</button>
+                  <button onClick={() => onReject(selected.id, selected.name)} disabled={saving} style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: "rgba(255,64,64,0.15)", color: "#ff4040", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>❌ Từ chối</button>
                 </div>
               )}
               {selected.status === "approved" && (
@@ -349,12 +442,13 @@ function DriversTab({ drivers, filter, loading, selected, saving, onFilterChange
 
 // ── Shops Tab ──────────────────────────────────────────────────
 
-function ShopsTab({ shops, filter, loading, selected, saving, onFilterChange, onSelect, onUpdateStatus }: {
+function ShopsTab({ shops, filter, loading, selected, saving, onFilterChange, onSelect, onUpdateStatus, onReject }: {
   shops: Shop[]; filter: string; loading: boolean
   selected: Shop | null; saving: boolean
   onFilterChange: (f: "all" | ShopStatus) => void
   onSelect: (s: Shop | null) => void
-  onUpdateStatus: (id: string, status: ShopStatus) => void
+  onUpdateStatus: (id: string, status: ShopStatus, reason?: string) => void
+  onReject: (id: string, name: string) => void
 }) {
   return (
     <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
@@ -398,7 +492,7 @@ function ShopsTab({ shops, filter, loading, selected, saving, onFilterChange, on
                   {s.status === "pending" && (
                     <div style={{ display: "flex", gap: 5 }} onClick={e => e.stopPropagation()}>
                       <button onClick={() => onUpdateStatus(s.id, "approved")} disabled={saving} style={{ height: 26, padding: "0 10px", borderRadius: 7, border: "none", background: "rgba(62,207,110,0.15)", color: "#3ecf6e", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Duyệt</button>
-                      <button onClick={() => onUpdateStatus(s.id, "suspended")} disabled={saving} style={{ height: 26, padding: "0 10px", borderRadius: 7, border: "none", background: "rgba(255,64,64,0.12)", color: "#ff4040", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Từ chối</button>
+                      <button onClick={() => onReject(s.id, s.shopName)} disabled={saving} style={{ height: 26, padding: "0 10px", borderRadius: 7, border: "none", background: "rgba(255,64,64,0.12)", color: "#ff4040", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Từ chối</button>
                     </div>
                   )}
                   {s.status === "approved" && (
@@ -448,7 +542,7 @@ function ShopsTab({ shops, filter, loading, selected, saving, onFilterChange, on
                   <button onClick={() => onUpdateStatus(selected.id, "approved")} disabled={saving} style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: "linear-gradient(90deg,#3ecf6e,#2db85a)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>✅ Duyệt</button>
                 )}
                 {selected.status !== "suspended" && (
-                  <button onClick={() => onUpdateStatus(selected.id, "suspended")} disabled={saving} style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: "rgba(255,64,64,0.15)", color: "#ff4040", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>🔒 Khóa</button>
+                  <button onClick={() => onReject(selected.id, selected.shopName)} disabled={saving} style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: "rgba(255,64,64,0.15)", color: "#ff4040", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>🔒 {selected.status === "pending" ? "Từ chối" : "Khóa"}</button>
                 )}
               </div>
             </div>

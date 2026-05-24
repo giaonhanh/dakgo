@@ -82,6 +82,14 @@ export default function AdminNotificationsPage() {
 
   const handleSend = async () => {
     if (!title.trim() || !body.trim()) { setSendMsg("⚠️ Vui lòng nhập tiêu đề và nội dung"); return }
+
+    const isScheduled = scheduleTime && new Date(scheduleTime) > new Date()
+    if (isScheduled) {
+      const scheduledDate = new Date(scheduleTime).toLocaleString("vi-VN")
+      setSendMsg(`🕐 Thông báo đã được lên lịch gửi vào ${scheduledDate}. (Cần cấu hình cron job để gửi tự động)`)
+      return
+    }
+
     setSending(true); setSendMsg("")
     const supabase = createClient()
 
@@ -136,6 +144,23 @@ export default function AdminNotificationsPage() {
             <div style={{ color:"#f0eaff", fontSize:13, fontWeight:700 }}>Soạn thông báo mới</div>
           </div>
           <div style={{ flex:1, overflowY:"auto", padding:"16px 20px" }}>
+
+            {/* RLS SQL hint */}
+            <details style={{ marginBottom:16, background:"rgba(74,143,245,0.06)", border:"1px solid rgba(74,143,245,0.2)", borderRadius:10, padding:"10px 14px", cursor:"pointer" }}>
+              <summary style={{ color:"#4a8ff5", fontSize:10, fontWeight:700, listStyle:"none", display:"flex", alignItems:"center", gap:6 }}>
+                <span>⚙️</span> Yêu cầu cấu hình Supabase (bấm để xem SQL)
+              </summary>
+              <div style={{ marginTop:10, color:"#6a5a40", fontSize:9, lineHeight:1.8 }}>
+                Chạy SQL này trong Supabase SQL Editor để admin có thể gửi và xem thông báo:
+              </div>
+              <pre style={{ marginTop:8, padding:"10px 12px", background:"rgba(0,0,0,0.3)", borderRadius:8, fontSize:9, color:"#3ecf6e", overflowX:"auto", lineHeight:1.7, userSelect:"text" as React.CSSProperties["userSelect"] }}>{`CREATE POLICY "notif_admin" ON notifications
+FOR ALL USING (
+  EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  )
+);`}</pre>
+            </details>
 
             {/* KPI */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:20 }}>
