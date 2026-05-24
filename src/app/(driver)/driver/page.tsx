@@ -339,23 +339,15 @@ function SetupGate({
 /* ── topup sheet ── */
 const PRESET_AMOUNTS = [50000, 100000, 200000, 500000]
 
-const VN_BANKS = [
-  { name: "Vietcombank", ios: "vcbmobile",   pkg: "com.VCB.digibank" },
-  { name: "Techcombank", ios: "techcombank", pkg: "vn.com.techcombank.tb" },
-  { name: "MB Bank",     ios: "mbmobile",    pkg: "com.mbmobile" },
-  { name: "BIDV",        ios: "bidv",        pkg: "com.BIDV.SmartBanking" },
-  { name: "VPBank",      ios: "vpbank",      pkg: "com.vpbank.vpbankneo" },
-  { name: "Agribank",    ios: "agribank",    pkg: "vn.agribank.ibanking" },
-  { name: "ACB",         ios: "acb",         pkg: "vn.acb.digital" },
-  { name: "VietinBank",  ios: "vietinbank",  pkg: "com.VietinBank.iBank" },
-  { name: "TPBank",      ios: "tpbank",      pkg: "vn.tpb.business" },
-  { name: "HDBank",      ios: "hdbank",      pkg: "vn.com.hdbank" },
-  { name: "Sacombank",   ios: "sacombank",   pkg: "vn.sacombank.mbanking" },
-  { name: "MSB",         ios: "msb",         pkg: "vn.msb.msb" },
-  { name: "SHB",         ios: "shb",         pkg: "vn.shb.mobile" },
-  { name: "OCB",         ios: "ocb",         pkg: "vn.ocb.om.android" },
-  { name: "Nam A Bank",  ios: "namabank",    pkg: "com.namabank.mobile" },
-]
+// Map BIN → tên ngân hàng (dùng để hiện tên thay vì "Xem trong app")
+const BIN_MAP: Record<string, string> = {
+  "970436":"Vietcombank","970407":"Techcombank","970422":"MB Bank",
+  "970418":"BIDV","970432":"VPBank","970405":"Agribank","970416":"ACB",
+  "970415":"VietinBank","970423":"TPBank","970437":"HDBank",
+  "970403":"Sacombank","970431":"Eximbank","970426":"MSB","970429":"SHB",
+  "970441":"VIB","970440":"SeABank","970425":"ABBank","970428":"NamABank",
+  "970454":"BVBank","422589":"BVBank","796500":"Cake by VPBank",
+}
 
 interface PayInfo {
   bin: string
@@ -372,7 +364,6 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
   const [useCustom, setUseCustom] = useState(false)
   const [step,      setStep]      = useState<"pick"|"pay">("pick")
   const [payInfo,   setPayInfo]   = useState<PayInfo | null>(null)
-  const [selBank,   setSelBank]   = useState(VN_BANKS[0].name)
   const [loading,   setLoading]   = useState(false)
   const [err,       setErr]       = useState("")
   const [paid,      setPaid]      = useState(false)
@@ -398,7 +389,16 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
 
       const payCode = Math.floor(10000000 + Math.random() * 90000000)
       payCodeRef.current = payCode
-      const desc = `NAPVI ${payCode}`
+
+      // Lấy tên tài xế, strip dấu cho tương thích hệ thống ngân hàng
+      const { data: profile } = await supabase
+        .from("profiles").select("full_name").eq("id", user.id).single()
+      const rawName = profile?.full_name ?? "Tai xe"
+      const asciiName = rawName
+        .normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/đ/g, "d").replace(/Đ/g, "D")
+        .replace(/[^a-zA-Z0-9 ]/g, "").trim()
+      const desc = `NAP VI ${asciiName}`.slice(0, 25)
 
       const { error: dbErr } = await supabase.from("wallet_topups").insert({
         user_id: user.id, wallet_type: "driver",
@@ -446,6 +446,23 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
     }
   }
 
+  // Tên ngân hàng nền tảng từ BIN (PayOS trả về bankName thường rỗng)
+  const platformBank = payInfo
+    ? (payInfo.bankName || BIN_MAP[payInfo.bin] || "Ngân hàng thụ hưởng")
+    : ""
+
+  // Clipboard format chuẩn — BIDV/MB/VCB tự nhận diện và điền vào Chuyển tiền
+  function getClipboardText() {
+    if (!payInfo) return ""
+    return [
+      `Ngân hàng: ${platformBank}`,
+      `Số tài khoản: ${payInfo.accountNumber}`,
+      `Tên tài khoản: ${payInfo.accountName}`,
+      `Số tiền: ${finalAmount.toLocaleString("vi-VN")}`,
+      `Nội dung: ${payInfo.description}`,
+    ].join("\n")
+  }
+
   function copy(text: string, label: string) {
     navigator.clipboard?.writeText(text).then(() => {
       setCopied(label)
@@ -453,25 +470,20 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
     })
   }
 
-  function openBankApp() {
-    const bank = VN_BANKS.find(b => b.name === selBank)
-    if (!bank || !payInfo) return
-
-    // Copy STK vào clipboard trước khi mở app → dán vào ô chuyển khoản
-    navigator.clipboard?.writeText(payInfo.accountNumber).then(() => {
-      setCopied("stk-open")
-      setTimeout(() => setCopied(null), 3000)
+  // Mở VietQR deeplink — chuẩn quốc gia, 80% banking app VN hỗ trợ
+  // Đồng thời copy clipboard format chuẩn để app tự điền (BIDV, MB, VCB...)
+  function openVietQR() {
+    if (!payInfo) return
+    const clipText = getClipboardText()
+    navigator.clipboard?.writeText(clipText).then(() => {
+      setCopied("open")
+      setTimeout(() => setCopied(null), 4000)
     })
-
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
     setTimeout(() => {
-      if (isIOS) {
-        window.location.href = `${bank.ios}://`
-      } else {
-        const qr = encodeURIComponent(payInfo.qrCode)
-        window.location.href = `intent://qr?data=${qr}#Intent;scheme=${bank.ios};package=${bank.pkg};end`
-      }
-    }, 100)
+      const deeplink = `vietqr://pay?ba=${payInfo.accountNumber}@${payInfo.bin}` +
+        `&am=${finalAmount}&tn=${encodeURIComponent(payInfo.description)}`
+      window.location.href = deeplink
+    }, 150)
   }
 
   function goBack() {
@@ -544,7 +556,7 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
             <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
               {[
                 { label:"Số tài khoản", value: payInfo.accountNumber,                     key:"stk",   big: true },
-                { label:"Ngân hàng",    value: payInfo.bankName || "Xem trong app",       key:"bank",  big: false },
+                { label:"Ngân hàng",    value: platformBank,                               key:"bank",  big: false },
                 { label:"Chủ TK",       value: payInfo.accountName,                        key:"name",  big: false },
                 { label:"Nội dung CK",  value: payInfo.description,                        key:"desc",  big: false },
                 { label:"Số tiền",      value: finalAmount.toLocaleString("vi-VN") + "đ", key:"amt",   big: true },
@@ -562,19 +574,18 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
               ))}
             </div>
 
-            {/* Chọn ngân hàng + mở app */}
+            {/* Mở app ngân hàng — VietQR universal deeplink */}
             <div style={{ background:"rgba(74,143,245,0.07)", border:"1px solid rgba(74,143,245,0.2)", borderRadius:14, padding:"12px 14px", marginBottom:14 }}>
               <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px", marginBottom:10 }}>Mở app ngân hàng để chuyển khoản</div>
-              <select value={selBank} onChange={e => setSelBank(e.target.value)}
-                style={{ width:"100%", height:44, padding:"0 12px", borderRadius:10, border:"1px solid rgba(74,143,245,0.3)", background:"rgba(255,255,255,0.05)", color:"#f8f0e0", fontSize:13, fontFamily:"Lexend", marginBottom:10, appearance:"auto", boxSizing:"border-box" }}>
-                {VN_BANKS.map(b => <option key={b.name} value={b.name} style={{ background:"#0e0b07" }}>{b.name}</option>)}
-              </select>
-              <button onClick={openBankApp}
-                style={{ width:"100%", height:48, borderRadius:12, border:"none", background:"linear-gradient(90deg,#4a8ff5,#3a7ae4)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", boxShadow:"0 4px 16px rgba(74,143,245,0.3)" }}>
-                {copied==="stk-open" ? "✓ Đã copy STK · Đang mở app..." : `🚀 Copy STK & Mở ${selBank}`}
+              <button onClick={openVietQR}
+                style={{ width:"100%", height:48, borderRadius:12, border:"none", background:"linear-gradient(90deg,#4a8ff5,#3a7ae4)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", boxShadow:"0 4px 16px rgba(74,143,245,0.3)", marginBottom:10 }}>
+                {copied==="open" ? "✓ Đã copy thông tin · Đang mở app..." : "🏦 Mở app ngân hàng · Chuyển khoản"}
               </button>
-              <div style={{ color:"#6a5a40", fontSize:9, textAlign:"center", marginTop:8, lineHeight:1.6 }}>
-                STK sẽ tự động được copy → Dán vào ô <b style={{color:"#b0956a"}}>Số tài khoản</b> trong app → nhập số tiền & nội dung → xác nhận
+              <div style={{ color:"#6a5a40", fontSize:9, textAlign:"center", lineHeight:1.7 }}>
+                Vào <b style={{color:"#b0956a"}}>Chuyển tiền</b> → App hỏi <b style={{color:"#b0956a"}}>&quot;Dán thông tin?&quot;</b> → <b style={{color:"#b0956a"}}>Có</b> → xác nhận bảo mật
+              </div>
+              <div style={{ color:"#4a8ff5", fontSize:8, textAlign:"center", marginTop:6, opacity:0.7 }}>
+                BIDV · MB Bank · Vietcombank · VPBank và hầu hết ngân hàng VN
               </div>
             </div>
 

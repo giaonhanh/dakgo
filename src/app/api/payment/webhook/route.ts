@@ -46,11 +46,12 @@ export async function POST(req: NextRequest) {
       const commission    = Math.round(order.total_amount * 0.15)
       const driverEarning = order.total_amount - commission
       await supabase.rpc("add_to_wallet", {
-        p_user_id: order.driver_id,
-        p_type:    "driver",
-        p_amount:  driverEarning,
-        p_ref_id:  order.id,
-        p_note:    `Đơn #${data.orderCode} · HH ${commission.toLocaleString("vi-VN")}đ`,
+        p_user_id:  order.driver_id,
+        p_type:     "driver",
+        p_amount:   driverEarning,
+        p_ref_id:   order.id,
+        p_note:     `Đơn #${data.orderCode} · HH ${commission.toLocaleString("vi-VN")}đ`,
+        p_tx_type:  "commission",
       })
     }
 
@@ -84,13 +85,25 @@ async function handleWalletTopup(
 
   if (!topup) return
 
-  await supabase.rpc("add_to_wallet", {
+  const { error: rpcErr } = await supabase.rpc("add_to_wallet", {
     p_user_id: topup.user_id,
     p_type:    topup.wallet_type,
     p_amount:  amount,
     p_ref_id:  null,
     p_note:    `Nạp ví #${orderCode}`,
+    p_tx_type: "topup",
   })
 
-  console.log(`[Webhook] ✅ Nạp ví ${topup.wallet_type} ${amount.toLocaleString("vi-VN")}đ`)
+  if (rpcErr) {
+    console.error("[Webhook] add_to_wallet error:", rpcErr)
+    return
+  }
+
+  // Đánh dấu đã thanh toán → UI polling phát hiện thành công
+  await supabase
+    .from("wallet_topups")
+    .update({ status: "paid" })
+    .eq("payment_code", orderCode)
+
+  console.log(`[Webhook] ✅ Nạp ví ${topup.wallet_type} ${amount.toLocaleString("vi-VN")}đ cho ${topup.user_id}`)
 }
