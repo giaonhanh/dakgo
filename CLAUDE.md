@@ -45,7 +45,7 @@
 | Biểu đồ | Recharts 2.x | doanh thu, thu nhập |
 | State | Zustand 4.x | cart, session, UI state |
 | Deploy | Vercel | Edge Cache + Analytics |
-| Push | Firebase FCM | Web Push API, free tier |
+| Push | Web Push VAPID | Không cần Firebase — dùng Web Push API + VAPID key tự sinh, lưu subscription vào bảng `push_subscriptions` Supabase |
 | SMS OTP | ESMS Việt Nam | rẻ hơn Twilio, hỗ trợ VN tốt |
 
 ### Bốn vai trò hệ thống
@@ -1032,7 +1032,7 @@ export interface Voucher {
 □ 1.13 Tạo src/types/index.ts đầy đủ (Section 5)
 □ 1.14 Cài Leaflet + react-leaflet, test render bản đồ Phước An (no-ssr)
 □ 1.15 Cài Zustand, tạo cartStore + sessionStore + uiStore
-□ 1.16 Cấu hình Firebase FCM, lấy VAPID key
+□ 1.16 Sinh VAPID key pair (web-push generate-vapid-keys), set NEXT_PUBLIC_VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY vào Vercel env
 □ 1.17 Test OTP với số điện thoại Việt Nam thật
 □ 1.18 Deploy Vercel, set env variables, test middleware redirect
 ```

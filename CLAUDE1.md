@@ -532,68 +532,93 @@ self.addEventListener("notificationclick", (event) => {
 
 ### hooks/usePushNotification.ts
 
+> ✅ **Đã triển khai** — Dùng Web Push VAPID, không cần Firebase SDK.
+> Subscription lưu vào bảng `push_subscriptions` (user_id, endpoint, p256dh, auth).
+> Edge Function `send-push` đọc bảng này để gửi notification.
+
 ```typescript
-// src/hooks/usePushNotification.ts
-export async function registerPushNotification(userId: string) {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return
+// src/hooks/usePushNotification.ts  ← code thực tế đang dùng
+"use client"
+import { useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 
-  const registration = await navigator.serviceWorker.ready
-  const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY!
+export function usePushNotification() {
+  const [permission, setPermission] = useState<"default"|"granted"|"denied">(() => {
+    if (typeof Notification === "undefined") return "default"
+    return Notification.permission as "default"|"granted"|"denied"
+  })
 
-  // Import Firebase Messaging
-  const { getMessaging, getToken } = await import("firebase/messaging")
-  const { app } = await import("@/lib/firebase")
-  const messaging = getMessaging(app)
+  const requestPermission = async (userId: string): Promise<boolean> => {
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return false
 
-  const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration })
+    const result = await Notification.requestPermission()
+    setPermission(result as "default"|"granted"|"denied")
+    if (result !== "granted") return false
 
-  if (token) {
-    // Lưu FCM token vào DB
-    const { createBrowserClient } = await import("@supabase/ssr")
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-    await supabase.from("profiles").update({ fcm_token: token }).eq("id", userId)
+    const registration = await navigator.serviceWorker.ready
+    const existing = await registration.pushManager.getSubscription()
+    const sub = existing ?? await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
+    })
+
+    const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } }
+    const supabase = createClient()
+    await supabase.from("push_subscriptions").upsert({
+      user_id: userId, endpoint: json.endpoint,
+      p256dh: json.keys.p256dh, auth: json.keys.auth,
+    }, { onConflict: "user_id" })
+    return true
   }
+
+  const unsubscribe = async (userId: string) => {
+    const registration = await navigator.serviceWorker.ready
+    const sub = await registration.pushManager.getSubscription()
+    if (sub) await sub.unsubscribe()
+    const supabase = createClient()
+    await supabase.from("push_subscriptions").delete().eq("user_id", userId)
+  }
+
+  return { permission, requestPermission, unsubscribe }
+}
+
+function urlBase64ToUint8Array(base64: string): ArrayBuffer {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4)
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/")
+  const raw = window.atob(b64)
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0))) as unknown as ArrayBuffer
 }
 ```
+
+> **Env cần có:**
+> - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — public key (để ở client)
+> - `VAPID_PRIVATE_KEY` — private key (chỉ server/Edge Fn, KHÔNG public)
+> - Sinh bằng: `npx web-push generate-vapid-keys`
 
 ### PWA Install Prompt
 
-```typescript
-// src/hooks/usePWAInstall.ts
-import { useEffect, useState } from "react"
+> ✅ **Đã triển khai** — `src/hooks/usePWAInstall.ts` + `src/components/pwa/InstallPrompt.tsx`
+> Tích hợp vào `src/app/(customer)/layout.tsx`.
 
-export function usePWAInstall() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
-  const [showInstall, setShowInstall] = useState(false)
+**Logic:**
+- Lần 1: hiện full modal ngay — hướng dẫn cụ thể theo OS/trình duyệt
+- Lần 2+: nếu chưa cài → hiện reminder bar nhỏ phía trên bottom nav
+- Sau khi cài hoặc bấm "Đã cài xong" → không hiện lại
 
-  useEffect(() => {
-    // Đếm số lần mở app
-    const visits = parseInt(localStorage.getItem("app_visits") ?? "0") + 1
-    localStorage.setItem("app_visits", String(visits))
+**Platform detection:**
+| Platform | Hành động |
+|---|---|
+| Android Chrome | Native `beforeinstallprompt` → nút "Cài đặt ngay" |
+| iOS Safari | Hướng dẫn 3 bước: Share → "Thêm vào Màn hình chính" → Thêm |
+| iOS Chrome/Firefox | Thông báo dùng Safari |
+| Desktop Chrome/Edge | Native `beforeinstallprompt` |
 
-    window.addEventListener("beforeinstallprompt", (e) => {
-      e.preventDefault()
-      setDeferredPrompt(e)
-      // Chỉ hiện sau lần thứ 2
-      if (visits >= 2) setShowInstall(true)
-    })
-  }, [])
+**Env không cần thêm gì cho install prompt** — chỉ dùng browser API.
 
-  const install = async () => {
-    if (!deferredPrompt) return
-    deferredPrompt.prompt()
-    const { outcome } = await deferredPrompt.userChoice
-    setDeferredPrompt(null)
-    setShowInstall(false)
-    return outcome
-  }
-
-  return { showInstall, install, dismiss: () => setShowInstall(false) }
-}
-```
+**localStorage keys:**
+- `pwa_visits` — đếm số lần vào app
+- `pwa_dismissed` — đã bấm "Để sau"
+- `pwa_installed` — đã xác nhận cài xong
 
 ---
 

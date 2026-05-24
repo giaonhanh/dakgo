@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
 import FloatingBottomMenu from '@/components/navigation/FloatingBottomMenu'
+import InstallPrompt from '@/components/pwa/InstallPrompt'
 
 // Các trang đã có inline bottom nav riêng — không cần render thêm từ layout
 const SELF_NAV_PATHS = [
@@ -89,6 +90,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
       <AdminPreviewBar />
       {children}
       {!hasSelfNav && <FloatingBottomMenu />}
+      <InstallPrompt />
     </>
   )
 }
