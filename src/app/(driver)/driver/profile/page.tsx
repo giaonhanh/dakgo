@@ -356,6 +356,8 @@ export default function DriverProfilePage() {
   const [avatar, setAvatar]   = useState<string | null>(null)
   const avatarRef             = useRef<HTMLInputElement>(null)
   const [bankInfo, setBankInfo] = useState<{ bank_name: string | null; bank_account_number: string | null } | null>(null)
+  const [driverStats, setDriverStats] = useState({ rating: 0, trips: 0, walletBal: 0, joinDate: "" })
+  const [vehicleSub,  setVehicleSub]  = useState("Chưa cập nhật thông tin xe")
 
   const loadBankInfo = async (uid: string) => {
     const { data } = await supabase.from("drivers")
@@ -365,16 +367,44 @@ export default function DriverProfilePage() {
   }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
       setUserId(user.id)
-      supabase.from("profiles").select("full_name, phone").eq("id", user.id).single()
-        .then(({ data }) => {
-          if (!data) return
-          setName(data.full_name ?? "")
-          setPhone(data.phone ?? "")
-        })
-      loadBankInfo(user.id)
+
+      // profile info
+      const { data: prof } = await supabase.from("profiles")
+        .select("full_name, phone, created_at").eq("id", user.id).single()
+      if (prof) {
+        setName(prof.full_name ?? "")
+        setPhone(prof.phone ?? "")
+      }
+
+      // driver stats + vehicle
+      const { data: drv } = await supabase.from("drivers")
+        .select("rating_avg, total_trips, vehicle_type, vehicle_model, license_plate, bank_name, bank_account_number")
+        .eq("id", user.id).single()
+
+      // wallet balance
+      const { data: wallet } = await supabase.from("wallets")
+        .select("balance").eq("user_id", user.id).eq("type", "driver").maybeSingle()
+
+      const joinDate = prof?.created_at
+        ? new Date(prof.created_at).toLocaleDateString("vi-VN", { month:"2-digit", year:"numeric" })
+        : ""
+
+      setDriverStats({
+        rating:    (drv as { rating_avg?: number } | null)?.rating_avg ?? 5.0,
+        trips:     (drv as { total_trips?: number } | null)?.total_trips ?? 0,
+        walletBal: (wallet as { balance?: number } | null)?.balance ?? 0,
+        joinDate,
+      })
+
+      if (drv) {
+        const d = drv as { vehicle_model?: string; license_plate?: string }
+        const parts = [d.vehicle_model, d.license_plate].filter(Boolean)
+        setVehicleSub(parts.length ? parts.join(" · ") : "Chưa cập nhật thông tin xe")
+        setBankInfo({ bank_name: (drv as { bank_name?: string }).bank_name ?? null, bank_account_number: (drv as { bank_account_number?: string }).bank_account_number ?? null })
+      }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -462,16 +492,15 @@ export default function DriverProfilePage() {
               <div style={{ color: "#f8f0e0", fontSize: 18, fontWeight: 800, marginBottom: 8 }}>{name}</div>
             )}
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 16 }}>
-              <span style={{ background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.3)", borderRadius: 6, padding: "2px 10px", color: "#3ecf6e", fontSize: 9, fontWeight: 700 }}>🟢 Đang hoạt động</span>
-              <span style={{ color: "#6a5a40", fontSize: 9 }}>· Tham gia 01/03/2024</span>
+              <span style={{ background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.3)", borderRadius: 6, padding: "2px 10px", color: "#3ecf6e", fontSize: 9, fontWeight: 700 }}>🟢 Tài xế</span>
+              {driverStats.joinDate && <span style={{ color: "#6a5a40", fontSize: 9 }}>· Tham gia {driverStats.joinDate}</span>}
             </div>
-            {/* quick stats */}
+            {/* quick stats — real data */}
             <div style={{ display: "flex", gap: 8, width: "100%" }}>
               {[
-                { icon: "⭐", val: "4.9", label: "Đánh giá" },
-                { icon: "📦", val: "312", label: "Chuyến" },
-                { icon: "💰", val: "245k", label: "Hôm nay" },
-                { icon: "🗺", val: "38km", label: "Quãng đường" },
+                { icon: "⭐", val: driverStats.rating.toFixed(1), label: "Đánh giá" },
+                { icon: "📦", val: String(driverStats.trips),     label: "Chuyến" },
+                { icon: "💳", val: driverStats.walletBal >= 1000 ? `${Math.round(driverStats.walletBal/1000)}k` : `${driverStats.walletBal}đ`, label: "Số dư ví" },
               ].map(s => (
                 <div key={s.label} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "10px 0", textAlign: "center" }}>
                   <div style={{ fontSize: 16, marginBottom: 3 }}>{s.icon}</div>
@@ -484,17 +513,14 @@ export default function DriverProfilePage() {
 
           {/* personal info */}
           <Section title="Thông tin cá nhân">
-            <Row icon="👤" label="Họ và tên" sub={name} />
-            <Row icon="📞" label="Số điện thoại" sub={phone} />
-            <Row icon="🪪" label="CMND / CCCD" sub="••• ••• 6789" />
+            <Row icon="👤" label="Họ và tên" sub={name || "Chưa cập nhật"} />
+            <Row icon="📞" label="Số điện thoại" sub={phone || "Chưa cập nhật"} />
           </Section>
 
           {/* vehicle & docs */}
           <Section title="Phương tiện & Giấy tờ">
-            <Row icon="🛵" label="Thông tin xe" sub="Honda Wave Alpha · 47B1-23456" onClick={() => setShowVehicle(true)} arrow />
-            <Row icon="📄" label="Giấy tờ & Hồ sơ" sub="5 giấy tờ · 1 sắp hết hạn" onClick={() => setShowDocs(true)} arrow>
-              <span style={{ background: "rgba(255,179,71,0.12)", border: "1px solid rgba(255,179,71,0.3)", borderRadius: 5, padding: "2px 7px", color: "#FFB347", fontSize: 8, fontWeight: 700 }}>1 sắp hết hạn</span>
-            </Row>
+            <Row icon="🛵" label="Thông tin xe" sub={vehicleSub} onClick={() => setShowVehicle(true)} arrow />
+            <Row icon="📄" label="Giấy tờ & Hồ sơ" sub="Xem và cập nhật giấy tờ" onClick={() => setShowDocs(true)} arrow />
           </Section>
 
           {/* earnings shortcut */}
@@ -592,7 +618,7 @@ export default function DriverProfilePage() {
       <AnimatePresence>
         {showPw      && <PwSheet      onClose={() => setShowPw(false)}      />}
         {showVehicle && <VehicleSheet onClose={() => setShowVehicle(false)} />}
-        {showBank    && <BankSheet    onClose={() => setShowBank(false)}    onSaved={() => userId && loadBankInfo(userId)} />}
+        {showBank    && <BankSheet    onClose={() => setShowBank(false)}    onSaved={async () => { if (!userId) return; const { data } = await supabase.from("drivers").select("bank_name,bank_account_number").eq("id", userId).single(); setBankInfo(data ?? null) }} />}
         {showDocs    && <DocSheet     onClose={() => setShowDocs(false)}    />}
       </AnimatePresence>
     </>

@@ -122,9 +122,6 @@ export default function DriverEarningsPage() {
               <div style={{ color:"#f8f0e0",fontSize:16,fontWeight:800 }}>Thu nhập</div>
               <div style={{ color:"#6a5a40",fontSize:9 }}>Thống kê & lịch sử chuyến</div>
             </div>
-            <button style={{ background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.25)",borderRadius:10,padding:"6px 14px",color:"#3ecf6e",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"Lexend" }}>
-              Rút tiền
-            </button>
           </div>
           <div style={{ display:"flex",background:"rgba(255,255,255,0.04)",borderRadius:10,padding:2,gap:2 }}>
             {(["today","week","month"] as const).map(p => (

@@ -631,6 +631,143 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
   )
 }
 
+/* ── withdraw sheet ── */
+function WithdrawSheet({ onClose, walletBalance, onSuccess }: {
+  onClose: () => void
+  walletBalance: number
+  onSuccess: () => void
+}) {
+  const supabase = createClient()
+  const PRESETS = [100000, 200000, 500000, 1000000]
+  const [amount,    setAmount]    = useState(200000)
+  const [custom,    setCustom]    = useState("")
+  const [useCustom, setUseCustom] = useState(false)
+  const [loading,   setLoading]   = useState(false)
+  const [done,      setDone]      = useState(false)
+  const [err,       setErr]       = useState("")
+  const [bankInfo,  setBankInfo]  = useState<{ bank_name: string; bank_account_number: string; bank_account_name: string } | null>(null)
+
+  const finalAmount = useCustom ? (parseInt(custom.replace(/\D/g, "")) || 0) : amount
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from("drivers")
+        .select("bank_name, bank_account_number, bank_account_name")
+        .eq("id", user.id).single()
+        .then(({ data }) => { if (data?.bank_account_number) setBankInfo(data as { bank_name: string; bank_account_number: string; bank_account_name: string }) })
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function submit() {
+    setErr("")
+    if (finalAmount < 50000) return setErr("Số tiền tối thiểu 50,000đ")
+    if (finalAmount > walletBalance) return setErr(`Số dư không đủ. Ví hiện có ${walletBalance.toLocaleString("vi-VN")}đ`)
+    if (!bankInfo) return setErr("Bạn chưa liên kết tài khoản ngân hàng")
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return setErr("Chưa đăng nhập") }
+    const { error } = await supabase.rpc("subtract_from_wallet", {
+      p_user_id: user.id,
+      p_type:    "driver",
+      p_amount:  finalAmount,
+      p_ref_id:  null,
+      p_note:    `Rút tiền · ${bankInfo.bank_name} · ${bankInfo.bank_account_number}`,
+      p_tx_type: "withdrawal",
+    })
+    setLoading(false)
+    if (error) {
+      if (error.message.includes("insufficient")) return setErr("Số dư không đủ")
+      return setErr("Không thể xử lý yêu cầu. Thử lại sau.")
+    }
+    setDone(true)
+    setTimeout(onSuccess, 2000)
+  }
+
+  return (
+    <motion.div
+      initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+      transition={{ type: "spring", damping: 26, stiffness: 280 }}
+      style={{ position:"fixed", inset:0, zIndex:101, background:"rgba(8,8,6,0.9)", backdropFilter:"blur(8px)", display:"flex", flexDirection:"column", justifyContent:"flex-end" }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{ background:"linear-gradient(180deg,#0e0b07,#080806)", borderTop:"1px solid rgba(255,107,0,0.3)", borderRadius:"24px 24px 0 0", maxHeight:"88dvh", overflowY:"auto", padding:"20px 20px calc(env(safe-area-inset-bottom) + 24px)" }}>
+
+        {/* header */}
+        <div style={{ display:"flex", alignItems:"center", marginBottom:20 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ color:"#FF8C00", fontSize:15, fontWeight:800 }}>💸 Rút tiền về ngân hàng</div>
+            <div style={{ color:"#6a5a40", fontSize:10, marginTop:2 }}>Chuyển từ ví tài xế về tài khoản của bạn</div>
+          </div>
+          <button onClick={onClose} style={{ width:30, height:30, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
+        </div>
+
+        {done ? (
+          <div style={{ textAlign:"center", padding:"24px 0" }}>
+            <div style={{ fontSize:56, marginBottom:12 }}>✅</div>
+            <div style={{ color:"#3ecf6e", fontSize:18, fontWeight:800, marginBottom:6 }}>Yêu cầu đã gửi!</div>
+            <div style={{ color:"#6a5a40", fontSize:11, lineHeight:1.7 }}>
+              Admin sẽ chuyển khoản trong vòng <b style={{color:"#b0956a"}}>24 giờ</b><br />
+              đến tài khoản {bankInfo?.bank_name} của bạn.
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* balance */}
+            <div style={{ background:"rgba(255,107,0,0.07)", border:"1px solid rgba(255,107,0,0.2)", borderRadius:14, padding:"12px 16px", marginBottom:16, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span style={{ color:"#6a5a40", fontSize:11 }}>Số dư ví hiện tại</span>
+              <span style={{ color:"#FF8C00", fontSize:16, fontWeight:800 }}>{walletBalance.toLocaleString("vi-VN")}đ</span>
+            </div>
+
+            {/* bank info */}
+            {bankInfo ? (
+              <div style={{ background:"rgba(62,207,110,0.06)", border:"1px solid rgba(62,207,110,0.2)", borderRadius:14, padding:"12px 16px", marginBottom:16 }}>
+                <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px", marginBottom:8 }}>Tài khoản nhận tiền</div>
+                <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700 }}>{bankInfo.bank_name}</div>
+                <div style={{ color:"#3ecf6e", fontSize:12, fontWeight:600, marginTop:2 }}>{bankInfo.bank_account_number}</div>
+                <div style={{ color:"#6a5a40", fontSize:10, marginTop:2 }}>{bankInfo.bank_account_name}</div>
+              </div>
+            ) : (
+              <div style={{ background:"rgba(255,64,64,0.07)", border:"1px solid rgba(255,64,64,0.2)", borderRadius:14, padding:"12px 16px", marginBottom:16, display:"flex", gap:10, alignItems:"center" }}>
+                <span style={{ fontSize:20 }}>⚠️</span>
+                <div>
+                  <div style={{ color:"#ff4040", fontSize:11, fontWeight:700 }}>Chưa liên kết ngân hàng</div>
+                  <div style={{ color:"#6a5a40", fontSize:9, marginTop:2 }}>Vào Hồ sơ → Tài khoản ngân hàng để thêm</div>
+                </div>
+              </div>
+            )}
+
+            {/* amount presets */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
+              {PRESETS.map(a => (
+                <button key={a} onClick={() => { setAmount(a); setUseCustom(false) }}
+                  style={{ padding:"11px 0", borderRadius:12, border:`1px solid ${!useCustom && amount===a ? "rgba(255,107,0,0.5)" : "rgba(255,255,255,0.08)"}`, background:!useCustom && amount===a ? "rgba(255,107,0,0.1)" : "rgba(255,255,255,0.04)", color:!useCustom && amount===a ? "#FF8C00" : "#f8f0e0", fontSize:13, fontWeight:!useCustom && amount===a ? 800 : 500, cursor:"pointer", fontFamily:"Lexend" }}>
+                  {(a/1000).toFixed(0)}k
+                </button>
+              ))}
+            </div>
+            <input type="tel" placeholder="Hoặc nhập số tiền khác..." value={custom}
+              onFocus={() => setUseCustom(true)}
+              onChange={e => { setUseCustom(true); setCustom(e.target.value) }}
+              style={{ width:"100%", boxSizing:"border-box", height:44, padding:"0 14px", borderRadius:12, border:`1px solid ${useCustom ? "rgba(255,107,0,0.4)" : "rgba(255,255,255,0.08)"}`, background:"rgba(255,255,255,0.04)", color:"#f8f0e0", fontSize:13, fontFamily:"Lexend", outline:"none", marginBottom:6 }}
+            />
+            {err && <div style={{ color:"#ff4040", fontSize:10, marginBottom:10, textAlign:"center" }}>⚠ {err}</div>}
+
+            <button onClick={submit} disabled={loading || !bankInfo || finalAmount < 50000}
+              style={{ width:"100%", height:50, borderRadius:14, border:"none", background:"linear-gradient(90deg,#FF6B00,#FF8C00)", color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer", fontFamily:"Lexend", opacity: loading || !bankInfo || finalAmount < 50000 ? 0.5 : 1, marginTop:4 }}>
+              {loading ? "Đang xử lý..." : `Gửi yêu cầu rút · ${finalAmount >= 50000 ? finalAmount.toLocaleString("vi-VN") + "đ" : "chọn số tiền"}`}
+            </button>
+            <div style={{ color:"#6a5a40", fontSize:9, textAlign:"center", marginTop:8 }}>
+              Xử lý trong vòng 24 giờ · Miễn phí rút tiền
+            </div>
+          </>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
 /* ── main page ── */
 export default function DriverDashboard() {
   const router = useRouter()
@@ -643,6 +780,7 @@ export default function DriverDashboard() {
   const [todayStats,    setTodayStats]    = useState({ orders: 0, earnings: 0, rating: 5.0 })
   const [toggling,      setToggling]      = useState(false)
   const [walletBalance, setWalletBalance] = useState(0)
+  const [showWithdraw,  setShowWithdraw]  = useState(false)
   const [setupDone,     setSetupDone]     = useState(false)
   const [setupStatus,   setSetupStatus]   = useState({ bankLinked: false, vehicleDocs: false, depositDone: false })
   const [showSetupGate, setShowSetupGate] = useState(false)
@@ -940,11 +1078,14 @@ export default function DriverDashboard() {
                 <div style={{ color:"#ff4040", fontSize:9, marginTop:2 }}>⚠ Số dư thấp — nạp thêm để nhận đơn thoải mái</div>
               )}
             </div>
-            <button onClick={() => setShowTopup(true)} style={{
-              padding:"8px 14px", borderRadius:10, border:"none",
-              background:"linear-gradient(90deg,#3ecf6e,#2db55d)",
-              color:"#fff", fontSize:10, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", whiteSpace:"nowrap",
-            }}>+ Nạp tiền</button>
+            <div style={{ display:"flex", flexDirection:"column", gap:6, flexShrink:0 }}>
+              <button onClick={() => setShowTopup(true)} style={{ padding:"7px 12px", borderRadius:10, border:"none", background:"linear-gradient(90deg,#3ecf6e,#2db55d)", color:"#fff", fontSize:10, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", whiteSpace:"nowrap" }}>
+                + Nạp tiền
+              </button>
+              <button onClick={() => setShowWithdraw(true)} style={{ padding:"7px 12px", borderRadius:10, border:"1px solid rgba(255,107,0,0.35)", background:"rgba(255,107,0,0.08)", color:"#FF8C00", fontSize:10, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", whiteSpace:"nowrap" }}>
+                💸 Rút tiền
+              </button>
+            </div>
           </div>
 
           {/* ── tips card ── */}
@@ -1023,6 +1164,27 @@ export default function DriverDashboard() {
             onClose={() => setShowTopup(false)}
             onSuccess={async () => {
               setShowTopup(false)
+              const { data: { user } } = await supabase.auth.getUser()
+              if (!user) return
+              const { data: w } = await supabase
+                .from("wallets").select("balance")
+                .eq("user_id", user.id).eq("type", "driver").maybeSingle()
+              const newBal = (w as { balance: number } | null)?.balance ?? 0
+              setWalletBalance(newBal)
+              setSetupStatus(s => ({ ...s, depositDone: newBal >= 200000 }))
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── withdraw sheet ── */}
+      <AnimatePresence>
+        {showWithdraw && (
+          <WithdrawSheet
+            walletBalance={walletBalance}
+            onClose={() => setShowWithdraw(false)}
+            onSuccess={async () => {
+              setShowWithdraw(false)
               const { data: { user } } = await supabase.auth.getUser()
               if (!user) return
               const { data: w } = await supabase
