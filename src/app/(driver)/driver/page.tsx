@@ -260,18 +260,32 @@ function OrderPopup({
 
 /* ── setup gate ── */
 function SetupGate({
-  status, walletBalance, onClose,
+  status, walletBalance, onClose, onTopup,
 }: {
   status: { bankLinked: boolean; vehicleDocs: boolean; depositDone: boolean }
   walletBalance: number
   onClose: () => void
+  onTopup: () => void
 }) {
-  const items = [
-    { done: status.bankLinked,  icon: "🏦", label: "Tài khoản ngân hàng",   sub: status.bankLinked  ? "Đã liên kết"  : "Chưa liên kết tài khoản nhận tiền" },
-    { done: status.vehicleDocs, icon: "🛵", label: "Thông tin phương tiện",  sub: status.vehicleDocs ? "Đã cập nhật"  : "Cần cập nhật biển số và loại xe"   },
-    { done: status.depositDone, icon: "💰", label: "Nạp tiền cọc 200,000đ", sub: `Số dư hiện tại: ${walletBalance.toLocaleString("vi-VN")}đ` },
+  const profileItems = [
+    { done: status.bankLinked,  icon: "🏦", label: "Tài khoản ngân hàng",  sub: status.bankLinked  ? "Đã liên kết" : "Chưa liên kết tài khoản nhận tiền" },
+    { done: status.vehicleDocs, icon: "🛵", label: "Thông tin phương tiện", sub: status.vehicleDocs ? "Đã cập nhật" : "Cần cập nhật biển số và loại xe"   },
   ]
-  const allDone = items.every(i => i.done)
+  const allDone = status.bankLinked && status.vehicleDocs && status.depositDone
+
+  function ItemRow({ done, icon, label, sub, onClick }: { done: boolean; icon: string; label: string; sub: string; onClick: () => void }) {
+    return (
+      <div onClick={onClick} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:14, cursor:"pointer", background: done ? "rgba(62,207,110,0.06)" : "rgba(255,255,255,0.04)", border:`1px solid ${done ? "rgba(62,207,110,0.2)" : "rgba(255,255,255,0.08)"}` }}>
+        <div style={{ width:40, height:40, borderRadius:12, background: done ? "rgba(62,207,110,0.12)" : "rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>{icon}</div>
+        <div style={{ flex:1 }}>
+          <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700 }}>{label}</div>
+          <div style={{ color:"#6a5a40", fontSize:9, marginTop:2 }}>{sub}</div>
+        </div>
+        {done ? <span style={{ color:"#3ecf6e", fontSize:18 }}>✓</span> : <span style={{ color:"#FF8C00", fontSize:14 }}>›</span>}
+      </div>
+    )
+  }
+
   return (
     <motion.div
       initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
@@ -288,26 +302,23 @@ function SetupGate({
           <button onClick={onClose} style={{ width:30, height:30, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
         </div>
         <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
-          {items.map((item, i) => (
-            <a key={i} href="/driver/profile" style={{ textDecoration:"none" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:14, background: item.done ? "rgba(62,207,110,0.06)" : "rgba(255,255,255,0.04)", border:`1px solid ${item.done ? "rgba(62,207,110,0.2)" : "rgba(255,255,255,0.08)"}` }}>
-                <div style={{ width:40, height:40, borderRadius:12, background: item.done ? "rgba(62,207,110,0.12)" : "rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>{item.icon}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700 }}>{item.label}</div>
-                  <div style={{ color:"#6a5a40", fontSize:9, marginTop:2 }}>{item.sub}</div>
-                </div>
-                {item.done
-                  ? <span style={{ color:"#3ecf6e", fontSize:18 }}>✓</span>
-                  : <span style={{ color:"#FF8C00", fontSize:14 }}>›</span>
-                }
-              </div>
-            </a>
+          {/* Ngân hàng + phương tiện → vào profile */}
+          {profileItems.map((item) => (
+            <ItemRow key={item.label} {...item} onClick={() => { window.location.href = "/driver/profile" }} />
           ))}
+          {/* Nạp tiền → mở TopupSheet */}
+          <ItemRow
+            done={status.depositDone}
+            icon="💳"
+            label="Nạp tiền vào ví (tối thiểu 200,000đ)"
+            sub={`Số dư hiện tại: ${walletBalance.toLocaleString("vi-VN")}đ`}
+            onClick={() => { onClose(); onTopup() }}
+          />
         </div>
         {!allDone && (
           <div style={{ marginTop:14, padding:"10px 14px", borderRadius:12, background:"rgba(255,107,0,0.06)", border:"1px dashed rgba(255,107,0,0.2)", display:"flex", gap:10, alignItems:"flex-start" }}>
             <span style={{ fontSize:16, flexShrink:0 }}>💡</span>
-            <span style={{ color:"#b0956a", fontSize:9, lineHeight:1.5 }}>Hoàn thành hồ sơ để bắt đầu nhận đơn và kiếm thu nhập. Liên hệ admin nếu cần hỗ trợ nạp tiền cọc.</span>
+            <span style={{ color:"#b0956a", fontSize:9, lineHeight:1.5 }}>Hoàn thành hồ sơ để bắt đầu nhận đơn và kiếm thu nhập.</span>
           </div>
         )}
         <button
@@ -973,6 +984,7 @@ export default function DriverDashboard() {
             status={setupStatus}
             walletBalance={walletBalance}
             onClose={() => setShowSetupGate(false)}
+            onTopup={() => setShowTopup(true)}
           />
         )}
       </AnimatePresence>
