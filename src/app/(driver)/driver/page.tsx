@@ -358,7 +358,7 @@ interface PayInfo {
   description: string
 }
 
-function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (amount: number) => void }) {
+function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [amount,    setAmount]    = useState(200000)
   const [custom,    setCustom]    = useState("")
   const [useCustom, setUseCustom] = useState(false)
@@ -436,7 +436,7 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (a
         if (topup?.status === "paid") {
           clearInterval(intervalRef.current!)
           setPaid(true)
-          setTimeout(() => onSuccess(finalAmount), 1500)
+          setTimeout(() => onSuccess(), 1500)
         }
       }, 5000)
     } catch (e) {
@@ -1021,9 +1021,16 @@ export default function DriverDashboard() {
         {showTopup && (
           <TopupSheet
             onClose={() => setShowTopup(false)}
-            onSuccess={(added) => {
-              setWalletBalance(b => b + added)
+            onSuccess={async () => {
               setShowTopup(false)
+              const { data: { user } } = await supabase.auth.getUser()
+              if (!user) return
+              const { data: w } = await supabase
+                .from("wallets").select("balance")
+                .eq("user_id", user.id).eq("type", "driver").maybeSingle()
+              const newBal = (w as { balance: number } | null)?.balance ?? 0
+              setWalletBalance(newBal)
+              setSetupStatus(s => ({ ...s, depositDone: newBal >= 200000 }))
             }}
           />
         )}
