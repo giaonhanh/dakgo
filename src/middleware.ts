@@ -6,32 +6,6 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   let response = NextResponse.next({ request });
 
-  // ── DEV QUICK LOGIN bypass (chỉ hoạt động khi NODE_ENV=development) ──
-  if (process.env.NODE_ENV === "development") {
-    const devRole = request.cookies.get("dev_role")?.value;
-    if (devRole) {
-      if (pathname === "/login") return response; // cho phép ở trang login
-      // Redirect từ root "/" sang đúng dashboard
-      if (pathname === "/") {
-        const dest = devRole === "driver"   ? "/driver"
-                   : devRole === "merchant" ? "/merchant"
-                   : devRole === "admin"    ? "/admin"    : null;
-        if (dest) return NextResponse.redirect(new URL(dest, request.url));
-        return response;
-      }
-      // Bảo vệ route theo dev_role
-      if (pathname.startsWith("/driver")   && devRole !== "driver"   && devRole !== "admin")
-        return NextResponse.redirect(new URL("/", request.url));
-      if (pathname.startsWith("/merchant") && devRole !== "merchant" && devRole !== "admin")
-        return NextResponse.redirect(new URL("/", request.url));
-      if (pathname.startsWith("/admin")    && devRole !== "admin")
-        return NextResponse.redirect(new URL("/", request.url));
-      return response; // cho qua
-    }
-    // Không có dev_role cookie → fall through để kiểm tra Supabase session thật
-  }
-  // ── END DEV BYPASS ──
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -63,13 +37,18 @@ export async function middleware(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    // Tài khoản bị khóa (chỉ khi profile tồn tại VÀ is_active = false)
+    // Tài khoản bị khóa
     if (profile?.is_active === false) {
       return NextResponse.redirect(new URL("/login?error=suspended", request.url));
     }
 
-    // Profile chưa tạo (trigger thất bại) → mặc định customer, cho qua
-    const role = profile?.role ?? "customer";
+    // Profile không tồn tại (trigger thất bại hoặc RLS chặn) → đăng xuất + về login
+    if (!profile) {
+      console.error("[Middleware] profile null for user", user.id, "— check RLS policies on profiles table")
+      return NextResponse.redirect(new URL("/login?error=no_profile", request.url));
+    }
+
+    const role = profile.role;
 
     // Normalize: DB có thể dùng "shop" hoặc "merchant" — đều vào /merchant
     const isMerchant = role === "merchant" || role === "shop";

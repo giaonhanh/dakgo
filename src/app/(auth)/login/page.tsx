@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
 type Tab      = "login" | "register"
@@ -147,7 +147,6 @@ function Divider({ label, color }: { label: string; color: string }) {
 
 // ════════════════════════════════════════════════════════════
 function LoginContent() {
-  const router = useRouter()
   const params = useSearchParams()
   const supabase = createClient()
 
@@ -186,12 +185,9 @@ function LoginContent() {
   const submitting    = useRef(false)
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function devLogin(role: string, dest: string) {
-    document.cookie = `dev_role=${role}; path=/; max-age=86400`
-    router.push(dest)
-  }
-
   useEffect(() => {
+    // Xóa dev_role cookie cũ (nếu còn từ lần test trước)
+    document.cookie = "dev_role=; path=/; max-age=0"
     // Xóa session cũ khi vào login — tránh bị kẹt account cũ
     supabase.auth.signOut()
     const t = setTimeout(() => setPhase("auth"), 3000)
@@ -226,7 +222,7 @@ function LoginContent() {
         email: phoneToEmail(phone), password,
       })
       if (err) { setError("Số điện thoại hoặc mật khẩu không đúng"); return }
-      router.push("/")
+      window.location.href = "/"
     } finally {
       setLoading(false)
       submitting.current = false
@@ -288,7 +284,7 @@ function LoginContent() {
       }
 
       setSuccess("Đăng ký thành công! Đang chuyển hướng...")
-      redirectTimer.current = setTimeout(() => router.push("/"), 1200)
+      redirectTimer.current = setTimeout(() => { window.location.href = "/" }, 1200)
     } finally {
       setLoading(false)
       submitting.current = false
@@ -636,45 +632,6 @@ function LoginContent() {
                 </motion.div>
               )}
 
-              {/* ── DEV QUICK LOGIN — chỉ hiện khi development ── */}
-              {process.env.NODE_ENV === "development" && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: .3 }}
-                  style={{ width: "100%", paddingBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
-                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.05)" }} />
-                    <div style={{
-                      display: "flex", alignItems: "center", gap: 5,
-                      background: "rgba(245,197,66,.08)", border: "1px solid rgba(245,197,66,.2)",
-                      borderRadius: 8, padding: "3px 9px",
-                    }}>
-                      <span style={{ fontSize: 10 }}>🧪</span>
-                      <span style={{ color: "rgba(245,197,66,.75)", fontSize: 8.5, fontWeight: 600 }}>DEV TEST</span>
-                    </div>
-                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.05)" }} />
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
-                    {[
-                      { icon: "👤", label: "Khách hàng",   role: "customer",  dest: "/",         c: "rgba(255,107,0,.12)",  bd: "rgba(255,107,0,.3)",  tc: "#FF8C00" },
-                      { icon: "🛵", label: "Tài xế Xe ôm", role: "driver",    dest: "/driver",   c: "rgba(62,207,110,.10)", bd: "rgba(62,207,110,.3)", tc: "#3ecf6e" },
-                      { icon: "🚕", label: "Tài xế Taxi",  role: "driver",    dest: "/driver",   c: "rgba(74,143,245,.10)", bd: "rgba(74,143,245,.3)", tc: "#4a8ff5" },
-                      { icon: "🏪", label: "Cửa hàng",     role: "merchant",  dest: "/merchant", c: "rgba(180,100,255,.10)",bd: "rgba(180,100,255,.3)",tc: "#b464ff" },
-                    ].map(a => (
-                      <button key={a.label} onClick={() => devLogin(a.role, a.dest)} style={{
-                        height: 52, borderRadius: 12, border: `1px solid ${a.bd}`,
-                        background: a.c, cursor: "pointer",
-                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
-                        fontFamily: "Lexend", transition: "all .15s",
-                      }}>
-                        <span style={{ fontSize: 18 }}>{a.icon}</span>
-                        <span style={{ color: a.tc, fontSize: 9, fontWeight: 700 }}>{a.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <p style={{ color: "rgba(245,197,66,.35)", fontSize: 8, textAlign: "center", marginTop: 8 }}>
-                    Nhấn để truy cập không cần đăng nhập · Chỉ dùng khi dev
-                  </p>
-                </motion.div>
-              )}
 
               <p style={{ color: "rgba(255,255,255,.14)", fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: 20 }}>
                 GIAO NHANH · KRÔNG PẮC
