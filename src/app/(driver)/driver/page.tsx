@@ -325,6 +325,180 @@ function SetupGate({
   )
 }
 
+/* ── topup sheet ── */
+const PRESET_AMOUNTS = [50000, 100000, 200000, 500000]
+
+function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (amount: number) => void }) {
+  const [amount,    setAmount]    = useState(200000)
+  const [custom,    setCustom]    = useState("")
+  const [useCustom, setUseCustom] = useState(false)
+  const [step,      setStep]      = useState<"pick"|"qr">("pick")
+  const [qrImg,     setQrImg]     = useState("")
+  const [bankInfo,  setBankInfo]  = useState({ accountNumber: "", accountName: "", bin: "" })
+  const [loading,   setLoading]   = useState(false)
+  const [err,       setErr]       = useState("")
+  const [paid,      setPaid]      = useState(false)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const payCodeRef  = useRef<number>(0)
+
+  const finalAmount = useCustom ? (parseInt(custom.replace(/\D/g, "")) || 0) : amount
+
+  async function createQR() {
+    if (finalAmount < 10000) return setErr("Số tiền tối thiểu 10,000đ")
+    setLoading(true)
+    setErr("")
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("not-auth")
+
+      const payCode = Math.floor(10000000 + Math.random() * 90000000)
+      payCodeRef.current = payCode
+
+      // Lưu vào wallet_topups để webhook nhận diện
+      const { error: dbErr } = await supabase.from("wallet_topups").insert({
+        user_id: user.id, wallet_type: "driver",
+        payment_code: payCode, amount: finalAmount, status: "pending",
+      })
+      if (dbErr) throw new Error(dbErr.message)
+
+      // Tạo QR PayOS
+      const res = await fetch("/api/payment/payos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderCode:   payCode,
+          amount:      finalAmount,
+          description: `NAP VI TAI XE`,
+          returnUrl:   `${window.location.origin}/driver`,
+          cancelUrl:   `${window.location.origin}/driver`,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) throw new Error(json.error ?? "PayOS error")
+
+      setQrImg(json.qrCode ?? "")
+      setBankInfo({ accountNumber: json.accountNumber ?? "", accountName: json.accountName ?? "", bin: json.bin ?? "" })
+      setStep("qr")
+
+      // Poll wallet balance mỗi 5s để phát hiện khi webhook cộng tiền
+      intervalRef.current = setInterval(async () => {
+        const { data: topup } = await supabase
+          .from("wallet_topups")
+          .select("status")
+          .eq("payment_code", payCode)
+          .single()
+        if (topup?.status === "paid") {
+          clearInterval(intervalRef.current!)
+          setPaid(true)
+          setTimeout(() => onSuccess(finalAmount), 1200)
+        }
+      }, 5000)
+    } catch (e) {
+      setErr((e as Error).message || "Không thể tạo QR, thử lại sau")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current) }, [])
+
+  return (
+    <motion.div
+      initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+      transition={{ type: "spring", damping: 26, stiffness: 280 }}
+      style={{ position:"fixed", inset:0, zIndex:101, background:"rgba(8,8,6,0.88)", backdropFilter:"blur(8px)", display:"flex", flexDirection:"column", justifyContent:"flex-end" }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{ background:"linear-gradient(180deg,#0e0b07,#080806)", borderTop:"1px solid rgba(62,207,110,0.3)", borderRadius:"24px 24px 0 0", padding:"20px 20px calc(env(safe-area-inset-bottom) + 24px)" }}>
+
+        {/* header */}
+        <div style={{ display:"flex", alignItems:"center", marginBottom:20 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ color:"#3ecf6e", fontSize:15, fontWeight:800 }}>💳 Nạp tiền vào ví</div>
+            <div style={{ color:"#6a5a40", fontSize:10, marginTop:2 }}>Quét QR để nạp tiền ngay lập tức</div>
+          </div>
+          <button onClick={onClose} style={{ width:30, height:30, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
+        </div>
+
+        {step === "pick" ? (
+          <>
+            {/* preset amounts */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:12 }}>
+              {PRESET_AMOUNTS.map(a => (
+                <button key={a} onClick={() => { setAmount(a); setUseCustom(false) }}
+                  style={{ padding:"10px 0", borderRadius:12, border:`1px solid ${!useCustom && amount===a ? "rgba(62,207,110,0.6)" : "rgba(255,255,255,0.08)"}`, background: !useCustom && amount===a ? "rgba(62,207,110,0.1)" : "rgba(255,255,255,0.04)", color: !useCustom && amount===a ? "#3ecf6e" : "#f8f0e0", fontSize:11, fontWeight:!useCustom && amount===a ? 700 : 500, cursor:"pointer", fontFamily:"Lexend" }}>
+                  {(a/1000).toFixed(0)}k
+                </button>
+              ))}
+            </div>
+
+            {/* custom amount */}
+            <div style={{ marginBottom:16 }}>
+              <input
+                type="tel"
+                placeholder="Hoặc nhập số tiền khác..."
+                value={custom}
+                onFocus={() => setUseCustom(true)}
+                onChange={e => { setUseCustom(true); setCustom(e.target.value) }}
+                style={{ width:"100%", boxSizing:"border-box", padding:"10px 14px", borderRadius:12, border:`1px solid ${useCustom ? "rgba(62,207,110,0.4)" : "rgba(255,255,255,0.08)"}`, background:"rgba(255,255,255,0.04)", color:"#f8f0e0", fontSize:12, fontFamily:"Lexend", outline:"none" }}
+              />
+              {useCustom && finalAmount > 0 && (
+                <div style={{ color:"#6a5a40", fontSize:9, marginTop:4, paddingLeft:4 }}>= {finalAmount.toLocaleString("vi-VN")}đ</div>
+              )}
+            </div>
+
+            {err && <div style={{ color:"#ff4040", fontSize:10, marginBottom:10, textAlign:"center" }}>{err}</div>}
+
+            <button onClick={createQR} disabled={loading || finalAmount < 10000}
+              style={{ width:"100%", height:50, borderRadius:14, border:"none", background:"linear-gradient(90deg,#3ecf6e,#2db55d)", color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer", fontFamily:"Lexend", opacity: loading || finalAmount < 10000 ? 0.5 : 1 }}>
+              {loading ? "Đang tạo QR..." : `Tạo QR · ${finalAmount >= 10000 ? finalAmount.toLocaleString("vi-VN") + "đ" : "chọn số tiền"}`}
+            </button>
+          </>
+        ) : paid ? (
+          <div style={{ textAlign:"center", padding:"20px 0" }}>
+            <div style={{ fontSize:56, marginBottom:12 }}>🎉</div>
+            <div style={{ color:"#3ecf6e", fontSize:18, fontWeight:800, marginBottom:6 }}>Nạp tiền thành công!</div>
+            <div style={{ color:"#6a5a40", fontSize:11 }}>+{finalAmount.toLocaleString("vi-VN")}đ đã vào ví</div>
+          </div>
+        ) : (
+          <>
+            {/* QR code */}
+            {qrImg ? (
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:12 }}>
+                <div style={{ background:"#fff", borderRadius:16, padding:12 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={qrImg} alt="QR thanh toán" width={200} height={200} style={{ display:"block" }} />
+                </div>
+                <div style={{ textAlign:"center" }}>
+                  <div style={{ color:"#3ecf6e", fontSize:20, fontWeight:800 }}>{finalAmount.toLocaleString("vi-VN")}đ</div>
+                  <div style={{ color:"#6a5a40", fontSize:9, marginTop:4 }}>Mở app ngân hàng quét mã QR để nạp tiền</div>
+                </div>
+                {bankInfo.accountNumber && (
+                  <div style={{ width:"100%", padding:"10px 14px", borderRadius:12, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", fontSize:10 }}>
+                    <div style={{ color:"#6a5a40", marginBottom:4 }}>Hoặc chuyển khoản thủ công:</div>
+                    <div style={{ color:"#f8f0e0", fontWeight:600 }}>STK: {bankInfo.accountNumber}</div>
+                    <div style={{ color:"#f8f0e0" }}>Tên: {bankInfo.accountName}</div>
+                  </div>
+                )}
+                <div style={{ display:"flex", alignItems:"center", gap:6, color:"#6a5a40", fontSize:9 }}>
+                  <div style={{ width:6, height:6, borderRadius:"50%", background:"#3ecf6e", animation:"pulse 1.5s infinite" }} />
+                  Đang chờ xác nhận thanh toán...
+                </div>
+              </div>
+            ) : (
+              <div style={{ textAlign:"center", color:"#6a5a40", fontSize:11, padding:"20px 0" }}>Đang tải QR...</div>
+            )}
+            <button onClick={() => { setStep("pick"); if (intervalRef.current) clearInterval(intervalRef.current) }}
+              style={{ width:"100%", marginTop:16, height:44, borderRadius:12, border:"1px solid rgba(255,255,255,0.1)", background:"transparent", color:"#6a5a40", fontSize:11, cursor:"pointer", fontFamily:"Lexend" }}>
+              ← Chọn lại số tiền
+            </button>
+          </>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
 /* ── main page ── */
 export default function DriverDashboard() {
   const router = useRouter()
@@ -340,6 +514,7 @@ export default function DriverDashboard() {
   const [setupDone,     setSetupDone]     = useState(false)
   const [setupStatus,   setSetupStatus]   = useState({ bankLinked: false, vehicleDocs: false, depositDone: false })
   const [showSetupGate, setShowSetupGate] = useState(false)
+  const [showTopup,     setShowTopup]     = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   // ── Load driver profile on mount ──
@@ -633,7 +808,7 @@ export default function DriverDashboard() {
                 <div style={{ color:"#ff4040", fontSize:9, marginTop:2 }}>⚠ Số dư thấp — nạp thêm để nhận đơn thoải mái</div>
               )}
             </div>
-            <button onClick={() => setShowSetupGate(true)} style={{
+            <button onClick={() => setShowTopup(true)} style={{
               padding:"8px 14px", borderRadius:10, border:"none",
               background:"linear-gradient(90deg,#3ecf6e,#2db55d)",
               color:"#fff", fontSize:10, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", whiteSpace:"nowrap",
@@ -704,6 +879,19 @@ export default function DriverDashboard() {
             status={setupStatus}
             walletBalance={walletBalance}
             onClose={() => setShowSetupGate(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── topup sheet ── */}
+      <AnimatePresence>
+        {showTopup && (
+          <TopupSheet
+            onClose={() => setShowTopup(false)}
+            onSuccess={(added) => {
+              setWalletBalance(b => b + added)
+              setShowTopup(false)
+            }}
           />
         )}
       </AnimatePresence>
