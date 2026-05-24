@@ -168,11 +168,12 @@ export default function MerchantMenuPage() {
   const [importSaving, setImportSaving] = useState(false)
 
   const [toast, setToast] = useState("")
+  const [toastOk, setToastOk] = useState(true)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const fileRef  = useRef<HTMLInputElement>(null)
   const csvRef   = useRef<HTMLInputElement>(null)
 
-  const fire = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2400) }
+  const fire = (msg: string, ok = true) => { setToast(msg); setToastOk(ok); setTimeout(() => setToast(""), 3000) }
 
   // ── Drag-and-drop sensors & handlers ──────────────────────────────────────
   const sensors = useSensors(
@@ -185,6 +186,11 @@ export default function MerchantMenuPage() {
       await supabase.from("products").update({ sort_order: p.sortOrder }).eq("id", p.id)
     }
   }, [supabase])
+
+  const persistGroups = useCallback(async (grps: MenuGroup[]) => {
+    if (!shopId) return
+    await supabase.from("shops").update({ menu_groups_data: grps }).eq("id", shopId)
+  }, [shopId, supabase])
 
   const handleProductDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
@@ -214,7 +220,7 @@ export default function MerchantMenuPage() {
   }, [])
 
   // ── Load from Supabase ─────────────────────────────────────────────────
-  const loadProducts = useCallback(async (sid: string) => {
+  const loadProducts = useCallback(async (sid: string): Promise<Product[]> => {
     const { data } = await supabase
       .from("products")
       .select("id,name,description,price,original_price,category,is_available,sold_count,sort_order,image_url")
@@ -230,18 +236,34 @@ export default function MerchantMenuPage() {
       badge: null, available: p.is_available, soldCount: p.sold_count, sortOrder: p.sort_order,
     }))
     setProducts(mapped)
-
-    // Derive groups from unique categories
-    const cats = Array.from(new Set(mapped.map(p => p.menuGroupId).filter(Boolean)))
-    setGroups(cats.map((cat, i) => ({ id: cat, name: cat, allDay: true, startHour: "06:00", endHour: "22:00", sortOrder: i })))
+    return mapped
   }, [supabase])
 
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
-      const { data: shop } = await supabase.from("shops").select("id").eq("owner_id", user.id).single()
-      if (shop) { setShopId(shop.id); await loadProducts(shop.id) }
+      const { data: shop } = await supabase
+        .from("shops").select("id, menu_groups_data").eq("owner_id", user.id).single()
+      if (!shop) { setLoading(false); return }
+
+      setShopId(shop.id)
+      const prods = await loadProducts(shop.id)
+
+      const saved = (shop.menu_groups_data as MenuGroup[] | null) ?? []
+      if (saved.length > 0) {
+        setGroups(saved)
+      } else {
+        // Backward compat: derive from existing product categories
+        const cats = Array.from(new Set(prods.map(p => p.menuGroupId).filter(Boolean)))
+        const derived: MenuGroup[] = cats.map((cat, i) => ({
+          id: cat, name: cat, allDay: true, startHour: "06:00", endHour: "22:00", sortOrder: i,
+        }))
+        setGroups(derived)
+        if (derived.length > 0) {
+          await supabase.from("shops").update({ menu_groups_data: derived }).eq("id", shop.id)
+        }
+      }
       setLoading(false)
     }
     init()
@@ -392,23 +414,28 @@ export default function MerchantMenuPage() {
   const openNewGroup  = () => { setGModal(blankGroup()); setGEditing(false) }
   const openEditGroup = (g: MenuGroup) => { setGModal({...g}); setGEditing(true) }
 
-  const saveGroup = () => {
+  const saveGroup = async () => {
     if (!gModal?.name.trim()) return
+    let newGroups: MenuGroup[]
     if (gEditing) {
-      setGroups(gs => gs.map(g => g.id === gModal.id ? {...gModal, sortOrder:g.sortOrder} as MenuGroup : g))
-      fire("Đã cập nhật nhóm menu")
+      newGroups = groups.map(g => g.id === gModal.id ? {...gModal, sortOrder: g.sortOrder} as MenuGroup : g)
+      fire("Đã lưu nhóm menu")
     } else {
       const newId = gModal.name.trim()
-      if (groups.find(g => g.id === newId)) { fire("❌ Nhóm này đã tồn tại"); return }
-      setGroups(gs => [...gs, {...gModal, id: newId, sortOrder:gs.length} as MenuGroup])
+      if (groups.find(g => g.id === newId)) { fire("❌ Nhóm này đã tồn tại", false); return }
+      newGroups = [...groups, {...gModal, id: newId, sortOrder: groups.length} as MenuGroup]
       fire("Đã tạo nhóm menu mới")
     }
+    setGroups(newGroups)
+    await persistGroups(newGroups)
     setGModal(null)
   }
 
-  const delGroup = (id: string) => {
+  const delGroup = async (id: string) => {
     if (!confirm("Xoá nhóm này? Các món trong nhóm sẽ không bị xoá.")) return
-    setGroups(gs => gs.filter(g => g.id !== id))
+    const newGroups = groups.filter(g => g.id !== id)
+    setGroups(newGroups)
+    await persistGroups(newGroups)
     setProducts(ps => ps.map(p => p.menuGroupId === id ? {...p, menuGroupId:""} : p))
     fire("Đã xoá nhóm")
   }
@@ -430,7 +457,7 @@ export default function MerchantMenuPage() {
   const openEditProduct = (p: Product) => { setPModal({...p}); setPEditing(true) }
 
   const saveProduct = async () => {
-    if (!pModal?.name.trim() || pModal.price <= 0) { fire("❌ Vui lòng nhập tên món và giá bán"); return }
+    if (!pModal?.name.trim() || pModal.price <= 0) { fire("❌ Vui lòng nhập tên món và giá bán", false); return }
     const category = pModal.categories[0] || pModal.menuGroupId || null
 
     // Upload image if new file selected
@@ -456,18 +483,18 @@ export default function MerchantMenuPage() {
     }
     if (pEditing) {
       const { error } = await supabase.from("products").update(payload).eq("id", pModal.id)
-      if (error) { fire("❌ Lỗi cập nhật: " + error.message); return }
+      if (error) { fire("❌ Lỗi cập nhật: " + error.message, false); return }
       const updatedPreview = imageUrl ?? pModal.imagePreview
       setProducts(ps => ps.map(p => p.id === pModal.id
         ? {...pModal, imagePreview: updatedPreview, categories: category ? [category] : [], menuGroupId: category ?? ""}
         : p))
       fire("Đã cập nhật món")
     } else {
-      if (!shopId) { fire("❌ Không tìm thấy cửa hàng. Vui lòng tải lại trang."); return }
+      if (!shopId) { fire("❌ Không tìm thấy cửa hàng. Vui lòng tải lại trang.", false); return }
       const { data, error } = await supabase.from("products")
         .insert({ ...payload, shop_id: shopId, sold_count: 0 })
         .select("id").single()
-      if (error || !data) { fire("❌ Lỗi thêm món: " + (error?.message ?? "")); return }
+      if (error || !data) { fire("❌ Lỗi thêm món: " + (error?.message ?? ""), false); return }
       const newProd: Product = {
         ...pModal, id: data.id, sortOrder: products.length,
         imagePreview: imageUrl ?? pModal.imagePreview,
@@ -485,7 +512,7 @@ export default function MerchantMenuPage() {
 
   const delProduct = async (id: string) => {
     const { error } = await supabase.from("products").delete().eq("id", id)
-    if (error) { fire("❌ Lỗi xoá: " + error.message); return }
+    if (error) { fire("❌ Lỗi xoá: " + error.message, false); return }
     setProducts(ps => ps.filter(p => p.id !== id))
     fire("Đã xoá món")
   }
@@ -495,7 +522,7 @@ export default function MerchantMenuPage() {
     if (!p) return
     const next = !p.available
     const { error } = await supabase.from("products").update({ is_available: next }).eq("id", id)
-    if (error) { fire("❌ Lỗi cập nhật"); return }
+    if (error) { fire("❌ Lỗi cập nhật", false); return }
     setProducts(ps => ps.map(x => x.id === id ? {...x, available: next} : x))
   }
 
@@ -573,9 +600,12 @@ export default function MerchantMenuPage() {
         {toast && (
           <motion.div initial={{opacity:0,y:-10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}}
             style={{position:"fixed",top:56,left:"50%",transform:"translateX(-50%)",zIndex:999,whiteSpace:"nowrap",
-              background:"rgba(62,207,110,0.15)",border:"1px solid rgba(62,207,110,0.35)",
-              borderRadius:12,padding:"7px 18px",color:"#3ecf6e",fontSize:11,fontWeight:600,backdropFilter:"blur(10px)"}}>
-            ✓ {toast}
+              background: toastOk ? "rgba(62,207,110,0.15)" : "rgba(255,64,64,0.15)",
+              border: toastOk ? "1px solid rgba(62,207,110,0.35)" : "1px solid rgba(255,64,64,0.35)",
+              borderRadius:12,padding:"7px 18px",
+              color: toastOk ? "#3ecf6e" : "#ff4040",
+              fontSize:11,fontWeight:600,backdropFilter:"blur(10px)"}}>
+            {toastOk ? "✓" : "✕"} {toast}
           </motion.div>
         )}
       </AnimatePresence>
