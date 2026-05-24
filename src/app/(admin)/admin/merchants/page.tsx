@@ -157,12 +157,12 @@ export default function AdminMerchantsPage() {
 
   const saveInlineCommission = async (id: string, rate: number) => {
     const supabase = createClient()
-    const { error } = await supabase.from("shops").update({ commission_rate: rate }).eq("id", id)
+    const { error } = await supabase.from("shops").update({ commission_rate: rate, is_negotiated_commission: true }).eq("id", id)
     if (error) { fireToast("❌ Lỗi cập nhật hoa hồng", false); return }
     setMerchants(ps => ps.map(m => m.id === id ? { ...m, commissionRate: rate } : m))
     if (selected?.id === id) setSelected(p => p ? { ...p, commissionRate: rate } : p)
     setInlineEdit(null)
-    fireToast(`✅ Hoa hồng cập nhật thành ${rate}%`)
+    fireToast(`✅ Hoa hồng thoả thuận ${rate}% đã lưu`)
   }
 
   const deleteShop = async () => {

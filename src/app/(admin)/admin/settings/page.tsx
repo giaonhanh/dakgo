@@ -152,15 +152,16 @@ export default function AdminSettingsPage() {
     const { data: updatedShops, error } = await supabase.from("shops")
       .update({ commission_rate: rate, updated_at: new Date().toISOString() })
       .eq("status", "approved")
+      .or("is_negotiated_commission.is.null,is_negotiated_commission.eq.false")
       .select("id")
     const count = updatedShops?.length ?? 0
     if (error) {
       setApplyCommissionMsg("❌ Lỗi: " + error.message)
     } else {
-      setApplyCommissionMsg(`✅ Đã cập nhật ${count ?? 0} cửa hàng → ${rate}%`)
+      setApplyCommissionMsg(`✅ Đã cập nhật ${count} cửa hàng → ${rate}% (bỏ qua cửa hàng hoa hồng thoả thuận)`)
     }
     setApplyingCommission(false)
-    setTimeout(() => setApplyCommissionMsg(""), 4000)
+    setTimeout(() => setApplyCommissionMsg(""), 5000)
   }
 
   /* ── Features ── */
@@ -529,7 +530,7 @@ export default function AdminSettingsPage() {
               </div>
               <div style={{ marginTop:14, padding:"14px 16px", background:"rgba(255,107,0,0.05)", border:"1px solid rgba(255,107,0,0.15)", borderRadius:12 }}>
                 <div style={{ color:"#FF8C00", fontSize:11, fontWeight:700, marginBottom:6 }}>⚡ Áp dụng hoa hồng cho cửa hàng</div>
-                <div style={{ color:"#6a5a40", fontSize:10, marginBottom:12 }}>Cập nhật tỉ lệ hoa hồng mặc định ({commissionSettings.defaultRate}%) cho tất cả cửa hàng đang hoạt động. Đây sẽ là mức hiển thị trong phần cài đặt của từng cửa hàng.</div>
+                <div style={{ color:"#6a5a40", fontSize:10, marginBottom:12 }}>Cập nhật tỉ lệ hoa hồng mặc định ({commissionSettings.defaultRate}%) cho tất cả cửa hàng đang hoạt động. <strong style={{ color:"#FFB347" }}>Cửa hàng có hoa hồng thoả thuận riêng sẽ không bị ảnh hưởng.</strong></div>
                 <button onClick={handleApplyCommissionToAllShops} disabled={applyingCommission}
                   style={{ height:34, padding:"0 18px", borderRadius:9, border:"none", background:"linear-gradient(90deg,#FF6B00,#FF8C00)", color:"#fff", fontSize:11, fontWeight:700, cursor:applyingCommission?"not-allowed":"pointer", opacity:applyingCommission?0.6:1 }}>
                   {applyingCommission ? "Đang cập nhật..." : `Áp dụng ${commissionSettings.defaultRate}% cho tất cả cửa hàng`}

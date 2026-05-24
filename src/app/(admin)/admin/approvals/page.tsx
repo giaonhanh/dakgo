@@ -168,7 +168,10 @@ export default function ApprovalsPage() {
     setSaving(true)
     const supabase = createClient()
     const updatePayload: Record<string, unknown> = { status }
-    if (commissionRate !== undefined) updatePayload.commission_rate = commissionRate
+    if (commissionRate !== undefined) {
+      updatePayload.commission_rate = commissionRate
+      updatePayload.is_negotiated_commission = true
+    }
     await supabase.from("shops").update(updatePayload).eq("id", id)
 
     const shop = shops.find(s => s.id === id)

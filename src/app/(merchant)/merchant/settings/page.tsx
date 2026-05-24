@@ -309,6 +309,7 @@ export default function MerchantSettingsPage() {
   const [shopAddress,      setShopAddress]      = useState("")
   const [shopIsOpen,       setShopIsOpen]       = useState(false)
   const [shopRating,       setShopRating]       = useState<number | null>(null)
+  const [shopCommission,   setShopCommission]   = useState(15)
 
   useEffect(() => {
     getAdminContact().then(c => {
@@ -318,13 +319,14 @@ export default function MerchantSettingsPage() {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-      supabase.from("shops").select("name, address, is_open, rating_avg").eq("owner_id", user.id).single()
+      supabase.from("shops").select("name, address, is_open, rating_avg, commission_rate").eq("owner_id", user.id).single()
         .then(({ data }) => {
           if (!data) return
           setShopName(data.name ?? "")
           setShopAddress(data.address ?? "")
           setShopIsOpen(data.is_open ?? false)
           setShopRating(data.rating_avg ?? null)
+          setShopCommission(data.commission_rate ?? 15)
         })
     })
   }, [])
@@ -388,7 +390,7 @@ export default function MerchantSettingsPage() {
           <div style={{ background: "rgba(74,143,245,0.06)", border: "1px solid rgba(74,143,245,0.18)", borderRadius: 14, padding: "12px 14px", marginBottom: 18, display: "flex", gap: 10 }}>
             <span style={{ fontSize: 18, flexShrink: 0 }}>📊</span>
             <div>
-              <div style={{ color: "#4a8ff5", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>Hoa hồng nền tảng: 15%</div>
+              <div style={{ color: "#4a8ff5", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>Hoa hồng nền tảng: {shopCommission}%</div>
               <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.5 }}>Áp dụng cho mỗi đơn hàng. Thanh toán hàng tuần vào thứ Hai. Muốn điều chỉnh? Liên hệ admin để đàm phán.</div>
             </div>
           </div>
@@ -471,7 +473,7 @@ export default function MerchantSettingsPage() {
                 {[
                   { step: "1", icon: "🛒", color: "#4a8ff5", label: "Khách đặt đơn",          sub: "Khách chọn thanh toán tiền mặt khi nhận hàng"                },
                   { step: "2", icon: "✅", color: "#FFB347", label: "Quán xác nhận & chuẩn bị", sub: "Chuẩn bị đơn sau khi xác nhận"                              },
-                  { step: "3", icon: "🛵", color: "#FF8C00", label: "Tài xế đến lấy hàng",     sub: "Tài xế trả tiền mặt (đã trừ hoa hồng 15%) cho quán"          },
+                  { step: "3", icon: "🛵", color: "#FF8C00", label: "Tài xế đến lấy hàng",     sub: `Tài xế trả tiền mặt (đã trừ hoa hồng ${shopCommission}%) cho quán`          },
                   { step: "4", icon: "📦", color: "#3ecf6e", label: "Tài xế giao khách",        sub: "Khách trả toàn bộ tiền mặt cho tài xế (gồm phí giao hàng)"  },
                 ].map((s, i, arr) => (
                   <div key={s.step} style={{ display: "flex", gap: 12, paddingBottom: i < arr.length - 1 ? 12 : 0 }}>
@@ -491,10 +493,10 @@ export default function MerchantSettingsPage() {
               <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                 <div style={{ color: "#b0956a", fontSize: 10, fontWeight: 700, marginBottom: 10 }}>📊 Ví dụ: Đơn 100.000đ — không có voucher</div>
                 {[
-                  { label: "Tiền hàng (khách trả)",   value: "100.000đ", color: "#f8f0e0",  bold: false },
-                  { label: "Hoa hồng Giao Nhanh 15%", value: "−15.000đ", color: "#ff4040",  bold: false },
-                  { label: "✓ Quán thực nhận",         value: "85.000đ",  color: "#3ecf6e",  bold: true  },
-                  { label: "Phí giao hàng (tài xế giữ)", value: "+15.000đ–18.000đ", color: "#6a5a40", bold: false },
+                  { label: "Tiền hàng (khách trả)",                   value: "100.000đ",                                  color: "#f8f0e0",  bold: false },
+                  { label: `Hoa hồng Giao Nhanh ${shopCommission}%`,  value: `−${(shopCommission * 1000).toLocaleString("vi-VN")}đ`, color: "#ff4040",  bold: false },
+                  { label: "✓ Quán thực nhận",                         value: `${((100 - shopCommission) * 1000).toLocaleString("vi-VN")}đ`, color: "#3ecf6e",  bold: true  },
+                  { label: "Phí giao hàng (tài xế giữ)",              value: "+15.000đ–18.000đ",                          color: "#6a5a40", bold: false },
                 ].map((r, i) => (
                   <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderTop: i === 2 ? "1px solid rgba(62,207,110,0.25)" : i === 3 ? "1px solid rgba(255,255,255,0.05)" : "none", marginTop: i === 2 ? 4 : 0 }}>
                     <span style={{ color: r.bold ? "#3ecf6e" : "#6a5a40", fontSize: r.bold ? 12 : 10, fontWeight: r.bold ? 800 : 400 }}>{r.label}</span>
@@ -507,10 +509,10 @@ export default function MerchantSettingsPage() {
               <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                 <div style={{ color: "#b0956a", fontSize: 10, fontWeight: 700, marginBottom: 10 }}>🎟 Ví dụ: Đơn 100.000đ — có voucher 10.000đ</div>
                 {[
-                  { label: "Tiền hàng",               value: "100.000đ", color: "#f8f0e0",  bold: false },
-                  { label: "Hoa hồng 15%",            value: "−15.000đ", color: "#ff4040",  bold: false },
-                  { label: "Voucher giảm giá",         value: "−10.000đ", color: "#FFB347",  bold: false },
-                  { label: "✓ Quán thực nhận",         value: "75.000đ",  color: "#3ecf6e",  bold: true  },
+                  { label: "Tiền hàng",                              value: "100.000đ",                                           color: "#f8f0e0",  bold: false },
+                  { label: `Hoa hồng ${shopCommission}%`,            value: `−${(shopCommission * 1000).toLocaleString("vi-VN")}đ`, color: "#ff4040",  bold: false },
+                  { label: "Voucher giảm giá",                        value: "−10.000đ",                                           color: "#FFB347",  bold: false },
+                  { label: "✓ Quán thực nhận",                        value: `${((100 - shopCommission) * 1000 - 10000).toLocaleString("vi-VN")}đ`, color: "#3ecf6e",  bold: true  },
                 ].map((r, i) => (
                   <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderTop: i === 3 ? "1px solid rgba(62,207,110,0.25)" : "none", marginTop: i === 3 ? 4 : 0 }}>
                     <span style={{ color: r.bold ? "#3ecf6e" : "#6a5a40", fontSize: r.bold ? 12 : 10, fontWeight: r.bold ? 800 : 400 }}>{r.label}</span>
