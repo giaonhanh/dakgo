@@ -393,7 +393,7 @@ export default function MerchantSettingsPage() {
             <span style={{ fontSize: 18, flexShrink: 0 }}>📊</span>
             <div>
               <div style={{ color: "#4a8ff5", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>Hoa hồng nền tảng: {shopCommission}%</div>
-              <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.5 }}>Áp dụng cho mỗi đơn hàng. Thanh toán hàng tuần vào thứ Hai. Muốn điều chỉnh? Liên hệ admin để đàm phán.</div>
+              <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.5 }}>Áp dụng cho mỗi đơn hàng. Thanh toán ngay khi tài xế nhận đơn. Liên hệ Admin để đàm phán điều chỉnh nếu có nhu cầu.</div>
             </div>
           </div>
 

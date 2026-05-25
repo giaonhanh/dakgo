@@ -17,6 +17,7 @@ interface Promotion {
   minOrder: number
   maxDiscount: number | null
   usageLimit: number | null
+  perPersonLimit: number | null
   usedCount: number
   startAt: string
   endAt: string
@@ -74,7 +75,7 @@ export default function MerchantPromotionsPage() {
   const loadData = useCallback(async (sid: string) => {
     const [{ data: vouchers }, { data: products }] = await Promise.all([
       supabase.from("vouchers")
-        .select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,used_count,valid_from,valid_to,is_active")
+        .select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,per_person_limit,used_count,valid_from,valid_to,is_active")
         .eq("shop_id", sid)
         .order("created_at", { ascending: false }),
       supabase.from("products")
@@ -92,6 +93,7 @@ export default function MerchantPromotionsPage() {
         minOrder: v.min_order,
         maxDiscount: v.max_discount,
         usageLimit: v.usage_limit,
+        perPersonLimit: v.per_person_limit ?? null,
         usedCount: v.used_count,
         startAt: v.valid_from,
         endAt: v.valid_to,
@@ -200,6 +202,7 @@ export default function MerchantPromotionsPage() {
       min_order: parseInt(form.minOrder) || 0,
       max_discount: form.maxDiscount ? parseInt(form.maxDiscount) : null,
       usage_limit: form.usageLimit ? parseInt(form.usageLimit) : null,
+      per_person_limit: form.perPersonLimit ? parseInt(form.perPersonLimit) : null,
       valid_from: new Date(form.startAt).toISOString(),
       valid_to: new Date(form.endAt).toISOString(),
       is_active: true,
@@ -216,6 +219,7 @@ export default function MerchantPromotionsPage() {
       minOrder: data.min_order,
       maxDiscount: data.max_discount,
       usageLimit: data.usage_limit,
+      perPersonLimit: form.perPersonLimit ? parseInt(form.perPersonLimit) : null,
       usedCount: 0,
       startAt: data.valid_from,
       endAt: data.valid_to,
@@ -350,6 +354,11 @@ export default function MerchantPromotionsPage() {
                 <MLabel>Tổng lượt dùng</MLabel>
                 <MInput value={form.usageLimit} onChange={v => setForm(f => ({ ...f, usageLimit:v }))}
                   type="number" placeholder="Bỏ trống = không giới hạn" />
+
+                {/* Per-person limit */}
+                <MLabel>Giới hạn/người</MLabel>
+                <MInput value={form.perPersonLimit} onChange={v => setForm(f => ({ ...f, perPersonLimit:v }))}
+                  type="number" placeholder="VD: 1 (bỏ trống = không giới hạn)" />
 
                 {/* Date range */}
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:12 }}>
