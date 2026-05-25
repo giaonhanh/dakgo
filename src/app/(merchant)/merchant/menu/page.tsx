@@ -293,30 +293,59 @@ export default function MerchantMenuPage() {
 
   const parseCSV = (text: string): ImportRow[] => {
     const lines = text.trim().split(/\r?\n/)
+    const start = lines[0]?.toLowerCase().match(/tên|name|món/) ? 1 : 0
     const rows: ImportRow[] = []
-    const start = lines[0]?.toLowerCase().includes("tên") || lines[0]?.toLowerCase().includes("name") ? 1 : 0
     for (let i = start; i < lines.length; i++) {
-      const cols = splitCSVLine(lines[i])
-      if (!cols[0]) continue
-      const price = parseInt(cols[2]?.replace(/\D/g, "") || "0") || 0
-      const promoPrice = cols[3] ? (parseInt(cols[3].replace(/\D/g, "")) || null) : null
-      const badgeRaw = (cols[5] ?? "").toLowerCase()
-      const badge: Product["badge"] = badgeRaw === "hot" ? "hot" : badgeRaw === "bigsale" ? "bigsale" : badgeRaw === "bestseller" ? "bestseller" : null
-      rows.push({ name: cols[0], description: cols[1] ?? "", price, promoPrice, category: cols[4] ?? "", badge })
+      const r = parseRawRow(splitCSVLine(lines[i]))
+      if (r) rows.push(r)
     }
     return rows
   }
 
+  const parseRawRow = (cols: string[]): ImportRow | null => {
+    const name = cols[0]?.trim()
+    if (!name) return null
+    const price = parseInt((cols[2] ?? "").replace(/\D/g, "")) || 0
+    const promoPrice = cols[3] ? (parseInt(String(cols[3]).replace(/\D/g, "")) || null) : null
+    const badgeRaw = (cols[5] ?? "").toLowerCase().trim()
+    const badge: Product["badge"] = badgeRaw === "hot" ? "hot" : badgeRaw === "bigsale" ? "bigsale" : badgeRaw === "bestseller" ? "bestseller" : null
+    return { name, description: (cols[1] ?? "").trim(), price, promoPrice, category: (cols[4] ?? "").trim(), badge }
+  }
+
   const onCSVFile = (file: File) => {
     setImportError("")
-    const reader = new FileReader()
-    reader.onload = e => {
-      const text = e.target?.result as string
-      const rows = parseCSV(text)
-      if (rows.length === 0) { setImportError("File trống hoặc không đúng định dạng"); return }
-      setImportRows(rows)
+    const isXLSX = /\.(xlsx|xls)$/i.test(file.name)
+    if (isXLSX) {
+      const reader = new FileReader()
+      reader.onload = e => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer)
+          const wb = XLSX.read(data, { type: "array" })
+          const ws = wb.Sheets[wb.SheetNames[0]]
+          const raw = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "" }) as string[][]
+          const isHeader = raw[0] && /tên|name|món/i.test(String(raw[0][0]))
+          const rows: ImportRow[] = []
+          for (let i = isHeader ? 1 : 0; i < raw.length; i++) {
+            const r = parseRawRow(raw[i].map(c => String(c ?? "")))
+            if (r) rows.push(r)
+          }
+          if (rows.length === 0) { setImportError("File trống hoặc không đúng định dạng"); return }
+          setImportRows(rows)
+        } catch {
+          setImportError("Không đọc được file XLSX. Vui lòng tải lại file mẫu.")
+        }
+      }
+      reader.readAsArrayBuffer(file)
+    } else {
+      const reader = new FileReader()
+      reader.onload = e => {
+        const text = e.target?.result as string
+        const rows = parseCSV(text)
+        if (rows.length === 0) { setImportError("File trống hoặc không đúng định dạng"); return }
+        setImportRows(rows)
+      }
+      reader.readAsText(file, "utf-8")
     }
-    reader.readAsText(file, "utf-8")
   }
 
   const confirmImport = async () => {
@@ -467,12 +496,14 @@ export default function MerchantMenuPage() {
     if (imageFile) {
       const ext = imageFile.name.split(".").pop() || "jpg"
       const productId = pEditing ? pModal.id : `new_${Date.now()}`
-      const path = `product-images/${shopId}/${productId}.${ext}`
+      const path = `${shopId}/${productId}.${ext}`
       const { error: upErr } = await supabase.storage
         .from("product-images")
         .upload(path, imageFile, { upsert: true })
       if (!upErr) {
         imageUrl = supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl
+      } else {
+        fire("⚠️ Không upload được ảnh (" + upErr.message + "). Món vẫn được lưu.", false)
       }
     }
 
@@ -494,7 +525,7 @@ export default function MerchantMenuPage() {
     } else {
       if (!shopId) { fire("❌ Không tìm thấy cửa hàng. Vui lòng tải lại trang.", false); return }
       const { data, error } = await supabase.from("products")
-        .insert({ ...payload, shop_id: shopId, sold_count: 0 })
+        .insert({ ...payload, shop_id: shopId, sold_count: 0, sort_order: products.length })
         .select("id").single()
       if (error || !data) { fire("❌ Lỗi thêm món: " + (error?.message ?? ""), false); return }
       const newProd: Product = {
@@ -615,7 +646,7 @@ export default function MerchantMenuPage() {
       {/* Hidden file inputs */}
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}}
         onChange={e => { const f = e.target.files?.[0]; if (f) onImageFile(f); e.target.value="" }} />
-      <input ref={csvRef} type="file" accept=".csv,.txt" style={{display:"none"}}
+      <input ref={csvRef} type="file" accept=".csv,.txt,.xlsx,.xls" style={{display:"none"}}
         onChange={e => { const f = e.target.files?.[0]; if (f) onCSVFile(f); e.target.value="" }} />
 
       {/* ── LAYOUT ── */}

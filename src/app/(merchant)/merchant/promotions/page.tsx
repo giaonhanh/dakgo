@@ -183,6 +183,10 @@ export default function MerchantPromotionsPage() {
       const pct = parseInt(form.value) || 0
       if (pct <= 0 || pct > 100) { fireToast("Phần trăm giảm phải từ 1–100", true); return }
     }
+    if (form.type === "fixed") {
+      const amt = parseInt(form.value) || 0
+      if (amt <= 0) { fireToast("Số tiền giảm phải lớn hơn 0đ!", true); return }
+    }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     const now = new Date()
@@ -343,18 +347,9 @@ export default function MerchantPromotionsPage() {
                 )}
 
                 {/* Usage limit */}
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-                  <div>
-                    <MLabel>Tổng lượt dùng</MLabel>
-                    <MInput value={form.usageLimit} onChange={v => setForm(f => ({ ...f, usageLimit:v }))}
-                      type="number" placeholder="Bỏ trống = ∞" />
-                  </div>
-                  <div>
-                    <MLabel>Giới hạn / người</MLabel>
-                    <MInput value={form.perPersonLimit} onChange={v => setForm(f => ({ ...f, perPersonLimit:v }))}
-                      type="number" placeholder="VD: 1 lần" />
-                  </div>
-                </div>
+                <MLabel>Tổng lượt dùng</MLabel>
+                <MInput value={form.usageLimit} onChange={v => setForm(f => ({ ...f, usageLimit:v }))}
+                  type="number" placeholder="Bỏ trống = không giới hạn" />
 
                 {/* Date range */}
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:12 }}>
