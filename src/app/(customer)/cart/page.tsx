@@ -36,7 +36,7 @@ export default function CartPage() {
 
         {/* Header */}
         <div style={{
-          padding: "52px 20px 14px",
+          padding: "calc(env(safe-area-inset-top) + 14px) 20px 14px",
           borderBottom: "1px solid rgba(255,255,255,0.06)",
           flexShrink: 0,
         }}>

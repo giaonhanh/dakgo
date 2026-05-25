@@ -219,7 +219,7 @@ export default function DriverRegisterPage() {
 
         {/* Header */}
         <div style={{ background:"rgba(8,8,6,0.96)",backdropFilter:"blur(16px)",
-          borderBottom:"1px solid rgba(255,255,255,0.07)",padding:"44px 16px 10px",flexShrink:0,zIndex:40 }}>
+          borderBottom:"1px solid rgba(255,255,255,0.07)",padding:"calc(env(safe-area-inset-top) + 10px) 16px 10px",flexShrink:0,zIndex:40 }}>
           <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:10 }}>
             {step>1
               ? <button onClick={()=>setStep(p=>(p-1) as Step)} style={{ width:32,height:32,borderRadius:9,

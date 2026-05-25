@@ -43,6 +43,35 @@ const SVC_META: Record<ServiceType, { label: string; icon: string; color: string
 const PHUOC_AN_LAT = 12.6521
 const PHUOC_AN_LNG = 108.5073
 
+const VM_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
+
+// Fallback: Haversine × 1.3 khi VietMap không có key hoặc lỗi mạng
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+// VietMap Route API — dữ liệu đường Việt Nam, chính xác nhất
+async function routeDistanceKm(
+  fromLat: number, fromLng: number,
+  toLat: number, toLng: number,
+  signal?: AbortSignal
+): Promise<number> {
+  if (!VM_KEY) return Math.max(0.5, haversineKm(fromLat, fromLng, toLat, toLng) * 1.3)
+  const url = `https://maps.vietmap.vn/api/route?api-version=1.1&apikey=${VM_KEY}` +
+    `&point=${fromLat},${fromLng}&point=${toLat},${toLng}` +
+    `&vehicle=motorbike&locale=vi&calc_points=false&instructions=false`
+  const res  = await fetch(url, { signal })
+  const data = await res.json()
+  const meters: number = data?.paths?.[0]?.distance
+  if (!meters) throw new Error("no route")
+  return Math.max(0.5, meters / 1000)
+}
+
 interface NominatimResult { display_name: string; lat: string; lon: string }
 
 function AddrInput({ label, value, onChange, onSelect, placeholder, required = false }: {
@@ -243,7 +272,7 @@ export default function AdminOrdersPage() {
       .then(({ data }) => { if (data?.value) setPricing(data.value as PricingMap) })
   }, [load])
 
-  // Auto-calculate distance via OSRM when lat/lng are set
+  // Tính khoảng cách qua VietMap Route API (fallback Haversine × 1.3 nếu lỗi)
   useEffect(() => {
     if (feeOverride) return
     const fromLat = service === "food" ? PHUOC_AN_LAT : pickupLat
@@ -251,13 +280,12 @@ export default function AdminOrdersPage() {
     if (!delivLat || !delivLng) return
     if (service !== "food" && (!fromLat || !fromLng)) return
     const ctrl = new AbortController()
-    fetch(
-      `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${delivLng},${delivLat}?overview=false`,
-      { signal: ctrl.signal }
-    ).then(r => r.json()).then(data => {
-      const meters = data.routes?.[0]?.distance
-      if (meters) { setDistKm((meters / 1000).toFixed(1)); setFeeOverride("") }
-    }).catch(() => {})
+    routeDistanceKm(fromLat, fromLng, delivLat, delivLng, ctrl.signal)
+      .then(km => { setDistKm(km.toFixed(1)); setFeeOverride("") })
+      .catch(() => {
+        const fb = Math.max(0.5, haversineKm(fromLat, fromLng, delivLat, delivLng) * 1.3)
+        setDistKm(fb.toFixed(1))
+      })
     return () => ctrl.abort()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [delivLat, delivLng, pickupLat, pickupLng, service])

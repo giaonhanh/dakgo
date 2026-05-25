@@ -204,7 +204,7 @@ export default function ShopPreviewPage() {
       <div style={{minHeight:"100dvh",background:"#080806",fontFamily:"'Lexend',sans-serif",paddingBottom:32}}>
 
         {/* ── Merchant preview banner ── */}
-        <div style={{background:"linear-gradient(90deg,rgba(255,140,0,0.18),rgba(255,107,0,0.1))",borderBottom:"1px solid rgba(255,107,0,0.25)",padding:"10px 16px",display:"flex",alignItems:"center",gap:10,position:"sticky",top:0,zIndex:30,backdropFilter:"blur(12px)"}}>
+        <div style={{background:"linear-gradient(90deg,rgba(255,140,0,0.18),rgba(255,107,0,0.1))",borderBottom:"1px solid rgba(255,107,0,0.25)",padding:"calc(env(safe-area-inset-top) + 10px) 16px 10px",display:"flex",alignItems:"center",gap:10,position:"sticky",top:0,zIndex:30,backdropFilter:"blur(12px)"}}>
           <a href="/merchant" style={{width:30,height:30,borderRadius:8,background:"rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",color:"#f8f0e0",fontSize:14,flexShrink:0}}>←</a>
           <div style={{flex:1}}>
             <div style={{color:"#FF8C00",fontSize:11,fontWeight:800}}>👁 Chế độ xem trước</div>

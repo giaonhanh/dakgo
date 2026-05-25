@@ -346,7 +346,7 @@ export default function ProfilePage() {
       <div style={{ position: "fixed", inset: 0, background: "#080806", zIndex: 60, display: "flex", flexDirection: "column", fontFamily: "'Lexend',sans-serif" }}>
 
         {/* Header */}
-        <div style={{ background: "rgba(8,8,6,0.96)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "44px 16px 12px", flexShrink: 0 }}>
+        <div style={{ background: "rgba(8,8,6,0.96)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "calc(env(safe-area-inset-top) + 12px) 16px 12px", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button onClick={() => router.back()} style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, cursor: "pointer", color: "#FF8C00" }}>←</button>
             <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 700 }}>Hồ sơ cá nhân</div>

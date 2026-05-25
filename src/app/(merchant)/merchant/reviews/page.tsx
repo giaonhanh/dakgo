@@ -113,7 +113,7 @@ export default function MerchantReviewsPage() {
         display:"flex", flexDirection:"column", fontFamily:"'Lexend',sans-serif" }}>
 
         {/* Header */}
-        <div style={{ padding:"50px 16px 12px", background:"rgba(8,8,6,0.97)",
+        <div style={{ padding:"calc(env(safe-area-inset-top) + 12px) 16px 12px", background:"rgba(8,8,6,0.97)",
           backdropFilter:"blur(20px)", borderBottom:"1px solid rgba(255,255,255,0.06)",
           flexShrink:0 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:0 }}>

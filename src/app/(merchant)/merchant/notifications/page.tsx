@@ -75,7 +75,7 @@ export default function MerchantNotificationsPage() {
   return (
     <div style={{ minHeight:"100dvh", background:"#080806", display:"flex", flexDirection:"column", fontFamily:"'Lexend',sans-serif" }}>
       {/* Header */}
-      <div style={{ background:"rgba(8,8,6,0.96)", backdropFilter:"blur(20px)", borderBottom:"1px solid rgba(255,107,0,0.08)", padding:"44px 16px 12px", flexShrink:0 }}>
+      <div style={{ background:"rgba(8,8,6,0.96)", backdropFilter:"blur(20px)", borderBottom:"1px solid rgba(255,107,0,0.08)", padding:"calc(env(safe-area-inset-top) + 12px) 16px 12px", flexShrink:0 }}>
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
           <button onClick={() => router.back()}
             style={{ width:36, height:36, borderRadius:10, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, cursor:"pointer", color:"#f8f0e0" }}>

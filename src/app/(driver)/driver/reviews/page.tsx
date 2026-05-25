@@ -92,7 +92,7 @@ export default function DriverReviewsPage() {
       <div style={{ position:"fixed", inset:0, background:"#080806", display:"flex", flexDirection:"column" }}>
 
         {/* Header */}
-        <div style={{ padding:"50px 16px 12px", background:"rgba(8,8,6,0.97)",
+        <div style={{ padding:"calc(env(safe-area-inset-top) + 12px) 16px 12px", background:"rgba(8,8,6,0.97)",
           backdropFilter:"blur(20px)", borderBottom:"1px solid rgba(255,255,255,0.06)", flexShrink:0 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <a href="/driver" style={{ width:36, height:36, borderRadius:10, background:"rgba(255,255,255,0.06)",

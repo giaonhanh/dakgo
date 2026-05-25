@@ -27,10 +27,12 @@ export default function MerchantRevenuePage() {
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
   const [topItems,     setTopItems]     = useState<TopItem[]>([])
   const [expandOrder,  setExpandOrder]  = useState<string | null>(null)
+  const [loadErr,      setLoadErr]      = useState("")
 
   useEffect(() => {
     async function load() {
       setLoading(true)
+      setLoadErr("")
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
@@ -163,7 +165,10 @@ export default function MerchantRevenuePage() {
         } else {
           setTopItems([])
         }
-      } catch { /* ignore */ }
+      } catch (err) {
+        console.error("revenue load error:", err)
+        setLoadErr("Không thể tải dữ liệu. Vui lòng thử lại.")
+      }
       setLoading(false)
     }
     load()
@@ -189,7 +194,7 @@ export default function MerchantRevenuePage() {
       <div style={{ position:"fixed",inset:0,background:"#080806",display:"flex",flexDirection:"column",overflow:"hidden" }}>
 
         {/* Header */}
-        <div style={{ padding:"52px 16px 14px",borderBottom:"1px solid rgba(255,255,255,0.06)",flexShrink:0 }}>
+        <div style={{ padding:"calc(env(safe-area-inset-top) + 14px) 16px 14px",borderBottom:"1px solid rgba(255,255,255,0.06)",flexShrink:0 }}>
           <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:14 }}>
             <a href="/merchant" style={{ width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",color:"#f8f0e0",fontSize:16 }}>←</a>
             <div style={{ flex:1 }}>
@@ -217,6 +222,14 @@ export default function MerchantRevenuePage() {
             <div style={{ textAlign:"center",padding:"40px 0" }}>
               <div style={{ fontSize:32,marginBottom:8 }}>📊</div>
               <div style={{ color:"#6a5a40",fontSize:12 }}>Đang tải doanh thu...</div>
+            </div>
+          ) : loadErr ? (
+            <div style={{ textAlign:"center",padding:"40px 16px" }}>
+              <div style={{ fontSize:32,marginBottom:8 }}>⚠️</div>
+              <div style={{ color:"#ff4040",fontSize:13,marginBottom:16 }}>{loadErr}</div>
+              <button onClick={() => { setPeriod(p => p) }} style={{ background:"rgba(255,107,0,0.12)",border:"1px solid rgba(255,107,0,0.3)",borderRadius:10,padding:"8px 20px",color:"#FF8C00",fontSize:12,fontWeight:600,cursor:"pointer" }}>
+                Thử lại
+              </button>
             </div>
           ) : (
             <>

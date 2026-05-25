@@ -234,7 +234,7 @@ export default function VouchersPage() {
         {/* Header */}
         <div style={{ background:"rgba(8,8,6,0.96)", backdropFilter:"blur(16px)",
           borderBottom:"1px solid rgba(255,255,255,0.07)",
-          padding:"44px 16px 0", flexShrink:0 }}>
+          padding:"calc(env(safe-area-inset-top) + 12px) 16px 0", flexShrink:0 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
             <a href="/" style={{ width:32, height:32, borderRadius:9, textDecoration:"none",
               background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)",

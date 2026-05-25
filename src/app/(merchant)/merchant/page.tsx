@@ -329,7 +329,7 @@ export default function MerchantDashboard() {
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity: 0, y: -14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }}
-            style={{ position: "fixed", top: 52, left: "50%", transform: "translateX(-50%)",
+            style={{ position: "fixed", top: "calc(env(safe-area-inset-top) + 64px)", left: "50%", transform: "translateX(-50%)",
               zIndex: 999, background: toastOk ? "rgba(62,207,110,0.15)" : "rgba(255,64,64,0.15)",
               border: `1px solid ${toastOk ? "rgba(62,207,110,0.35)" : "rgba(255,64,64,0.35)"}`,
               borderRadius: 12, padding: "8px 18px", color: toastOk ? "#3ecf6e" : "#ff6060",
@@ -346,7 +346,7 @@ export default function MerchantDashboard() {
         {/* Header */}
         <div style={{ background: "rgba(8,8,6,0.96)", backdropFilter: "blur(20px)",
           borderBottom: "1px solid rgba(255,107,0,0.08)",
-          padding: "44px 16px 12px", flexShrink: 0 }}>
+          padding: "calc(env(safe-area-inset-top) + 12px) 16px 12px", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
               <div style={{ color: "#6a5a40", fontSize: 9 }}>Dashboard Merchant</div>

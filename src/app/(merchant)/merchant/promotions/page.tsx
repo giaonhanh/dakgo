@@ -63,6 +63,7 @@ export default function MerchantPromotionsPage() {
   const [showCreate, setShowCreate]     = useState(false)
   const [selected, setSelected]         = useState<Promotion | null>(null)
   const [toast, setToast]               = useState("")
+  const [toastErr, setToastErr]         = useState(false)
 
   const [form, setForm] = useState({
     title: "", type: "percent" as PromoType, value: "", minOrder: "", maxDiscount: "",
@@ -139,7 +140,7 @@ export default function MerchantPromotionsPage() {
         : [...f.selectedProductIds, id],
     }))
 
-  const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2400) }
+  const fireToast = (msg: string, err = false) => { setToast(msg); setToastErr(err); setTimeout(() => setToast(""), 2400) }
 
   const toggleStatus = async (id: string) => {
     const p = promos.find(x => x.id === id)
@@ -151,7 +152,7 @@ export default function MerchantPromotionsPage() {
       .eq("id", id)
     if (error) {
       setPromos(ps => ps.map(x => x.id !== id ? x : { ...x, status: p.status }))
-      fireToast("Lỗi cập nhật trạng thái!")
+      fireToast("Lỗi cập nhật trạng thái!", true)
     } else {
       fireToast(nowActive ? "Đã tắt chương trình" : "Đã bật chương trình")
     }
@@ -164,7 +165,7 @@ export default function MerchantPromotionsPage() {
     const { error } = await supabase.from("vouchers").delete().eq("id", id)
     if (error) {
       setPromos(backup)
-      fireToast("Lỗi xoá!")
+      fireToast("Lỗi xoá!", true)
     } else {
       fireToast("Đã xoá chương trình khuyến mãi")
     }
@@ -173,14 +174,14 @@ export default function MerchantPromotionsPage() {
   const handleCreate = async () => {
     if (!form.title || !form.startAt || !form.endAt || !shopId) return
     if (!form.applyAll && form.selectedProductIds.length === 0) {
-      fireToast("Vui lòng chọn ít nhất 1 món!"); return
+      fireToast("Vui lòng chọn ít nhất 1 món!", true); return
     }
     if (new Date(form.endAt) <= new Date(form.startAt)) {
-      fireToast("Ngày kết thúc phải sau ngày bắt đầu!"); return
+      fireToast("Ngày kết thúc phải sau ngày bắt đầu!", true); return
     }
     if (form.type === "percent") {
       const pct = parseInt(form.value) || 0
-      if (pct <= 0 || pct > 100) { fireToast("Phần trăm giảm phải từ 1–100"); return }
+      if (pct <= 0 || pct > 100) { fireToast("Phần trăm giảm phải từ 1–100", true); return }
     }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -202,7 +203,7 @@ export default function MerchantPromotionsPage() {
       created_by: user?.id,
     }).select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,used_count,valid_from,valid_to,is_active").single()
     setSaving(false)
-    if (error || !data) { fireToast("Lỗi tạo chương trình!"); return }
+    if (error || !data) { fireToast("Lỗi tạo chương trình!", true); return }
     const newPromo: Promotion = {
       id: data.id,
       title: data.title,
@@ -258,12 +259,14 @@ export default function MerchantPromotionsPage() {
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity:0, y:-14 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-14 }}
-            style={{ position:"fixed", top:52, left:"50%", transform:"translateX(-50%)",
+            style={{ position:"fixed", top:"calc(env(safe-area-inset-top) + 64px)", left:"50%", transform:"translateX(-50%)",
               zIndex:999, whiteSpace:"nowrap",
-              background:"rgba(62,207,110,0.15)", border:"1px solid rgba(62,207,110,0.35)",
+              background: toastErr ? "rgba(255,64,64,0.15)" : "rgba(62,207,110,0.15)",
+              border: toastErr ? "1px solid rgba(255,64,64,0.35)" : "1px solid rgba(62,207,110,0.35)",
               borderRadius:12, padding:"7px 18px",
-              color:"#3ecf6e", fontSize:11, fontWeight:600, backdropFilter:"blur(10px)" }}>
-            ✓ {toast}
+              color: toastErr ? "#ff4040" : "#3ecf6e",
+              fontSize:11, fontWeight:600, backdropFilter:"blur(10px)" }}>
+            {toastErr ? "✕" : "✓"} {toast}
           </motion.div>
         )}
       </AnimatePresence>
@@ -616,7 +619,7 @@ export default function MerchantPromotionsPage() {
         {/* Header */}
         <div style={{ background:"rgba(8,8,6,0.96)", backdropFilter:"blur(16px)",
           borderBottom:"1px solid rgba(255,255,255,0.07)",
-          padding:"52px 16px 12px", flexShrink:0 }}>
+          padding:"calc(env(safe-area-inset-top) + 12px) 16px 12px", flexShrink:0 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
             <a href="/merchant" style={{ width:36, height:36, borderRadius:10, textDecoration:"none",
               background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.08)",

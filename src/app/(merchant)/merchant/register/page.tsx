@@ -59,7 +59,7 @@ export default function MerchantRegisterPage() {
       <div style={{ position:"fixed",inset:0,background:"#080806",display:"flex",flexDirection:"column",overflow:"hidden" }}>
 
         {/* Header */}
-        <div style={{ padding:"52px 16px 16px",borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ padding:"calc(env(safe-area-inset-top) + 14px) 16px 16px",borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:16 }}>
             <button onClick={() => step>0?setStep(s=>s-1):history.back()}
               style={{ width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.06)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16,color:"#f8f0e0" }}>←</button>

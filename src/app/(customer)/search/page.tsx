@@ -249,7 +249,7 @@ function SearchContent() {
         display: "flex", flexDirection: "column", fontFamily: "'Lexend', sans-serif",
       }}>
         {/* Search header */}
-        <div style={{ padding: "52px 16px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ padding: "calc(env(safe-area-inset-top) + 12px) 16px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
             <button
               onClick={() => router.back()}

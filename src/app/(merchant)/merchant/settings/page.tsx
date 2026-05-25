@@ -353,7 +353,7 @@ export default function MerchantSettingsPage() {
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-            style={{ position: "fixed", top: 62, left: "50%", transform: "translateX(-50%)", zIndex: 999, whiteSpace: "nowrap", background: "rgba(62,207,110,0.15)", border: "1px solid rgba(62,207,110,0.35)", borderRadius: 12, padding: "7px 18px", color: "#3ecf6e", fontSize: 11, fontWeight: 600, backdropFilter: "blur(10px)" }}>
+            style={{ position: "fixed", top: "calc(env(safe-area-inset-top) + 62px)", left: "50%", transform: "translateX(-50%)", zIndex: 999, whiteSpace: "nowrap", background: "rgba(62,207,110,0.15)", border: "1px solid rgba(62,207,110,0.35)", borderRadius: 12, padding: "7px 18px", color: "#3ecf6e", fontSize: 11, fontWeight: 600, backdropFilter: "blur(10px)" }}>
             ✓ {toast}
           </motion.div>
         )}
@@ -362,9 +362,11 @@ export default function MerchantSettingsPage() {
       <div style={{ minHeight: "100dvh", background: "#080806", paddingBottom: 24 }}>
 
         {/* header */}
-        <div style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(8,8,6,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 16px", height: 56, display: "flex", alignItems: "center", gap: 12 }}>
-          <a href="/merchant" style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", color: "#f8f0e0", fontSize: 15 }}>←</a>
-          <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>⚙️ Cài đặt cửa hàng</div>
+        <div style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(8,8,6,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingTop: "env(safe-area-inset-top)" }}>
+          <div style={{ height: 56, padding: "0 16px", display: "flex", alignItems: "center", gap: 12 }}>
+            <a href="/merchant" style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", color: "#f8f0e0", fontSize: 15 }}>←</a>
+            <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>⚙️ Cài đặt cửa hàng</div>
+          </div>
         </div>
 
         <div style={{ padding: "14px 16px 0" }}>
@@ -461,81 +463,6 @@ export default function MerchantSettingsPage() {
               <Toggle on={priv.analytics} onToggle={() => sp("analytics")} color="#4a8ff5" />
             </Row>
           </Section>
-
-          {/* cash model info */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ color: "#6a5a40", fontSize: 9, fontWeight: 700, letterSpacing: ".5px", textTransform: "uppercase", paddingLeft: 4, marginBottom: 8 }}>Cơ chế thu tiền</div>
-            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, overflow: "hidden" }}>
-
-              {/* flow steps */}
-              <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700, marginBottom: 12 }}>💵 Luồng tiền — Tiền mặt</div>
-                {[
-                  { step: "1", icon: "🛒", color: "#4a8ff5", label: "Khách đặt đơn",          sub: "Khách chọn thanh toán tiền mặt khi nhận hàng"                },
-                  { step: "2", icon: "✅", color: "#FFB347", label: "Quán xác nhận & chuẩn bị", sub: "Chuẩn bị đơn sau khi xác nhận"                              },
-                  { step: "3", icon: "🛵", color: "#FF8C00", label: "Tài xế đến lấy hàng",     sub: `Tài xế trả tiền mặt (đã trừ hoa hồng ${shopCommission}%) cho quán`          },
-                  { step: "4", icon: "📦", color: "#3ecf6e", label: "Tài xế giao khách",        sub: "Khách trả toàn bộ tiền mặt cho tài xế (gồm phí giao hàng)"  },
-                ].map((s, i, arr) => (
-                  <div key={s.step} style={{ display: "flex", gap: 12, paddingBottom: i < arr.length - 1 ? 12 : 0 }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: `rgba(${s.color === "#4a8ff5" ? "74,143,245" : s.color === "#FFB347" ? "255,179,71" : s.color === "#FF8C00" ? "255,140,0" : "62,207,110"},0.15)`, border: `1.5px solid ${s.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{s.icon}</div>
-                      {i < arr.length - 1 && <div style={{ width: 1.5, flex: 1, background: "rgba(255,255,255,0.07)", marginTop: 4, minHeight: 16 }} />}
-                    </div>
-                    <div style={{ paddingBottom: i < arr.length - 1 ? 0 : 0 }}>
-                      <div style={{ color: s.color, fontSize: 11, fontWeight: 700 }}>Bước {s.step}: {s.label}</div>
-                      <div style={{ color: "#6a5a40", fontSize: 9.5, marginTop: 2, lineHeight: 1.5 }}>{s.sub}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* example calc */}
-              <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{ color: "#b0956a", fontSize: 10, fontWeight: 700, marginBottom: 10 }}>📊 Ví dụ: Đơn 100.000đ — không có voucher</div>
-                {[
-                  { label: "Tiền hàng (khách trả)",                   value: "100.000đ",                                  color: "#f8f0e0",  bold: false },
-                  { label: `Hoa hồng Giao Nhanh ${shopCommission}%`,  value: `−${(shopCommission * 1000).toLocaleString("vi-VN")}đ`, color: "#ff4040",  bold: false },
-                  { label: "✓ Quán thực nhận",                         value: `${((100 - shopCommission) * 1000).toLocaleString("vi-VN")}đ`, color: "#3ecf6e",  bold: true  },
-                  { label: "Phí giao hàng (tài xế giữ)",              value: "+15.000đ–18.000đ",                          color: "#6a5a40", bold: false },
-                ].map((r, i) => (
-                  <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderTop: i === 2 ? "1px solid rgba(62,207,110,0.25)" : i === 3 ? "1px solid rgba(255,255,255,0.05)" : "none", marginTop: i === 2 ? 4 : 0 }}>
-                    <span style={{ color: r.bold ? "#3ecf6e" : "#6a5a40", fontSize: r.bold ? 12 : 10, fontWeight: r.bold ? 800 : 400 }}>{r.label}</span>
-                    <span style={{ color: r.color, fontSize: r.bold ? 14 : 11, fontWeight: r.bold ? 800 : 600 }}>{r.value}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* voucher note */}
-              <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{ color: "#b0956a", fontSize: 10, fontWeight: 700, marginBottom: 10 }}>🎟 Ví dụ: Đơn 100.000đ — có voucher 10.000đ</div>
-                {[
-                  { label: "Tiền hàng",                              value: "100.000đ",                                           color: "#f8f0e0",  bold: false },
-                  { label: `Hoa hồng ${shopCommission}%`,            value: `−${(shopCommission * 1000).toLocaleString("vi-VN")}đ`, color: "#ff4040",  bold: false },
-                  { label: "Voucher giảm giá",                        value: "−10.000đ",                                           color: "#FFB347",  bold: false },
-                  { label: "✓ Quán thực nhận",                        value: `${((100 - shopCommission) * 1000 - 10000).toLocaleString("vi-VN")}đ`, color: "#3ecf6e",  bold: true  },
-                ].map((r, i) => (
-                  <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderTop: i === 3 ? "1px solid rgba(62,207,110,0.25)" : "none", marginTop: i === 3 ? 4 : 0 }}>
-                    <span style={{ color: r.bold ? "#3ecf6e" : "#6a5a40", fontSize: r.bold ? 12 : 10, fontWeight: r.bold ? 800 : 400 }}>{r.label}</span>
-                    <span style={{ color: r.color, fontSize: r.bold ? 14 : 11, fontWeight: r.bold ? 800 : 600 }}>{r.value}</span>
-                  </div>
-                ))}
-                <div style={{ marginTop: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(255,179,71,0.06)", border: "1px solid rgba(255,179,71,0.15)" }}>
-                  <div style={{ color: "#6a5a40", fontSize: 9, lineHeight: 1.5 }}>⚠️ Voucher do <strong style={{ color: "#FFB347" }}>quán tạo ra</strong> sẽ bị trừ vào doanh thu của quán. Voucher do Giao Nhanh tài trợ sẽ không trừ.</div>
-                </div>
-              </div>
-
-              {/* revenue link */}
-              <div onClick={() => { window.location.href = "/merchant/revenue" }}
-                style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(62,207,110,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📈</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: "#f8f0e0", fontSize: 13, fontWeight: 600 }}>Xem báo cáo doanh thu</div>
-                  <div style={{ color: "#6a5a40", fontSize: 10 }}>Chi tiết từng đơn: thực nhận, hoa hồng, voucher</div>
-                </div>
-                <div style={{ color: "#6a5a40", fontSize: 16 }}>›</div>
-              </div>
-            </div>
-          </div>
 
           {/* security */}
           <Section title="Bảo mật">

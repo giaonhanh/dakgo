@@ -327,7 +327,7 @@ export default function ShopPage() {
           background: scrolled ? "rgba(8,8,6,0.96)" : "transparent",
           backdropFilter: scrolled ? "blur(16px)" : "none",
           borderBottom: scrolled ? "1px solid rgba(255,255,255,0.07)" : "none",
-          padding:"44px 16px 10px",
+          padding:"calc(env(safe-area-inset-top) + 10px) 16px 10px",
           transition:"all .25s" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <a href="/" style={{ width:32, height:32, borderRadius:9,

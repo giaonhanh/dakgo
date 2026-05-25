@@ -215,9 +215,11 @@ export default function MerchantMenuPage() {
       const oldIdx = sorted.findIndex(g => g.id === active.id)
       const newIdx = sorted.findIndex(g => g.id === over.id)
       if (oldIdx === -1 || newIdx === -1) return gs
-      return arrayMove(sorted, oldIdx, newIdx).map((g, i) => ({ ...g, sortOrder: i }))
+      const updated = arrayMove(sorted, oldIdx, newIdx).map((g, i) => ({ ...g, sortOrder: i }))
+      persistGroups(updated)
+      return updated
     })
-  }, [])
+  }, [persistGroups])
 
   // ── Load from Supabase ─────────────────────────────────────────────────
   const loadProducts = useCallback(async (sid: string): Promise<Product[]> => {
@@ -599,7 +601,7 @@ export default function MerchantMenuPage() {
       <AnimatePresence>
         {toast && (
           <motion.div initial={{opacity:0,y:-10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}}
-            style={{position:"fixed",top:56,left:"50%",transform:"translateX(-50%)",zIndex:999,whiteSpace:"nowrap",
+            style={{position:"fixed",top:"calc(env(safe-area-inset-top) + 64px)",left:"50%",transform:"translateX(-50%)",zIndex:999,whiteSpace:"nowrap",
               background: toastOk ? "rgba(62,207,110,0.15)" : "rgba(255,64,64,0.15)",
               border: toastOk ? "1px solid rgba(62,207,110,0.35)" : "1px solid rgba(255,64,64,0.35)",
               borderRadius:12,padding:"7px 18px",
@@ -620,7 +622,7 @@ export default function MerchantMenuPage() {
       <div style={{position:"fixed",inset:0,background:"#080806",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
         {/* Header */}
-        <div style={{padding:"52px 16px 0",background:"rgba(8,8,6,0.98)",backdropFilter:"blur(20px)",borderBottom:"1px solid rgba(255,255,255,0.06)",flexShrink:0}}>
+        <div style={{padding:"calc(env(safe-area-inset-top) + 12px) 16px 0",background:"rgba(8,8,6,0.98)",backdropFilter:"blur(20px)",borderBottom:"1px solid rgba(255,255,255,0.06)",flexShrink:0}}>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
             <a href="/merchant" style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",color:"#f8f0e0",fontSize:16,flexShrink:0}}>←</a>
             <div style={{flex:1,minWidth:0}}>
