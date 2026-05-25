@@ -1,25 +1,55 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useCartStore } from "@/store/cartStore"
 import { formatPrice } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
 
 const SHIP_FEE = 15000
 
+interface AppliedCombo { title: string; discount: number }
+
 export default function CartPage() {
-  const router = useRouter()
-  const items      = useCartStore(s => s.items)
-  const note       = useCartStore(s => s.note)
-  const updateQty  = useCartStore(s => s.updateQty)
+  const router   = useRouter()
+  const supabase = createClient()
+  const items       = useCartStore(s => s.items)
+  const note        = useCartStore(s => s.note)
+  const shopId      = useCartStore(s => s.shopId)
+  const updateQty   = useCartStore(s => s.updateQty)
   const setItemNote = useCartStore(s => s.setItemNote)
-  const setNote    = useCartStore(s => s.setNote)
+  const setNote     = useCartStore(s => s.setNote)
 
-  const [openNoteId, setOpenNoteId] = useState<string | null>(null)
+  const [openNoteId,     setOpenNoteId]     = useState<string | null>(null)
+  const [appliedCombos,  setAppliedCombos]  = useState<AppliedCombo[]>([])
 
+  // Tự nhận diện combo đủ điều kiện
+  useEffect(() => {
+    if (!shopId || items.length === 0) { setAppliedCombos([]); return }
+    const now = new Date().toISOString()
+    supabase.from("vouchers")
+      .select("id,title,discount_value,combo_items(product_id,min_quantity)")
+      .eq("shop_id", shopId).eq("is_active", true).eq("is_combo", true).gte("valid_to", now)
+      .then(({ data }) => {
+        if (!data) return
+        const matched: AppliedCombo[] = []
+        data.forEach((v: { id: string; title: string; discount_value: number; combo_items: { product_id: string; min_quantity: number }[] }) => {
+          const allMet = v.combo_items.every(ci => {
+            const cartItem = items.find(i => i.id === ci.product_id)
+            return cartItem && cartItem.qty >= ci.min_quantity
+          })
+          if (allMet && v.combo_items.length > 0) {
+            matched.push({ title: v.title, discount: v.discount_value })
+          }
+        })
+        setAppliedCombos(matched)
+      })
+  }, [items, shopId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const comboDiscount = appliedCombos.reduce((s, c) => s + c.discount, 0)
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
-  const total    = subtotal + SHIP_FEE
+  const total    = subtotal + SHIP_FEE - comboDiscount
 
   return (
     <>
@@ -261,11 +291,31 @@ export default function CartPage() {
                 />
               </Section>
 
+              {/* Combo savings badge */}
+              {appliedCombos.length > 0 && (
+                <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
+                  style={{ marginBottom:10, background:"rgba(180,100,255,0.08)",
+                    border:"1px solid rgba(180,100,255,0.25)", borderRadius:12, padding:"10px 13px" }}>
+                  <div style={{ color:"#b464ff", fontSize:10, fontWeight:700, marginBottom:4 }}>
+                    🎁 Combo đang áp dụng
+                  </div>
+                  {appliedCombos.map((c, i) => (
+                    <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      <span style={{ color:"#b0956a", fontSize:10 }}>{c.title}</span>
+                      <span style={{ color:"#b464ff", fontSize:10, fontWeight:700 }}>−{formatPrice(c.discount)}</span>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+
               {/* Tóm tắt giá (tạm tính — voucher & địa chỉ ở bước sau) */}
               <SectionLabel>Tóm tắt</SectionLabel>
               <Section style={{ padding: "12px 14px" }}>
                 <Row label="Tạm tính" value={formatPrice(subtotal)} />
                 <Row label="Phí giao hàng (ước tính)" value={formatPrice(SHIP_FEE)} />
+                {comboDiscount > 0 && (
+                  <Row label={`Combo (${appliedCombos.length} ưu đãi)`} value={`−${formatPrice(comboDiscount)}`} />
+                )}
                 <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "10px 0" }} />
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#f8f0e0" }}>Dự kiến</span>

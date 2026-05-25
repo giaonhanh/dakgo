@@ -36,6 +36,14 @@ interface ShopInfo {
   prep_time:     string | null
 }
 
+interface ComboVoucher {
+  id:       string
+  title:    string
+  discount: number
+  endAt:    string
+  items:    { productId: string; productName: string; productPrice: number; minQty: number }[]
+}
+
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
 // ─── Particle effect (add-to-cart) ───────────────────────
@@ -191,6 +199,7 @@ export default function ShopPage() {
   const [shop,          setShop]          = useState<ShopInfo | null>(null)
   const [products,      setProducts]      = useState<Product[]>([])
   const [categories,    setCategories]    = useState<{id:string; label:string}[]>([])
+  const [combos,        setCombos]        = useState<ComboVoucher[]>([])
   const [loading,       setLoading]       = useState(true)
   const [activeTab,     setActiveTab]     = useState("")
   const [scrolled,      setScrolled]      = useState(false)
@@ -238,6 +247,33 @@ export default function ShopPage() {
       const cats = [{ id:"__all__", label:"Tất cả" }, ...Array.from(catMap.entries()).map(([id, label]) => ({ id, label }))]
       setCategories(cats)
       setActiveTab(cats[0]?.id ?? "")
+
+      // Load combo vouchers
+      const now = new Date().toISOString()
+      const { data: vouchers } = await supabase
+        .from("vouchers")
+        .select("id,title,discount_value,valid_to")
+        .eq("shop_id", shopId)
+        .eq("is_active", true)
+        .eq("is_combo", true)
+        .gte("valid_to", now)
+      if (vouchers && vouchers.length > 0) {
+        const vIds = vouchers.map((v: {id:string}) => v.id)
+        const { data: ciRows } = await supabase
+          .from("combo_items")
+          .select("voucher_id,product_id,min_quantity,products(name,price)")
+          .in("voucher_id", vIds)
+        const ciMap: Record<string, ComboVoucher["items"]> = {}
+        ;(ciRows ?? []).forEach((r: {voucher_id:string;product_id:string;min_quantity:number;products:{name:string;price:number}[]|null}) => {
+          if (!ciMap[r.voucher_id]) ciMap[r.voucher_id] = []
+          const prod = Array.isArray(r.products) ? r.products[0] : r.products
+          ciMap[r.voucher_id].push({ productId: r.product_id, productName: (prod as {name:string;price:number}|null)?.name ?? "", productPrice: (prod as {name:string;price:number}|null)?.price ?? 0, minQty: r.min_quantity })
+        })
+        setCombos(vouchers.map((v: {id:string;title:string;discount_value:number;valid_to:string}) => ({
+          id: v.id, title: v.title, discount: v.discount_value, endAt: v.valid_to,
+          items: ciMap[v.id] ?? [],
+        })))
+      }
 
       setLoading(false)
     }
@@ -519,6 +555,76 @@ export default function ShopPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Combo deals ── */}
+          {combos.length > 0 && (
+            <div style={{ padding:"10px 14px 0" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                <span style={{ fontSize:13 }}>🎁</span>
+                <span style={{ color:"#f8f0e0", fontSize:12, fontWeight:700 }}>Combo ưu đãi</span>
+                <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.06)" }} />
+              </div>
+              <div style={{ display:"flex", gap:8, overflowX:"auto", scrollbarWidth:"none", paddingBottom:4 } as React.CSSProperties}>
+                {combos.map(combo => {
+                  const totalOriginal = combo.items.reduce((s, i) => s + i.productPrice * i.minQty, 0)
+                  return (
+                    <div key={combo.id} style={{ flexShrink:0, width:220,
+                      background:"rgba(180,100,255,0.06)", border:"1px solid rgba(180,100,255,0.22)",
+                      borderRadius:14, padding:"11px 13px" }}>
+                      <div style={{ color:"#b464ff", fontSize:10, fontWeight:700, marginBottom:6 }}>{combo.title}</div>
+                      <div style={{ marginBottom:8 }}>
+                        {combo.items.map(item => (
+                          <div key={item.productId} style={{ display:"flex", justifyContent:"space-between",
+                            alignItems:"center", marginBottom:3 }}>
+                            <span style={{ color:"#b0956a", fontSize:9.5, flex:1, overflow:"hidden",
+                              textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                              {item.productName}
+                            </span>
+                            <span style={{ color:"#6a5a40", fontSize:8.5, flexShrink:0, marginLeft:4 }}>×{item.minQty}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                        <div>
+                          {totalOriginal > 0 && (
+                            <div style={{ color:"#6a5a40", fontSize:8.5, textDecoration:"line-through" }}>
+                              {totalOriginal.toLocaleString("vi-VN")}đ
+                            </div>
+                          )}
+                          <div style={{ background:"linear-gradient(90deg,#b464ff,#8b5cf6)",
+                            WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                            backgroundClip:"text", fontSize:13, fontWeight:800 }}>
+                            {totalOriginal > 0 ? (totalOriginal - combo.discount).toLocaleString("vi-VN") + "đ" : `Giảm ${combo.discount.toLocaleString("vi-VN")}đ`}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            combo.items.forEach(item => {
+                              const prod = products.find(p => p.id === item.productId)
+                              if (!prod) return
+                              const newItem = { id: prod.id, name: prod.name, price: prod.price, shop: shop?.name ?? "", shopId }
+                              if (storeShopId && storeShopId !== shopId) { setConflictItem(newItem); return }
+                              for (let q = 0; q < item.minQty; q++) addItem(newItem)
+                            })
+                            fireToast(`Đã thêm combo ${combo.title}`)
+                          }}
+                          style={{ height:30, padding:"0 12px", borderRadius:9, border:"none",
+                            background:"linear-gradient(90deg,#b464ff,#8b5cf6)",
+                            color:"#fff", fontSize:10, fontWeight:700,
+                            cursor:"pointer", fontFamily:"Lexend", flexShrink:0,
+                            boxShadow:"0 2px 10px rgba(180,100,255,0.35)" }}>
+                          + Thêm combo
+                        </button>
+                      </div>
+                      <div style={{ color:"#6a5a40", fontSize:7.5 }}>
+                        HSD: {new Date(combo.endAt).toLocaleDateString("vi-VN")}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

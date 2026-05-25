@@ -9,6 +9,8 @@ type PromoStatus = "active" | "scheduled" | "ended"
 
 interface PickerProduct { id: string; name: string; price: number; category: string }
 
+interface ComboItem { productId: string; minQty: number; productName?: string; productPrice?: number }
+
 interface Promotion {
   id: string
   title: string
@@ -24,6 +26,7 @@ interface Promotion {
   status: PromoStatus
   productIds: string[]
   applyAll: boolean
+  comboItems: ComboItem[]
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
@@ -70,12 +73,13 @@ export default function MerchantPromotionsPage() {
     title: "", type: "percent" as PromoType, value: "", minOrder: "", maxDiscount: "",
     usageLimit: "", perPersonLimit: "", startAt: "", endAt: "", applyAll: true,
     selectedProductIds: [] as string[],
+    comboItems: [] as ComboItem[],
   })
 
   const loadData = useCallback(async (sid: string) => {
     const [{ data: vouchers }, { data: products }] = await Promise.all([
       supabase.from("vouchers")
-        .select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,per_person_limit,used_count,valid_from,valid_to,is_active")
+        .select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,per_person_limit,used_count,valid_from,valid_to,is_active,is_combo")
         .eq("shop_id", sid)
         .order("created_at", { ascending: false }),
       supabase.from("products")
@@ -85,10 +89,30 @@ export default function MerchantPromotionsPage() {
         .order("sort_order"),
     ])
     if (vouchers) {
+      const voucherIds = vouchers.map(v => v.id)
+      let comboMap: Record<string, ComboItem[]> = {}
+      if (voucherIds.length > 0) {
+        const { data: ciRows } = await supabase
+          .from("combo_items")
+          .select("voucher_id,product_id,min_quantity,products(name,price)")
+          .in("voucher_id", voucherIds)
+        if (ciRows) {
+          ciRows.forEach((r: { voucher_id: string; product_id: string; min_quantity: number; products: { name: string; price: number }[] | null }) => {
+            if (!comboMap[r.voucher_id]) comboMap[r.voucher_id] = []
+            const prod = Array.isArray(r.products) ? r.products[0] : r.products
+            comboMap[r.voucher_id].push({
+              productId: r.product_id,
+              minQty: r.min_quantity,
+              productName: (prod as {name:string;price:number} | null)?.name,
+              productPrice: (prod as {name:string;price:number} | null)?.price,
+            })
+          })
+        }
+      }
       setPromos(vouchers.map(v => ({
         id: v.id,
         title: v.title,
-        type: (v.discount_type as PromoType) ?? "percent",
+        type: v.is_combo ? "combo" : (v.discount_type as PromoType) ?? "percent",
         value: v.discount_value,
         minOrder: v.min_order,
         maxDiscount: v.max_discount,
@@ -100,6 +124,7 @@ export default function MerchantPromotionsPage() {
         status: deriveStatus(v),
         productIds: [],
         applyAll: true,
+        comboItems: comboMap[v.id] ?? [],
       })))
     }
     if (products) {
@@ -173,9 +198,22 @@ export default function MerchantPromotionsPage() {
     }
   }
 
+  const setComboItemQty = (productId: string, qty: number) => {
+    setForm(f => {
+      if (qty <= 0) return { ...f, comboItems: f.comboItems.filter(c => c.productId !== productId) }
+      const existing = f.comboItems.find(c => c.productId === productId)
+      if (existing) return { ...f, comboItems: f.comboItems.map(c => c.productId === productId ? { ...c, minQty: qty } : c) }
+      const prod = pickerProducts.find(p => p.id === productId)
+      return { ...f, comboItems: [...f.comboItems, { productId, minQty: qty, productName: prod?.name, productPrice: prod?.price }] }
+    })
+  }
+
   const handleCreate = async () => {
     if (!form.title || !form.startAt || !form.endAt || !shopId) return
-    if (!form.applyAll && form.selectedProductIds.length === 0) {
+    if (form.type === "combo" && form.comboItems.length === 0) {
+      fireToast("Chọn ít nhất 1 món cho combo!", true); return
+    }
+    if (form.type !== "combo" && !form.applyAll && form.selectedProductIds.length === 0) {
       fireToast("Vui lòng chọn ít nhất 1 món!", true); return
     }
     if (new Date(form.endAt) <= new Date(form.startAt)) {
@@ -185,7 +223,7 @@ export default function MerchantPromotionsPage() {
       const pct = parseInt(form.value) || 0
       if (pct <= 0 || pct > 100) { fireToast("Phần trăm giảm phải từ 1–100", true); return }
     }
-    if (form.type === "fixed") {
+    if (form.type === "fixed" || form.type === "combo") {
       const amt = parseInt(form.value) || 0
       if (amt <= 0) { fireToast("Số tiền giảm phải lớn hơn 0đ!", true); return }
     }
@@ -206,11 +244,24 @@ export default function MerchantPromotionsPage() {
       valid_from: new Date(form.startAt).toISOString(),
       valid_to: new Date(form.endAt).toISOString(),
       is_active: true,
+      is_combo: form.type === "combo",
       shop_id: shopId,
       created_by: user?.id,
     }).select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,used_count,valid_from,valid_to,is_active").single()
+    if (error || !data) { setSaving(false); fireToast("Lỗi tạo chương trình!", true); return }
+
+    // Lưu combo_items nếu là combo
+    if (form.type === "combo" && form.comboItems.length > 0) {
+      await supabase.from("combo_items").insert(
+        form.comboItems.map(ci => ({
+          voucher_id: data.id,
+          product_id: ci.productId,
+          min_quantity: ci.minQty,
+        }))
+      )
+    }
+
     setSaving(false)
-    if (error || !data) { fireToast("Lỗi tạo chương trình!", true); return }
     const newPromo: Promotion = {
       id: data.id,
       title: data.title,
@@ -226,9 +277,10 @@ export default function MerchantPromotionsPage() {
       status: start > now ? "scheduled" : "active",
       productIds: form.applyAll ? [] : form.selectedProductIds,
       applyAll: form.applyAll,
+      comboItems: form.comboItems,
     }
     setPromos(ps => [newPromo, ...ps])
-    setForm({ title:"", type:"percent", value:"", minOrder:"", maxDiscount:"", usageLimit:"", perPersonLimit:"", startAt:"", endAt:"", applyAll:true, selectedProductIds:[] })
+    setForm({ title:"", type:"percent", value:"", minOrder:"", maxDiscount:"", usageLimit:"", perPersonLimit:"", startAt:"", endAt:"", applyAll:true, selectedProductIds:[], comboItems:[] })
     setShowCreate(false)
     fireToast("Tạo chương trình khuyến mãi thành công!")
   }
@@ -328,9 +380,9 @@ export default function MerchantPromotionsPage() {
                 </div>
 
                 {/* Giá trị */}
-                {form.type !== "freeship" && form.type !== "combo" && (
+                {form.type !== "freeship" && (
                   <>
-                    <MLabel>{form.type === "percent" ? "Phần trăm giảm (%)" : "Số tiền giảm (đ)"}</MLabel>
+                    <MLabel>{form.type === "percent" ? "Phần trăm giảm (%)" : "Số tiền giảm khi mua combo (đ)"}</MLabel>
                     <MInput value={form.value} onChange={v => setForm(f => ({ ...f, value:v }))}
                       type="number" placeholder={form.type === "percent" ? "VD: 20" : "VD: 15000"} />
                   </>
@@ -380,114 +432,160 @@ export default function MerchantPromotionsPage() {
                   </div>
                 </div>
 
-                {/* Apply scope */}
-                <MLabel>Áp dụng cho</MLabel>
-                <div style={{ display:"flex", gap:6, marginBottom:form.applyAll ? 18 : 10 }}>
-                  <div onClick={() => setForm(f => ({ ...f, applyAll: true }))}
-                    style={{ flex:1, height:40, borderRadius:10, cursor:"pointer",
-                      display:"flex", alignItems:"center", justifyContent:"center",
-                      background:form.applyAll?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
-                      border:`1px solid ${form.applyAll?"rgba(255,107,0,0.35)":"rgba(255,255,255,0.08)"}`,
-                      color:form.applyAll?"#FF8C00":"#6a5a40",
-                      fontSize:10, fontWeight:form.applyAll?700:400, transition:"all .15s" }}>
-                    Tất cả món
-                  </div>
-                  <div onClick={() => setForm(f => ({ ...f, applyAll: false }))}
-                    style={{ flex:1, height:40, borderRadius:10, cursor:"pointer", position:"relative",
-                      display:"flex", alignItems:"center", justifyContent:"center", gap:5,
-                      background:!form.applyAll?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
-                      border:`1px solid ${!form.applyAll?"rgba(255,107,0,0.35)":"rgba(255,255,255,0.08)"}`,
-                      color:!form.applyAll?"#FF8C00":"#6a5a40",
-                      fontSize:10, fontWeight:!form.applyAll?700:400, transition:"all .15s" }}>
-                    Món được chọn
-                    {!form.applyAll && form.selectedProductIds.length > 0 && (
-                      <span style={{ width:16, height:16, borderRadius:"50%",
-                        background:"#FF6B00", color:"#fff",
-                        fontSize:8, fontWeight:800,
-                        display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                        {form.selectedProductIds.length}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Product picker */}
-                {!form.applyAll && (
+                {/* Combo picker — chỉ hiện khi type = combo */}
+                {form.type === "combo" && (
                   <div style={{ marginBottom:18 }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                      <div style={{ color:"rgba(176,149,106,0.6)", fontSize:9.5 }}>
-                        Chọn món áp dụng {form.selectedProductIds.length > 0 && `(${form.selectedProductIds.length} món)`}
-                      </div>
-                      {form.selectedProductIds.length > 0 && (
-                        <button onClick={() => setForm(f => ({ ...f, selectedProductIds:[] }))}
-                          style={{ background:"none", border:"none", color:"#6a5a40", fontSize:9, cursor:"pointer", fontFamily:"Lexend" }}>
-                          Bỏ chọn tất cả
-                        </button>
-                      )}
-                    </div>
+                    <MLabel>Món trong combo <span style={{ color:"#6a5a40", fontSize:8.5, fontWeight:400 }}>(đặt số lượng tối thiểu)</span></MLabel>
                     {pickerProducts.length === 0 ? (
-                      <div style={{ padding:"16px", textAlign:"center", color:"#6a5a40", fontSize:10,
-                        background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)",
-                        borderRadius:12 }}>
+                      <div style={{ padding:"14px", textAlign:"center", color:"#6a5a40", fontSize:10,
+                        background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:12 }}>
                         Chưa có sản phẩm nào trong menu
                       </div>
                     ) : (
-                      <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:12, overflow:"hidden" }}>
-                        {Object.entries(productsByCategory).map(([cat, items], ci) => (
-                          <div key={cat}>
-                            <div style={{ padding:"7px 12px", background:"rgba(255,255,255,0.02)",
-                              borderBottom:"1px solid rgba(255,255,255,0.05)",
-                              color:"#6a5a40", fontSize:8.5, fontWeight:700, letterSpacing:".3px", textTransform:"uppercase" }}>
-                              {cat}
+                      <div style={{ background:"rgba(180,100,255,0.04)", border:"1px solid rgba(180,100,255,0.2)", borderRadius:12, overflow:"hidden" }}>
+                        {pickerProducts.map((prod, pi) => {
+                          const ci = form.comboItems.find(c => c.productId === prod.id)
+                          const qty = ci?.minQty ?? 0
+                          const isLast = pi === pickerProducts.length - 1
+                          return (
+                            <div key={prod.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px",
+                              borderBottom:isLast?"none":"1px solid rgba(255,255,255,0.05)",
+                              background:qty>0?"rgba(180,100,255,0.06)":"transparent", transition:"background .15s" }}>
+                              <div style={{ flex:1 }}>
+                                <div style={{ color:qty>0?"#f8f0e0":"#b0956a", fontSize:11, fontWeight:qty>0?600:400 }}>{prod.name}</div>
+                                <div style={{ color:"#6a5a40", fontSize:9 }}>{prod.price.toLocaleString("vi-VN")}đ</div>
+                              </div>
+                              <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+                                <button onClick={() => setComboItemQty(prod.id, qty - 1)}
+                                  style={{ width:28, height:28, borderRadius:7, border:"none",
+                                    background:qty>0?"rgba(180,100,255,0.2)":"rgba(255,255,255,0.06)",
+                                    color:qty>0?"#b464ff":"#6a5a40", fontSize:16, cursor:"pointer",
+                                    display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Lexend" }}>−</button>
+                                <span style={{ fontSize:12, fontWeight:700, color:qty>0?"#b464ff":"#6a5a40",
+                                  minWidth:18, textAlign:"center" }}>{qty}</span>
+                                <button onClick={() => setComboItemQty(prod.id, qty + 1)}
+                                  style={{ width:28, height:28, borderRadius:7, border:"none",
+                                    background:"rgba(180,100,255,0.2)", color:"#b464ff", fontSize:16, cursor:"pointer",
+                                    display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Lexend" }}>+</button>
+                              </div>
                             </div>
-                            {items.map((prod, pi) => {
-                              const checked = form.selectedProductIds.includes(prod.id)
-                              const isLast = ci === Object.keys(productsByCategory).length - 1 && pi === items.length - 1
-                              return (
-                                <div key={prod.id} onClick={() => toggleProduct(prod.id)}
-                                  style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px",
-                                    borderBottom:isLast?"none":"1px solid rgba(255,255,255,0.05)",
-                                    background:checked?"rgba(255,107,0,0.04)":"transparent",
-                                    cursor:"pointer", transition:"background .15s" }}>
-                                  <div style={{ width:20, height:20, borderRadius:6, flexShrink:0,
-                                    background:checked?"#FF6B00":"rgba(255,255,255,0.06)",
-                                    border:`1.5px solid ${checked?"#FF6B00":"rgba(255,255,255,0.12)"}`,
-                                    display:"flex", alignItems:"center", justifyContent:"center",
-                                    fontSize:10, transition:"all .15s" }}>
-                                    {checked && <span style={{ color:"#fff", fontSize:9, fontWeight:900 }}>✓</span>}
-                                  </div>
-                                  <div style={{ flex:1 }}>
-                                    <div style={{ color:checked?"#f8f0e0":"#b0956a", fontSize:11, fontWeight:checked?600:400 }}>
-                                      {prod.name}
-                                    </div>
-                                  </div>
-                                  <div style={{ color:"#6a5a40", fontSize:9.5, flexShrink:0 }}>
-                                    {prod.price.toLocaleString("vi-VN")}đ
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
-                    {!form.applyAll && form.selectedProductIds.length === 0 && pickerProducts.length > 0 && (
-                      <div style={{ marginTop:6, color:"rgba(255,64,64,0.7)", fontSize:9 }}>
-                        ⚠ Chọn ít nhất 1 món để tiếp tục
+                    {form.comboItems.length === 0 && pickerProducts.length > 0 && (
+                      <div style={{ marginTop:6, color:"rgba(255,64,64,0.7)", fontSize:9 }}>⚠ Đặt số lượng ≥ 1 cho ít nhất 1 món</div>
+                    )}
+                    {form.comboItems.length > 0 && (
+                      <div style={{ marginTop:6, color:"#b464ff", fontSize:9 }}>
+                        ✓ {form.comboItems.length} món trong combo · giảm {fmt(parseInt(form.value)||0)} khi mua đủ
                       </div>
                     )}
                   </div>
                 )}
 
-                <button onClick={handleCreate} disabled={saving ||
-                  !form.title || !form.startAt || !form.endAt ||
-                  (!form.applyAll && form.selectedProductIds.length === 0 && pickerProducts.length > 0)}
+                {/* Apply scope — chỉ hiện khi KHÔNG phải combo */}
+                {form.type !== "combo" && (
+                  <>
+                    <MLabel>Áp dụng cho</MLabel>
+                    <div style={{ display:"flex", gap:6, marginBottom:form.applyAll ? 18 : 10 }}>
+                      <div onClick={() => setForm(f => ({ ...f, applyAll: true }))}
+                        style={{ flex:1, height:40, borderRadius:10, cursor:"pointer",
+                          display:"flex", alignItems:"center", justifyContent:"center",
+                          background:form.applyAll?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
+                          border:`1px solid ${form.applyAll?"rgba(255,107,0,0.35)":"rgba(255,255,255,0.08)"}`,
+                          color:form.applyAll?"#FF8C00":"#6a5a40",
+                          fontSize:10, fontWeight:form.applyAll?700:400, transition:"all .15s" }}>
+                        Tất cả món
+                      </div>
+                      <div onClick={() => setForm(f => ({ ...f, applyAll: false }))}
+                        style={{ flex:1, height:40, borderRadius:10, cursor:"pointer", position:"relative",
+                          display:"flex", alignItems:"center", justifyContent:"center", gap:5,
+                          background:!form.applyAll?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
+                          border:`1px solid ${!form.applyAll?"rgba(255,107,0,0.35)":"rgba(255,255,255,0.08)"}`,
+                          color:!form.applyAll?"#FF8C00":"#6a5a40",
+                          fontSize:10, fontWeight:!form.applyAll?700:400, transition:"all .15s" }}>
+                        Món được chọn
+                        {!form.applyAll && form.selectedProductIds.length > 0 && (
+                          <span style={{ width:16, height:16, borderRadius:"50%",
+                            background:"#FF6B00", color:"#fff", fontSize:8, fontWeight:800,
+                            display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                            {form.selectedProductIds.length}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {!form.applyAll && (
+                      <div style={{ marginBottom:18 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                          <div style={{ color:"rgba(176,149,106,0.6)", fontSize:9.5 }}>
+                            Chọn món áp dụng {form.selectedProductIds.length > 0 && `(${form.selectedProductIds.length} món)`}
+                          </div>
+                          {form.selectedProductIds.length > 0 && (
+                            <button onClick={() => setForm(f => ({ ...f, selectedProductIds:[] }))}
+                              style={{ background:"none", border:"none", color:"#6a5a40", fontSize:9, cursor:"pointer", fontFamily:"Lexend" }}>
+                              Bỏ chọn tất cả
+                            </button>
+                          )}
+                        </div>
+                        {pickerProducts.length === 0 ? (
+                          <div style={{ padding:"16px", textAlign:"center", color:"#6a5a40", fontSize:10,
+                            background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:12 }}>
+                            Chưa có sản phẩm nào trong menu
+                          </div>
+                        ) : (
+                          <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:12, overflow:"hidden" }}>
+                            {Object.entries(productsByCategory).map(([cat, items], ci) => (
+                              <div key={cat}>
+                                <div style={{ padding:"7px 12px", background:"rgba(255,255,255,0.02)",
+                                  borderBottom:"1px solid rgba(255,255,255,0.05)",
+                                  color:"#6a5a40", fontSize:8.5, fontWeight:700, letterSpacing:".3px", textTransform:"uppercase" }}>
+                                  {cat}
+                                </div>
+                                {items.map((prod, pi) => {
+                                  const checked = form.selectedProductIds.includes(prod.id)
+                                  const isLast = ci === Object.keys(productsByCategory).length - 1 && pi === items.length - 1
+                                  return (
+                                    <div key={prod.id} onClick={() => toggleProduct(prod.id)}
+                                      style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px",
+                                        borderBottom:isLast?"none":"1px solid rgba(255,255,255,0.05)",
+                                        background:checked?"rgba(255,107,0,0.04)":"transparent",
+                                        cursor:"pointer", transition:"background .15s" }}>
+                                      <div style={{ width:20, height:20, borderRadius:6, flexShrink:0,
+                                        background:checked?"#FF6B00":"rgba(255,255,255,0.06)",
+                                        border:`1.5px solid ${checked?"#FF6B00":"rgba(255,255,255,0.12)"}`,
+                                        display:"flex", alignItems:"center", justifyContent:"center",
+                                        fontSize:10, transition:"all .15s" }}>
+                                        {checked && <span style={{ color:"#fff", fontSize:9, fontWeight:900 }}>✓</span>}
+                                      </div>
+                                      <div style={{ flex:1 }}>
+                                        <div style={{ color:checked?"#f8f0e0":"#b0956a", fontSize:11, fontWeight:checked?600:400 }}>{prod.name}</div>
+                                      </div>
+                                      <div style={{ color:"#6a5a40", fontSize:9.5, flexShrink:0 }}>{prod.price.toLocaleString("vi-VN")}đ</div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {form.selectedProductIds.length === 0 && pickerProducts.length > 0 && (
+                          <div style={{ marginTop:6, color:"rgba(255,64,64,0.7)", fontSize:9 }}>⚠ Chọn ít nhất 1 món để tiếp tục</div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <button onClick={handleCreate} disabled={saving || !form.title || !form.startAt || !form.endAt ||
+                  (form.type === "combo" && form.comboItems.length === 0) ||
+                  (form.type !== "combo" && !form.applyAll && form.selectedProductIds.length === 0 && pickerProducts.length > 0)}
                   style={{ width:"100%", height:48, borderRadius:13, border:"none",
                     background:"linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)",
                     color:"#fff", fontSize:12, fontWeight:700, fontFamily:"Lexend",
                     cursor:saving?"not-allowed":"pointer", position:"relative", overflow:"hidden",
                     boxShadow:"0 3px 16px rgba(255,107,0,0.4)",
-                    opacity:(saving||!form.title||!form.startAt||!form.endAt||(!form.applyAll&&form.selectedProductIds.length===0&&pickerProducts.length>0))?0.5:1 }}>
+                    opacity:(saving||!form.title||!form.startAt||!form.endAt||(form.type==="combo"&&form.comboItems.length===0)||(form.type!=="combo"&&!form.applyAll&&form.selectedProductIds.length===0&&pickerProducts.length>0))?0.5:1 }}>
                   <div style={{ position:"absolute", top:0, left:"-60%", width:"35%", height:"100%",
                     background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)",
                     animation:"shimmer 2.5s infinite" }} />
@@ -590,6 +688,28 @@ export default function MerchantPromotionsPage() {
                     </span>
                   </div>
                 </div>
+
+                {/* Combo items detail */}
+                {selected.type === "combo" && selected.comboItems.length > 0 && (
+                  <div style={{ background:"rgba(180,100,255,0.06)", border:"1px solid rgba(180,100,255,0.2)",
+                    borderRadius:10, padding:"10px 12px", marginBottom:14 }}>
+                    <div style={{ color:"#b464ff", fontSize:9, fontWeight:700, marginBottom:8 }}>🎁 Các món trong combo</div>
+                    {selected.comboItems.map(ci => (
+                      <div key={ci.productId} style={{ display:"flex", justifyContent:"space-between",
+                        alignItems:"center", marginBottom:5 }}>
+                        <span style={{ color:"#f8f0e0", fontSize:10 }}>{ci.productName ?? ci.productId}</span>
+                        <span style={{ color:"#b464ff", fontSize:9, fontWeight:700,
+                          background:"rgba(180,100,255,0.15)", borderRadius:5, padding:"2px 7px" }}>
+                          ×{ci.minQty}
+                        </span>
+                      </div>
+                    ))}
+                    <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid rgba(180,100,255,0.15)",
+                      color:"#6a5a40", fontSize:8.5 }}>
+                      Giảm <span style={{ color:"#b464ff", fontWeight:700 }}>{fmt(selected.value)}</span> khi mua đủ combo
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div style={{ padding:"12px 16px 28px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
