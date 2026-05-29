@@ -127,15 +127,17 @@ export default function HomePage() {
   const cartIconRef  = useRef<HTMLDivElement>(null)
 
   // ─── Real data state ───────────────────────────────────────
-  const [userName,     setUserName]     = useState("bạn")
-  const [notifCount,   setNotifCount]   = useState(0)
-  const [liveOrder,    setLiveOrder]    = useState<LiveOrderRow | null>(null)
-  const [vouchers,     setVouchers]     = useState<VoucherRow[]>([])
-  const [nearbyShops,  setNearbyShops]  = useState<ShopRow[]>([])
-  const [bestSellers,  setBestSellers]  = useState<ProductRow[]>([])
-  const [reorders,     setReorders]     = useState<OrderRow[]>([])
-  const [promos,       setPromos]       = useState<ProductRow[]>([])
-  const [recos,        setRecos]        = useState<RecoRow[]>([])
+  const [userName,      setUserName]      = useState("bạn")
+  const [notifCount,    setNotifCount]    = useState(0)
+  const [liveOrder,     setLiveOrder]     = useState<LiveOrderRow | null>(null)
+  const [vouchers,      setVouchers]      = useState<VoucherRow[]>([])
+  const [nearbyShops,   setNearbyShops]   = useState<ShopRow[]>([])
+  const [bestSellers,   setBestSellers]   = useState<ProductRow[]>([])
+  const [reorders,      setReorders]      = useState<OrderRow[]>([])
+  const [promos,        setPromos]        = useState<ProductRow[]>([])
+  const [recos,         setRecos]         = useState<RecoRow[]>([])
+  const [favoriteIds,   setFavoriteIds]   = useState<string[]>([])
+  const [favoriteShops, setFavoriteShops] = useState<ShopRow[]>([])
 
   // ─── Fetch real data from Supabase ────────────────────────
   useEffect(() => {
@@ -247,6 +249,35 @@ export default function HomePage() {
     loadData()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Load favorites from localStorage + fetch shop data
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("favorite_shop_ids")
+      const ids: string[] = saved ? JSON.parse(saved) : []
+      setFavoriteIds(ids)
+      if (ids.length === 0) return
+      supabase.from("shops")
+        .select("id,name,is_open,rating_avg,address,avatar_url")
+        .in("id", ids)
+        .then(({ data }) => { if (data) setFavoriteShops(data as ShopRow[]) })
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const toggleFavorite = (shopId: string) => {
+    setFavoriteIds(prev => {
+      const next = prev.includes(shopId) ? prev.filter(x => x !== shopId) : [...prev, shopId]
+      try { localStorage.setItem("favorite_shop_ids", JSON.stringify(next)) } catch { /* ignore */ }
+      if (!prev.includes(shopId)) {
+        const shop = nearbyShops.find(s => s.id === shopId)
+        if (shop) setFavoriteShops(fs => fs.find(s => s.id === shopId) ? fs : [...fs, shop])
+      } else {
+        setFavoriteShops(fs => fs.filter(s => s.id !== shopId))
+      }
+      return next
+    })
+  }
 
   // GPS location + weather
   useEffect(() => {
@@ -926,6 +957,48 @@ export default function HomePage() {
           )}
 
           {/* ──────────────────────────────────────
+              S8.5 — Cửa hàng yêu thích
+          ────────────────────────────────────── */}
+          {favoriteShops.length > 0 && (
+            <>
+              <SectionHeader title="❤️ Cửa hàng yêu thích" />
+              <HScroll>
+                {favoriteShops.map(s => (
+                  <a key={s.id} href={`/shop/${s.id}`} style={{ textDecoration:"none", flexShrink:0 }}>
+                    <div style={{
+                      width:140, background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
+                      border:"1px solid rgba(255,107,0,0.18)", borderRadius:14, overflow:"hidden",
+                    }}>
+                      <div style={{ height:64, background:"rgba(255,107,0,0.06)",
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        fontSize:36, position:"relative" }}>
+                        {s.avatar_url
+                          ? <img src={s.avatar_url} alt={s.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                          : "🏪"}
+                        <button onClick={e => { e.preventDefault(); e.stopPropagation(); toggleFavorite(s.id) }}
+                          style={{ position:"absolute", top:5, right:5, width:24, height:24, borderRadius:7,
+                            background:"rgba(255,64,64,0.15)", border:"1px solid rgba(255,64,64,0.3)",
+                            color:"#ff6060", fontSize:12, cursor:"pointer", display:"flex",
+                            alignItems:"center", justifyContent:"center" }}>❤️</button>
+                      </div>
+                      <div style={{ padding:"8px 9px" }}>
+                        <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600,
+                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</div>
+                        <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:3 }}>
+                          {s.is_open
+                            ? <span style={{ color:"#3ecf6e", fontSize:8 }}>🟢 Mở cửa</span>
+                            : <span style={{ color:"#ff6060", fontSize:8 }}>🔴 Đóng cửa</span>}
+                          <span style={{ color:"#6a5a40", fontSize:8 }}>· ★ {s.rating_avg?.toFixed(1) ?? "Mới"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </HScroll>
+            </>
+          )}
+
+          {/* ──────────────────────────────────────
               S9 — NearbyShops
           ────────────────────────────────────── */}
           <SectionHeader title="📍 Quán gần bạn" more="Xem tất cả →" href="/nearby-shops" />
@@ -935,49 +1008,62 @@ export default function HomePage() {
               <div style={{ textAlign:"center", padding:"20px 0", color:"#6a5a40", fontSize:11 }}>
                 Chưa có quán nào trong khu vực
               </div>
-            ) : nearbyShops.map(s => (
-              <a key={s.id} href={`/shop/${s.id}`} style={{ textDecoration:"none" }}>
-                <div className="shop-card" style={{
-                  background:"rgba(255,255,255,0.06)", backdropFilter:"blur(10px)",
-                  border:"1px solid rgba(255,255,255,0.08)",
-                  borderRadius:14, padding:"10px 11px",
-                  display:"flex", alignItems:"center", gap:10, cursor:"pointer",
-                }}>
-                  <div style={{ width:54, height:54, borderRadius:12, flexShrink:0,
-                    background:"rgba(255,107,0,0.07)", border:"1px solid rgba(255,255,255,0.08)",
-                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:27 }}>
-                    {s.avatar_url ? (
-                      <img src={s.avatar_url} alt={s.name} style={{ width:"100%", height:"100%", borderRadius:12, objectFit:"cover" }} />
-                    ) : "🏪"}
+            ) : nearbyShops.map(s => {
+              const isFav = favoriteIds.includes(s.id)
+              return (
+              <div key={s.id} style={{ position:"relative" }}>
+                <a href={`/shop/${s.id}`} style={{ textDecoration:"none" }}>
+                  <div className="shop-card" style={{
+                    background:"rgba(255,255,255,0.06)", backdropFilter:"blur(10px)",
+                    border:`1px solid ${isFav ? "rgba(255,64,64,0.25)" : "rgba(255,255,255,0.08)"}`,
+                    borderRadius:14, padding:"10px 11px",
+                    display:"flex", alignItems:"center", gap:10, cursor:"pointer",
+                  }}>
+                    <div style={{ width:54, height:54, borderRadius:12, flexShrink:0,
+                      background:"rgba(255,107,0,0.07)", border:"1px solid rgba(255,255,255,0.08)",
+                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:27, overflow:"hidden" }}>
+                      {s.avatar_url ? (
+                        <img src={s.avatar_url} alt={s.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                      ) : "🏪"}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ color:"#f8f0e0", fontSize:11.5, fontWeight:600,
+                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                        {s.name}
+                      </div>
+                      <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
+                        <span style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.06)",
+                          color:"#6a5a40", fontSize:7.5, borderRadius:5, padding:"2px 6px" }}>
+                          {s.address.split(",")[0]}
+                        </span>
+                        {s.is_open ? (
+                          <span style={{ background:"rgba(62,207,110,0.08)", border:"1px solid rgba(62,207,110,0.2)",
+                            color:"#3ecf6e", fontSize:7.5, borderRadius:5, padding:"2px 6px" }}>🟢 Đang mở</span>
+                        ) : (
+                          <span style={{ background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)",
+                            color:"#ff6060", fontSize:7.5, borderRadius:5, padding:"2px 6px" }}>🔴 Đóng cửa</span>
+                        )}
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:7, marginTop:5 }}>
+                        <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
+                        <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.rating_avg?.toFixed(1) ?? "Mới"}</span>
+                        <span style={{ color:"#4a5040", fontSize:9 }}>·</span>
+                        <span style={{ color:"#b0956a", fontSize:8.5 }}>Ship 15k</span>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ color:"#f8f0e0", fontSize:11.5, fontWeight:600,
-                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                      {s.name}
-                    </div>
-                    <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
-                      <span style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.06)",
-                        color:"#6a5a40", fontSize:7.5, borderRadius:5, padding:"2px 6px" }}>
-                        {s.address.split(",")[0]}
-                      </span>
-                      {s.is_open ? (
-                        <span style={{ background:"rgba(62,207,110,0.08)", border:"1px solid rgba(62,207,110,0.2)",
-                          color:"#3ecf6e", fontSize:7.5, borderRadius:5, padding:"2px 6px" }}>🟢 Đang mở</span>
-                      ) : (
-                        <span style={{ background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)",
-                          color:"#ff6060", fontSize:7.5, borderRadius:5, padding:"2px 6px" }}>🔴 Đóng cửa</span>
-                      )}
-                    </div>
-                    <div style={{ display:"flex", alignItems:"center", gap:7, marginTop:5 }}>
-                      <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
-                      <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.rating_avg?.toFixed(1) ?? "Mới"}</span>
-                      <span style={{ color:"#4a5040", fontSize:9 }}>·</span>
-                      <span style={{ color:"#b0956a", fontSize:8.5 }}>Ship 15k</span>
-                    </div>
-                  </div>
-                </div>
-              </a>
-            ))}
+                </a>
+                {/* Favorite toggle button */}
+                <button onClick={e => { e.preventDefault(); toggleFavorite(s.id) }}
+                  style={{ position:"absolute", top:10, right:10, width:28, height:28, borderRadius:8, border:"none",
+                    background: isFav ? "rgba(255,64,64,0.15)" : "rgba(255,255,255,0.07)",
+                    color: isFav ? "#ff4040" : "#6a5a40", fontSize:14, cursor:"pointer",
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    transition:"all .2s", zIndex:1 }}>
+                  {isFav ? "❤️" : "🤍"}
+                </button>
+              </div>
+            )})}
           </div>
 
           {/* ──────────────────────────────────────

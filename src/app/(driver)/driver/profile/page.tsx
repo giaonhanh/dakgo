@@ -373,10 +373,11 @@ export default function DriverProfilePage() {
 
       // profile info
       const { data: prof } = await supabase.from("profiles")
-        .select("full_name, phone, created_at").eq("id", user.id).single()
+        .select("full_name, phone, avatar_url, created_at").eq("id", user.id).single()
       if (prof) {
         setName(prof.full_name ?? "")
         setPhone(prof.phone ?? "")
+        if (prof.avatar_url) setAvatar(prof.avatar_url)
       }
 
       // driver stats + vehicle
@@ -409,7 +410,7 @@ export default function DriverProfilePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /* work settings */
+  /* work settings — loaded from localStorage */
   const [work, setWork] = useState({
     soundNewOrder:    true,
     vibrationOrder:   true,
@@ -418,13 +419,23 @@ export default function DriverProfilePage() {
     nightMode:        false,
   })
 
-  /* notification settings */
+  /* notification settings — loaded from localStorage */
   const [notif, setNotif] = useState({
     orderAlerts: true,
     earnings:    true,
     promos:      false,
     system:      true,
   })
+
+  /* load persisted settings on mount */
+  useEffect(() => {
+    try {
+      const w = localStorage.getItem("driver_work_settings")
+      if (w) setWork(JSON.parse(w))
+      const n = localStorage.getItem("driver_notif_settings")
+      if (n) setNotif(JSON.parse(n))
+    } catch { /* ignore */ }
+  }, [])
 
   /* sheets */
   const [showPw,      setShowPw]      = useState(false)
@@ -434,8 +445,16 @@ export default function DriverProfilePage() {
   const [toast, setToast]             = useState("")
 
   const fire = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2200) }
-  const wk = (k: keyof typeof work)   => setWork(p => ({ ...p, [k]: !p[k] }))
-  const nt = (k: keyof typeof notif)  => setNotif(p => ({ ...p, [k]: !p[k] }))
+  const wk = (k: keyof typeof work) => setWork(p => {
+    const next = { ...p, [k]: !p[k] }
+    try { localStorage.setItem("driver_work_settings", JSON.stringify(next)) } catch { /* ignore */ }
+    return next
+  })
+  const nt = (k: keyof typeof notif) => setNotif(p => {
+    const next = { ...p, [k]: !p[k] }
+    try { localStorage.setItem("driver_notif_settings", JSON.stringify(next)) } catch { /* ignore */ }
+    return next
+  })
 
   return (
     <>
@@ -456,7 +475,20 @@ export default function DriverProfilePage() {
         )}
       </AnimatePresence>
 
-      <input ref={avatarRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) setAvatar(URL.createObjectURL(f)); e.target.value = "" }} />
+      <input ref={avatarRef} type="file" accept="image/*" style={{ display: "none" }} onChange={async e => {
+        const f = e.target.files?.[0]; if (!f || !userId) { e.target.value = ""; return }
+        setAvatar(URL.createObjectURL(f))
+        e.target.value = ""
+        const ext = f.name.split(".").pop() ?? "jpg"
+        const path = `${userId}/avatar.${ext}`
+        const { error: upErr } = await supabase.storage.from("avatars").upload(path, f, { upsert: true })
+        if (upErr) { fire("❌ Không upload được ảnh: " + upErr.message); return }
+        const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path)
+        const { error: dbErr } = await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", userId)
+        if (dbErr) { fire("❌ Không lưu được ảnh vào hồ sơ"); return }
+        setAvatar(publicUrl)
+        fire("Đã cập nhật ảnh đại diện")
+      }} />
 
       <div style={{ minHeight: "100dvh", background: "#080806", paddingBottom: 100 }}>
 

@@ -70,7 +70,7 @@ export default function MerchantPromotionsPage() {
   const [toastErr, setToastErr]         = useState(false)
 
   const [form, setForm] = useState({
-    title: "", type: "percent" as PromoType, value: "", minOrder: "", maxDiscount: "",
+    title: "", code: genCode(), type: "percent" as PromoType, value: "", minOrder: "", maxDiscount: "",
     usageLimit: "", perPersonLimit: "", startAt: "", endAt: "", applyAll: true,
     selectedProductIds: [] as string[],
     comboItems: [] as ComboItem[],
@@ -233,18 +233,19 @@ export default function MerchantPromotionsPage() {
     const start = new Date(form.startAt)
     const dbType = form.type === "combo" ? "fixed" : form.type
     const insertPayload: Record<string, unknown> = {
-      code: genCode(),
+      code: form.code.trim().toUpperCase() || genCode(),
       title: form.title,
       discount_type: dbType,
       discount_value: parseInt(form.value) || 0,
       min_order: parseInt(form.minOrder) || 0,
       max_discount: form.maxDiscount ? parseInt(form.maxDiscount) : null,
       usage_limit: form.usageLimit ? parseInt(form.usageLimit) : null,
+      per_person_limit: form.perPersonLimit ? parseInt(form.perPersonLimit) : null,
       valid_from: new Date(form.startAt).toISOString(),
       valid_to: new Date(form.endAt).toISOString(),
       is_active: true,
+      is_combo: form.type === "combo",
       shop_id: shopId,
-      created_by: user?.id,
     }
     const { data, error } = await supabase.from("vouchers").insert(insertPayload)
       .select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,used_count,valid_from,valid_to,is_active").single()
@@ -280,7 +281,7 @@ export default function MerchantPromotionsPage() {
       comboItems: form.comboItems,
     }
     setPromos(ps => [newPromo, ...ps])
-    setForm({ title:"", type:"percent", value:"", minOrder:"", maxDiscount:"", usageLimit:"", perPersonLimit:"", startAt:"", endAt:"", applyAll:true, selectedProductIds:[], comboItems:[] })
+    setForm({ title:"", code:genCode(), type:"percent", value:"", minOrder:"", maxDiscount:"", usageLimit:"", perPersonLimit:"", startAt:"", endAt:"", applyAll:true, selectedProductIds:[], comboItems:[] })
     setShowCreate(false)
     fireToast("Tạo chương trình khuyến mãi thành công!")
   }
@@ -367,6 +368,29 @@ export default function MerchantPromotionsPage() {
                 <MLabel>Tên chương trình</MLabel>
                 <MInput value={form.title} onChange={v => setForm(f => ({ ...f, title:v }))}
                   placeholder="VD: Flash Sale cuối tuần" />
+
+                {/* Mã voucher */}
+                <MLabel>Mã voucher</MLabel>
+                <div style={{ display:"flex", gap:6, marginBottom:10 }}>
+                  <div style={{ flex:1, display:"flex", alignItems:"center",
+                    background:"rgba(255,255,255,0.04)",
+                    border:"1px solid rgba(255,255,255,0.08)",
+                    borderRadius:11, padding:"0 12px", height:42 }}>
+                    <input value={form.code}
+                      onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase().replace(/\s/g,"") }))}
+                      placeholder="VD: SALE50"
+                      maxLength={20}
+                      style={{ flex:1, background:"transparent", border:"none",
+                        color:"#FF8C00", fontSize:13, fontWeight:700, letterSpacing:1,
+                        fontFamily:"monospace" }} />
+                  </div>
+                  <button onClick={() => setForm(f => ({ ...f, code: genCode() }))}
+                    style={{ padding:"0 12px", height:42, borderRadius:11, border:"none",
+                      background:"rgba(255,255,255,0.07)", color:"#6a5a40",
+                      fontSize:10, cursor:"pointer", fontFamily:"Lexend", whiteSpace:"nowrap" }}>
+                    🎲 Tạo ngẫu nhiên
+                  </button>
+                </div>
 
                 {/* Loại */}
                 <MLabel>Loại khuyến mãi</MLabel>

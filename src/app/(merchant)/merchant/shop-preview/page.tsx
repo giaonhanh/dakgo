@@ -128,14 +128,11 @@ export default function ShopPreviewPage() {
     setUploading("cover")
     const ext = file.name.split(".").pop() ?? "jpg"
     const path = `${shopId}/cover.${ext}`
-    const { error } = await supabase.storage.from("shop-covers").upload(path, file, { upsert: true })
-    if (error) {
-      fire("Lỗi tải ảnh bìa!")
-      setUploading(null)
-      return
-    }
+    const { error: upErr } = await supabase.storage.from("shop-covers").upload(path, file, { upsert: true })
+    if (upErr) { fire("❌ Lỗi tải ảnh bìa: " + upErr.message); setUploading(null); return }
     const { data: { publicUrl } } = supabase.storage.from("shop-covers").getPublicUrl(path)
-    await supabase.from("shops").update({ cover_image_url: publicUrl, updated_at: new Date().toISOString() }).eq("id", shopId)
+    const { error: dbErr } = await supabase.from("shops").update({ cover_image_url: publicUrl }).eq("id", shopId)
+    if (dbErr) { fire("❌ Không lưu được vào DB: " + dbErr.message); setUploading(null); return }
     setCoverUrl(publicUrl)
     setUploading(null)
     fire("Đã cập nhật ảnh bìa")
@@ -148,14 +145,11 @@ export default function ShopPreviewPage() {
     setUploading("logo")
     const ext = file.name.split(".").pop() ?? "jpg"
     const path = `${shopId}/logo.${ext}`
-    const { error } = await supabase.storage.from("shop-logos").upload(path, file, { upsert: true })
-    if (error) {
-      fire("Lỗi tải logo!")
-      setUploading(null)
-      return
-    }
+    const { error: upErr } = await supabase.storage.from("shop-logos").upload(path, file, { upsert: true })
+    if (upErr) { fire("❌ Lỗi tải logo: " + upErr.message); setUploading(null); return }
     const { data: { publicUrl } } = supabase.storage.from("shop-logos").getPublicUrl(path)
-    await supabase.from("shops").update({ logo_url: publicUrl, updated_at: new Date().toISOString() }).eq("id", shopId)
+    const { error: dbErr } = await supabase.from("shops").update({ logo_url: publicUrl }).eq("id", shopId)
+    if (dbErr) { fire("❌ Không lưu được vào DB: " + dbErr.message); setUploading(null); return }
     setLogoUrl(publicUrl)
     setUploading(null)
     fire("Đã cập nhật logo cửa hàng")

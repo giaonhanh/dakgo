@@ -511,7 +511,6 @@ export default function MerchantMenuPage() {
       name: pModal.name, description: pModal.description || null,
       price: pModal.price, original_price: pModal.promoEnabled && pModal.promoPrice ? pModal.promoPrice : null,
       category, tags: pModal.categories, is_available: pModal.available, sort_order: pModal.sortOrder,
-      updated_at: new Date().toISOString(),
       ...(imageUrl ? { image_url: imageUrl } : {}),
     }
     if (pEditing) {

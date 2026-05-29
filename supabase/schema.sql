@@ -1,228 +1,869 @@
--- ==============================================
--- GIAO NHANH KRONG PAC - Database Schema v1.2
--- Reset & Recreate (dung cho lan setup dau tien)
--- ==============================================
+-- ============================================================
+-- GIAO NHANH KRONG PAC — Database Schema v3.0
+-- Single source of truth — tổng hợp base + tất cả migrations
+-- Safe to run from scratch (DROP → CREATE)
+-- ============================================================
 
--- Enable PostGIS
-create extension if not exists postgis;
 
--- ==============================================
--- DROP (thu tu nguoc de tranh loi FK)
--- ==============================================
-drop trigger if exists trg_update_shop_rating on reviews;
-drop function if exists update_shop_rating();
+-- ════════════════════════════════════════════════
+-- EXTENSIONS
+-- ════════════════════════════════════════════════
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-drop table if exists vouchers      cascade;
-drop table if exists reviews       cascade;
-drop table if exists blacklist     cascade;
-drop table if exists drivers       cascade;
-drop table if exists order_items   cascade;
-drop table if exists orders        cascade;
-drop table if exists products      cascade;
-drop table if exists shops         cascade;
-drop table if exists profiles      cascade;
 
-drop type if exists pay_method     cascade;
-drop type if exists service_type   cascade;
-drop type if exists order_status   cascade;
-drop type if exists user_role      cascade;
+-- ════════════════════════════════════════════════
+-- DROP (thứ tự ngược để tránh lỗi FK)
+-- ════════════════════════════════════════════════
+DROP TRIGGER  IF EXISTS trigger_referral_reward    ON orders;
+DROP TRIGGER  IF EXISTS trg_update_shop_rating     ON reviews;
+DROP TRIGGER  IF EXISTS trg_handle_new_user        ON auth.users;
 
--- ==============================================
+DROP FUNCTION IF EXISTS process_referral_reward();
+DROP FUNCTION IF EXISTS update_shop_rating();
+DROP FUNCTION IF EXISTS handle_new_user();
+DROP FUNCTION IF EXISTS get_recommendations(UUID, INTEGER);
+DROP FUNCTION IF EXISTS search_catalog(TEXT);
+DROP FUNCTION IF EXISTS add_to_wallet(UUID, wallet_type, INTEGER, UUID, TEXT, tx_type);
+DROP FUNCTION IF EXISTS subtract_from_wallet(UUID, wallet_type, INTEGER, UUID, TEXT, tx_type);
+DROP FUNCTION IF EXISTS apply_referral_code(TEXT, UUID);
+
+DROP TABLE IF EXISTS referral_usages    CASCADE;
+DROP TABLE IF EXISTS referral_codes     CASCADE;
+DROP TABLE IF EXISTS wallet_topups      CASCADE;
+DROP TABLE IF EXISTS transactions       CASCADE;
+DROP TABLE IF EXISTS wallets            CASCADE;
+DROP TABLE IF EXISTS push_subscriptions CASCADE;
+DROP TABLE IF EXISTS chat_messages      CASCADE;
+DROP TABLE IF EXISTS combo_items        CASCADE;
+DROP TABLE IF EXISTS vouchers           CASCADE;
+DROP TABLE IF EXISTS app_settings       CASCADE;
+DROP TABLE IF EXISTS notifications      CASCADE;
+DROP TABLE IF EXISTS reviews            CASCADE;
+DROP TABLE IF EXISTS blacklist          CASCADE;
+DROP TABLE IF EXISTS order_items        CASCADE;
+DROP TABLE IF EXISTS orders             CASCADE;
+DROP TABLE IF EXISTS products           CASCADE;
+DROP TABLE IF EXISTS drivers            CASCADE;
+DROP TABLE IF EXISTS shops              CASCADE;
+DROP TABLE IF EXISTS profiles           CASCADE;
+
+DROP TYPE IF EXISTS tx_type      CASCADE;
+DROP TYPE IF EXISTS wallet_type  CASCADE;
+DROP TYPE IF EXISTS pay_method   CASCADE;
+DROP TYPE IF EXISTS service_type CASCADE;
+DROP TYPE IF EXISTS order_status CASCADE;
+DROP TYPE IF EXISTS user_role    CASCADE;
+
+
+-- ════════════════════════════════════════════════
 -- ENUM TYPES
--- ==============================================
-create type user_role    as enum ('customer', 'driver', 'shop', 'admin');
-create type order_status as enum ('pending', 'accepted', 'delivering', 'done', 'cancelled');
-create type service_type as enum ('food', 'buy_for', 'xe_om', 'taxi');
-create type pay_method   as enum ('cash', 'vietqr');
+-- ════════════════════════════════════════════════
+CREATE TYPE user_role    AS ENUM ('customer', 'driver', 'shop', 'admin');
+CREATE TYPE order_status AS ENUM (
+  'pending', 'accepted', 'preparing', 'ready', 'delivering', 'delivered', 'done', 'cancelled'
+);
+CREATE TYPE service_type AS ENUM ('food', 'buy_for', 'send_for', 'xe_om', 'taxi', 'errand');
+CREATE TYPE pay_method   AS ENUM ('cash', 'vietqr', 'wallet');
+CREATE TYPE wallet_type  AS ENUM ('customer', 'driver', 'merchant');
+CREATE TYPE tx_type      AS ENUM ('topup', 'payment', 'refund', 'commission', 'withdrawal', 'referral');
 
--- ==============================================
+
+-- ════════════════════════════════════════════════
 -- PROFILES
--- ==============================================
-create table profiles (
-  id          uuid primary key references auth.users(id) on delete cascade,
-  role        user_role not null default 'customer',
-  full_name   text,
-  phone       text unique,
-  avatar_url  text,
-  address     text,
-  is_active   boolean not null default true,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+-- ════════════════════════════════════════════════
+CREATE TABLE profiles (
+  id          UUID        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  role        user_role   NOT NULL DEFAULT 'customer',
+  full_name   TEXT,
+  phone       TEXT        UNIQUE,
+  avatar_url  TEXT,
+  address     TEXT,
+  is_active   BOOLEAN     NOT NULL DEFAULT true,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-alter table profiles enable row level security;
-create policy "Users see own profile"    on profiles for select using (auth.uid() = id);
-create policy "Users update own profile" on profiles for update using (auth.uid() = id);
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "profiles_select_own"  ON profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "profiles_update_own"  ON profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "profiles_admin_all"   ON profiles FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));
 
--- ==============================================
+
+-- ════════════════════════════════════════════════
 -- SHOPS
--- ==============================================
-create table shops (
-  id            uuid primary key default gen_random_uuid(),
-  owner_id      uuid references profiles(id) on delete set null,
-  name          text not null,
-  description   text,
-  address       text,
-  location      geography(point, 4326),
-  phone         text,
-  avatar_url    text,
-  cover_url     text,
-  is_open       boolean not null default true,
-  rating        numeric(3,2) default 5.0,
-  rating_count  int default 0,
-  created_at    timestamptz not null default now()
-);
-alter table shops enable row level security;
-create policy "Anyone can view open shops" on shops for select using (is_open = true);
-create policy "Owner manages shop"         on shops for all    using (auth.uid() = owner_id);
+-- ════════════════════════════════════════════════
+CREATE TABLE shops (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id          UUID        REFERENCES profiles(id) ON DELETE SET NULL,
+  name              TEXT        NOT NULL,
+  description       TEXT,
+  category          TEXT,
+  address           TEXT,
+  location          geography(point, 4326),
+  phone             TEXT,
 
--- ==============================================
+  -- Images (logo_url = avatar, cover_image_url = banner)
+  avatar_url        TEXT,        -- dùng ở home page (tương thích cũ)
+  logo_url          TEXT,        -- dùng ở shop page và preview
+  cover_image_url   TEXT,        -- ảnh bìa banner
+
+  is_open           BOOLEAN     NOT NULL DEFAULT true,
+  status            TEXT        NOT NULL DEFAULT 'approved',
+
+  -- Ratings
+  rating            NUMERIC(3,2) DEFAULT 5.0,   -- cột cũ, giữ tương thích
+  rating_count      INT          DEFAULT 0,      -- cột cũ
+  rating_avg        NUMERIC(3,2) DEFAULT 5.0,   -- cột mới dùng trong code
+  total_reviews     INT          DEFAULT 0,      -- cột mới dùng trong code
+
+  -- Menu & giờ mở cửa
+  menu_groups_data  JSONB,
+  opening_hours     JSONB,
+  prep_time         TEXT,
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE shops ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "shops_select_open"    ON shops FOR SELECT USING (true);
+CREATE POLICY "shops_owner_manage"   ON shops FOR ALL    USING (auth.uid() = owner_id);
+CREATE POLICY "shops_admin_all"      ON shops FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_shops_owner      ON shops(owner_id);
+CREATE INDEX IF NOT EXISTS idx_shops_is_open    ON shops(is_open);
+CREATE INDEX IF NOT EXISTS idx_shops_status     ON shops(status);
+CREATE INDEX IF NOT EXISTS idx_shops_name_trgm  ON shops USING gin(name gin_trgm_ops);
+
+
+-- ════════════════════════════════════════════════
+-- DRIVERS
+-- ════════════════════════════════════════════════
+CREATE TABLE drivers (
+  id                   UUID        PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  is_online            BOOLEAN     NOT NULL DEFAULT false,
+  is_busy              BOOLEAN     NOT NULL DEFAULT false,
+  location             geography(point, 4326),
+
+  -- Phương tiện
+  vehicle_type         TEXT,
+  license_plate        TEXT,
+  vehicle_model        TEXT,
+
+  -- Stats
+  rating_avg           NUMERIC(3,2) DEFAULT 5.0,
+  total_trips          INT          DEFAULT 0,
+
+  -- Tài khoản ngân hàng
+  bank_name            TEXT,
+  bank_account_number  TEXT,
+  bank_account_name    TEXT,
+
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE drivers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "drivers_own"          ON drivers FOR ALL    USING (auth.uid() = id);
+CREATE POLICY "drivers_online_view"  ON drivers FOR SELECT USING (is_online = true);
+CREATE POLICY "drivers_admin_all"    ON drivers FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+
+-- ════════════════════════════════════════════════
 -- PRODUCTS
--- ==============================================
-create table products (
-  id           uuid primary key default gen_random_uuid(),
-  shop_id      uuid references shops(id) on delete cascade,
-  name         text not null,
-  description  text,
-  price        int not null,
-  image_url    text,
-  category     text,
-  is_available boolean not null default true,
-  discount     int default 0,
-  sold_count   int default 0,
-  created_at   timestamptz not null default now()
+-- ════════════════════════════════════════════════
+CREATE TABLE products (
+  id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  shop_id        UUID        REFERENCES shops(id) ON DELETE CASCADE,
+  name           TEXT        NOT NULL,
+  description    TEXT,
+  price          INT         NOT NULL,
+  original_price INT,                           -- giá gốc (nếu đang giảm giá)
+  image_url      TEXT,
+  category       TEXT,                          -- nhóm menu nội bộ (= menuGroupId)
+  tags           TEXT[]      DEFAULT ARRAY[]::TEXT[],  -- danh mục trang chủ
+  badge          TEXT        CHECK (badge IN ('hot', 'bigsale', 'bestseller')),
+  is_available   BOOLEAN     NOT NULL DEFAULT true,
+  sort_order     INT         NOT NULL DEFAULT 0,
+  sold_count     INT         DEFAULT 0,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-alter table products enable row level security;
-create policy "Anyone views available products" on products for select using (is_available = true);
-create policy "Shop owner manages products"     on products for all
-  using (auth.uid() = (select owner_id from shops where id = shop_id));
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "products_select_available" ON products FOR SELECT USING (true);
+CREATE POLICY "products_shop_manage"      ON products FOR ALL
+  USING (auth.uid() = (SELECT owner_id FROM shops WHERE id = shop_id));
+CREATE POLICY "products_admin_all"        ON products FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
--- ==============================================
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_products_shop        ON products(shop_id);
+CREATE INDEX IF NOT EXISTS idx_products_tags        ON products USING GIN(tags);
+CREATE INDEX IF NOT EXISTS idx_products_sort_order  ON products(sort_order);
+CREATE INDEX IF NOT EXISTS idx_products_name_trgm   ON products USING gin(name gin_trgm_ops);
+
+
+-- ════════════════════════════════════════════════
 -- ORDERS
--- ==============================================
-create table orders (
-  id              uuid primary key default gen_random_uuid(),
-  customer_id     uuid references profiles(id),
-  driver_id       uuid references profiles(id),
-  shop_id         uuid references shops(id),
-  service_type    service_type not null default 'food',
-  status          order_status not null default 'pending',
-  pay_method      pay_method   not null default 'cash',
-  total           int not null,
-  ship_fee        int not null default 15000,
-  note            text,
-  cancel_reason   text,
-  pickup_address  text,
-  drop_address    text,
-  pickup_location geography(point, 4326),
-  drop_location   geography(point, 4326),
-  scheduled_at    timestamptz,
-  accepted_at     timestamptz,
-  delivered_at    timestamptz,
-  cancelled_at    timestamptz,
-  created_at      timestamptz not null default now()
-);
-alter table orders enable row level security;
-create policy "Customer sees own orders"    on orders for select using (auth.uid() = customer_id);
-create policy "Driver sees assigned orders" on orders for select using (auth.uid() = driver_id);
-create policy "Customer creates order"      on orders for insert with check (auth.uid() = customer_id);
-create policy "Driver updates order"        on orders for update using (auth.uid() = driver_id);
+-- ════════════════════════════════════════════════
+CREATE TABLE orders (
+  id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id      UUID         REFERENCES profiles(id),
+  driver_id        UUID         REFERENCES profiles(id),
+  shop_id          UUID         REFERENCES shops(id),
+  service_type     service_type NOT NULL DEFAULT 'food',
+  status           order_status NOT NULL DEFAULT 'pending',
+  pay_method       pay_method   NOT NULL DEFAULT 'cash',
 
--- ==============================================
+  -- Giá tiền
+  total            INT          NOT NULL DEFAULT 0,   -- cột cũ (tương thích)
+  total_amount     INT          NOT NULL DEFAULT 0,   -- cột mới dùng trong code
+  ship_fee         INT          NOT NULL DEFAULT 15000,
+
+  -- Địa chỉ
+  note             TEXT,
+  cancel_reason    TEXT,
+  pickup_address   TEXT,
+  drop_address     TEXT,
+  pickup_location  geography(point, 4326),
+  drop_location    geography(point, 4326),
+
+  -- Thanh toán
+  payment_code     INTEGER,
+
+  -- Thời gian
+  scheduled_at     TIMESTAMPTZ,
+  accepted_at      TIMESTAMPTZ,
+  delivered_at     TIMESTAMPTZ,
+  cancelled_at     TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "orders_customer_select"  ON orders FOR SELECT USING (auth.uid() = customer_id);
+CREATE POLICY "orders_driver_select"    ON orders FOR SELECT USING (auth.uid() = driver_id);
+CREATE POLICY "orders_shop_select"      ON orders FOR SELECT
+  USING (auth.uid() = (SELECT owner_id FROM shops WHERE id = shop_id));
+CREATE POLICY "orders_customer_insert"  ON orders FOR INSERT WITH CHECK (auth.uid() = customer_id);
+CREATE POLICY "orders_driver_update"    ON orders FOR UPDATE USING (auth.uid() = driver_id);
+CREATE POLICY "orders_shop_update"      ON orders FOR UPDATE
+  USING (auth.uid() = (SELECT owner_id FROM shops WHERE id = shop_id));
+CREATE POLICY "orders_admin_all"        ON orders FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_orders_customer      ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_driver        ON orders(driver_id);
+CREATE INDEX IF NOT EXISTS idx_orders_shop          ON orders(shop_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status        ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_payment_code  ON orders(payment_code) WHERE payment_code IS NOT NULL;
+
+
+-- ════════════════════════════════════════════════
 -- ORDER ITEMS
--- ==============================================
-create table order_items (
-  id          uuid primary key default gen_random_uuid(),
-  order_id    uuid references orders(id)   on delete cascade,
-  product_id  uuid references products(id),
-  name        text not null,
-  price       int  not null,
-  qty         int  not null default 1
+-- ════════════════════════════════════════════════
+CREATE TABLE order_items (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id    UUID REFERENCES orders(id)   ON DELETE CASCADE,
+  product_id  UUID REFERENCES products(id),
+  name        TEXT NOT NULL,
+  price       INT  NOT NULL,
+  qty         INT  NOT NULL DEFAULT 1,
+  note        TEXT
 );
-alter table order_items enable row level security;
-create policy "Order owner sees items" on order_items for select
-  using (auth.uid() = (select customer_id from orders where id = order_id));
+ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "order_items_order_owner" ON order_items FOR SELECT
+  USING (auth.uid() = (SELECT customer_id FROM orders WHERE id = order_id));
+CREATE POLICY "order_items_admin_all"   ON order_items FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
--- ==============================================
--- DRIVERS (realtime location)
--- ==============================================
-create table drivers (
-  id          uuid primary key references profiles(id),
-  is_online   boolean not null default false,
-  is_busy     boolean not null default false,
-  location    geography(point, 4326),
-  updated_at  timestamptz not null default now()
-);
-alter table drivers enable row level security;
-create policy "Driver manages own data"          on drivers for all    using (auth.uid() = id);
-create policy "Anyone sees online drivers"       on drivers for select using (is_online = true);
 
--- ==============================================
+-- ════════════════════════════════════════════════
 -- BLACKLIST
--- ==============================================
-create table blacklist (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid references profiles(id) on delete cascade,
-  reason      text,
-  blocked_by  uuid references profiles(id),
-  created_at  timestamptz not null default now()
+-- ════════════════════════════════════════════════
+CREATE TABLE blacklist (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  reason      TEXT,
+  blocked_by  UUID REFERENCES profiles(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-alter table blacklist enable row level security;
-create policy "Admin manages blacklist" on blacklist for all using (auth.uid() = blocked_by);
+ALTER TABLE blacklist ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "blacklist_admin" ON blacklist FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
--- ==============================================
+
+-- ════════════════════════════════════════════════
 -- REVIEWS
--- ==============================================
-create table reviews (
-  id           uuid primary key default gen_random_uuid(),
-  order_id     uuid references orders(id)   on delete cascade,
-  customer_id  uuid references profiles(id),
-  shop_id      uuid references shops(id),
-  driver_id    uuid references profiles(id),
-  shop_stars   int check (shop_stars   between 1 and 5),
-  driver_stars int check (driver_stars between 1 and 5),
-  comment      text,
-  created_at   timestamptz not null default now()
+-- ════════════════════════════════════════════════
+CREATE TABLE reviews (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id     UUID REFERENCES orders(id)   ON DELETE CASCADE,
+  customer_id  UUID REFERENCES profiles(id),
+  shop_id      UUID REFERENCES shops(id),
+  driver_id    UUID REFERENCES profiles(id),
+  shop_stars   INT  CHECK (shop_stars   BETWEEN 1 AND 5),
+  driver_stars INT  CHECK (driver_stars BETWEEN 1 AND 5),
+  comment      TEXT,
+  images       TEXT[],
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-alter table reviews enable row level security;
-create policy "Customer creates review" on reviews for insert with check (auth.uid() = customer_id);
-create policy "Anyone views reviews"    on reviews for select using (true);
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "reviews_customer_insert" ON reviews FOR INSERT WITH CHECK (auth.uid() = customer_id);
+CREATE POLICY "reviews_public_select"   ON reviews FOR SELECT USING (true);
+CREATE POLICY "reviews_admin_all"       ON reviews FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
--- ==============================================
+CREATE INDEX IF NOT EXISTS idx_reviews_shop   ON reviews(shop_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_driver ON reviews(driver_id);
+
+
+-- ════════════════════════════════════════════════
 -- VOUCHERS
--- ==============================================
-create table vouchers (
-  id            uuid primary key default gen_random_uuid(),
-  code          text unique not null,
-  discount_pct  int not null check (discount_pct between 1 and 100),
-  max_uses      int default 100,
-  used_count    int default 0,
-  min_order     int default 0,
-  expires_at    timestamptz,
-  is_active     boolean default true
+-- ════════════════════════════════════════════════
+CREATE TABLE vouchers (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  shop_id          UUID        REFERENCES shops(id) ON DELETE CASCADE,
+  code             TEXT        UNIQUE NOT NULL,
+  title            TEXT,
+  discount_type    TEXT        NOT NULL DEFAULT 'percent'
+                               CHECK (discount_type IN ('percent','fixed','freeship','combo')),
+  discount_value   INT         NOT NULL DEFAULT 0,
+  min_order        INT         NOT NULL DEFAULT 0,
+  max_discount     INT,
+  usage_limit      INT,
+  per_person_limit INT,
+  used_count       INT         NOT NULL DEFAULT 0,
+  valid_from       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  valid_to         TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '30 days',
+  is_active        BOOLEAN     NOT NULL DEFAULT true,
+  is_combo         BOOLEAN     NOT NULL DEFAULT false,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-alter table vouchers enable row level security;
-create policy "Anyone views active vouchers" on vouchers for select using (is_active = true);
+ALTER TABLE vouchers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "vouchers_public_active"  ON vouchers FOR SELECT USING (is_active = true);
+CREATE POLICY "vouchers_shop_manage"    ON vouchers FOR ALL
+  USING (
+    shop_id IS NULL OR
+    auth.uid() = (SELECT owner_id FROM shops WHERE id = shop_id)
+  );
+CREATE POLICY "vouchers_admin_all"      ON vouchers FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
--- ==============================================
--- TRIGGER: auto update shop rating
--- ==============================================
-create or replace function update_shop_rating()
-returns trigger language plpgsql as $$
-begin
-  update shops set
-    rating       = (select avg(shop_stars)  from reviews where shop_id = new.shop_id),
-    rating_count = (select count(*)         from reviews where shop_id = new.shop_id)
-  where id = new.shop_id;
-  return new;
-end;
+CREATE INDEX IF NOT EXISTS idx_vouchers_shop      ON vouchers(shop_id);
+CREATE INDEX IF NOT EXISTS idx_vouchers_active    ON vouchers(is_active, valid_to);
+
+
+-- ════════════════════════════════════════════════
+-- COMBO ITEMS
+-- ════════════════════════════════════════════════
+CREATE TABLE combo_items (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  voucher_id   UUID REFERENCES vouchers(id)  ON DELETE CASCADE,
+  product_id   UUID REFERENCES products(id)  ON DELETE CASCADE,
+  min_quantity INT  NOT NULL DEFAULT 1
+);
+ALTER TABLE combo_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "combo_public_select"   ON combo_items FOR SELECT USING (true);
+CREATE POLICY "combo_shop_manage"     ON combo_items FOR ALL
+  USING (
+    auth.uid() = (
+      SELECT s.owner_id FROM vouchers v
+      JOIN shops s ON s.id = v.shop_id
+      WHERE v.id = voucher_id
+    )
+  );
+
+
+-- ════════════════════════════════════════════════
+-- NOTIFICATIONS
+-- ════════════════════════════════════════════════
+CREATE TABLE notifications (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID        REFERENCES profiles(id) ON DELETE CASCADE,
+  title      TEXT        NOT NULL,
+  body       TEXT,
+  type       TEXT        NOT NULL DEFAULT 'info',
+  is_read    BOOLEAN     NOT NULL DEFAULT false,
+  data       JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "notif_own_select"  ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "notif_own_update"  ON notifications FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "notif_admin_all"   ON notifications FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+CREATE INDEX IF NOT EXISTS idx_notif_user_unread
+  ON notifications(user_id, is_read, created_at DESC);
+
+
+-- ════════════════════════════════════════════════
+-- WALLETS
+-- ════════════════════════════════════════════════
+CREATE TABLE wallets (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  type       wallet_type NOT NULL,
+  balance    INTEGER     NOT NULL DEFAULT 0 CHECK (balance >= 0),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id, type)
+);
+ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "wallets_own"       ON wallets FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "wallets_admin_all" ON wallets FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+
+-- ════════════════════════════════════════════════
+-- TRANSACTIONS
+-- ════════════════════════════════════════════════
+CREATE TABLE transactions (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  wallet_id     UUID        NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  type          tx_type     NOT NULL,
+  amount        INTEGER     NOT NULL,
+  balance_after INTEGER     NOT NULL,
+  ref_type      TEXT,
+  ref_id        UUID,
+  note          TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "tx_wallet_owner" ON transactions FOR SELECT
+  USING (auth.uid() = (SELECT user_id FROM wallets WHERE id = wallet_id));
+CREATE POLICY "tx_admin_all"    ON transactions FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+CREATE INDEX IF NOT EXISTS idx_tx_wallet ON transactions(wallet_id, created_at DESC);
+
+
+-- ════════════════════════════════════════════════
+-- CHAT MESSAGES
+-- ════════════════════════════════════════════════
+CREATE TABLE chat_messages (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id   UUID        NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  sender_id  UUID        NOT NULL REFERENCES profiles(id),
+  role       TEXT        NOT NULL CHECK (role IN ('customer', 'driver', 'shop')),
+  content    TEXT        NOT NULL CHECK (char_length(content) > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "chat_order_parties" ON chat_messages FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM orders o
+      WHERE o.id = chat_messages.order_id
+        AND (o.customer_id = auth.uid() OR o.driver_id = auth.uid()
+          OR auth.uid() = (SELECT owner_id FROM shops WHERE id = o.shop_id))
+    )
+  );
+
+CREATE INDEX IF NOT EXISTS idx_chat_order ON chat_messages(order_id, created_at ASC);
+
+
+-- ════════════════════════════════════════════════
+-- PUSH SUBSCRIPTIONS
+-- ════════════════════════════════════════════════
+CREATE TABLE push_subscriptions (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  endpoint   TEXT        NOT NULL,
+  p256dh     TEXT        NOT NULL,
+  auth       TEXT        NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id)
+);
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "push_sub_own" ON push_subscriptions
+  USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+
+-- ════════════════════════════════════════════════
+-- WALLET TOPUPS (PayOS)
+-- ════════════════════════════════════════════════
+CREATE TABLE wallet_topups (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  wallet_type  wallet_type NOT NULL DEFAULT 'customer',
+  payment_code INTEGER     NOT NULL,
+  amount       INTEGER     NOT NULL,
+  status       TEXT        NOT NULL DEFAULT 'pending'
+               CHECK (status IN ('pending','paid','cancelled')),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE wallet_topups ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "topup_own"       ON wallet_topups USING (user_id = auth.uid());
+CREATE POLICY "topup_admin_all" ON wallet_topups FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_topups_payment_code ON wallet_topups(payment_code);
+
+
+-- ════════════════════════════════════════════════
+-- APP SETTINGS
+-- ════════════════════════════════════════════════
+CREATE TABLE app_settings (
+  key        TEXT PRIMARY KEY,
+  value      JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "settings_admin_all"   ON app_settings FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+CREATE POLICY "settings_public_read" ON app_settings FOR SELECT
+  USING (key IN ('features', 'app_hours', 'weather_surcharge', 'night_surcharge'));
+
+INSERT INTO app_settings (key, value) VALUES
+  ('pricing',    '{"food":{"rows":["15000","12000","10000","9000","8000","7500","7000","6500","6000","5500"],"extra":"5000"},"delivery_pkg":{"rows":["18000","15000","12000","10000","9000","8500","8000","7500","7000","6500"],"extra":"6000"},"errand":{"rows":["20000","17000","14000","12000","11000","10000","9000","8500","8000","7500"],"extra":"7000"},"motorbike":{"rows":["10000","8000","7000","6500","6000","5500","5000","4800","4600","4500"],"extra":"4000"},"taxi":{"rows":["15000","13000","11000","10000","9500","9000","8500","8000","7500","7000"],"extra":"6500"}}'),
+  ('commission', '{"defaultRate":"15","minRate":"10","maxRate":"25","driverSharePercent":"80","platformSharePercent":"20","loyaltyPointsRate":"1"}'),
+  ('features',   '{"maintenance_mode":false,"new_user_register":true,"driver_register":true,"merchant_register":true,"flash_sale":true,"loyalty_program":true,"surge_pricing":false,"ride_service":true,"errand_service":true,"wallet_topup":false}'),
+  ('area',       '{"centerLat":"12.6521","centerLng":"108.5073","serviceName":"Phước An, Krông Pắc, Đắk Lắk","coverageRadius":"10"}'),
+  ('delivery',   '{"maxRadius":"10","rushHourMultiplier":"1.3","rainMultiplier":"1.2","minDriverRating":"4.0"}'),
+  ('app_hours',  '{"open":"07:00","close":"21:00"}'),
+  ('weather_surcharge', '{"enabled":false,"type":"percent","value":"20"}'),
+  ('night_surcharge',   '{"enabled":false,"start":"22:00","end":"05:00","fee":"5000"}')
+ON CONFLICT (key) DO NOTHING;
+
+
+-- ════════════════════════════════════════════════
+-- REFERRAL SYSTEM
+-- ════════════════════════════════════════════════
+CREATE TABLE referral_codes (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  code         TEXT        UNIQUE NOT NULL,
+  total_uses   INTEGER     NOT NULL DEFAULT 0,
+  total_earned INTEGER     NOT NULL DEFAULT 0,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id)
+);
+
+CREATE TABLE referral_usages (
+  id                  UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  code                TEXT    NOT NULL REFERENCES referral_codes(code),
+  referee_id          UUID    NOT NULL REFERENCES profiles(id) UNIQUE,
+  qualifying_order_id UUID    REFERENCES orders(id),
+  referrer_rewarded   BOOLEAN NOT NULL DEFAULT false,
+  referee_rewarded    BOOLEAN NOT NULL DEFAULT false,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE referral_codes  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE referral_usages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "ref_codes_own"   ON referral_codes  FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "ref_usage_own"   ON referral_usages FOR SELECT USING (referee_id = auth.uid());
+CREATE POLICY "ref_codes_admin" ON referral_codes  FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+CREATE POLICY "ref_usage_admin" ON referral_usages FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+CREATE INDEX IF NOT EXISTS idx_referral_usages_code ON referral_usages(code);
+
+
+-- ════════════════════════════════════════════════
+-- STORAGE BUCKETS
+-- ════════════════════════════════════════════════
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES
+  ('shop-covers',    'shop-covers',    true, 5242880, ARRAY['image/jpeg','image/png','image/webp']),
+  ('shop-logos',     'shop-logos',     true, 2097152, ARRAY['image/jpeg','image/png','image/webp']),
+  ('product-images', 'product-images', true, 5242880, ARRAY['image/jpeg','image/png','image/webp']),
+  ('avatars',        'avatars',        true, 2097152, ARRAY['image/jpeg','image/png','image/webp'])
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Storage RLS
+CREATE POLICY "storage_public_view" ON storage.objects
+  FOR SELECT USING (bucket_id IN ('shop-covers','shop-logos','product-images','avatars'));
+
+CREATE POLICY "storage_auth_upload" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id IN ('shop-covers','shop-logos','product-images','avatars')
+    AND auth.role() = 'authenticated'
+  );
+
+CREATE POLICY "storage_auth_update" ON storage.objects
+  FOR UPDATE USING (auth.role() = 'authenticated');
+
+CREATE POLICY "storage_auth_delete" ON storage.objects
+  FOR DELETE USING (auth.role() = 'authenticated');
+
+
+-- ════════════════════════════════════════════════
+-- FUNCTIONS & TRIGGERS
+-- ════════════════════════════════════════════════
+
+-- ── 1. Auto sync profile khi user mới đăng ký ──
+CREATE OR REPLACE FUNCTION handle_new_user() RETURNS TRIGGER AS $$
+DECLARE
+  v_phone TEXT;
+  v_name  TEXT;
+BEGIN
+  v_phone := COALESCE(
+    NULLIF(TRIM(NEW.phone), ''),
+    NULLIF(split_part(COALESCE(NEW.email, ''), '@', 1), ''),
+    'user_' || substr(NEW.id::text, 1, 8)
+  );
+  v_name := COALESCE(
+    NULLIF(TRIM(NEW.raw_user_meta_data->>'full_name'), ''),
+    v_phone
+  );
+  INSERT INTO profiles (id, phone, full_name, role)
+  VALUES (NEW.id, v_phone, v_name, 'customer')
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER trg_handle_new_user
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+
+-- ── 2. Auto update rating shop khi có review mới ──
+CREATE OR REPLACE FUNCTION update_shop_rating() RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE shops SET
+    rating       = (SELECT AVG(shop_stars)  FROM reviews WHERE shop_id = NEW.shop_id),
+    rating_avg   = (SELECT AVG(shop_stars)  FROM reviews WHERE shop_id = NEW.shop_id),
+    rating_count = (SELECT COUNT(*)         FROM reviews WHERE shop_id = NEW.shop_id),
+    total_reviews= (SELECT COUNT(*)         FROM reviews WHERE shop_id = NEW.shop_id)
+  WHERE id = NEW.shop_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER trg_update_shop_rating
+  AFTER INSERT ON reviews
+  FOR EACH ROW EXECUTE FUNCTION update_shop_rating();
+
+
+-- ── 3. Cộng tiền vào ví ──
+CREATE OR REPLACE FUNCTION add_to_wallet(
+  p_user_id  UUID,
+  p_type     wallet_type,
+  p_amount   INTEGER,
+  p_ref_id   UUID    DEFAULT NULL,
+  p_note     TEXT    DEFAULT '',
+  p_tx_type  tx_type DEFAULT 'topup'
+) RETURNS INTEGER AS $$
+DECLARE
+  v_wallet_id UUID;
+  v_balance   INTEGER;
+BEGIN
+  INSERT INTO wallets (user_id, type, balance)
+  VALUES (p_user_id, p_type, p_amount)
+  ON CONFLICT (user_id, type) DO UPDATE
+    SET balance    = wallets.balance + p_amount,
+        updated_at = now()
+  RETURNING id, balance INTO v_wallet_id, v_balance;
+
+  INSERT INTO transactions (wallet_id, type, amount, balance_after, ref_type, ref_id, note)
+  VALUES (
+    v_wallet_id, p_tx_type, p_amount, v_balance,
+    CASE WHEN p_ref_id IS NOT NULL THEN 'order' ELSE 'topup' END,
+    p_ref_id, p_note
+  );
+  RETURN v_balance;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ── 4. Trừ tiền khỏi ví ──
+CREATE OR REPLACE FUNCTION subtract_from_wallet(
+  p_user_id  UUID,
+  p_type     wallet_type,
+  p_amount   INTEGER,
+  p_ref_id   UUID    DEFAULT NULL,
+  p_note     TEXT    DEFAULT '',
+  p_tx_type  tx_type DEFAULT 'payment'
+) RETURNS INTEGER AS $$
+DECLARE
+  v_wallet_id UUID;
+  v_balance   INTEGER;
+BEGIN
+  SELECT id, balance INTO v_wallet_id, v_balance
+  FROM wallets WHERE user_id = p_user_id AND type = p_type FOR UPDATE;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'wallet_not_found'; END IF;
+  IF v_balance < p_amount THEN RAISE EXCEPTION 'insufficient_balance'; END IF;
+
+  UPDATE wallets
+  SET balance = balance - p_amount, updated_at = now()
+  WHERE id = v_wallet_id
+  RETURNING balance INTO v_balance;
+
+  INSERT INTO transactions (wallet_id, type, amount, balance_after, ref_type, ref_id, note)
+  VALUES (
+    v_wallet_id, p_tx_type, p_amount, v_balance,
+    CASE WHEN p_ref_id IS NOT NULL THEN 'order' ELSE 'payment' END,
+    p_ref_id, p_note
+  );
+  RETURN v_balance;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ── 5. Smart recommendations ──
+CREATE OR REPLACE FUNCTION get_recommendations(uid UUID, lim INTEGER DEFAULT 10)
+RETURNS TABLE (
+  id             UUID, name TEXT, price INTEGER,
+  original_price INTEGER, image_url TEXT, sold_count INTEGER,
+  shop_id UUID, shop_name TEXT, order_count BIGINT
+) LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  RETURN QUERY
+  SELECT DISTINCT ON (p.id)
+    p.id, p.name, p.price, p.original_price, p.image_url, p.sold_count,
+    p.shop_id, s.name AS shop_name, sc.cnt AS order_count
+  FROM products p
+  JOIN shops s ON s.id = p.shop_id
+  JOIN (
+    SELECT shop_id, COUNT(*) AS cnt
+    FROM orders
+    WHERE customer_id = uid AND status = 'delivered'
+    GROUP BY shop_id ORDER BY cnt DESC LIMIT 5
+  ) sc ON sc.shop_id = p.shop_id
+  WHERE p.is_available = true
+  ORDER BY p.id, sc.cnt DESC, p.sold_count DESC
+  LIMIT lim;
+END;
 $$;
 
-create trigger trg_update_shop_rating
-after insert on reviews
-for each row execute function update_shop_rating();
 
--- ==============================================
+-- ── 6. Full-text search catalog ──
+CREATE OR REPLACE FUNCTION search_catalog(query TEXT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  products_result JSONB;
+  shops_result    JSONB;
+BEGIN
+  SELECT COALESCE(jsonb_agg(r ORDER BY r.score DESC, r.sold_count DESC), '[]'::jsonb)
+  INTO products_result
+  FROM (
+    SELECT p.id, p.name, p.price, p.original_price, p.image_url, p.sold_count, p.shop_id,
+           s.name AS shop_name,
+           GREATEST(similarity(p.name, query), 0) AS score
+    FROM products p JOIN shops s ON s.id = p.shop_id
+    WHERE p.is_available = true
+      AND (p.name ILIKE '%' || query || '%' OR similarity(p.name, query) > 0.15)
+    LIMIT 20
+  ) r;
+
+  SELECT COALESCE(jsonb_agg(r ORDER BY r.score DESC, r.rating_avg DESC), '[]'::jsonb)
+  INTO shops_result
+  FROM (
+    SELECT s.id, s.name, s.logo_url, s.rating_avg, s.is_open,
+           GREATEST(similarity(s.name, query), 0) AS score
+    FROM shops s
+    WHERE s.status = 'approved'
+      AND (s.name ILIKE '%' || query || '%' OR similarity(s.name, query) > 0.15)
+    LIMIT 10
+  ) r;
+
+  RETURN jsonb_build_object('products', products_result, 'shops', shops_result);
+END;
+$$;
+
+
+-- ── 7. Referral code ──
+CREATE OR REPLACE FUNCTION apply_referral_code(p_code TEXT, p_referee_id UUID)
+RETURNS JSONB AS $$
+DECLARE
+  v_referrer_id UUID;
+BEGIN
+  SELECT user_id INTO v_referrer_id FROM referral_codes WHERE code = p_code;
+  IF NOT FOUND THEN
+    RETURN '{"ok":false,"error":"Mã giới thiệu không tồn tại"}'::JSONB;
+  END IF;
+  IF v_referrer_id = p_referee_id THEN
+    RETURN '{"ok":false,"error":"Không thể dùng mã của chính mình"}'::JSONB;
+  END IF;
+  IF EXISTS (SELECT 1 FROM referral_usages WHERE referee_id = p_referee_id) THEN
+    RETURN '{"ok":false,"error":"Bạn đã sử dụng mã giới thiệu trước đây"}'::JSONB;
+  END IF;
+  INSERT INTO referral_usages (code, referee_id)
+  VALUES (p_code, p_referee_id) ON CONFLICT (referee_id) DO NOTHING;
+  RETURN '{"ok":true}'::JSONB;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ── 8. Referral reward trigger ──
+CREATE OR REPLACE FUNCTION process_referral_reward() RETURNS TRIGGER AS $$
+DECLARE
+  v_usage    referral_usages%ROWTYPE;
+  v_ref_code referral_codes%ROWTYPE;
+BEGIN
+  IF NEW.status <> 'delivered' OR OLD.status = 'delivered' THEN RETURN NEW; END IF;
+  IF COALESCE(NEW.total_amount, NEW.total) < 50000 THEN RETURN NEW; END IF;
+
+  SELECT * INTO v_usage FROM referral_usages
+  WHERE referee_id = NEW.customer_id
+    AND qualifying_order_id IS NULL AND referrer_rewarded = false;
+  IF NOT FOUND THEN RETURN NEW; END IF;
+
+  UPDATE referral_usages SET qualifying_order_id = NEW.id WHERE id = v_usage.id;
+  SELECT * INTO v_ref_code FROM referral_codes WHERE code = v_usage.code;
+
+  -- Thưởng referrer
+  PERFORM add_to_wallet(v_ref_code.user_id, 'customer', 10000, v_usage.id,
+    'Xu thưởng giới thiệu bạn bè thành công', 'referral');
+  INSERT INTO notifications (user_id, type, title, body, data) VALUES (
+    v_ref_code.user_id, 'system', '🎉 Bạn nhận được 10.000đ xu!',
+    'Người bạn giới thiệu vừa hoàn thành đơn đầu tiên.',
+    jsonb_build_object('xu_amount', 10000)
+  );
+
+  -- Thưởng referee
+  PERFORM add_to_wallet(NEW.customer_id, 'customer', 10000, v_usage.id,
+    'Xu thưởng dùng mã giới thiệu', 'referral');
+  INSERT INTO notifications (user_id, type, title, body, data) VALUES (
+    NEW.customer_id, 'system', '🎁 Nhận 10.000đ xu từ mã giới thiệu!',
+    'Đơn đầu tiên của bạn hoàn thành. 10.000đ xu đã vào ví.',
+    jsonb_build_object('xu_amount', 10000)
+  );
+
+  UPDATE referral_codes
+  SET total_uses = total_uses + 1, total_earned = total_earned + 10000
+  WHERE code = v_usage.code;
+
+  UPDATE referral_usages SET referrer_rewarded = true, referee_rewarded = true
+  WHERE id = v_usage.id;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER trigger_referral_reward
+  AFTER UPDATE ON orders
+  FOR EACH ROW EXECUTE FUNCTION process_referral_reward();
+
+
+-- ════════════════════════════════════════════════
 -- REALTIME
--- ==============================================
-alter publication supabase_realtime add table orders;
-alter publication supabase_realtime add table drivers;
+-- ════════════════════════════════════════════════
+ALTER PUBLICATION supabase_realtime ADD TABLE orders;
+ALTER PUBLICATION supabase_realtime ADD TABLE drivers;
+ALTER PUBLICATION supabase_realtime ADD TABLE chat_messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+
+
+-- ════════════════════════════════════════════════
+-- NOTES — Sau khi chạy schema này lần đầu:
+--
+-- 1. Set admin cho tài khoản của bạn:
+--    UPDATE profiles SET role = 'admin' WHERE phone = '0848612712';
+--
+-- 2. Đồng bộ profiles từ auth.users đã tồn tại:
+--    INSERT INTO profiles (id, phone, full_name, role)
+--    SELECT u.id,
+--      COALESCE(NULLIF(TRIM(u.phone),''), split_part(u.email,'@',1), 'user_'||substr(u.id::text,1,8)),
+--      COALESCE(u.raw_user_meta_data->>'full_name', split_part(u.email,'@',1), 'Người dùng'),
+--      'customer'
+--    FROM auth.users u
+--    WHERE NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = u.id)
+--    ON CONFLICT (id) DO NOTHING;
+-- ════════════════════════════════════════════════
