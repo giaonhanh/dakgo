@@ -6,23 +6,13 @@ import { useRouter, useParams } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 
-const CATEGORY_META: Record<string, { icon: string; label: string; color: string; bg: string; border: string }> = {
-  "buoi-sang": { icon:"☀️",  label:"Buổi sáng",  color:"#FFB347", bg:"rgba(255,179,71,0.08)",  border:"rgba(255,179,71,0.25)" },
-  "buoi-trua": { icon:"🌤️", label:"Buổi trưa",  color:"#FF8C00", bg:"rgba(255,140,0,0.08)",   border:"rgba(255,140,0,0.25)"  },
-  "buoi-toi":  { icon:"🌙",  label:"Buổi tối",   color:"#4a8ff5", bg:"rgba(74,143,245,0.08)",  border:"rgba(74,143,245,0.25)" },
-  "nuoc-uong": { icon:"🧋",  label:"Nước uống",  color:"#3ecf6e", bg:"rgba(62,207,110,0.08)",  border:"rgba(62,207,110,0.25)" },
-  "mon-nhau":  { icon:"🍺",  label:"Món nhậu",   color:"#b464ff", bg:"rgba(180,100,255,0.08)", border:"rgba(180,100,255,0.25)"},
-  "an-vat":    { icon:"🍿",  label:"Ăn vặt",    color:"#ff6060", bg:"rgba(255,96,96,0.08)",   border:"rgba(255,96,96,0.25)"  },
-}
-
-// Keywords used to filter products client-side by category
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  "buoi-sang": ["bánh mì","cháo","xôi","cà phê","cafe","sáng","bánh","trứng","bún","phở"],
-  "buoi-trua": ["cơm","trưa","gà","heo","bún","phở","mì","cá"],
-  "buoi-toi":  ["tối","lẩu","nướng","pizza","burger","đêm"],
-  "nuoc-uong": ["trà","nước","sinh tố","boba","ép","đồ uống","café","cà phê","sữa"],
-  "mon-nhau":  ["nhậu","lẩu","nướng","mực","hải sản","bia","nem","đậu"],
-  "an-vat":    ["bánh","vặt","snack","kẹo","mochi","chả","bắp","ăn vặt"],
+const CATEGORY_META: Record<string, { icon: string; label: string; tag: string; color: string; bg: string; border: string }> = {
+  "buoi-sang": { icon:"☀️",  label:"Buổi sáng", tag:"Buổi sáng", color:"#FFB347", bg:"rgba(255,179,71,0.08)",  border:"rgba(255,179,71,0.25)" },
+  "buoi-trua": { icon:"🌤️", label:"Buổi trưa", tag:"Buổi trưa", color:"#FF8C00", bg:"rgba(255,140,0,0.08)",   border:"rgba(255,140,0,0.25)"  },
+  "buoi-toi":  { icon:"🌙",  label:"Buổi tối",  tag:"Buổi tối",  color:"#4a8ff5", bg:"rgba(74,143,245,0.08)",  border:"rgba(74,143,245,0.25)" },
+  "nuoc-uong": { icon:"🧋",  label:"Nước uống", tag:"Nước uống", color:"#3ecf6e", bg:"rgba(62,207,110,0.08)",  border:"rgba(62,207,110,0.25)" },
+  "mon-nhau":  { icon:"🍺",  label:"Món nhậu",  tag:"Món nhậu",  color:"#b464ff", bg:"rgba(180,100,255,0.08)", border:"rgba(180,100,255,0.25)"},
+  "an-vat":    { icon:"🍿",  label:"Ăn vặt",    tag:"Ăn vặt",    color:"#ff6060", bg:"rgba(255,96,96,0.08)",   border:"rgba(255,96,96,0.25)"  },
 }
 
 interface DBProduct {
@@ -46,16 +36,19 @@ export default function CategoryPage() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const keywords = CATEGORY_KEYWORDS[category] ?? []
+      const tag = meta?.tag
+      if (!tag) { setLoading(false); return }
 
       const { data } = await supabase
         .from("products")
         .select(`
           id, name, price, original_price, sold_count, image_url, shop_id,
-          shops!inner(name, rating_avg, status, is_available)
+          shops!inner(name, rating_avg, status, is_open)
         `)
         .eq("is_available", true)
         .eq("shops.status", "approved")
+        .eq("shops.is_open", true)
+        .contains("tags", [tag])
         .order("sold_count", { ascending: false })
         .limit(60)
 
@@ -64,23 +57,10 @@ export default function CategoryPage() {
       const rows = (data as Array<{
         id:string; name:string; price:number; original_price:number|null
         sold_count:number; image_url:string|null; shop_id:string
-        shops: { name:string; rating_avg:number; status:string; is_available:boolean } | Array<{ name:string; rating_avg:number; status:string; is_available:boolean }>
+        shops: { name:string; rating_avg:number } | Array<{ name:string; rating_avg:number }>
       }>)
 
-      // Filter by category keywords (Vietnamese accent-insensitive)
-      const normalize = (s: string) => s.toLowerCase()
-        .replace(/[àáạảãăắặẳẵâấậẩẫ]/g,"a").replace(/[èéẹẻẽêếệểễ]/g,"e")
-        .replace(/[ìíịỉĩ]/g,"i").replace(/[òóọỏõôốộổỗơớợởỡ]/g,"o")
-        .replace(/[ùúụủũưứựửữ]/g,"u").replace(/[ỳýỵỷỹ]/g,"y").replace(/đ/g,"d")
-
-      const matched = keywords.length > 0
-        ? rows.filter(r => {
-            const n = normalize(r.name)
-            return keywords.some(k => n.includes(normalize(k)))
-          })
-        : rows
-
-      setItems(matched.slice(0, 30).map(r => {
+      setItems(rows.map(r => {
         const shop = Array.isArray(r.shops) ? r.shops[0] : r.shops
         return {
           id: r.id, name: r.name, price: r.price,

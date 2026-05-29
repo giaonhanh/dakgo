@@ -35,7 +35,7 @@ interface Product {
 // ── Constants ──────────────────────────────────────────────────────────────
 const CATEGORY_LIST = [
   "Buổi sáng","Buổi trưa","Buổi tối",
-  "Đồ uống","Đồ nhậu","Ăn vặt","Khác",
+  "Nước uống","Món nhậu","Ăn vặt",
 ]
 const BADGE_LIST = [
   { key:"hot"        as const, label:"🔥 HOT",      color:"#ff4040", bg:"rgba(255,64,64,0.15)",    border:"rgba(255,64,64,0.4)"    },
@@ -225,13 +225,13 @@ export default function MerchantMenuPage() {
   const loadProducts = useCallback(async (sid: string): Promise<Product[]> => {
     const { data } = await supabase
       .from("products")
-      .select("id,name,description,price,original_price,category,is_available,sold_count,sort_order,image_url")
+      .select("id,name,description,price,original_price,category,tags,is_available,sold_count,sort_order,image_url")
       .eq("shop_id", sid)
       .order("sort_order", { ascending: true })
 
     const mapped: Product[] = (data ?? []).map(p => ({
       id: p.id, name: p.name, description: p.description ?? "", imagePreview: p.image_url ?? null,
-      price: p.price, categories: p.category ? [p.category] : [], menuGroupId: p.category ?? "",
+      price: p.price, categories: (p.tags as string[]) ?? [], menuGroupId: p.category ?? "",
       allDay: true, startHour: "", endHour: "", toppings: [], sizes: [],
       promoEnabled: !!(p.original_price && p.original_price < p.price),
       promoPrice: p.original_price ?? null, promoStart: "", promoEnd: "", promoPerPerson: null,
@@ -489,7 +489,7 @@ export default function MerchantMenuPage() {
 
   const saveProduct = async () => {
     if (!pModal?.name.trim() || pModal.price <= 0) { fire("❌ Vui lòng nhập tên món và giá bán", false); return }
-    const category = pModal.categories[0] || pModal.menuGroupId || null
+    const category = pModal.menuGroupId || null
 
     // Upload image if new file selected
     let imageUrl: string | undefined
@@ -510,7 +510,7 @@ export default function MerchantMenuPage() {
     const payload = {
       name: pModal.name, description: pModal.description || null,
       price: pModal.price, original_price: pModal.promoEnabled && pModal.promoPrice ? pModal.promoPrice : null,
-      category, is_available: pModal.available, sort_order: pModal.sortOrder,
+      category, tags: pModal.categories, is_available: pModal.available, sort_order: pModal.sortOrder,
       updated_at: new Date().toISOString(),
       ...(imageUrl ? { image_url: imageUrl } : {}),
     }
@@ -519,7 +519,7 @@ export default function MerchantMenuPage() {
       if (error) { fire("❌ Lỗi cập nhật: " + error.message, false); return }
       const updatedPreview = imageUrl ?? pModal.imagePreview
       setProducts(ps => ps.map(p => p.id === pModal.id
-        ? {...pModal, imagePreview: updatedPreview, categories: category ? [category] : [], menuGroupId: category ?? ""}
+        ? {...pModal, imagePreview: updatedPreview, menuGroupId: category ?? ""}
         : p))
       fire("Đã cập nhật món")
     } else {
@@ -531,7 +531,7 @@ export default function MerchantMenuPage() {
       const newProd: Product = {
         ...pModal, id: data.id, sortOrder: products.length,
         imagePreview: imageUrl ?? pModal.imagePreview,
-        categories: category ? [category] : [], menuGroupId: category ?? "",
+        menuGroupId: category ?? "",
       }
       setProducts(ps => [...ps, newProd])
       if (category && !groups.find(g => g.id === category)) {
@@ -949,7 +949,7 @@ export default function MerchantMenuPage() {
                       onChange={v => setPModal(m => m ? {...m,price:parseInt(v)||0} : m)} placeholder="VD: 45000" />
                   </div>
                   <div>
-                    <FLabel>Nhóm menu</FLabel>
+                    <FLabel>Nhóm menu nội bộ</FLabel>
                     <select value={pModal.menuGroupId} onChange={e => setPModal(m => m ? {...m,menuGroupId:e.target.value} : m)}
                       style={{width:"100%",height:42,borderRadius:11,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:pModal.menuGroupId?"#f8f0e0":"#6a5a40",fontSize:11,padding:"0 10px",marginBottom:10,colorScheme:"dark",fontFamily:"Lexend"} as React.CSSProperties}>
                       <option value="" style={{background:"#0e0c09"}}>-- Không chọn --</option>
@@ -973,9 +973,12 @@ export default function MerchantMenuPage() {
                   )}
                 </div>
 
-                {/* ─ Danh mục (max 3) ─ */}
+                {/* ─ Danh mục hiển thị trên trang chủ khách (max 3) ─ */}
                 <div style={{marginBottom:14}}>
-                  <FLabel>Danh mục <span style={{color:"#6a5a40"}}>(chọn tối đa 3 · đã chọn {pModal.categories.length}/3)</span></FLabel>
+                  <FLabel>
+                    📍 Danh mục trang chủ khách
+                    <span style={{color:"#6a5a40"}}> · chọn 1–3 · đã chọn {pModal.categories.length}/3</span>
+                  </FLabel>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                     {CATEGORY_LIST.map(c => {
                       const on       = pModal.categories.includes(c)

@@ -37,8 +37,8 @@ const MEAL_TIMES = [
   { icon:"☀️",  label:"Buổi sáng",  value:"buoi-sang"  },
   { icon:"🌤️", label:"Buổi trưa",  value:"buoi-trua"  },
   { icon:"🌙",  label:"Buổi tối",   value:"buoi-toi"   },
-  { icon:"🧋",  label:"Nước uống",  value:"nuoc-uong"  },
-  { icon:"🍺",  label:"Món nhậu",   value:"mon-nhau"   },
+  { icon:"🧋",  label:"Nước uống", value:"nuoc-uong"  },
+  { icon:"🍺",  label:"Món nhậu",  value:"mon-nhau"   },
   { icon:"🍿",  label:"Ăn vặt",    value:"an-vat"     },
 ]
 
