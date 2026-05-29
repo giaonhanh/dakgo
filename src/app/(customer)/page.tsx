@@ -23,6 +23,7 @@ import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { useCartStore } from "@/store/cartStore"
+import { useLocationStore } from "@/store/locationStore"
 import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ─────────────────────────────────────────────────
@@ -121,8 +122,11 @@ export default function HomePage() {
   const [countdown,     setCountdown]     = useState({ h:0, m:0, s:0 })
   const [activeTab,     setActiveTab]     = useState("home")
   const [conflictItem,  setConflictItem]  = useState<PendingItem | null>(null)
-  const [location,      setLocation]      = useState("Phước An, Krông Pắc")
   const [weatherTip,    setWeatherTip]    = useState<string | null>(null)
+
+  // Đọc địa chỉ từ locationStore (đã được GpsInit trong layout lấy sẵn)
+  const locationData = useLocationStore()
+  const location = locationData.address || "Phước An, Krông Pắc"
   const containerRef = useRef<HTMLDivElement>(null)
   const cartIconRef  = useRef<HTMLDivElement>(null)
 
@@ -279,32 +283,20 @@ export default function HomePage() {
     })
   }
 
-  // GPS location + weather
+  // Weather tip — dùng tọa độ từ locationStore (GPS đã được layout lấy sẵn)
   useEffect(() => {
-    if (!navigator.geolocation) return
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
-        try {
-          const res  = await fetch(`https://maps.vietmap.vn/api/reverse/v3?apikey=${VM_KEY}&lat=${coords.latitude}&lng=${coords.longitude}`)
-          const list = await res.json() as Array<{ ward?: string; district?: string; display?: string }>
-          const d = list[0]
-          if (d) {
-            const parts = [d.ward, d.district].filter(Boolean)
-            setLocation(parts.length > 0 ? parts.join(", ") : (d.display ?? "Phước An, Krông Pắc"))
-          }
-        } catch {}
-        try {
-          const wRes  = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,weather_code`)
-          const wData = await wRes.json() as { current?: { temperature_2m: number; weather_code: number } }
-          const code  = wData.current?.weather_code ?? 0
-          const temp  = wData.current?.temperature_2m ?? 28
-          setWeatherTip(getWeatherTip(code, temp, new Date().getHours()))
-        } catch {}
-      },
-      () => {},
-      { enableHighAccuracy: true, timeout: 8000 },
-    )
-  }, [])
+    const { lat, lng } = useLocationStore.getState()
+    if (!lat || !lng) return
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code`)
+      .then(r => r.json())
+      .then((wData: { current?: { temperature_2m: number; weather_code: number } }) => {
+        const code = wData.current?.weather_code ?? 0
+        const temp = wData.current?.temperature_2m ?? 28
+        setWeatherTip(getWeatherTip(code, temp, new Date().getHours()))
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationData.ready])
 
   // Banner auto-slide — cycle through real vouchers
   useEffect(() => {

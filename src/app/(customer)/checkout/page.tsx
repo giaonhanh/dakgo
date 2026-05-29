@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useCartStore } from "@/store/cartStore"
+import { useLocationStore } from "@/store/locationStore"
 import type { CartItem } from "@/store/cartStore"
 import AddressPicker from "@/components/map/AddressPicker"
 import type { AddressPickerResult } from "@/types"
@@ -1169,31 +1170,12 @@ export default function CheckoutPage() {
         const def = mapped.find(a => a.isDefault) ?? mapped[0]
         setSelectedAddr(def.id)
       } else {
-        // Không có địa chỉ lưu → fallback GPS (đã được cấp phép từ trang chủ)
-        await new Promise<void>(resolve => {
-          if (!navigator.geolocation) { resolve(); return }
-          navigator.geolocation.getCurrentPosition(
-            async ({ coords }) => {
-              try {
-                const VM_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
-                const res  = await fetch(
-                  `https://maps.vietmap.vn/api/reverse/v3?apikey=${VM_KEY}&lat=${coords.latitude}&lng=${coords.longitude}`
-                )
-                const list = await res.json() as Array<{ display?: string; address?: string }>
-                const label = list[0]?.display ?? list[0]?.address ?? "Vị trí hiện tại"
-                setMapAddress({ address: label, lat: coords.latitude, lng: coords.longitude })
-                setSelectedAddr("map")
-              } catch {
-                // VietMap lỗi → vẫn dùng tọa độ thô
-                setMapAddress({ address: "Vị trí hiện tại", lat: coords.latitude, lng: coords.longitude })
-                setSelectedAddr("map")
-              }
-              resolve()
-            },
-            () => resolve(), // User từ chối → không có địa chỉ, vẫn mở trang
-            { timeout: 5000, maximumAge: 60000 }
-          )
-        })
+        // Không có địa chỉ lưu → đọc GPS từ locationStore (layout đã lấy sẵn)
+        const loc = useLocationStore.getState()
+        if (loc.lat && loc.lng) {
+          setMapAddress({ address: loc.address || "Vị trí hiện tại", lat: loc.lat, lng: loc.lng })
+          setSelectedAddr("map")
+        }
       }
 
       if (wallet) {

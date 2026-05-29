@@ -4,6 +4,39 @@ import { useState, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
 import FloatingBottomMenu from '@/components/navigation/FloatingBottomMenu'
 import InstallPrompt from '@/components/pwa/InstallPrompt'
+import { useLocationStore } from '@/store/locationStore'
+
+const VM_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
+
+// Request GPS 1 lần duy nhất khi vào customer layout
+// Kết quả lưu vào locationStore — dùng chung cho mọi trang (home, checkout, shop...)
+function GpsInit() {
+  const { ready, setLocation, setDenied } = useLocationStore()
+
+  useEffect(() => {
+    if (ready || !navigator.geolocation) { if (!ready) setDenied(); return }
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        const { latitude: lat, longitude: lng } = coords
+        try {
+          const res  = await fetch(`https://maps.vietmap.vn/api/reverse/v3?apikey=${VM_KEY}&lat=${lat}&lng=${lng}`)
+          const list = await res.json() as Array<{ ward?: string; district?: string; display?: string }>
+          const d    = list[0]
+          const parts = [d?.ward, d?.district].filter(Boolean)
+          const address = parts.length > 0 ? parts.join(", ") : (d?.display ?? "Vị trí hiện tại")
+          setLocation(lat, lng, address)
+        } catch {
+          setLocation(lat, lng, "Vị trí hiện tại")
+        }
+      },
+      () => setDenied(),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return null
+}
 
 // Các trang đã có inline bottom nav riêng — không cần render thêm từ layout
 const SELF_NAV_PATHS = [
@@ -87,6 +120,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
 
   return (
     <>
+      <GpsInit />
       <AdminPreviewBar />
       {children}
       {!hasSelfNav && <FloatingBottomMenu />}
