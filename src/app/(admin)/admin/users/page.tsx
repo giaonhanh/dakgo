@@ -424,7 +424,6 @@ export default function AdminUsersPage() {
   const totalCustSpent    = users.filter(u => u.role === "customer").reduce((s, u) => s + u.totalSpent, 0)
 
   const shownUsers = users
-    .filter(u => u.role === "customer")
     .filter(u => filterStatus === "all" || u.status === filterStatus)
     .filter(u => !search || u.fullName.toLowerCase().includes(search.toLowerCase()) || u.phone.includes(search))
 
