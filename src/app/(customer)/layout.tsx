@@ -6,39 +6,170 @@ import FloatingBottomMenu from '@/components/navigation/FloatingBottomMenu'
 import InstallPrompt from '@/components/pwa/InstallPrompt'
 import { useLocationStore } from '@/store/locationStore'
 
-const VM_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
+const VM_KEY        = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
+const REFRESH_MS    = 5 * 60 * 1000   // 5 phút — tự cập nhật lại vị trí
 
-// Request GPS 1 lần duy nhất khi vào customer layout
-// Kết quả lưu vào locationStore — dùng chung cho mọi trang (home, checkout, shop...)
-function GpsInit() {
-  const { ready, setLocation, setDenied } = useLocationStore()
+// ── Lấy GPS + reverse geocode → lưu vào store ──────────────────────────────
+async function fetchGps(
+  setLocation: (lat: number, lng: number, addr: string) => void,
+  setDenied: () => void,
+) {
+  if (!navigator.geolocation) { setDenied(); return }
 
+  navigator.geolocation.getCurrentPosition(
+    async ({ coords }) => {
+      const { latitude: lat, longitude: lng } = coords
+      try {
+        const res  = await fetch(
+          `https://maps.vietmap.vn/api/reverse/v3?apikey=${VM_KEY}&lat=${lat}&lng=${lng}`
+        )
+        const list = await res.json() as Array<{ ward?: string; district?: string; display?: string }>
+        const d    = list[0]
+        const parts = [d?.ward, d?.district].filter(Boolean)
+        const address = parts.length > 0 ? parts.join(", ") : (d?.display ?? "Vị trí hiện tại")
+        setLocation(lat, lng, address)
+      } catch {
+        setLocation(lat, lng, "Vị trí hiện tại")
+      }
+    },
+    () => setDenied(),
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+  )
+}
+
+// ── Custom Permission UI (hiện trước browser dialog) ───────────────────────
+function GpsPermissionModal({ onAllow, onDeny }: { onAllow: () => void; onDeny: () => void }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 10000,
+      background: 'rgba(8,8,6,0.96)', backdropFilter: 'blur(8px)',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      fontFamily: "'Lexend',sans-serif",
+      padding: '0 32px',
+    }}>
+      {/* Icon */}
+      <div style={{
+        width: 96, height: 96, borderRadius: 28,
+        background: 'linear-gradient(135deg,rgba(255,107,0,0.18),rgba(255,107,0,0.06))',
+        border: '1.5px solid rgba(255,107,0,0.35)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 44, marginBottom: 24,
+        boxShadow: '0 0 40px rgba(255,107,0,0.15)',
+      }}>
+        📍
+      </div>
+
+      {/* Title */}
+      <div style={{
+        color: '#f8f0e0', fontSize: 20, fontWeight: 800,
+        textAlign: 'center', marginBottom: 10, lineHeight: 1.3,
+      }}>
+        Cho phép lấy vị trí của bạn
+      </div>
+
+      {/* Description */}
+      <div style={{
+        color: '#6a5a40', fontSize: 12, textAlign: 'center',
+        lineHeight: 1.8, marginBottom: 32, maxWidth: 300,
+      }}>
+        Giao Nhanh cần vị trí GPS để{'\n'}
+        <span style={{ color: '#b0956a' }}>tìm quán gần bạn</span>,{' '}
+        <span style={{ color: '#b0956a' }}>tính phí ship</span> và{' '}
+        <span style={{ color: '#b0956a' }}>giao hàng chính xác</span> đến tận nơi.
+      </div>
+
+      {/* Buttons */}
+      <button
+        onClick={onAllow}
+        style={{
+          width: '100%', maxWidth: 300, height: 52, borderRadius: 14, border: 'none',
+          background: 'linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)',
+          color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+          fontFamily: "'Lexend',sans-serif",
+          boxShadow: '0 4px 24px rgba(255,107,0,0.4)',
+          marginBottom: 10,
+        }}
+      >
+        📍 Cho phép lấy vị trí
+      </button>
+
+      <button
+        onClick={onDeny}
+        style={{
+          width: '100%', maxWidth: 300, height: 44, borderRadius: 12,
+          background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
+          color: '#6a5a40', fontSize: 12, cursor: 'pointer',
+          fontFamily: "'Lexend',sans-serif",
+        }}
+      >
+        Không, tôi tự nhập địa chỉ
+      </button>
+
+      <div style={{ color: 'rgba(106,90,64,0.5)', fontSize: 9.5, marginTop: 16, textAlign: 'center' }}>
+        Vị trí chỉ dùng cho mục đích giao hàng · Không lưu trữ lâu dài
+      </div>
+    </div>
+  )
+}
+
+// ── GPS Manager: permission prompt + periodic refresh ──────────────────────
+function GpsManager() {
+  const { ready, denied, promptShown, lastUpdated, setLocation, setDenied, setPromptShown } =
+    useLocationStore()
+  const [showModal, setShowModal] = useState(false)
+
+  // Lần đầu vào app — hiện custom UI trước khi gọi browser permission
   useEffect(() => {
-    if (ready || !navigator.geolocation) { if (!ready) setDenied(); return }
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
-        const { latitude: lat, longitude: lng } = coords
-        try {
-          const res  = await fetch(`https://maps.vietmap.vn/api/reverse/v3?apikey=${VM_KEY}&lat=${lat}&lng=${lng}`)
-          const list = await res.json() as Array<{ ward?: string; district?: string; display?: string }>
-          const d    = list[0]
-          const parts = [d?.ward, d?.district].filter(Boolean)
-          const address = parts.length > 0 ? parts.join(", ") : (d?.display ?? "Vị trí hiện tại")
-          setLocation(lat, lng, address)
-        } catch {
-          setLocation(lat, lng, "Vị trí hiện tại")
-        }
-      },
-      () => setDenied(),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
-    )
+    if (!promptShown) {
+      setShowModal(true)
+    } else if (!denied) {
+      // Đã đồng ý trước đó → lấy GPS ngay không hỏi lại
+      fetchGps(setLocation, setDenied)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return null
+  // Periodic refresh mỗi 5 phút — đảm bảo vị trí luôn cập nhật
+  useEffect(() => {
+    if (denied || !ready) return
+    const interval = setInterval(() => {
+      fetchGps(setLocation, setDenied)
+    }, REFRESH_MS)
+    return () => clearInterval(interval)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, denied])
+
+  // Refresh khi app từ background → foreground (user mở lại tab / unlock phone)
+  useEffect(() => {
+    if (denied) return
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      const stale = Date.now() - lastUpdated > REFRESH_MS
+      if (stale) fetchGps(setLocation, setDenied)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastUpdated, denied])
+
+  const handleAllow = () => {
+    setShowModal(false)
+    setPromptShown()
+    fetchGps(setLocation, setDenied)
+  }
+
+  const handleDeny = () => {
+    setShowModal(false)
+    setPromptShown()
+    setDenied()
+  }
+
+  if (!showModal) return null
+  return <GpsPermissionModal onAllow={handleAllow} onDeny={handleDeny} />
 }
 
-// Các trang đã có inline bottom nav riêng — không cần render thêm từ layout
+// ── Các trang đã có inline bottom nav riêng ────────────────────────────────
 const SELF_NAV_PATHS = [
   '/tracking', '/shop', '/search', '/cart', '/orders', '/profile',
   '/addresses', '/wallet', '/vouchers', '/loyalty', '/notifications', '/errand',
@@ -77,35 +208,24 @@ function AdminPreviewBar() {
       boxShadow: '0 2px 20px rgba(180,100,255,0.25)',
       fontFamily: "'Lexend',sans-serif",
     }}>
-      {/* Left: badge + text */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
         <span style={{
           padding: '2px 8px', borderRadius: 999,
           background: 'linear-gradient(135deg,#7c3aed,#b464ff)',
-          color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
-          flexShrink: 0,
-        }}>
-          🛡️ ADMIN
-        </span>
+          color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: 0.5, flexShrink: 0,
+        }}>🛡️ ADMIN</span>
         <span style={{ color: '#d4b4ff', fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           Đang xem giao diện khách · Mọi thao tác đều có hiệu lực thật
         </span>
       </div>
-
-      {/* Right: exit button */}
-      <button
-        onClick={exit}
-        disabled={exiting}
-        style={{
-          height: 28, padding: '0 12px', borderRadius: 8, flexShrink: 0,
-          background: exiting ? 'rgba(255,255,255,0.06)' : 'rgba(255,107,0,0.2)',
-          border: '1px solid rgba(255,107,0,0.5)',
-          color: exiting ? '#6a5a40' : '#FF8C00',
-          fontSize: 11, fontWeight: 700, cursor: exiting ? 'not-allowed' : 'pointer',
-          fontFamily: "'Lexend',sans-serif", whiteSpace: 'nowrap',
-          transition: 'all .2s',
-        }}
-      >
+      <button onClick={exit} disabled={exiting} style={{
+        height: 28, padding: '0 12px', borderRadius: 8, flexShrink: 0,
+        background: exiting ? 'rgba(255,255,255,0.06)' : 'rgba(255,107,0,0.2)',
+        border: '1px solid rgba(255,107,0,0.5)',
+        color: exiting ? '#6a5a40' : '#FF8C00',
+        fontSize: 11, fontWeight: 700, cursor: exiting ? 'not-allowed' : 'pointer',
+        fontFamily: "'Lexend',sans-serif", whiteSpace: 'nowrap', transition: 'all .2s',
+      }}>
         {exiting ? '⏳ Đang thoát...' : '← Thoát preview'}
       </button>
     </div>
@@ -120,7 +240,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
 
   return (
     <>
-      <GpsInit />
+      <GpsManager />
       <AdminPreviewBar />
       {children}
       {!hasSelfNav && <FloatingBottomMenu />}
