@@ -1129,6 +1129,7 @@ export default function CheckoutPage() {
   const [showVoucherPicker,setShowVoucherPicker] = useState(false)
   const [driverNote,       setDriverNote]       = useState("")
   const [loading,          setLoading]          = useState(false)
+  const [pageReady,        setPageReady]        = useState(false)
   const [toast,            setToast]            = useState("")
   const [showMapPicker,    setShowMapPicker]    = useState(false)
   const [showVietQR,       setShowVietQR]       = useState(false)
@@ -1172,6 +1173,7 @@ export default function CheckoutPage() {
         setXuBalance(wallet.balance)
         setXuWalletId(wallet.id)
       }
+      setPageReady(true)
     }
     loadData()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1384,8 +1386,8 @@ export default function CheckoutPage() {
   const remaining   = total - xuUsed
   const ctaBlocked  = loading || (!deliveryNow && !scheduledTime)
 
-  // Guard: currentAddr is undefined during SSR (savedAddrs not yet loaded)
-  if (!currentAddr) return (
+  // Spinner chỉ hiện trong lúc đang load dữ liệu từ Supabase
+  if (!pageReady) return (
     <div style={{ minHeight:"100dvh", background:"#080806", display:"flex",
       alignItems:"center", justifyContent:"center" }}>
       <div style={{ width:28, height:28, borderRadius:"50%",
