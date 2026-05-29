@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 
@@ -420,7 +420,6 @@ export default function DriverProfilePage() {
   const [userId,    setUserId]    = useState<string | null>(null)
   const [editing,   setEditing]   = useState(false)
   const [avatar,    setAvatar]    = useState<string | null>(null)
-  const avatarRef                 = useRef<HTMLInputElement>(null)
   const [bankInfo,  setBankInfo]  = useState<{ bank_name: string | null; bank_account_number: string | null } | null>(null)
   const [stats,     setStats]     = useState({ rating: 0, trips: 0, todayEarnings: 0, walletBal: 0, joinDate: "" })
   const [vehicleSub, setVehicleSub] = useState("Chưa cập nhật thông tin xe")
@@ -479,6 +478,27 @@ export default function DriverProfilePage() {
 
   const fire = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2200) }
 
+  function openFilePicker() {
+    if (!userId) return
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = "image/*"
+    input.onchange = async () => {
+      const f = input.files?.[0]
+      if (!f) return
+      setAvatar(URL.createObjectURL(f))
+      const path = `${userId}/avatar`
+      const { error: upErr } = await supabase.storage.from("avatars").upload(path, f, { upsert: true, contentType: f.type })
+      if (upErr) { fire("❌ Không upload được ảnh"); return }
+      const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path)
+      const bustedUrl = `${publicUrl}?t=${Date.now()}`
+      const { error: dbErr } = await supabase.from("profiles").update({ avatar_url: bustedUrl }).eq("id", userId)
+      if (dbErr) { fire("❌ Không lưu được ảnh"); return }
+      setAvatar(bustedUrl); fire("Đã cập nhật ảnh đại diện")
+    }
+    input.click()
+  }
+
   return (
     <>
       <style>{`
@@ -497,42 +517,31 @@ export default function DriverProfilePage() {
         )}
       </AnimatePresence>
 
-      {/* hidden file input for avatar */}
-      <input ref={avatarRef} type="file" accept="image/*" style={{ display: "none" }} onChange={async e => {
-        const f = e.target.files?.[0]; if (!f || !userId) { e.target.value = ""; return }
-        setAvatar(URL.createObjectURL(f)); e.target.value = ""
-        const path = `${userId}/avatar`
-        const { error: upErr } = await supabase.storage.from("avatars").upload(path, f, { upsert: true, contentType: f.type })
-        if (upErr) { fire("❌ Không upload được ảnh"); return }
-        const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path)
-        const bustedUrl = `${publicUrl}?t=${Date.now()}`
-        const { error: dbErr } = await supabase.from("profiles").update({ avatar_url: bustedUrl }).eq("id", userId)
-        if (dbErr) { fire("❌ Không lưu được ảnh"); return }
-        setAvatar(bustedUrl); fire("Đã cập nhật ảnh đại diện")
-      }} />
 
       <div style={{ minHeight: "100dvh", background: "#080806", paddingBottom: 100 }}>
 
         {/* ── header ── */}
-        <div style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(8,8,6,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 16px", height: 56, display: "flex", alignItems: "center", gap: 12 }}>
-          <a href="/driver" style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", color: "#f8f0e0", fontSize: 15 }}>←</a>
-          <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>Hồ sơ & Cài đặt</div>
-          <button onClick={async () => {
-            if (editing && userId) {
-              const { error } = await supabase.from("profiles").update({ full_name: name }).eq("id", userId)
-              fire(error ? "❌ Lỗi lưu thông tin" : "Đã lưu thông tin!")
-            }
-            setEditing(e => !e)
-          }} style={{ padding: "7px 14px", borderRadius: 9, background: editing ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.06)", border: editing ? "1px solid rgba(255,107,0,0.3)" : "1px solid rgba(255,255,255,0.1)", color: editing ? "#FF8C00" : "#6a5a40", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
-            {editing ? "💾 Lưu" : "✏️ Sửa"}
-          </button>
+        <div style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(8,8,6,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingTop: "env(safe-area-inset-top)" }}>
+          <div style={{ height: 56, padding: "0 16px", display: "flex", alignItems: "center", gap: 12 }}>
+            <a href="/driver" style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", color: "#f8f0e0", fontSize: 15 }}>←</a>
+            <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>Hồ sơ & Cài đặt</div>
+            <button onClick={async () => {
+              if (editing && userId) {
+                const { error } = await supabase.from("profiles").update({ full_name: name }).eq("id", userId)
+                fire(error ? "❌ Lỗi lưu thông tin" : "Đã lưu thông tin!")
+              }
+              setEditing(e => !e)
+            }} style={{ padding: "7px 14px", borderRadius: 9, background: editing ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.06)", border: editing ? "1px solid rgba(255,107,0,0.3)" : "1px solid rgba(255,255,255,0.1)", color: editing ? "#FF8C00" : "#6a5a40", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
+              {editing ? "💾 Lưu" : "✏️ Sửa"}
+            </button>
+          </div>
         </div>
 
         <div style={{ padding: "16px 16px 0" }}>
 
           {/* ── avatar + info ── */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 0 20px" }}>
-            <div onClick={() => avatarRef.current?.click()} style={{ position: "relative", marginBottom: 14, cursor: "pointer" }}>
+            <div onClick={openFilePicker} style={{ position: "relative", marginBottom: 14, cursor: "pointer" }}>
               <div style={{ width: 90, height: 90, borderRadius: 24, background: "linear-gradient(135deg,rgba(255,107,0,0.2),rgba(255,107,0,0.05))", border: "2.5px solid rgba(255,107,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, overflow: "hidden" }}>
                 {avatar ? <img src={avatar} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🧑‍💼"}
               </div>
@@ -552,20 +561,6 @@ export default function DriverProfilePage() {
               {stats.joinDate && <span style={{ color: "#6a5a40", fontSize: 9 }}>· Từ {stats.joinDate}</span>}
             </div>
 
-            {/* quick stats */}
-            <div style={{ display: "flex", gap: 8, width: "100%" }}>
-              {[
-                { icon: "⭐", val: stats.rating.toFixed(1), label: "Đánh giá" },
-                { icon: "📦", val: String(stats.trips),     label: "Chuyến" },
-                { icon: "💰", val: stats.todayEarnings >= 1000 ? `${Math.round(stats.todayEarnings / 1000)}k` : `${stats.todayEarnings}đ`, label: "Hôm nay" },
-              ].map(s => (
-                <div key={s.label} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "10px 0", textAlign: "center" }}>
-                  <div style={{ fontSize: 16, marginBottom: 3 }}>{s.icon}</div>
-                  <div style={{ color: "#f8f0e0", fontSize: 13, fontWeight: 800 }}>{s.val}</div>
-                  <div style={{ color: "#6a5a40", fontSize: 8 }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* ── 1. Ví & Thu nhập ── */}
@@ -626,8 +621,8 @@ export default function DriverProfilePage() {
           {/* ── 4. Hỗ trợ & Tài khoản ── */}
           <Section title="Hỗ trợ & Tài khoản">
             <Row icon="🔑" label="Đổi mật khẩu" sub="Cập nhật mật khẩu đăng nhập" onClick={() => setShowPw(true)} arrow />
-            <Row icon="💬" label="Chat với hỗ trợ" sub="Phản hồi trong vòng 30 phút" onClick={() => fire("Đang kết nối hỗ trợ...")} arrow />
-            <Row icon="⚠️" label="Báo cáo vấn đề" sub="Khiếu nại, sự cố khi giao hàng" onClick={() => fire("Đang mở form báo cáo...")} arrow />
+            <Row icon="💬" label="Chat với hỗ trợ" sub="Nhắn tin Zalo hỗ trợ" onClick={() => window.open("https://zalo.me/0000000000", "_blank")} arrow />
+            <Row icon="⚠️" label="Báo cáo vấn đề" sub="Khiếu nại, sự cố khi giao hàng" onClick={() => window.open("https://zalo.me/0000000000", "_blank")} arrow />
             <Row icon="🚀" label="Giao Nhanh v1.0" sub="© 2025 Giao Nhanh · Phước An" />
             <Row icon="🚪" label="Đăng xuất" danger last
               onClick={async () => { await createClient().auth.signOut(); window.location.href = "/login" }} arrow />
@@ -637,7 +632,7 @@ export default function DriverProfilePage() {
       </div>
 
       {/* bottom nav */}
-      <nav style={{ position: "fixed", bottom: 12, left: 14, right: 14, height: 56, borderRadius: 9999, zIndex: 50, background: "rgba(8,8,6,0.92)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,107,0,0.2)", boxShadow: "0 0 20px rgba(255,107,0,0.1)", display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 8px" }}>
+      <nav style={{ position: "fixed", bottom: "max(12px, env(safe-area-inset-bottom))", left: 14, right: 14, height: 56, borderRadius: 9999, zIndex: 50, background: "rgba(8,8,6,0.92)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,107,0,0.2)", boxShadow: "0 0 20px rgba(255,107,0,0.1)", display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 8px" }}>
         {[
           { href: "/driver",          icon: "🏠", label: "Trang chủ", active: false },
           { href: "/driver/earnings", icon: "📊", label: "Thu nhập",  active: false },
@@ -652,7 +647,15 @@ export default function DriverProfilePage() {
 
       <AnimatePresence>
         {showPw      && <PwSheet      onClose={() => setShowPw(false)} />}
-        {showVehicle && <VehicleSheet onClose={() => setShowVehicle(false)} />}
+        {showVehicle && <VehicleSheet onClose={async () => {
+          setShowVehicle(false)
+          if (!userId) return
+          const { data: drv2 } = await supabase.from("drivers").select("vehicle_model, license_plate").eq("id", userId).single()
+          if (drv2) {
+            const d = drv2 as { vehicle_model?: string; license_plate?: string }
+            setVehicleSub([d.vehicle_model, d.license_plate].filter(Boolean).join(" · ") || "Chưa cập nhật thông tin xe")
+          }
+        }} />}
         {showBank    && <BankSheet    onClose={() => setShowBank(false)} onSaved={async () => { if (!userId) return; await loadBankInfo(userId) }} />}
         {showDocs    && <DocSheet     onClose={() => setShowDocs(false)} />}
         {showWallet  && <WalletHistorySheet onClose={() => setShowWallet(false)} walletBalance={stats.walletBal} />}

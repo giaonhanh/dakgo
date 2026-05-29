@@ -996,13 +996,8 @@ export default function DriverDashboard() {
       {isApproved !== false && <div style={{ minHeight:"100dvh", background:"#080806", paddingBottom:80 }}>
 
         {/* ── header ── */}
-        <div style={{
-          position:"sticky", top:0, zIndex:40,
-          background:"rgba(8,8,6,0.95)", backdropFilter:"blur(20px)",
-          borderBottom:"1px solid rgba(255,107,0,0.08)",
-          padding:"0 16px", height:56,
-          display:"flex", alignItems:"center", justifyContent:"space-between",
-        }}>
+        <div style={{ position:"sticky", top:0, zIndex:40, background:"rgba(8,8,6,0.95)", backdropFilter:"blur(20px)", borderBottom:"1px solid rgba(255,107,0,0.08)", paddingTop:"env(safe-area-inset-top)" }}>
+        <div style={{ height:56, padding:"0 16px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <div style={{
               width:38, height:38, borderRadius:12,
@@ -1053,6 +1048,7 @@ export default function DriverDashboard() {
             {toggling ? "..." : online ? "Đang hoạt động" : "Ngoại tuyến"}
           </motion.button>
           </div>
+        </div>
         </div>
 
         <div style={{ padding:"0 16px" }}>

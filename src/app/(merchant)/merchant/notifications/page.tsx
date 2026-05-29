@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
@@ -35,9 +35,11 @@ export default function MerchantNotificationsPage() {
   const supabase = createClient()
   const router   = useRouter()
 
-  const [notifs,  setNotifs]  = useState<Notif[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filter,  setFilter]  = useState<"all" | Notif["type"]>("all")
+  const [notifs,   setNotifs]   = useState<Notif[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [filter,   setFilter]   = useState<"all" | Notif["type"]>("all")
+  const [swipedId, setSwipedId] = useState<string | null>(null)
+  const touchX = useRef(0)
 
   useEffect(() => { load() }, [])
 
@@ -69,39 +71,61 @@ export default function MerchantNotificationsPage() {
     setNotifs(ns => ns.map(n => ({ ...n, is_read: true })))
   }
 
+  async function deleteNotif(id: string) {
+    setNotifs(ns => ns.filter(n => n.id !== id))
+    setSwipedId(null)
+    await supabase.from("notifications").delete().eq("id", id)
+  }
+
+  async function deleteAll() {
+    const ids = (filter === "all" ? notifs : notifs.filter(n => n.type === filter)).map(n => n.id)
+    if (!ids.length) return
+    setNotifs(ns => filter === "all" ? [] : ns.filter(n => n.type !== filter))
+    await supabase.from("notifications").delete().in("id", ids)
+  }
+
   const filtered  = filter === "all" ? notifs : notifs.filter(n => n.type === filter)
   const unreadCnt = notifs.filter(n => !n.is_read).length
 
   return (
     <div style={{ minHeight:"100dvh", background:"#080806", display:"flex", flexDirection:"column", fontFamily:"'Lexend',sans-serif" }}>
+
       {/* Header */}
-      <div style={{ background:"rgba(8,8,6,0.96)", backdropFilter:"blur(20px)", borderBottom:"1px solid rgba(255,107,0,0.08)", padding:"calc(env(safe-area-inset-top) + 12px) 16px 12px", flexShrink:0 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+      <div style={{ background:"rgba(8,8,6,0.96)", backdropFilter:"blur(20px)", borderBottom:"1px solid rgba(255,107,0,0.08)", paddingTop:"calc(env(safe-area-inset-top) + 12px)", padding:"calc(env(safe-area-inset-top) + 12px) 16px 12px", flexShrink:0 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <button onClick={() => router.back()}
-            style={{ width:36, height:36, borderRadius:10, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, cursor:"pointer", color:"#f8f0e0" }}>
+            style={{ width:36, height:36, borderRadius:10, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, cursor:"pointer", color:"#f8f0e0", flexShrink:0 }}>
             ←
           </button>
-          <div style={{ flex:1 }}>
+          <div style={{ flex:1, minWidth:0 }}>
             <div style={{ color:"#6a5a40", fontSize:9 }}>Merchant</div>
-            <div style={{ color:"#f8f0e0", fontSize:16, fontWeight:800 }}>
+            <div style={{ color:"#f8f0e0", fontSize:16, fontWeight:800, display:"flex", alignItems:"center", gap:6 }}>
               Thông báo
               {unreadCnt > 0 && (
-                <span style={{ marginLeft:8, background:"#ff4040", borderRadius:"50%", width:20, height:20, display:"inline-flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:800, color:"#fff", verticalAlign:"middle" }}>{unreadCnt}</span>
+                <span style={{ background:"#ff4040", borderRadius:"50%", width:20, height:20, display:"inline-flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:800, color:"#fff", verticalAlign:"middle" }}>{unreadCnt}</span>
               )}
             </div>
           </div>
-          {unreadCnt > 0 && (
-            <button onClick={markAllRead}
-              style={{ padding:"6px 12px", borderRadius:8, background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.25)", color:"#FF8C00", fontSize:10, fontWeight:700, cursor:"pointer" }}>
-              Đọc hết
-            </button>
-          )}
+          <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+            {unreadCnt > 0 && (
+              <button onClick={markAllRead}
+                style={{ padding:"6px 10px", borderRadius:8, background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.25)", color:"#FF8C00", fontSize:9, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
+                ✓ Đọc hết
+              </button>
+            )}
+            {filtered.length > 0 && (
+              <button onClick={deleteAll}
+                style={{ padding:"6px 10px", borderRadius:8, background:"rgba(255,64,64,0.1)", border:"1px solid rgba(255,64,64,0.25)", color:"#ff4040", fontSize:9, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
+                🗑 Xoá tất cả
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Filter chips */}
         <div style={{ display:"flex", gap:6, marginTop:12, overflowX:"auto" }}>
           {([["all","Tất cả","#6a5a40"], ...Object.entries(TYPE_CFG).map(([k,v]) => [k, v.label, v.color])] as [string,string,string][]).map(([k, label, color]) => (
-            <button key={k} onClick={() => setFilter(k as typeof filter)}
+            <button key={k} onClick={() => { setFilter(k as typeof filter); setSwipedId(null) }}
               style={{ flexShrink:0, padding:"5px 13px", borderRadius:20, fontSize:10, fontWeight: filter===k ? 700 : 400, cursor:"pointer",
                 background: filter===k ? `${color}18` : "rgba(255,255,255,0.04)",
                 border: filter===k ? `1px solid ${color}50` : "1px solid rgba(255,255,255,0.06)",
@@ -125,27 +149,50 @@ export default function MerchantNotificationsPage() {
           </div>
         ) : filtered.map(n => {
           const cfg = TYPE_CFG[n.type]
+          const swiped = swipedId === n.id
           return (
-            <div key={n.id} onClick={() => !n.is_read && markRead(n.id)}
-              style={{ display:"flex", gap:12, alignItems:"flex-start",
-                padding:"12px 14px", borderRadius:14, marginBottom:8, cursor: n.is_read ? "default" : "pointer",
-                background: n.is_read ? "rgba(255,255,255,0.03)" : "rgba(255,107,0,0.05)",
-                border: n.is_read ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(255,107,0,0.2)",
-                transition:"all .2s" }}>
-              <div style={{ width:40, height:40, borderRadius:12, background:cfg.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>
-                {cfg.icon}
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
-                  <div style={{ color:"#f8f0e0", fontSize:12, fontWeight: n.is_read ? 500 : 700, lineHeight:1.4 }}>{n.title}</div>
-                  {!n.is_read && <div style={{ width:8, height:8, borderRadius:"50%", background:"#FF6B00", flexShrink:0, marginTop:4 }} />}
+            <div key={n.id}
+              style={{ position:"relative", overflow:"hidden", marginBottom:8, borderRadius:14 }}
+              onTouchStart={e => { touchX.current = e.touches[0].clientX }}
+              onTouchEnd={e => {
+                const dx = touchX.current - e.changedTouches[0].clientX
+                if (dx > 60) setSwipedId(n.id)
+                else if (dx < -20) setSwipedId(null)
+              }}>
+              {/* Card */}
+              <div onClick={() => { if (swiped) { setSwipedId(null); return } if (!n.is_read) markRead(n.id) }}
+                style={{ display:"flex", gap:12, alignItems:"flex-start",
+                  padding:"12px 14px", borderRadius:14, cursor:"pointer",
+                  background: n.is_read ? "rgba(255,255,255,0.03)" : "rgba(255,107,0,0.05)",
+                  border: n.is_read ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(255,107,0,0.2)",
+                  transform: swiped ? "translateX(-72px)" : "translateX(0)",
+                  transition:"transform .2s ease",
+                }}>
+                <div style={{ width:40, height:40, borderRadius:12, background:cfg.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>
+                  {cfg.icon}
                 </div>
-                <div style={{ color:"#b0956a", fontSize:10, lineHeight:1.5, marginTop:3 }}>{n.body}</div>
-                <div style={{ color:"#6a5a40", fontSize:9, marginTop:5 }}>{fmtTime(n.created_at)}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+                    <div style={{ color:"#f8f0e0", fontSize:12, fontWeight: n.is_read ? 500 : 700, lineHeight:1.4 }}>{n.title}</div>
+                    {!n.is_read && <div style={{ width:8, height:8, borderRadius:"50%", background:"#FF6B00", flexShrink:0, marginTop:4 }} />}
+                  </div>
+                  <div style={{ color:"#b0956a", fontSize:10, lineHeight:1.5, marginTop:3 }}>{n.body}</div>
+                  <div style={{ color:"#6a5a40", fontSize:9, marginTop:5 }}>{fmtTime(n.created_at)}</div>
+                </div>
+              </div>
+              {/* Delete reveal */}
+              <div onClick={() => deleteNotif(n.id)}
+                style={{ position:"absolute", right:0, top:0, bottom:0, width:72, background:"rgba(255,64,64,0.88)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:22, borderRadius:"0 14px 14px 0" }}>
+                🗑
               </div>
             </div>
           )
         })}
+        {!loading && filtered.length > 0 && (
+          <div style={{ textAlign:"center", padding:"8px 0", color:"#6a5a40", fontSize:9 }}>
+            Vuốt trái để xoá từng thông báo
+          </div>
+        )}
       </div>
 
       <style>{`@keyframes pulse { 0%,100%{opacity:.6} 50%{opacity:.3} }`}</style>

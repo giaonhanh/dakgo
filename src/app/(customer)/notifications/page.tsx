@@ -4,7 +4,7 @@
 // Trung tâm thông báo — đầy đủ tính năng
 // Tab lọc · Mark read · Tap → đúng route · Badge unread · Real-time
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 
@@ -57,6 +57,8 @@ export default function NotificationsPage() {
   const [notifs,    setNotifs]    = useState<Notif[]>([])
   const [activeTab, setActiveTab] = useState("all")
   const [loading,   setLoading]   = useState(true)
+  const [swipedId,  setSwipedId]  = useState<string | null>(null)
+  const touchX = useRef(0)
 
   useEffect(() => {
     async function load() {
@@ -110,7 +112,15 @@ export default function NotificationsPage() {
 
   const deleteNotif = async (id: string) => {
     setNotifs(prev => prev.filter(n => n.id !== id))
+    setSwipedId(null)
     await supabase.from("notifications").delete().eq("id", id)
+  }
+
+  const deleteAll = async () => {
+    const ids = (activeTab === "all" ? notifs : notifs.filter(n => n.type === activeTab)).map(n => n.id)
+    if (!ids.length) return
+    setNotifs(prev => activeTab === "all" ? [] : prev.filter(n => n.type !== activeTab))
+    await supabase.from("notifications").delete().in("id", ids)
   }
 
   return (
@@ -142,16 +152,20 @@ export default function NotificationsPage() {
                 </div>
               )}
             </div>
-            {unreadCount > 0 && (
-              <button onClick={markAllRead}
-                style={{ cursor:"pointer",
-                  color:"#FF8C00",fontSize:10,fontWeight:600,fontFamily:"Lexend",
-                  padding:"6px 10px",borderRadius:8,
-                  background:"rgba(255,107,0,0.08)",
-                  border:"1px solid rgba(255,107,0,0.2)" }}>
-                Đọc tất cả
-              </button>
-            )}
+            <div style={{ display:"flex", gap:6 }}>
+              {unreadCount > 0 && (
+                <button onClick={markAllRead}
+                  style={{ cursor:"pointer", color:"#FF8C00", fontSize:9, fontWeight:700, fontFamily:"Lexend", padding:"6px 10px", borderRadius:8, background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.2)", whiteSpace:"nowrap" }}>
+                  ✓ Đọc hết
+                </button>
+              )}
+              {filtered.length > 0 && (
+                <button onClick={deleteAll}
+                  style={{ cursor:"pointer", color:"#ff4040", fontSize:9, fontWeight:700, fontFamily:"Lexend", padding:"6px 10px", borderRadius:8, background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)", whiteSpace:"nowrap" }}>
+                  🗑 Xoá tất cả
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Tabs */}
@@ -201,88 +215,56 @@ export default function NotificationsPage() {
               {filtered.map((n, idx) => (
                 <motion.div key={n.id}
                   initial={{ opacity:0,y:8 }} animate={{ opacity:1,y:0 }}
-                  exit={{ opacity:0,x:-20,transition:{duration:.2} }}
+                  exit={{ opacity:0,x:-40,transition:{duration:.2} }}
                   transition={{ delay:idx*0.03 }}
-                  style={{ marginBottom:7 }}>
-
-                  <div style={{ position:"relative",overflow:"hidden" }}>
-                    <a href={n.href} onClick={() => markRead(n.id)}
-                      style={{ textDecoration:"none",display:"block" }}>
-                      <div style={{
-                        background: !n.isRead
-                          ? "rgba(255,107,0,0.06)"
-                          : "rgba(255,255,255,0.03)",
-                        backdropFilter:"blur(10px)",
-                        border:`1px solid ${!n.isRead
-                          ? "rgba(255,107,0,0.2)"
-                          : "rgba(255,255,255,0.07)"}`,
-                        borderRadius:14,padding:"11px 13px",
-                        display:"flex",gap:10,alignItems:"flex-start",
-                        transition:"all .2s",
-                      }}>
-                        {/* Unread dot */}
-                        {!n.isRead && (
-                          <div style={{ position:"absolute",top:10,right:10,
-                            width:7,height:7,borderRadius:"50%",
-                            background:"#FF6B00",
-                            boxShadow:"0 0 5px rgba(255,107,0,0.6)",
-                            animation:"pulse 1.5s infinite" }} />
-                        )}
-
-                        {/* Icon */}
-                        <div style={{ width:38,height:38,borderRadius:11,
-                          background:n.iconBg, flexShrink:0,
-                          display:"flex",alignItems:"center",justifyContent:"center",
-                          fontSize:18,marginTop:1 }}>
-                          {n.icon}
+                  style={{ marginBottom:7, position:"relative", overflow:"hidden", borderRadius:14 }}
+                  onTouchStart={e => { touchX.current = e.touches[0].clientX }}
+                  onTouchEnd={e => {
+                    const dx = touchX.current - e.changedTouches[0].clientX
+                    if (dx > 60) setSwipedId(n.id)
+                    else if (dx < -20) setSwipedId(null)
+                  }}>
+                  <a href={n.href} onClick={() => { if (swipedId===n.id) { setSwipedId(null); return } markRead(n.id) }}
+                    style={{ textDecoration:"none", display:"block",
+                      transform: swipedId===n.id ? "translateX(-72px)" : "translateX(0)",
+                      transition:"transform .2s ease" }}>
+                    <div style={{
+                      background: !n.isRead ? "rgba(255,107,0,0.06)" : "rgba(255,255,255,0.03)",
+                      backdropFilter:"blur(10px)",
+                      border:`1px solid ${!n.isRead ? "rgba(255,107,0,0.2)" : "rgba(255,255,255,0.07)"}`,
+                      borderRadius:14, padding:"11px 13px",
+                      display:"flex", gap:10, alignItems:"flex-start",
+                    }}>
+                      {!n.isRead && (
+                        <div style={{ position:"absolute", top:10, right:10, width:7, height:7, borderRadius:"50%", background:"#FF6B00", boxShadow:"0 0 5px rgba(255,107,0,0.6)", animation:"pulse 1.5s infinite" }} />
+                      )}
+                      <div style={{ width:38, height:38, borderRadius:11, background:n.iconBg, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, marginTop:1 }}>
+                        {n.icon}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ color: !n.isRead?"#f8f0e0":"#b0956a", fontSize:11.5, fontWeight: !n.isRead?600:500, marginBottom:3, lineHeight:1.3 }}>
+                          {n.title}
                         </div>
-
-                        {/* Content */}
-                        <div style={{ flex:1,minWidth:0 }}>
-                          <div style={{ color: !n.isRead?"#f8f0e0":"#b0956a",
-                            fontSize:11.5,fontWeight: !n.isRead?600:500,
-                            marginBottom:3,lineHeight:1.3 }}>
-                            {n.title}
-                          </div>
-                          <div style={{ color:"#6a5a40",fontSize:9.5,lineHeight:1.5,
-                            marginBottom:5 }}>
-                            {n.body}
-                          </div>
-                          <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-                            <span style={{ color:"#6a5a40",fontSize:8.5 }}>{n.time}</span>
-                            <div style={{ width:3,height:3,borderRadius:"50%",
-                              background:"rgba(255,255,255,0.1)" }} />
-                            <span style={{ fontSize:7.5,fontWeight:600,
-                              padding:"1px 6px",borderRadius:5,
-                              background: n.type==="order"  ? "rgba(255,107,0,0.1)" :
-                                          n.type==="promo"  ? "rgba(255,179,71,0.1)" :
-                                          n.type==="driver" ? "rgba(62,207,110,0.1)" :
-                                                              "rgba(74,143,245,0.1)",
-                              color:      n.type==="order"  ? "#FF8C00" :
-                                          n.type==="promo"  ? "#FFB347" :
-                                          n.type==="driver" ? "#3ecf6e" : "#4a8ff5",
-                            }}>
-                              {n.type==="order"?"Đơn hàng":
-                               n.type==="promo"?"Khuyến mãi":
-                               n.type==="driver"?"Tài xế":"Hệ thống"}
-                            </span>
-                          </div>
+                        <div style={{ color:"#6a5a40", fontSize:9.5, lineHeight:1.5, marginBottom:5 }}>
+                          {n.body}
+                        </div>
+                        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                          <span style={{ color:"#6a5a40", fontSize:8.5 }}>{n.time}</span>
+                          <div style={{ width:3, height:3, borderRadius:"50%", background:"rgba(255,255,255,0.1)" }} />
+                          <span style={{ fontSize:7.5, fontWeight:600, padding:"1px 6px", borderRadius:5,
+                            background: n.type==="order"?"rgba(255,107,0,0.1)":n.type==="promo"?"rgba(255,179,71,0.1)":n.type==="driver"?"rgba(62,207,110,0.1)":"rgba(74,143,245,0.1)",
+                            color: n.type==="order"?"#FF8C00":n.type==="promo"?"#FFB347":n.type==="driver"?"#3ecf6e":"#4a8ff5",
+                          }}>
+                            {n.type==="order"?"Đơn hàng":n.type==="promo"?"Khuyến mãi":n.type==="driver"?"Tài xế":"Hệ thống"}
+                          </span>
                         </div>
                       </div>
-                    </a>
-
-                    {/* Swipe-to-delete hint */}
-                    <button onClick={() => deleteNotif(n.id)}
-                      style={{ position:"absolute",right:0,top:0,bottom:0,
-                        width:0,overflow:"hidden",border:"none",cursor:"pointer",
-                        background:"rgba(255,64,64,0.15)",
-                        display:"flex",alignItems:"center",justifyContent:"center",
-                        borderRadius:"0 14px 14px 0",transition:"width .2s",
-                        fontSize:13 }}
-                      onMouseEnter={e=>(e.currentTarget.style.width="44px")}
-                      onMouseLeave={e=>(e.currentTarget.style.width="0")}>
-                      🗑️
-                    </button>
+                    </div>
+                  </a>
+                  {/* Delete reveal */}
+                  <div onClick={() => deleteNotif(n.id)}
+                    style={{ position:"absolute", right:0, top:0, bottom:0, width:72, background:"rgba(255,64,64,0.88)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:22, borderRadius:"0 14px 14px 0" }}>
+                    🗑
                   </div>
                 </motion.div>
               ))}
