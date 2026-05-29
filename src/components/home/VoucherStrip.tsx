@@ -1,54 +1,65 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Tag } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
-interface Voucher {
+type VType = 'percent' | 'fixed' | 'freeship';
+
+interface DbVoucher {
+  id: string;
   code: string;
-  label: string;
-  desc: string;
-  pct: number;
-  expires: string;
-  color: string;
+  title: string;
+  discount_type: VType;
+  discount_value: number;
+  valid_to: string;
+  shop_id: string | null;
 }
 
-const VOUCHERS: Voucher[] = [
-  { code: 'GIAO20', label: '20%', desc: 'Giảm phí giao hàng', pct: 20, expires: '31/05', color: 'var(--acc)' },
-  { code: 'NEW15', label: '15%', desc: 'Cho khách mới', pct: 15, expires: '30/05', color: '#A78BFA' },
-  { code: 'LUNCH10', label: '10%', desc: 'Ăn trưa tiết kiệm', pct: 10, expires: '29/05', color: '#34D399' },
-  { code: 'HAPPY25', label: '25%', desc: 'Cuối tuần vui', pct: 25, expires: '28/05', color: '#F472B6' },
-];
+const TYPE_COLOR: Record<VType, string> = {
+  percent:  '#FF8C00',
+  fixed:    '#3ecf6e',
+  freeship: '#4a8ff5',
+};
 
-function VoucherCard({ v, i }: { v: Voucher; i: number }) {
+function getLabel(v: DbVoucher): string {
+  if (v.discount_type === 'percent')  return `-${v.discount_value}%`;
+  if (v.discount_type === 'freeship') return 'Free ship';
+  return `-${v.discount_value.toLocaleString('vi-VN')}đ`;
+}
+
+function VoucherCard({ v, i }: { v: DbVoucher; i: number }) {
+  const color  = TYPE_COLOR[v.discount_type];
+  const daysLeft = Math.ceil((new Date(v.valid_to).getTime() - Date.now()) / 86400000);
+  const expText  = daysLeft <= 0 ? 'Hết hạn hôm nay' : daysLeft === 1 ? 'Còn 1 ngày' : daysLeft <= 3 ? `Còn ${daysLeft} ngày` : new Date(v.valid_to).toLocaleDateString('vi-VN');
+  const urgent   = daysLeft <= 3;
+
   return (
     <motion.button
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: i * 0.06 }}
+      transition={{ delay: i * 0.07 }}
       whileTap={{ scale: 0.95 }}
-      className="flex-shrink-0 flex items-center gap-3 px-4 py-3 rounded-2xl"
       style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '10px 14px', borderRadius: 16, flexShrink: 0,
         background: 'rgba(255,255,255,0.04)',
-        border: `1px solid ${v.color}30`,
-        minWidth: 200,
+        border: `1px solid ${color}35`,
+        minWidth: 192, cursor: 'pointer',
+        fontFamily: 'Lexend, sans-serif',
+        outline: 'none',
       }}
     >
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ background: `${v.color}18`, border: `1px solid ${v.color}35` }}
-      >
-        <Tag size={16} style={{ color: v.color }} />
+      <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: `${color}18`, border: `1px solid ${color}35`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Tag size={16} style={{ color }} />
       </div>
-      <div className="text-left">
-        <p className="text-sm font-black leading-none" style={{ color: v.color }}>
-          -{v.label}
-        </p>
-        <p className="text-[11px] mt-0.5 font-medium" style={{ color: 'rgba(255,255,255,0.75)' }}>
-          {v.desc}
-        </p>
-        <p className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>
-          HSD: {v.expires} · {v.code}
+      <div style={{ textAlign: 'left', minWidth: 0 }}>
+        <p style={{ color, fontSize: 15, fontWeight: 800, margin: 0, lineHeight: 1 }}>{getLabel(v)}</p>
+        <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10.5, margin: '4px 0 2px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>{v.title}</p>
+        <p style={{ color: urgent ? '#ff4040' : 'rgba(255,255,255,0.3)', fontSize: 8.5, margin: 0, fontWeight: urgent ? 700 : 400 }}>
+          {expText} · {v.code}
         </p>
       </div>
     </motion.button>
@@ -56,18 +67,35 @@ function VoucherCard({ v, i }: { v: Voucher; i: number }) {
 }
 
 export default function VoucherStrip() {
-  const router = useRouter();
+  const router   = useRouter();
+  const [vouchers, setVouchers] = useState<DbVoucher[]>([]);
+
+  useEffect(() => {
+    const now = new Date().toISOString();
+    createClient()
+      .from('vouchers')
+      .select('id, code, title, discount_type, discount_value, valid_to, shop_id')
+      .eq('is_active', true)
+      .lte('valid_from', now)
+      .gte('valid_to', now)
+      .order('valid_to', { ascending: true })
+      .limit(6)
+      .then(({ data }) => { if (data) setVouchers(data as DbVoucher[]) });
+  }, []);
+
+  if (!vouchers.length) return null;
+
   return (
-    <section className="mb-5">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Voucher dành cho bạn</h2>
-        <button onClick={() => router.push('/vouchers')} className="text-xs font-semibold" style={{ color: 'var(--acc)' }}>
+    <section style={{ marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <h2 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, margin: 0 }}>Voucher dành cho bạn</h2>
+        <button onClick={() => router.push('/vouchers')} style={{ color: 'var(--acc)', fontSize: 12, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lexend, sans-serif' }}>
           Xem tất cả
         </button>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>
-        {VOUCHERS.map((v, i) => (
-          <VoucherCard key={v.code} v={v} i={i} />
+      <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6, scrollbarWidth: 'none' }}>
+        {vouchers.map((v, i) => (
+          <VoucherCard key={v.id} v={v} i={i} />
         ))}
       </div>
     </section>

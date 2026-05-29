@@ -36,6 +36,7 @@ interface DbVoucher {
   discount_type: "percent" | "fixed" | "freeship"
   discount_value: number; min_order: number; max_discount: number | null
   valid_to: string; shop_id: string | null; is_active: boolean
+  per_user_limit: number | null
 }
 
 function calcVoucherDiscount(v: DbVoucher, sub: number, fee: number): number {
@@ -658,27 +659,30 @@ function BankRow({ bank, selected, onSelect }: { bank: BankInfo; selected: strin
 // ─── Voucher Picker Sheet ─────────────────────────────────────
 
 function VoucherPickerSheet({
-  appliedVouchers, subtotal, deliveryFee, onApply, onClose, vouchers,
+  appliedVouchers, subtotal, deliveryFee, onApply, onClose, vouchers, userUsageMap,
 }: {
   appliedVouchers: AppliedVoucher[]
   subtotal: number; deliveryFee: number
   onApply: (code: string) => void
   onClose: () => void
   vouchers: DbVoucher[]
+  userUsageMap: Record<string, number>
 }) {
   const appVouchers  = vouchers.filter(v => dbVoucherType(v) === "app")
   const shopVouchers = vouchers.filter(v => dbVoucherType(v) === "shop")
 
-  const rowStatus = (code: string, type: "app" | "shop") => {
-    if (appliedVouchers.some(v => v.code === code))             return "applied"
-    if (appliedVouchers.length >= 2)                            return "full"
-    if (appliedVouchers.some(v => v.type === type))             return "conflict"
+  const rowStatus = (v: DbVoucher) => {
+    const code = v.code; const type = dbVoucherType(v)
+    if (appliedVouchers.some(x => x.code === code))                                           return "applied"
+    if (appliedVouchers.length >= 2)                                                          return "full"
+    if (appliedVouchers.some(x => x.type === type))                                           return "conflict"
+    if (v.per_user_limit !== null && (userUsageMap[v.id] ?? 0) >= v.per_user_limit)          return "maxed"
     return "available"
   }
 
   const VoucherRow = ({ v }: { v: DbVoucher }) => {
     const vType  = dbVoucherType(v)
-    const status = rowStatus(v.code, vType)
+    const status = rowStatus(v)
     const disc   = calcVoucherDiscount(v, subtotal, deliveryFee)
     return (
       <div style={{
@@ -716,11 +720,11 @@ function VoucherPickerSheet({
         {status === "applied" ? (
           <span style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>✓ Đã áp</span>
         ) : status === "conflict" ? (
-          <span style={{ color: "#6a5a40", fontSize: 9, flexShrink: 0, textAlign: "right", maxWidth: 60, lineHeight: 1.3 }}>
-            Đã có<br/>loại này
-          </span>
+          <span style={{ color: "#6a5a40", fontSize: 9, flexShrink: 0, textAlign: "right", maxWidth: 60, lineHeight: 1.3 }}>Đã có<br/>loại này</span>
         ) : status === "full" ? (
           <span style={{ color: "#6a5a40", fontSize: 9, flexShrink: 0 }}>Đã đủ</span>
+        ) : status === "maxed" ? (
+          <span style={{ color: "#ff4040", fontSize: 9, flexShrink: 0, textAlign: "right", maxWidth: 68, lineHeight: 1.3 }}>Đã dùng<br/>tối đa {v.per_user_limit} lần</span>
         ) : (
           <button type="button" onClick={() => { onApply(v.code); onClose() }} style={{
             height: 28, padding: "0 10px", borderRadius: 8, border: "none",
@@ -1127,6 +1131,7 @@ export default function CheckoutPage() {
   const [voucherInput,     setVoucherInput]     = useState("")
   const [appliedVouchers,  setAppliedVouchers]  = useState<AppliedVoucher[]>([])
   const [dbVouchers,       setDbVouchers]       = useState<DbVoucher[]>([])
+  const [userUsageMap,     setUserUsageMap]     = useState<Record<string, number>>({})
   const [showVoucherPicker,setShowVoucherPicker] = useState(false)
   const [driverNote,       setDriverNote]       = useState("")
   const [loading,          setLoading]          = useState(false)
@@ -1156,9 +1161,15 @@ export default function CheckoutPage() {
       const [{ data: addrs }, { data: wallet }, { data: voucherData }] = await Promise.all([
         supabase.from("saved_addresses").select("id, label, address, lat, lng, is_default").eq("user_id", user.id).order("is_default", { ascending: false }),
         supabase.from("wallets").select("id, balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
-        supabase.from("vouchers").select("id,code,title,discount_type,discount_value,min_order,max_discount,valid_to,shop_id,is_active").eq("is_active", true).gte("valid_to", new Date().toISOString()).limit(30),
+        supabase.from("vouchers").select("id,code,title,discount_type,discount_value,min_order,max_discount,valid_to,shop_id,is_active,per_user_limit").eq("is_active", true).gte("valid_to", new Date().toISOString()).limit(30),
       ])
-      if (voucherData) setDbVouchers(voucherData as DbVoucher[])
+      if (voucherData) {
+        setDbVouchers(voucherData as DbVoucher[])
+        const { data: usages } = await supabase.from("voucher_usages").select("voucher_id").eq("user_id", user.id)
+        const umap: Record<string, number> = {}
+        for (const u of usages ?? []) umap[u.voucher_id] = (umap[u.voucher_id] ?? 0) + 1
+        setUserUsageMap(umap)
+      }
 
       if (addrs && addrs.length > 0) {
         // Có địa chỉ đã lưu → dùng địa chỉ mặc định
@@ -1440,6 +1451,7 @@ export default function CheckoutPage() {
             onApply={code => applyVoucherCode(code, true)}
             onClose={() => setShowVoucherPicker(false)}
             vouchers={dbVouchers}
+            userUsageMap={userUsageMap}
           />
         )}
       </AnimatePresence>

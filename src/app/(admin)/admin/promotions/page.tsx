@@ -54,8 +54,9 @@ export default function AdminPromotionsPage() {
   const [form, setForm] = useState({
     code: "", title: "", type: "percent" as VoucherType,
     value: "", minOrder: "", maxDiscount: "", limit: "",
-    validFrom: "", validTo: "",
+    perUserLimit: "", validFrom: "", validTo: "",
   })
+  const [createMsg, setCreateMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -103,27 +104,36 @@ export default function AdminPromotionsPage() {
   const totalUsed      = useMemo(() => vouchers.reduce((s, v) => s + v.used, 0), [vouchers])
 
   async function handleCreate() {
-    if (!form.code || !form.title || !form.value || !form.validFrom || !form.validTo) return
-    setSaving(true)
+    if (!form.code || !form.title || !form.validFrom || !form.validTo) {
+      setCreateMsg({ ok: false, text: "Vui lòng điền đủ các trường có dấu *" }); return
+    }
+    if (form.type !== "freeship" && !form.value) {
+      setCreateMsg({ ok: false, text: "Vui lòng nhập giá trị giảm" }); return
+    }
+    setSaving(true); setCreateMsg(null)
     const supabase = createClient()
     const { error } = await supabase.from("vouchers").insert({
       code:           form.code.toUpperCase().trim(),
       title:          form.title.trim(),
       discount_type:  form.type,
-      discount_value: Number(form.value),
+      discount_value: form.type === "freeship" ? 0 : Number(form.value),
       min_order:      Number(form.minOrder) || 0,
       max_discount:   form.maxDiscount ? Number(form.maxDiscount) : null,
       usage_limit:    form.limit ? Number(form.limit) : null,
+      per_user_limit: form.perUserLimit ? Number(form.perUserLimit) : null,
       valid_from:     new Date(form.validFrom).toISOString(),
       valid_to:       new Date(form.validTo + "T23:59:59").toISOString(),
       is_active:      true,
       created_by:     userId,
     })
     setSaving(false)
-    if (!error) {
-      setShowCreate(false)
-      setForm({ code:"", title:"", type:"percent", value:"", minOrder:"", maxDiscount:"", limit:"", validFrom:"", validTo:"" })
+    if (error) {
+      setCreateMsg({ ok: false, text: error.message.includes("duplicate") ? `Mã "${form.code.toUpperCase()}" đã tồn tại, dùng mã khác` : "Lỗi: " + error.message })
+    } else {
+      setCreateMsg({ ok: true, text: `✓ Tạo voucher ${form.code.toUpperCase()} thành công!` })
+      setForm({ code:"", title:"", type:"percent", value:"", minOrder:"", maxDiscount:"", limit:"", perUserLimit:"", validFrom:"", validTo:"" })
       load()
+      setTimeout(() => { setShowCreate(false); setCreateMsg(null) }, 1800)
     }
   }
 
@@ -368,41 +378,56 @@ export default function AdminPromotionsPage() {
                   <button onClick={() => setShowCreate(false)} style={{ width:32, height:32, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
                 </div>
                 <div style={{ flex:1, padding:"16px 20px", display:"flex", flexDirection:"column", gap:12, overflowY:"auto" }}>
-                  {[
-                    { label:"Mã voucher",      key:"code",        placeholder:"GIAONHANH10", type:"text" },
-                    { label:"Tên voucher",      key:"title",       placeholder:"Giảm 10% đơn đầu tiên", type:"text" },
-                    { label:"Giá trị",          key:"value",       placeholder:"10 (hoặc 20000)", type:"number" },
-                    { label:"Đơn tối thiểu (đ)",key:"minOrder",    placeholder:"50000", type:"number" },
-                    { label:"Giảm tối đa (đ)",  key:"maxDiscount", placeholder:"30000 (để trống nếu không có)", type:"number" },
-                    { label:"Giới hạn dùng",    key:"limit",       placeholder:"500 (để trống = không giới hạn)", type:"number" },
-                    { label:"Từ ngày",          key:"validFrom",   placeholder:"", type:"date" },
-                    { label:"Đến ngày",         key:"validTo",     placeholder:"", type:"date" },
-                  ].map(f => (
-                    <div key={f.key}>
-                      <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>{f.label}</div>
-                      <input
-                        type={f.type}
-                        value={form[f.key as keyof typeof form]}
-                        onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                        placeholder={f.placeholder}
-                        style={{ width:"100%", padding:"10px 14px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, color:"#f0eaff", fontSize:12 }}
-                      />
-                    </div>
-                  ))}
+                  {/* 1. Loại lên đầu — biết đơn vị trước khi nhập Giá trị */}
                   <div>
-                    <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>Loại khuyến mãi</div>
+                    <div style={{ color:"#6a5a40", fontSize:10, marginBottom:6 }}>Loại khuyến mãi <span style={{ color:"#ff4040" }}>*</span></div>
                     <div style={{ display:"flex", gap:8 }}>
                       {(["percent","fixed","freeship"] as VoucherType[]).map(t => (
-                        <button key={t} onClick={() => setForm(p => ({ ...p, type:t }))} style={{ flex:1, height:36, borderRadius:10, background: form.type===t ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.04)", border: form.type===t ? "1px solid rgba(255,107,0,0.35)" : "1px solid rgba(255,255,255,0.08)", color: form.type===t ? "#FF8C00" : "#6a5a40", fontSize:10, cursor:"pointer", fontFamily:"Lexend", fontWeight: form.type===t ? 700 : 400 }}>
+                        <button key={t} onClick={() => setForm(p => ({ ...p, type:t, value: t==="freeship"?"0":p.value }))}
+                          style={{ flex:1, height:40, borderRadius:10, background: form.type===t?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)", border: form.type===t?"1px solid rgba(255,107,0,0.35)":"1px solid rgba(255,255,255,0.08)", color: form.type===t?"#FF8C00":"#6a5a40", fontSize:10, cursor:"pointer", fontFamily:"Lexend", fontWeight: form.type===t?700:400 }}>
                           {TYPE_CFG[t].icon} {TYPE_CFG[t].label}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <button
-                    onClick={handleCreate}
-                    disabled={saving || !form.code || !form.title || !form.value || !form.validFrom || !form.validTo}
-                    style={{ width:"100%", height:44, borderRadius:12, background:"linear-gradient(90deg,#FF6B00,#FF8C00)", border:"none", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", marginTop:4, opacity: saving ? 0.6 : 1 }}>
+
+                  {/* 2. Các trường nhập liệu */}
+                  {([
+                    { label:"Mã voucher *",             key:"code",         ph:"VD: GIAONHANH10, FREESHIP...",                  t:"text"   },
+                    { label:"Tên khuyến mãi *",          key:"title",        ph:"VD: Giảm 10% cho đơn đầu tiên",                t:"text"   },
+                    form.type!=="freeship" ? { label: form.type==="percent"?"Tỉ lệ giảm (%) *":"Số tiền giảm (đ) *",
+                      key:"value", ph: form.type==="percent"?"VD: 10 → giảm 10%":"VD: 20000 → giảm 20.000đ", t:"number" } : null,
+                    { label:"Đơn hàng tối thiểu (đ) — bỏ trống nếu không yêu cầu",  key:"minOrder",     ph:"VD: 50000",        t:"number" },
+                    form.type!=="freeship" ? { label:"Giảm tối đa mỗi đơn (đ) — bỏ trống = không giới hạn",
+                      key:"maxDiscount", ph:"VD: 50000 — dù 20% nhưng không quá 50k",                       t:"number" } : null,
+                    { label:"Tổng lượt dùng cả hệ thống — bỏ trống = không giới hạn",    key:"limit",        ph:"VD: 500",           t:"number" },
+                    { label:"Mỗi người dùng tối đa (lần) — bỏ trống = không giới hạn", key:"perUserLimit",  ph:"VD: 1 → mỗi tài khoản chỉ dùng 1 lần", t:"number" },
+                    { label:"Hiệu lực từ ngày *",        key:"validFrom",    ph:"",                              t:"date"   },
+                    { label:"Hết hạn vào ngày *",        key:"validTo",      ph:"",                              t:"date"   },
+                  ] as Array<{label:string;key:string;ph:string;t:string}|null>)
+                  .filter((f): f is {label:string;key:string;ph:string;t:string} => f!==null)
+                  .map(f => (
+                    <div key={f.key}>
+                      <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>{f.label}</div>
+                      <input
+                        type={f.t}
+                        value={form[f.key as keyof typeof form] as string}
+                        onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                        placeholder={f.ph}
+                        style={{ width:"100%", padding:"10px 14px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, color:"#f0eaff", fontSize:12, boxSizing:"border-box" as const }}
+                      />
+                    </div>
+                  ))}
+
+                  {/* Feedback */}
+                  {createMsg && (
+                    <div style={{ padding:"9px 14px", borderRadius:10, background: createMsg.ok?"rgba(62,207,110,0.08)":"rgba(255,64,64,0.08)", border:`1px solid ${createMsg.ok?"rgba(62,207,110,0.3)":"rgba(255,64,64,0.3)"}`, color: createMsg.ok?"#3ecf6e":"#ff4040", fontSize:11, textAlign:"center", fontWeight:600 }}>
+                      {createMsg.text}
+                    </div>
+                  )}
+
+                  <button onClick={handleCreate} disabled={saving || !form.code || !form.title || !form.validFrom || !form.validTo}
+                    style={{ width:"100%", height:44, borderRadius:12, background:"linear-gradient(90deg,#FF6B00,#FF8C00)", border:"none", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", marginTop:4, opacity: saving?0.6:1 }}>
                     {saving ? "Đang tạo..." : "🏷️ Tạo voucher"}
                   </button>
                 </div>
