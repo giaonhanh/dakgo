@@ -14,17 +14,27 @@ interface LocationState {
   setPromptShown:  () => void
 }
 
+const LS_KEY = "gps_prompt_shown"
+
+function readPromptShown(): boolean {
+  if (typeof window === "undefined") return false
+  try { return !!localStorage.getItem(LS_KEY) } catch { return false }
+}
+
 export const useLocationStore = create<LocationState>((set) => ({
   lat:         null,
   lng:         null,
   address:     "",
   ready:       false,
   denied:      false,
-  promptShown: false,
+  promptShown: readPromptShown(),
   lastUpdated: 0,
 
   setLocation:    (lat, lng, address) =>
     set({ lat, lng, address, ready: true, denied: false, lastUpdated: Date.now() }),
   setDenied:      () => set({ ready: true, denied: true }),
-  setPromptShown: () => set({ promptShown: true }),
+  setPromptShown: () => {
+    try { localStorage.setItem(LS_KEY, "1") } catch {}
+    set({ promptShown: true })
+  },
 }))

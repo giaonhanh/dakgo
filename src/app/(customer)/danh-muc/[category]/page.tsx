@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useRouter, useParams } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { useCartStore } from "@/store/cartStore"
 
 const CATEGORY_META: Record<string, { icon: string; label: string; tag: string; color: string; bg: string; border: string }> = {
   "buoi-sang": { icon:"☀️",  label:"Buổi sáng", tag:"Buổi sáng", color:"#FFB347", bg:"rgba(255,179,71,0.08)",  border:"rgba(255,179,71,0.25)" },
@@ -28,10 +29,14 @@ export default function CategoryPage() {
   const category = (params?.category as string) ?? ""
   const meta     = CATEGORY_META[category]
 
-  const [items,   setItems]   = useState<DBProduct[]>([])
-  const [loading, setLoading] = useState(true)
-  const [toast,   setToast]   = useState("")
-  const [sortBy,  setSortBy]  = useState<"popular" | "price_asc" | "price_desc">("popular")
+  const { items: cartItems, addItem, clearAndAdd, shopId: cartShopId } = useCartStore()
+  const totalQty = cartItems.reduce((s, i) => s + i.qty, 0)
+
+  const [items,       setItems]       = useState<DBProduct[]>([])
+  const [loading,     setLoading]     = useState(true)
+  const [toast,       setToast]       = useState("")
+  const [sortBy,      setSortBy]      = useState<"popular" | "price_asc" | "price_desc">("popular")
+  const [conflict,    setConflict]    = useState<DBProduct | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -78,6 +83,22 @@ export default function CategoryPage() {
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2000) }
 
+  const handleAdd = (item: DBProduct) => {
+    if (cartShopId && cartShopId !== item.shop_id && cartItems.length > 0) {
+      setConflict(item)
+      return
+    }
+    addItem({ id: item.id, name: item.name, price: item.price, shop: item.shop_name, shopId: item.shop_id, imageUrl: item.image_url ?? undefined })
+    fireToast("✅ Đã thêm vào giỏ hàng")
+  }
+
+  const confirmConflict = () => {
+    if (!conflict) return
+    clearAndAdd({ id: conflict.id, name: conflict.name, price: conflict.price, shop: conflict.shop_name, shopId: conflict.shop_id, imageUrl: conflict.image_url ?? undefined })
+    setConflict(null)
+    fireToast("✅ Đã thêm vào giỏ hàng")
+  }
+
   const sorted = [...items].sort((a, b) => {
     if (sortBy === "price_asc")  return a.price - b.price
     if (sortBy === "price_desc") return b.price - a.price
@@ -105,6 +126,46 @@ export default function CategoryPage() {
         html,body{background:#080806;font-family:'Lexend',sans-serif}
         @keyframes dmShim{0%{left:-60%}100%{left:120%}}
       `}</style>
+
+      {/* Conflict modal — giỏ hàng từ cửa hàng khác */}
+      <AnimatePresence>
+        {conflict && (
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+            style={{ position:"fixed", inset:0, zIndex:9000,
+              background:"rgba(8,8,6,0.85)", backdropFilter:"blur(10px)",
+              display:"flex", alignItems:"flex-end", justifyContent:"center", padding:"0 16px 40px" }}>
+            <motion.div initial={{y:60}} animate={{y:0}} exit={{y:60}}
+              style={{ width:"100%", maxWidth:400,
+                background:"rgba(20,18,14,0.98)", borderRadius:20,
+                border:"1px solid rgba(255,107,0,0.25)", padding:"20px 20px 16px" }}>
+              <div style={{ fontSize:22, textAlign:"center", marginBottom:10 }}>🛒</div>
+              <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700, textAlign:"center", marginBottom:6 }}>
+                Thêm từ cửa hàng khác?
+              </div>
+              <div style={{ color:"#6a5a40", fontSize:10.5, textAlign:"center", lineHeight:1.7, marginBottom:18 }}>
+                Giỏ hàng đang có món từ cửa hàng khác.<br/>
+                Thêm món này sẽ xoá giỏ hàng cũ.
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={() => setConflict(null)}
+                  style={{ flex:1, height:42, borderRadius:12,
+                    background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)",
+                    color:"#6a5a40", fontSize:12, fontWeight:600, cursor:"pointer",
+                    fontFamily:"Lexend" }}>
+                  Giữ giỏ cũ
+                </button>
+                <button onClick={confirmConflict}
+                  style={{ flex:1, height:42, borderRadius:12,
+                    background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
+                    border:"none", color:"#fff", fontSize:12, fontWeight:700,
+                    cursor:"pointer", fontFamily:"Lexend" }}>
+                  Thêm món mới
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Toast */}
       <AnimatePresence>
@@ -194,86 +255,87 @@ export default function CategoryPage() {
               initial={{ opacity:0, y:12 }}
               animate={{ opacity:1, y:0 }}
               transition={{ delay: i * 0.04 }}>
-              <a href={`/shop/${item.shop_id}`} style={{ textDecoration:"none" }}>
-                <div style={{
-                  background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
-                  border:"1px solid rgba(255,255,255,0.08)",
-                  borderRadius:16, padding:"11px 13px",
-                  display:"flex", alignItems:"center", gap:12,
-                  position:"relative", overflow:"hidden",
-                }}>
-                  {/* Image area */}
-                  <div style={{ width:70, height:70, borderRadius:14, flexShrink:0,
+              <div style={{
+                background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
+                border:"1px solid rgba(255,255,255,0.08)",
+                borderRadius:16, padding:"11px 13px",
+                display:"flex", alignItems:"center", gap:12,
+                position:"relative", overflow:"hidden",
+              }}>
+                {/* Image — tap to open shop */}
+                <div onClick={() => router.push(`/shop/${item.shop_id}`)}
+                  style={{ width:70, height:70, borderRadius:14, flexShrink:0,
                     background: item.image_url ? "transparent" : meta.bg,
                     border:`1px solid ${meta.border}`,
                     display:"flex", alignItems:"center", justifyContent:"center",
-                    fontSize:34, position:"relative", overflow:"hidden" }}>
-                    {item.image_url
-                      ? <img src={item.image_url} alt={item.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                      : "🍽️"}
+                    fontSize:34, position:"relative", overflow:"hidden", cursor:"pointer" }}>
+                  {item.image_url
+                    ? <img src={item.image_url} alt={item.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                    : "🍽️"}
+                  {item.original_price && item.original_price > item.price && (
+                    <div style={{ position:"absolute", top:-5, left:-5,
+                      background:"#ff4040", color:"#fff",
+                      fontSize:7, fontWeight:700, padding:"2px 5px", borderRadius:5,
+                      boxShadow:"0 0 5px rgba(255,64,64,0.3)" }}>
+                      -{Math.round((1-item.price/item.original_price)*100)}%
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700, marginBottom:3,
+                    whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                    {item.name}
+                  </div>
+                  <div onClick={() => router.push(`/shop/${item.shop_id}`)}
+                    style={{ color:"#6a5a40", fontSize:9, marginBottom:5, cursor:"pointer" }}>
+                    🏪 {item.shop_name}
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:3 }}>
+                      <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
+                      <span style={{ color:"#b0956a", fontSize:8.5 }}>{item.shop_rating.toFixed(1)}</span>
+                    </div>
+                    {item.sold_count > 0 && (
+                      <>
+                        <span style={{ color:"rgba(255,255,255,0.1)", fontSize:9 }}>·</span>
+                        <span style={{ color:"#3ecf6e", fontSize:8, fontWeight:600 }}>
+                          🔥 {item.sold_count.toLocaleString("vi-VN")} đã bán
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {/* Price */}
+                  <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:5 }}>
+                    <div style={{
+                      background:"linear-gradient(135deg,#FF6B00,#FFB347)",
+                      WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                      backgroundClip:"text", fontSize:13, fontWeight:800,
+                    }}>{formatPrice(item.price)}</div>
                     {item.original_price && item.original_price > item.price && (
-                      <div style={{ position:"absolute", top:-5, left:-5,
-                        background:"#ff4040", color:"#fff",
-                        fontSize:7, fontWeight:700, padding:"2px 5px", borderRadius:5,
-                        boxShadow:"0 0 5px rgba(255,64,64,0.3)" }}>
-                        -{Math.round((1-item.price/item.original_price)*100)}%
+                      <div style={{ color:"#4a5040", fontSize:9, textDecoration:"line-through" }}>
+                        {formatPrice(item.original_price)}
                       </div>
                     )}
                   </div>
-
-                  {/* Info */}
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700, marginBottom:3,
-                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                      {item.name}
-                    </div>
-                    <div style={{ color:"#6a5a40", fontSize:9, marginBottom:5 }}>
-                      🏪 {item.shop_name}
-                    </div>
-                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:3 }}>
-                        <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
-                        <span style={{ color:"#b0956a", fontSize:8.5 }}>{item.shop_rating.toFixed(1)}</span>
-                      </div>
-                      {item.sold_count > 0 && (
-                        <>
-                          <span style={{ color:"rgba(255,255,255,0.1)", fontSize:9 }}>·</span>
-                          <span style={{ color:"#3ecf6e", fontSize:8, fontWeight:600 }}>
-                            🔥 {item.sold_count.toLocaleString("vi-VN")} đã bán
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    {/* Price */}
-                    <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:5 }}>
-                      <div style={{
-                        background:"linear-gradient(135deg,#FF6B00,#FFB347)",
-                        WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
-                        backgroundClip:"text", fontSize:13, fontWeight:800,
-                      }}>{formatPrice(item.price)}</div>
-                      {item.original_price && item.original_price > item.price && (
-                        <div style={{ color:"#4a5040", fontSize:9, textDecoration:"line-through" }}>
-                          {formatPrice(item.original_price)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* View button */}
-                  <button
-                    onClick={e => { e.preventDefault(); e.stopPropagation(); router.push(`/shop/${item.shop_id}`) }}
-                    style={{ width:36, height:36, borderRadius:11, flexShrink:0,
-                      background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
-                      border:"none", color:"#fff", fontSize:20, fontWeight:700,
-                      cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
-                      boxShadow:"0 3px 10px rgba(255,107,0,0.4)", position:"relative", overflow:"hidden" }}>
-                    <div style={{ position:"absolute", top:0, left:"-60%", width:"35%", height:"100%",
-                      background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent)",
-                      animation:"dmShim 2.5s infinite" }} />
-                    <span style={{ position:"relative", zIndex:1 }}>›</span>
-                  </button>
                 </div>
-              </a>
+
+                {/* Add to cart button */}
+                <button
+                  onClick={() => handleAdd(item)}
+                  style={{ width:36, height:36, borderRadius:11, flexShrink:0,
+                    background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
+                    border:"none", color:"#fff", fontSize:24, fontWeight:400,
+                    cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+                    boxShadow:"0 3px 10px rgba(255,107,0,0.4)", position:"relative", overflow:"hidden",
+                    lineHeight:1 }}>
+                  <div style={{ position:"absolute", top:0, left:"-60%", width:"35%", height:"100%",
+                    background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent)",
+                    animation:"dmShim 2.5s infinite" }} />
+                  <span style={{ position:"relative", zIndex:1 }}>+</span>
+                </button>
+              </div>
             </motion.div>
           ))}
         </div>
@@ -288,13 +350,23 @@ export default function CategoryPage() {
         {[
           { icon:"🏠", label:"Trang chủ", href:"/" },
           { icon:"📋", label:"Đơn hàng",  href:"/orders" },
-          { icon:"🛒", label:"Giỏ hàng",  href:"/cart" },
+          { icon:"🛒", label:"Giỏ hàng",  href:"/cart", badge: totalQty },
           { icon:"⚙️", label:"Cài đặt",   href:"/settings" },
         ].map(tab => (
           <a key={tab.href} href={tab.href}
             style={{ textDecoration:"none", display:"flex", flexDirection:"column",
-              alignItems:"center", gap:2, padding:"5px 11px", borderRadius:18 }}>
+              alignItems:"center", gap:2, padding:"5px 11px", borderRadius:18,
+              position:"relative" }}>
             <span style={{ fontSize:19 }}>{tab.icon}</span>
+            {"badge" in tab && tab.badge > 0 && (
+              <div style={{ position:"absolute", top:1, right:6,
+                width:14, height:14, borderRadius:99,
+                background:"#ff4040", color:"#fff",
+                fontSize:7.5, fontWeight:800,
+                display:"flex", alignItems:"center", justifyContent:"center" }}>
+                {tab.badge > 9 ? "9+" : tab.badge}
+              </div>
+            )}
             <span style={{ fontSize:7.5, color:"#6a5a40" }}>{tab.label}</span>
           </a>
         ))}
