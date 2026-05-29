@@ -15,7 +15,7 @@ interface Trip { id: string; from: string; to: string; time: string; amount: num
 
 export default function DriverEarningsPage() {
   const supabase = createClient()
-  const [period, setPeriod] = useState<"today"|"week"|"month">("week")
+  const [period, setPeriod] = useState<"today"|"week"|"month">("today")
   const [weekly, setWeekly] = useState<WeekDay[]>(
     DAY_LABELS.map(d => ({ day: d, amount: 0, trips: 0 }))
   )

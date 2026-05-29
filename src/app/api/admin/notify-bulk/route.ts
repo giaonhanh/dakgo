@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Không có quyền" }, { status: 403 })
     }
 
-    const { title, body, audience } = await req.json()
+    const { title, body, audience, type = "system", image_url = null } = await req.json()
     if (!title?.trim() || !body?.trim()) {
       return NextResponse.json({ error: "Thiếu tiêu đề hoặc nội dung" }, { status: 400 })
     }
@@ -37,12 +37,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Không tìm thấy người dùng", count: 0 }, { status: 200 })
     }
 
+    const validType = ["promo","system","order","ride"].includes(type) ? type : "system"
     const rows = users.map(u => ({
       user_id: u.id,
-      type: "system" as const,
+      type: validType,
       title,
       body,
-      data: { sent_by: "admin", audience },
+      data: { sent_by: "admin", audience, ...(image_url ? { image_url } : {}) },
     }))
 
     const { error } = await admin.from("notifications").insert(rows)

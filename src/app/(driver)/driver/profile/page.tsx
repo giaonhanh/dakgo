@@ -422,7 +422,7 @@ export default function DriverProfilePage() {
   const [avatar,    setAvatar]    = useState<string | null>(null)
   const avatarRef                 = useRef<HTMLInputElement>(null)
   const [bankInfo,  setBankInfo]  = useState<{ bank_name: string | null; bank_account_number: string | null } | null>(null)
-  const [stats,     setStats]     = useState({ rating: 0, trips: 0, walletBal: 0, joinDate: "" })
+  const [stats,     setStats]     = useState({ rating: 0, trips: 0, todayEarnings: 0, walletBal: 0, joinDate: "" })
   const [vehicleSub, setVehicleSub] = useState("Chưa cập nhật thông tin xe")
 
   const loadBankInfo = async (uid: string) => {
@@ -438,8 +438,14 @@ export default function DriverProfilePage() {
       if (prof) { setName(prof.full_name ?? ""); setPhone(prof.phone ?? ""); if (prof.avatar_url) setAvatar(prof.avatar_url) }
       const { data: drv } = await supabase.from("drivers").select("rating_avg, total_trips, vehicle_type, vehicle_model, license_plate, bank_name, bank_account_number").eq("id", user.id).single()
       const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "driver").maybeSingle()
+      const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
+      const { data: todayOrders } = await supabase.from("orders")
+        .select("delivery_fee").eq("driver_id", user.id).eq("status", "delivered")
+        .gte("created_at", startOfDay.toISOString())
+      const todayEarnings = (todayOrders ?? []).reduce((s, o) => s + (o.delivery_fee ?? 0), 0)
+      const walletBal = (wallet as { balance?: number } | null)?.balance ?? 0
       const joinDate = prof?.created_at ? new Date(prof.created_at).toLocaleDateString("vi-VN", { month: "2-digit", year: "numeric" }) : ""
-      setStats({ rating: (drv as { rating_avg?: number } | null)?.rating_avg ?? 5.0, trips: (drv as { total_trips?: number } | null)?.total_trips ?? 0, walletBal: (wallet as { balance?: number } | null)?.balance ?? 0, joinDate })
+      setStats({ rating: (drv as { rating_avg?: number } | null)?.rating_avg ?? 5.0, trips: (drv as { total_trips?: number } | null)?.total_trips ?? 0, todayEarnings, walletBal, joinDate })
       if (drv) {
         const d = drv as { vehicle_model?: string; license_plate?: string }
         setVehicleSub([d.vehicle_model, d.license_plate].filter(Boolean).join(" · ") || "Chưa cập nhật thông tin xe")
@@ -495,14 +501,14 @@ export default function DriverProfilePage() {
       <input ref={avatarRef} type="file" accept="image/*" style={{ display: "none" }} onChange={async e => {
         const f = e.target.files?.[0]; if (!f || !userId) { e.target.value = ""; return }
         setAvatar(URL.createObjectURL(f)); e.target.value = ""
-        const ext = f.name.split(".").pop() ?? "jpg"
-        const path = `${userId}/avatar.${ext}`
-        const { error: upErr } = await supabase.storage.from("avatars").upload(path, f, { upsert: true })
+        const path = `${userId}/avatar`
+        const { error: upErr } = await supabase.storage.from("avatars").upload(path, f, { upsert: true, contentType: f.type })
         if (upErr) { fire("❌ Không upload được ảnh"); return }
         const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path)
-        const { error: dbErr } = await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", userId)
+        const bustedUrl = `${publicUrl}?t=${Date.now()}`
+        const { error: dbErr } = await supabase.from("profiles").update({ avatar_url: bustedUrl }).eq("id", userId)
         if (dbErr) { fire("❌ Không lưu được ảnh"); return }
-        setAvatar(publicUrl); fire("Đã cập nhật ảnh đại diện")
+        setAvatar(bustedUrl); fire("Đã cập nhật ảnh đại diện")
       }} />
 
       <div style={{ minHeight: "100dvh", background: "#080806", paddingBottom: 100 }}>
@@ -551,7 +557,7 @@ export default function DriverProfilePage() {
               {[
                 { icon: "⭐", val: stats.rating.toFixed(1), label: "Đánh giá" },
                 { icon: "📦", val: String(stats.trips),     label: "Chuyến" },
-                { icon: "🪙", val: stats.walletBal >= 1000 ? `${Math.round(stats.walletBal / 1000)}k` : `${stats.walletBal}đ`, label: "Số dư ví" },
+                { icon: "💰", val: stats.todayEarnings >= 1000 ? `${Math.round(stats.todayEarnings / 1000)}k` : `${stats.todayEarnings}đ`, label: "Hôm nay" },
               ].map(s => (
                 <div key={s.label} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "10px 0", textAlign: "center" }}>
                   <div style={{ fontSize: 16, marginBottom: 3 }}>{s.icon}</div>
