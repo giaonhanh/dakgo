@@ -77,7 +77,7 @@ export default function MerchantPromotionsPage() {
   })
 
   const loadData = useCallback(async (sid: string) => {
-    const [{ data: vouchers }, { data: products }] = await Promise.all([
+    const [{ data: vouchers, error: vErr }, { data: products }] = await Promise.all([
       supabase.from("vouchers")
         .select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,per_person_limit,used_count,valid_from,valid_to,is_active,is_combo")
         .eq("shop_id", sid)
@@ -88,6 +88,7 @@ export default function MerchantPromotionsPage() {
         .eq("is_available", true)
         .order("sort_order"),
     ])
+    if (vErr) console.error("[promotions] load error:", vErr)
     if (vouchers) {
       const voucherIds = vouchers.map(v => v.id)
       let comboMap: Record<string, ComboItem[]> = {}
@@ -249,7 +250,12 @@ export default function MerchantPromotionsPage() {
     }
     const { data, error } = await supabase.from("vouchers").insert(insertPayload)
       .select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,used_count,valid_from,valid_to,is_active").single()
-    if (error || !data) { setSaving(false); fireToast("Lỗi tạo chương trình!", true); return }
+    if (error || !data) {
+      setSaving(false)
+      console.error("[promotions] insert error:", error)
+      fireToast("Lỗi: " + (error?.message ?? "không tạo được chương trình"), true)
+      return
+    }
 
     // Lưu combo_items nếu bảng tồn tại
     if (form.type === "combo" && form.comboItems.length > 0) {
