@@ -1,11 +1,19 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 
 /* ── helpers ── */
 type Section = "notifications" | "security" | "payment" | "privacy" | "preferences" | "support" | "about" | "account"
+type TierLevel = "bronze" | "silver" | "gold" | "platinum"
+
+const TIER_CFG: Record<TierLevel, { label: string; color: string; icon: string }> = {
+  bronze:   { label: "Bronze",   color: "#cd7f32", icon: "🥉" },
+  silver:   { label: "Silver",   color: "#a8a9ad", icon: "🥈" },
+  gold:     { label: "Gold",     color: "#f5c542", icon: "🥇" },
+  platinum: { label: "Platinum", color: "#b464ff", icon: "💎" },
+}
 
 function Toggle({ on, onToggle, color = "#3ecf6e" }: { on: boolean; onToggle: () => void; color?: string }) {
   return (
@@ -69,17 +77,22 @@ function PwSheet({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [old, setOld] = useState(""); const [nw, setNw] = useState(""); const [cf, setCf] = useState("")
   const [err, setErr] = useState(""); const [show, setShow] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const labels = ["Nhập mật khẩu hiện tại", "Nhập mật khẩu mới", "Xác nhận mật khẩu mới"]
   const vals = [old, nw, cf]; const sets = [setOld, setNw, setCf]
 
-  const next = () => {
+  const next = async () => {
     setErr("")
     if (step === 1 && !old.trim()) return setErr("Vui lòng nhập mật khẩu hiện tại")
     if (step === 2 && nw.length < 6)  return setErr("Mật khẩu mới tối thiểu 6 ký tự")
     if (step === 3) {
       if (nw !== cf) return setErr("Mật khẩu xác nhận không khớp")
-      // TODO: call supabase.auth.updateUser({ password: nw })
+      setSaving(true)
+      const supabase = createClient()
+      const { error } = await supabase.auth.updateUser({ password: nw })
+      setSaving(false)
+      if (error) return setErr("Lỗi: " + error.message)
       onClose()
       return
     }
@@ -144,12 +157,13 @@ function PwSheet({ onClose }: { onClose: () => void }) {
             style={{ height: 46, borderRadius: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#b0956a", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>
             {step > 1 ? "← Quay lại" : "Hủy"}
           </button>
-          <button onClick={next} style={{
+          <button onClick={next} disabled={saving} style={{
             height: 46, borderRadius: 12, border: "none",
             background: "linear-gradient(90deg,#FF6B00,#FF8C00)",
-            color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend",
+            color: "#fff", fontSize: 13, fontWeight: 800, cursor: saving ? "default" : "pointer", fontFamily: "Lexend",
+            opacity: saving ? 0.7 : 1,
           }}>
-            {step === 3 ? "✓ Xác nhận" : "Tiếp theo →"}
+            {saving ? "Đang lưu..." : step === 3 ? "✓ Xác nhận" : "Tiếp theo →"}
           </button>
         </div>
       </div>
@@ -200,13 +214,14 @@ function SessionSheet({ onClose }: { onClose: () => void }) {
 }
 
 /* ── payment sheet ── */
-function PaymentSheet({ onClose }: { onClose: () => void }) {
+function PaymentSheet({ onClose, walletBalance }: { onClose: () => void; walletBalance: number }) {
   const [selected, setSelected] = useState("cash")
+  const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
   const METHODS = [
-    { id: "cash",   icon: "💵", label: "Tiền mặt",    sub: "Thanh toán khi nhận hàng" },
-    { id: "vietqr", icon: "🏦", label: "VietQR",      sub: "Chuyển khoản ngân hàng" },
-    { id: "momo",   icon: "🟣", label: "MoMo",        sub: "Ví điện tử MoMo" },
-    { id: "wallet", icon: "👛", label: "Ví Giao Nhanh", sub: "Số dư: 50.000đ" },
+    { id: "cash",   icon: "💵", label: "Tiền mặt",      sub: "Thanh toán khi nhận hàng" },
+    { id: "vietqr", icon: "🏦", label: "VietQR",        sub: "Chuyển khoản ngân hàng" },
+    { id: "momo",   icon: "🟣", label: "MoMo",          sub: "Ví điện tử MoMo" },
+    { id: "wallet", icon: "👛", label: "Ví Giao Nhanh", sub: `Số dư: ${fmt(walletBalance)}` },
   ]
   return (
     <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
@@ -250,6 +265,45 @@ function PaymentSheet({ onClose }: { onClose: () => void }) {
 
 /* ── main ── */
 export default function CustomerSettingsPage() {
+  /* realtime data */
+  const [userId,        setUserId]        = useState<string | null>(null)
+  const [fullName,      setFullName]      = useState("Đang tải...")
+  const [phone,         setPhone]         = useState("")
+  const [walletBalance, setWalletBalance] = useState(0)
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0)
+  const [tier,          setTier]          = useState<TierLevel>("bronze")
+  const [dataLoading,   setDataLoading]   = useState(true)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      setUserId(user.id)
+      const [
+        { data: profile },
+        { data: wallet },
+        { data: loyalty },
+      ] = await Promise.all([
+        supabase.from("profiles").select("full_name, phone").eq("id", user.id).single(),
+        supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "customer").single(),
+        supabase.from("loyalty_points").select("total_points, tier").eq("user_id", user.id).single(),
+      ])
+      if (profile) {
+        setFullName(profile.full_name ?? "Khách hàng")
+        setPhone(profile.phone ?? "")
+      }
+      if (wallet) setWalletBalance(wallet.balance ?? 0)
+      if (loyalty) {
+        setLoyaltyPoints(loyalty.total_points ?? 0)
+        setTier((loyalty.tier as TierLevel) ?? "bronze")
+      }
+      setDataLoading(false)
+    })
+  }, [])
+
+  const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
+  const tierCfg = TIER_CFG[tier]
+
   /* notification toggles */
   const [notif, setNotif] = useState({
     orderUpdates:   true,
@@ -317,11 +371,13 @@ export default function CustomerSettingsPage() {
 
       <div style={{ minHeight: "100dvh", background: "#080806", paddingBottom: 100 }}>
 
-        {/* header */}
-        <div style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(8,8,6,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 16px", height: 56, display: "flex", alignItems: "center", gap: 12 }}>
-          <a href="/profile" style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", color: "#f8f0e0", fontSize: 15 }}>←</a>
-          <div style={{ flex: 1 }}>
-            <div style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>Cài đặt</div>
+        {/* header — safe area */}
+        <div style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(8,8,6,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingTop: "env(safe-area-inset-top)" }}>
+          <div style={{ height: 56, padding: "0 16px", display: "flex", alignItems: "center", gap: 12 }}>
+            <a href="/profile" style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", color: "#f8f0e0", fontSize: 15 }}>←</a>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>Cài đặt</div>
+            </div>
           </div>
         </div>
 
@@ -331,11 +387,11 @@ export default function CustomerSettingsPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px", background: "rgba(255,107,0,0.07)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 16, marginBottom: 20 }}>
             <div style={{ width: 52, height: 52, borderRadius: 15, background: "rgba(255,107,0,0.15)", border: "2px solid rgba(255,107,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0 }}>👤</div>
             <div style={{ flex: 1 }}>
-              <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 800 }}>Phạm Hồng Mỹ</div>
-              <div style={{ color: "#6a5a40", fontSize: 10 }}>0848 612 712 · Khách hàng</div>
+              <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 800 }}>{dataLoading ? "Đang tải..." : fullName}</div>
+              <div style={{ color: "#6a5a40", fontSize: 10 }}>{phone} · Khách hàng</div>
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
-                <span style={{ background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.25)", borderRadius: 5, padding: "1px 8px", color: "#FFD700", fontSize: 8, fontWeight: 700 }}>🥇 Gold</span>
-                <span style={{ color: "#6a5a40", fontSize: 9 }}>· 1.240 điểm</span>
+                <span style={{ background: `${tierCfg.color}18`, border: `1px solid ${tierCfg.color}44`, borderRadius: 5, padding: "1px 8px", color: tierCfg.color, fontSize: 8, fontWeight: 700 }}>{tierCfg.icon} {tierCfg.label}</span>
+                <span style={{ color: "#6a5a40", fontSize: 9 }}>· {dataLoading ? "—" : loyaltyPoints.toLocaleString("vi-VN")} điểm</span>
               </div>
             </div>
             <a href="/profile" style={{ padding: "7px 12px", borderRadius: 9, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#b0956a", fontSize: 10, fontWeight: 700, textDecoration: "none" }}>Sửa hồ sơ</a>
@@ -388,9 +444,21 @@ export default function CustomerSettingsPage() {
           {/* PAYMENT */}
           <SectionCard title="Thanh toán">
             <Row icon="💳" label="Phương thức mặc định" sub="Tiền mặt · Thay đổi" onClick={() => setShowPayment(true)} arrow />
-            <Row icon="👛" label="Ví Giao Nhanh" sub="Số dư: 50.000đ" onClick={() => { window.location.href = "/wallet" }} arrow />
-            <Row icon="🎖" label="Điểm tích lũy" sub="1.240 điểm · Xem lịch sử" onClick={() => { window.location.href = "/wallet/points" }} arrow />
-            <Row icon="🎟" label="Kho voucher" sub="3 voucher khả dụng" onClick={() => { window.location.href = "/vouchers" }} arrow />
+            <Row
+              icon="👛"
+              label="Ví Giao Nhanh"
+              sub={dataLoading ? "Đang tải..." : `Số dư: ${fmt(walletBalance)}`}
+              onClick={() => { window.location.href = "/wallet" }}
+              arrow
+            />
+            <Row
+              icon="🎖"
+              label="Điểm tích lũy"
+              sub={dataLoading ? "Đang tải..." : `${loyaltyPoints.toLocaleString("vi-VN")} điểm · Xem lịch sử`}
+              onClick={() => { window.location.href = "/wallet/points" }}
+              arrow
+            />
+            <Row icon="🎟" label="Kho voucher" sub="Xem tất cả mã giảm giá" onClick={() => { window.location.href = "/vouchers" }} arrow />
           </SectionCard>
 
           {/* PRIVACY */}
@@ -430,8 +498,8 @@ export default function CustomerSettingsPage() {
           {/* SUPPORT */}
           <SectionCard title="Hỗ trợ">
             <Row icon="❓" label="Câu hỏi thường gặp" sub="FAQ · Hướng dẫn sử dụng" onClick={() => fire("Đang mở trang FAQ...")} arrow />
-            <Row icon="💬" label="Chat với hỗ trợ" sub="Phản hồi trong vòng 30 phút" onClick={() => fire("Đang kết nối tư vấn viên...")} arrow />
-            <Row icon="⚠️" label="Báo cáo vấn đề" sub="Đơn hàng sai, tài xế vi phạm..." onClick={() => fire("Đang mở form báo cáo...")} arrow />
+            <Row icon="💬" label="Chat với hỗ trợ" sub="Phản hồi trong vòng 30 phút" onClick={() => window.open("https://zalo.me/0000000000", "_blank")} arrow />
+            <Row icon="⚠️" label="Báo cáo vấn đề" sub="Đơn hàng sai, tài xế vi phạm..." onClick={() => window.open("https://zalo.me/0000000000", "_blank")} arrow />
             <Row icon="⭐" label="Đánh giá ứng dụng" sub="Để lại nhận xét trên trình duyệt" onClick={() => fire("Cảm ơn bạn đã đánh giá!")} arrow />
           </SectionCard>
 
@@ -454,9 +522,9 @@ export default function CustomerSettingsPage() {
 
       {/* sheets */}
       <AnimatePresence>
-        {showPw       && <PwSheet onClose={() => setShowPw(false)} />}
+        {showPw       && <PwSheet onClose={() => { setShowPw(false); fire("Đã đổi mật khẩu thành công") }} />}
         {showSessions && <SessionSheet onClose={() => setShowSessions(false)} />}
-        {showPayment  && <PaymentSheet onClose={() => setShowPayment(false)} />}
+        {showPayment  && <PaymentSheet onClose={() => setShowPayment(false)} walletBalance={walletBalance} />}
       </AnimatePresence>
 
       {/* delete confirm */}

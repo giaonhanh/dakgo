@@ -109,6 +109,13 @@ export default function AdminUsersPage() {
   const [pointsSaving,  setPointsSaving]  = useState(false)
   const [pointsMsg,     setPointsMsg]     = useState("")
 
+  // ── Wallet (xu) modal ──
+  const [walletModal,   setWalletModal]   = useState<{ id: string; name: string; role: "customer" | "driver"; balance: number } | null>(null)
+  const [walletAmount,  setWalletAmount]  = useState("")
+  const [walletNote,    setWalletNote]    = useState("")
+  const [walletSaving,  setWalletSaving]  = useState(false)
+  const [walletMsg,     setWalletMsg]     = useState("")
+
   // ── Drivers ──
   const [drivers,        setDrivers]        = useState<DriverRow[]>([])
   const [driversLoaded,  setDriversLoaded]  = useState(false)
@@ -326,7 +333,7 @@ export default function AdminUsersPage() {
   const addPoints = async () => {
     if (!pointsModal) return
     const amount = parseInt(pointsAmount)
-    if (!amount || isNaN(amount)) { setPointsMsg("Vui lòng nhập số xu hợp lệ"); return }
+    if (!amount || isNaN(amount)) { setPointsMsg("Vui lòng nhập số điểm hợp lệ"); return }
     const reason = pointsReason === "Tự nhập" ? pointsCustom.trim() : pointsReason
     if (!reason) { setPointsMsg("Vui lòng nhập lý do"); return }
     setPointsSaving(true); setPointsMsg("")
@@ -342,14 +349,53 @@ export default function AdminUsersPage() {
     const verb  = amount > 0 ? "được cộng" : "bị trừ"
     await supabase.from("notifications").insert({
       user_id: pointsModal.id, type: "system",
-      title: `${emoji} ${Math.abs(amount).toLocaleString("vi-VN")} xu ${verb}`,
-      body: `Lý do: ${reason}. Số xu hiện tại: ${newPoints.toLocaleString("vi-VN")} xu.`,
+      title: `${emoji} ${Math.abs(amount).toLocaleString("vi-VN")} điểm ${verb}`,
+      body: `Lý do: ${reason}. Điểm tích lũy hiện tại: ${newPoints.toLocaleString("vi-VN")} điểm.`,
     })
     setUsers(p => p.map(u => u.id === pointsModal.id ? { ...u, loyaltyPoints: newPoints, tier: newTier } : u))
     if (selected?.id === pointsModal.id) setSelected(s => s ? { ...s, loyaltyPoints: newPoints, tier: newTier } : s)
-    setPointsMsg(`✅ ${amount > 0 ? "Cộng" : "Trừ"} ${Math.abs(amount)} xu thành công · Tổng: ${newPoints.toLocaleString("vi-VN")}`)
+    setPointsMsg(`✅ ${amount > 0 ? "Cộng" : "Trừ"} ${Math.abs(amount)} điểm thành công · Tổng: ${newPoints.toLocaleString("vi-VN")}`)
     setTimeout(() => { setPointsModal(null); setPointsAmount(""); setPointsMsg(""); setPointsCustom("") }, 1800)
     setPointsSaving(false)
+  }
+
+  const adjustWallet = async () => {
+    if (!walletModal) return
+    const amount = parseInt(walletAmount)
+    if (!amount || isNaN(amount)) { setWalletMsg("Vui lòng nhập số xu hợp lệ"); return }
+    if (!walletNote.trim()) { setWalletMsg("Vui lòng nhập ghi chú"); return }
+    setWalletSaving(true); setWalletMsg("")
+    const supabase = createClient()
+    const wType = walletModal.role === "driver" ? "driver" : "customer"
+    const { data: cur } = await supabase.from("wallets").select("id, balance").eq("user_id", walletModal.id).eq("type", wType).single()
+    const curBalance = cur?.balance ?? 0
+    const newBalance = Math.max(0, curBalance + amount)
+    if (!cur) {
+      await supabase.from("wallets").insert({ user_id: walletModal.id, type: wType, balance: newBalance })
+    } else {
+      await supabase.from("wallets").update({ balance: newBalance, updated_at: new Date().toISOString() }).eq("id", cur.id)
+      if (cur.id) {
+        await supabase.from("transactions").insert({
+          wallet_id: cur.id,
+          type: amount > 0 ? "topup" : "withdrawal",
+          amount: Math.abs(amount),
+          balance_after: newBalance,
+          note: `[Admin] ${walletNote.trim()}`,
+        })
+      }
+    }
+    const emoji = amount > 0 ? "💰" : "💸"
+    const verb  = amount > 0 ? "được nạp" : "bị trừ"
+    await supabase.from("notifications").insert({
+      user_id: walletModal.id, type: "system",
+      title: `${emoji} ${Math.abs(amount).toLocaleString("vi-VN")}đ ${verb} vào ví`,
+      body: `Lý do: ${walletNote.trim()}. Số dư hiện tại: ${newBalance.toLocaleString("vi-VN")}đ.`,
+    })
+    setUsers(p => p.map(u => u.id === walletModal.id ? { ...u, walletBalance: newBalance } : u))
+    if (selected?.id === walletModal.id) setSelected(s => s ? { ...s, walletBalance: newBalance } : s)
+    setWalletMsg(`✅ ${amount > 0 ? "Nạp" : "Rút"} ${Math.abs(amount).toLocaleString("vi-VN")}đ · Số dư: ${newBalance.toLocaleString("vi-VN")}đ`)
+    setTimeout(() => { setWalletModal(null); setWalletAmount(""); setWalletNote(""); setWalletMsg("") }, 1800)
+    setWalletSaving(false)
   }
 
   const resetPassword = async () => {
@@ -654,8 +700,8 @@ export default function AdminUsersPage() {
               <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 13, overflow: "hidden" }}>
                 <div style={{ overflowX: "auto" }}>
                   <div style={{ minWidth: 720 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "42px 1.6fr 90px 90px 80px 60px 48px 72px 80px", gap: 8, padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
-                      {["", "Tên / SĐT", "Phương tiện", "Biển số", "Trạng thái", "Rating", "Đơn", "Hoa hồng", "Ngày tham gia"].map(h => (
+                    <div style={{ display: "grid", gridTemplateColumns: "42px 1.6fr 90px 90px 80px 60px 48px 72px 80px 54px", gap: 8, padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
+                      {["", "Tên / SĐT", "Phương tiện", "Biển số", "Trạng thái", "Rating", "Đơn", "Hoa hồng", "Ngày tham gia", "Ví xu"].map(h => (
                         <div key={h} style={{ color: "rgba(144,128,176,0.4)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>{h}</div>
                       ))}
                     </div>
@@ -667,7 +713,7 @@ export default function AdminUsersPage() {
                       const ds = DRIVER_STATUS_CFG[d.driverStatus]
                       return (
                         <div key={d.id} className="user-row"
-                          style={{ display: "grid", gridTemplateColumns: "42px 1.6fr 90px 90px 80px 60px 48px 72px 80px", gap: 8, padding: "10px 14px", alignItems: "center", borderBottom: idx < shownDrivers.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", transition: "all 0.15s" }}>
+                          style={{ display: "grid", gridTemplateColumns: "42px 1.6fr 90px 90px 80px 60px 48px 72px 80px 54px", gap: 8, padding: "10px 14px", alignItems: "center", borderBottom: idx < shownDrivers.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", transition: "all 0.15s" }}>
                           <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, position: "relative" }}>
                             🛵
                             {d.isApproved && <div style={{ position: "absolute", bottom: -2, right: -2, width: 11, height: 11, borderRadius: "50%", background: d.driverStatus === "online" ? "#3ecf6e" : "#9080b0", border: "1.5px solid #06050a" }} />}
@@ -691,6 +737,9 @@ export default function AdminUsersPage() {
                             <CommCell id={d.id} rate={d.commissionRate} inline={driverInline} setInline={setDriverInline} onSave={saveDriverCommission} saving={driverSaving} />
                           </div>
                           <div style={{ color: "rgba(144,128,176,0.45)", fontSize: 9 }}>{d.joinedDate}</div>
+                          <div onClick={e => e.stopPropagation()}>
+                            <button className="action-btn" onClick={() => { setWalletModal({ id: d.id, name: d.fullName, role: "driver", balance: users.find(u => u.id === d.id)?.walletBalance ?? 0 }); setWalletAmount(""); setWalletNote(""); setWalletMsg("") }} style={{ padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.2)", color: "#3ecf6e", fontSize: 8, fontWeight: 700, whiteSpace: "nowrap" }}>💰 Xu</button>
+                          </div>
                         </div>
                       )
                     })}
@@ -838,16 +887,25 @@ export default function AdminUsersPage() {
                       <div style={{ color: "rgba(255,100,100,0.8)", fontSize: 10, lineHeight: 1.5 }}>{selected.blacklistReason}</div>
                     </div>
                   )}
-                  {[["Số điện thoại", selected.phone], ["Ngày đăng ký", selected.registeredDate], ["Trạng thái", STATUS_CFG[selected.status].label], ["Vai trò", ROLE_CFG[selected.role].label]].map(([k, v]) => (
+                  {([
+                    ["Số điện thoại", selected.phone],
+                    ["Ngày đăng ký", selected.registeredDate],
+                    ["Trạng thái", STATUS_CFG[selected.status].label],
+                    ["Vai trò", ROLE_CFG[selected.role].label],
+                    ...(selected.role === "customer" ? [["Số dư ví", fmt(selected.walletBalance)]] : []),
+                  ] as [string, string][]).map(([k, v]) => (
                     <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", gap: 12 }}>
                       <span style={{ color: "rgba(144,128,176,0.5)", fontSize: 9 }}>{k}</span>
-                      <span style={{ color: "#f0eaff", fontSize: 9, fontWeight: 600, textAlign: "right" }}>{v}</span>
+                      <span style={{ color: k === "Số dư ví" ? "#3ecf6e" : "#f0eaff", fontSize: 9, fontWeight: 600, textAlign: "right" }}>{v}</span>
                     </div>
                   ))}
                 </div>
                 <div style={{ padding: "12px 18px 18px", borderTop: "1px solid rgba(255,255,255,0.07)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
                   {selected.role === "customer" && (
-                    <button onClick={() => { setPointsModal(selected); setPointsAmount(""); setPointsMsg(""); setPointsCustom(""); setPointsReason("Sự kiện") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.25)", color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>💰 Nạp / Rút xu</button>
+                    <>
+                      <button onClick={() => { setWalletModal({ id: selected.id, name: selected.fullName, role: "customer", balance: selected.walletBalance }); setWalletAmount(""); setWalletNote(""); setWalletMsg("") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.25)", color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>💰 Nạp / Rút xu Giao Nhanh</button>
+                      <button onClick={() => { setPointsModal(selected); setPointsAmount(""); setPointsMsg(""); setPointsCustom(""); setPointsReason("Sự kiện") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(180,100,255,0.08)", border: "1px solid rgba(180,100,255,0.25)", color: "#b464ff", fontSize: 11, fontWeight: 700 }}>⭐ Nạp / Rút điểm tích lũy</button>
+                    </>
                   )}
                   {selected.role !== "admin" && (
                     <button onClick={() => { setResetModal(selected); setNewPassword(""); setResetMsg("") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.25)", color: "#FF8C00", fontSize: 11, fontWeight: 700 }}>🔑 Đặt lại mật khẩu</button>
@@ -868,7 +926,7 @@ export default function AdminUsersPage() {
             <>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setResetModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 70, backdropFilter: "blur(6px)" }} />
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
-                style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, background: "#0d0b19", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 18, padding: "22px 20px 18px", zIndex: 71 }}>
+                style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100svh - 48px)", overflowY: "auto", background: "#0d0b19", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 18, padding: "22px 20px 18px", zIndex: 71 }}>
                 <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>🔑</div>
                 <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>Đặt lại mật khẩu</div>
                 <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 10, textAlign: "center", marginBottom: 16 }}>{resetModal.fullName} · {resetModal.phone}</div>
@@ -890,17 +948,17 @@ export default function AdminUsersPage() {
             <>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPointsModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 70, backdropFilter: "blur(6px)" }} />
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
-                style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 340, background: "#0d0b19", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 18, padding: "22px 20px 18px", zIndex: 71 }}>
-                <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>💰</div>
-                <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>Nạp / Rút xu</div>
+                style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 340, maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100svh - 48px)", overflowY: "auto", background: "#0d0b19", border: "1px solid rgba(180,100,255,0.25)", borderRadius: 18, padding: "22px 20px 18px", zIndex: 71 }}>
+                <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>⭐</div>
+                <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>Nạp / Rút điểm tích lũy</div>
                 <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 10, textAlign: "center", marginBottom: 16 }}>
-                  {pointsModal.fullName} · Hiện có {pointsModal.loyaltyPoints.toLocaleString("vi-VN")} xu
+                  {pointsModal.fullName} · Hiện có {pointsModal.loyaltyPoints.toLocaleString("vi-VN")} điểm
                 </div>
 
                 {/* Amount */}
-                <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 9, marginBottom: 5 }}>Số xu (+ để nạp, - để rút)</div>
+                <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 9, marginBottom: 5 }}>Số điểm (+ để cộng, - để trừ)</div>
                 <input type="number" value={pointsAmount} onChange={e => setPointsAmount(e.target.value)} placeholder="VD: 100 hoặc -50"
-                  style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 10, padding: "10px 13px", color: "#3ecf6e", fontSize: 14, fontFamily: "Lexend", marginBottom: 12, boxSizing: "border-box", textAlign: "center", fontWeight: 800 }} />
+                  style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(180,100,255,0.25)", borderRadius: 10, padding: "10px 13px", color: "#b464ff", fontSize: 14, fontFamily: "Lexend", marginBottom: 12, boxSizing: "border-box", textAlign: "center", fontWeight: 800 }} />
 
                 {/* Reason */}
                 <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 9, marginBottom: 6 }}>Lý do</div>
@@ -920,7 +978,39 @@ export default function AdminUsersPage() {
 
                 <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                   <button onClick={() => setPointsModal(null)} style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(144,128,176,0.6)", fontSize: 11, fontWeight: 600 }}>Hủy</button>
-                  <button onClick={addPoints} disabled={pointsSaving} style={{ flex: 2, height: 40, borderRadius: 10, cursor: pointsSaving ? "default" : "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.12)", border: "1px solid rgba(62,207,110,0.3)", color: "#3ecf6e", fontSize: 11, fontWeight: 800, opacity: pointsSaving ? 0.6 : 1 }}>{pointsSaving ? "Đang xử lý..." : "✅ Xác nhận"}</button>
+                  <button onClick={addPoints} disabled={pointsSaving} style={{ flex: 2, height: 40, borderRadius: 10, cursor: pointsSaving ? "default" : "pointer", fontFamily: "Lexend", background: "rgba(180,100,255,0.12)", border: "1px solid rgba(180,100,255,0.3)", color: "#b464ff", fontSize: 11, fontWeight: 800, opacity: pointsSaving ? 0.6 : 1 }}>{pointsSaving ? "Đang xử lý..." : "✅ Xác nhận"}</button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ── Wallet (xu) Modal ── */}
+        <AnimatePresence>
+          {walletModal && (
+            <>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setWalletModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 70, backdropFilter: "blur(6px)" }} />
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
+                style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 340, maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100svh - 48px)", overflowY: "auto", background: "#0d0b19", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 18, padding: "22px 20px 18px", zIndex: 71 }}>
+                <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>💰</div>
+                <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>Nạp / Rút xu Giao Nhanh</div>
+                <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 10, textAlign: "center", marginBottom: 16 }}>
+                  {walletModal.name} · {walletModal.role === "driver" ? "Tài xế" : "Khách hàng"} · Số dư: {walletModal.balance.toLocaleString("vi-VN")}đ
+                </div>
+
+                <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 9, marginBottom: 5 }}>Số tiền (+ để nạp, - để rút)</div>
+                <input type="number" value={walletAmount} onChange={e => setWalletAmount(e.target.value)} placeholder="VD: 50000 hoặc -20000"
+                  style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 10, padding: "10px 13px", color: "#3ecf6e", fontSize: 14, fontFamily: "Lexend", marginBottom: 12, boxSizing: "border-box", textAlign: "center", fontWeight: 800 }} />
+
+                <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 9, marginBottom: 6 }}>Ghi chú (bắt buộc)</div>
+                <input value={walletNote} onChange={e => setWalletNote(e.target.value)} placeholder="VD: Thưởng mời bạn bè, Hoàn tiền..."
+                  style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: "8px 13px", color: "#f0eaff", fontSize: 11, fontFamily: "Lexend", marginBottom: 14, boxSizing: "border-box" }} />
+
+                {walletMsg && <div style={{ fontSize: 10, color: walletMsg.startsWith("✅") ? "#3ecf6e" : "#ff6060", marginBottom: 10, textAlign: "center", background: walletMsg.startsWith("✅") ? "rgba(62,207,110,0.08)" : "rgba(255,64,64,0.08)", borderRadius: 8, padding: "6px 10px" }}>{walletMsg}</div>}
+
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <button onClick={() => setWalletModal(null)} style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(144,128,176,0.6)", fontSize: 11, fontWeight: 600 }}>Hủy</button>
+                  <button onClick={adjustWallet} disabled={walletSaving} style={{ flex: 2, height: 40, borderRadius: 10, cursor: walletSaving ? "default" : "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.12)", border: "1px solid rgba(62,207,110,0.3)", color: "#3ecf6e", fontSize: 11, fontWeight: 800, opacity: walletSaving ? 0.6 : 1 }}>{walletSaving ? "Đang xử lý..." : "✅ Xác nhận"}</button>
                 </div>
               </motion.div>
             </>
@@ -933,7 +1023,7 @@ export default function AdminUsersPage() {
             <>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setConfirmAction(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 70, backdropFilter: "blur(6px)" }} />
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
-                style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, background: "#0d0b19", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, padding: "22px 20px 18px", zIndex: 71 }}>
+                style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, maxWidth: "calc(100vw - 32px)", background: "#0d0b19", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, padding: "22px 20px 18px", zIndex: 71 }}>
                 {(() => {
                   const isLock = confirmAction.type === "lock"
                   const u      = users.find(x => x.id === confirmAction.id)
