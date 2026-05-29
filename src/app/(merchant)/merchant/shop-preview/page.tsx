@@ -302,12 +302,12 @@ export default function ShopPreviewPage() {
             </div>
           </div>
 
-          {/* Stats row */}
-          <div style={{display:"flex",gap:8,marginBottom:10}}>
+          {/* Stats row: chuẩn bị → giờ mở → đánh giá */}
+          <div style={{display:"flex",gap:8,marginBottom:4}}>
             {[
-              { icon:"⭐", val: rating.toFixed(1), sub:`(${totalReviews} đánh giá)` },
-              { icon:"⏱️", val:`${prepTime} phút`, sub:"chế biến" },
-              { icon:"🕐", val: todayClosed ? "Hôm nay nghỉ" : todayLabel, sub:"giờ mở" },
+              { icon:"⏱️", val:`${prepTime} phút`, sub:"Thời gian chuẩn bị" },
+              { icon:"🕐", val: todayClosed ? "Hôm nay nghỉ" : todayLabel, sub:"Thời gian mở cửa" },
+              { icon:"⭐", val: rating.toFixed(1), sub:`${totalReviews} đánh giá` },
             ].map(s => (
               <div key={s.icon} style={{flex:1,textAlign:"center",
                 background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",
@@ -316,22 +316,6 @@ export default function ShopPreviewPage() {
                 <div style={{color: todayClosed && s.icon==="🕐" ? "#ff4040" : "#f8f0e0",
                   fontSize:10,fontWeight:700,lineHeight:1.2}}>{s.val}</div>
                 <div style={{color:"#6a5a40",fontSize:7.5}}>{s.sub}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Info strip */}
-          <div style={{display:"flex",gap:8,marginBottom:4}}>
-            {[
-              { label:"Phí ship", val:fmt(15000), color:"#FF8C00" },
-              { label:"Đơn tối thiểu", val:fmt(30000), color:"#b0956a" },
-              { label:"Trạng thái", val:isOpen?"Đang mở":"Đã đóng", color:isOpen?"#3ecf6e":"#ff4040" },
-            ].map(d => (
-              <div key={d.label} style={{flex:1,textAlign:"center",
-                background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.05)",
-                borderRadius:10,padding:"6px 4px"}}>
-                <div style={{color:d.color,fontSize:11,fontWeight:700}}>{d.val}</div>
-                <div style={{color:"#6a5a40",fontSize:7.5}}>{d.label}</div>
               </div>
             ))}
           </div>

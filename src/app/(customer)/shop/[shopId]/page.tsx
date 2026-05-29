@@ -572,17 +572,17 @@ export default function ShopPage() {
                 </div>
               </div>
 
-              {/* Stats row */}
-              <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+              {/* Stats row: chuẩn bị → giờ mở → đánh giá */}
+              <div style={{ display:"flex", gap:8, marginBottom:4 }}>
                 {[
-                  { icon:"⭐", val: shop.rating?.toFixed(1) ?? "Mới", sub:`(${shop.rating_count ?? 0} đánh giá)` },
-                  { icon:"⏱️", val: shop.prep_time ?? "10–15 phút", sub:"chế biến" },
+                  { icon:"⏱️", val: shop.prep_time ?? "10–15 phút", sub:"Thời gian chuẩn bị" },
                   { icon:"🕐", val: (() => {
                       if (!shop.opening_hours) return "07:00–21:00"
                       const hours = shop.opening_hours as { open?: string; close?: string } | null
                       if (hours?.open && hours?.close) return `${hours.open}–${hours.close}`
                       return "07:00–21:00"
-                    })(), sub:"giờ mở" },
+                    })(), sub:"Thời gian mở cửa" },
+                  { icon:"⭐", val: shop.rating?.toFixed(1) ?? "Mới", sub:`${shop.rating_count ?? 0} đánh giá` },
                 ].map(s => (
                   <div key={s.icon} style={{ flex:1, textAlign:"center",
                     background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)",
@@ -590,22 +590,6 @@ export default function ShopPage() {
                     <div style={{ fontSize:15, marginBottom:2 }}>{s.icon}</div>
                     <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:700, lineHeight:1.2 }}>{s.val}</div>
                     <div style={{ color:"#6a5a40", fontSize:7.5 }}>{s.sub}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Info strip */}
-              <div style={{ display:"flex", gap:8, marginBottom:4 }}>
-                {[
-                  { label:"Phí ship", val:fmt(15000), color:"#FF8C00" },
-                  { label:"Đơn tối thiểu", val:fmt(30000), color:"#b0956a" },
-                  { label:"Trạng thái", val: shop.is_open ? "Đang mở" : "Đã đóng", color: shop.is_open ? "#3ecf6e" : "#ff4040" },
-                ].map(d => (
-                  <div key={d.label} style={{ flex:1, textAlign:"center",
-                    background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.05)",
-                    borderRadius:10, padding:"6px 4px" }}>
-                    <div style={{ color:d.color, fontSize:11, fontWeight:700 }}>{d.val}</div>
-                    <div style={{ color:"#6a5a40", fontSize:7.5 }}>{d.label}</div>
                   </div>
                 ))}
               </div>
