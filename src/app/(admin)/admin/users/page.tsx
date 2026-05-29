@@ -102,6 +102,12 @@ export default function AdminUsersPage() {
   const [newPassword,   setNewPassword]   = useState("")
   const [resetSaving,   setResetSaving]   = useState(false)
   const [resetMsg,      setResetMsg]      = useState("")
+  const [pointsModal,   setPointsModal]   = useState<AppUser | null>(null)
+  const [pointsAmount,  setPointsAmount]  = useState("")
+  const [pointsReason,  setPointsReason]  = useState<"Sự kiện" | "Sinh nhật" | "Event" | "Tự nhập">("Sự kiện")
+  const [pointsCustom,  setPointsCustom]  = useState("")
+  const [pointsSaving,  setPointsSaving]  = useState(false)
+  const [pointsMsg,     setPointsMsg]     = useState("")
 
   // ── Drivers ──
   const [drivers,        setDrivers]        = useState<DriverRow[]>([])
@@ -225,18 +231,15 @@ export default function AdminUsersPage() {
     const supabase = createClient()
     const { data: rows } = await supabase
       .from("drivers")
-      .select("id, vehicle_type, license_plate, status, is_approved, rating_avg, total_trips, commission_rate, created_at")
+      .select("id, vehicle_type, license_plate, status, is_approved, rating_avg, total_trips, commission_rate, created_at, profiles(full_name, phone)")
       .order("created_at", { ascending: false })
     if (!rows || rows.length === 0) { setDriversLoading(false); setDriversLoaded(true); return }
-    const ids = rows.map(r => r.id)
-    const { data: profiles } = await supabase.from("profiles").select("id, full_name, phone").in("id", ids)
-    const profMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p]))
     setDrivers(rows.map(r => {
-      const p = profMap[r.id] ?? {}
+      const p = (Array.isArray(r.profiles) ? r.profiles[0] : r.profiles) as { full_name?: string; phone?: string } | null
       return {
         id: r.id,
-        fullName: (p as { full_name?: string }).full_name ?? "Tài xế",
-        phone: (p as { phone?: string }).phone ?? "—",
+        fullName: p?.full_name ?? "Tài xế",
+        phone: p?.phone ?? "—",
         vehicleType: r.vehicle_type ?? "Xe máy",
         licensePlate: r.license_plate ?? "—",
         driverStatus: (r.status ?? "offline") as DriverStatus,
@@ -320,6 +323,35 @@ export default function AdminUsersPage() {
     if (confirmAction.type === "unlock") await unlockUser(confirmAction.id)
     setConfirmAction(null); setSelected(null)
   }
+  const addPoints = async () => {
+    if (!pointsModal) return
+    const amount = parseInt(pointsAmount)
+    if (!amount || isNaN(amount)) { setPointsMsg("Vui lòng nhập số xu hợp lệ"); return }
+    const reason = pointsReason === "Tự nhập" ? pointsCustom.trim() : pointsReason
+    if (!reason) { setPointsMsg("Vui lòng nhập lý do"); return }
+    setPointsSaving(true); setPointsMsg("")
+    const supabase = createClient()
+    const { data: cur } = await supabase.from("loyalty_points").select("total_points").eq("user_id", pointsModal.id).single()
+    const newPoints = Math.max(0, (cur?.total_points ?? 0) + amount)
+    let newTier: TierLevel = "bronze"
+    if (newPoints >= 2000) newTier = "platinum"
+    else if (newPoints >= 1000) newTier = "gold"
+    else if (newPoints >= 500)  newTier = "silver"
+    await supabase.from("loyalty_points").upsert({ user_id: pointsModal.id, total_points: newPoints, tier: newTier }, { onConflict: "user_id" })
+    const emoji = amount > 0 ? "🎉" : "💸"
+    const verb  = amount > 0 ? "được cộng" : "bị trừ"
+    await supabase.from("notifications").insert({
+      user_id: pointsModal.id, type: "system",
+      title: `${emoji} ${Math.abs(amount).toLocaleString("vi-VN")} xu ${verb}`,
+      body: `Lý do: ${reason}. Số xu hiện tại: ${newPoints.toLocaleString("vi-VN")} xu.`,
+    })
+    setUsers(p => p.map(u => u.id === pointsModal.id ? { ...u, loyaltyPoints: newPoints, tier: newTier } : u))
+    if (selected?.id === pointsModal.id) setSelected(s => s ? { ...s, loyaltyPoints: newPoints, tier: newTier } : s)
+    setPointsMsg(`✅ ${amount > 0 ? "Cộng" : "Trừ"} ${Math.abs(amount)} xu thành công · Tổng: ${newPoints.toLocaleString("vi-VN")}`)
+    setTimeout(() => { setPointsModal(null); setPointsAmount(""); setPointsMsg(""); setPointsCustom("") }, 1800)
+    setPointsSaving(false)
+  }
+
   const resetPassword = async () => {
     if (!resetModal || newPassword.length < 6) { setResetMsg("Mật khẩu phải ít nhất 6 ký tự"); return }
     setResetSaving(true); setResetMsg("")
@@ -392,8 +424,8 @@ export default function AdminUsersPage() {
   const totalCustSpent    = users.filter(u => u.role === "customer").reduce((s, u) => s + u.totalSpent, 0)
 
   const shownUsers = users
+    .filter(u => u.role === "customer")
     .filter(u => filterStatus === "all" || u.status === filterStatus)
-    .filter(u => filterRole   === "all" || u.role   === filterRole)
     .filter(u => !search || u.fullName.toLowerCase().includes(search.toLowerCase()) || u.phone.includes(search))
 
   const shownDrivers = drivers
@@ -526,17 +558,6 @@ export default function AdminUsersPage() {
                   ] as const).map(tab => (
                     <button key={tab.key} onClick={() => setFilterStatus(tab.key)} style={{ padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "Lexend", fontSize: 9, fontWeight: filterStatus === tab.key ? 700 : 400, background: filterStatus === tab.key ? `${tab.c}18` : "rgba(255,255,255,0.04)", border: `1px solid ${filterStatus === tab.key ? tab.c + "55" : "rgba(255,255,255,0.07)"}`, color: filterStatus === tab.key ? tab.c : "rgba(144,128,176,0.6)" }}>{tab.label}</button>
                   ))}
-                </div>
-                <div style={{ display: "flex", gap: 5 }}>
-                  <span style={{ color: "rgba(144,128,176,0.4)", fontSize: 8, alignSelf: "center", marginRight: 2 }}>Vai trò:</span>
-                  {(["all", "customer", "merchant", "driver", "admin"] as const).map(r => {
-                    const cfg = r === "all" ? null : ROLE_CFG[r]
-                    return (
-                      <button key={r} onClick={() => setFilterRole(r)} style={{ padding: "3px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "Lexend", fontSize: 8, fontWeight: filterRole === r ? 700 : 400, background: filterRole === r ? (cfg?.bg ?? "rgba(255,107,0,0.1)") : "rgba(255,255,255,0.04)", border: `1px solid ${filterRole === r ? (cfg?.color ?? "#FF8C00") + "55" : "rgba(255,255,255,0.07)"}`, color: filterRole === r ? (cfg?.color ?? "#FF8C00") : "rgba(144,128,176,0.55)" }}>
-                        {r === "all" ? "Tất cả" : `${cfg!.icon} ${cfg!.label}`}
-                      </button>
-                    )
-                  })}
                 </div>
               </div>
 
@@ -826,6 +847,9 @@ export default function AdminUsersPage() {
                   ))}
                 </div>
                 <div style={{ padding: "12px 18px 18px", borderTop: "1px solid rgba(255,255,255,0.07)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {selected.role === "customer" && (
+                    <button onClick={() => { setPointsModal(selected); setPointsAmount(""); setPointsMsg(""); setPointsCustom(""); setPointsReason("Sự kiện") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.25)", color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>💰 Nạp / Rút xu</button>
+                  )}
                   {selected.role !== "admin" && (
                     <button onClick={() => { setResetModal(selected); setNewPassword(""); setResetMsg("") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.25)", color: "#FF8C00", fontSize: 11, fontWeight: 700 }}>🔑 Đặt lại mật khẩu</button>
                   )}
@@ -855,6 +879,49 @@ export default function AdminUsersPage() {
                 <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                   <button onClick={() => setResetModal(null)} style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(144,128,176,0.6)", fontSize: 11, fontWeight: 600 }}>Hủy</button>
                   <button onClick={resetPassword} disabled={resetSaving || newPassword.length < 6} style={{ flex: 1, height: 40, borderRadius: 10, cursor: resetSaving ? "default" : "pointer", fontFamily: "Lexend", background: "rgba(255,107,0,0.12)", border: "1px solid rgba(255,107,0,0.3)", color: "#FF8C00", fontSize: 11, fontWeight: 800, opacity: newPassword.length < 6 ? 0.4 : 1 }}>{resetSaving ? "Đang lưu..." : "✅ Xác nhận"}</button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ── Points Modal ── */}
+        <AnimatePresence>
+          {pointsModal && (
+            <>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPointsModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 70, backdropFilter: "blur(6px)" }} />
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
+                style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 340, background: "#0d0b19", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 18, padding: "22px 20px 18px", zIndex: 71 }}>
+                <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>💰</div>
+                <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>Nạp / Rút xu</div>
+                <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 10, textAlign: "center", marginBottom: 16 }}>
+                  {pointsModal.fullName} · Hiện có {pointsModal.loyaltyPoints.toLocaleString("vi-VN")} xu
+                </div>
+
+                {/* Amount */}
+                <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 9, marginBottom: 5 }}>Số xu (+ để nạp, - để rút)</div>
+                <input type="number" value={pointsAmount} onChange={e => setPointsAmount(e.target.value)} placeholder="VD: 100 hoặc -50"
+                  style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 10, padding: "10px 13px", color: "#3ecf6e", fontSize: 14, fontFamily: "Lexend", marginBottom: 12, boxSizing: "border-box", textAlign: "center", fontWeight: 800 }} />
+
+                {/* Reason */}
+                <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 9, marginBottom: 6 }}>Lý do</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
+                  {(["Sự kiện", "Sinh nhật", "Event", "Tự nhập"] as const).map(r => (
+                    <button key={r} onClick={() => setPointsReason(r)} style={{ height: 32, borderRadius: 8, cursor: "pointer", fontFamily: "Lexend", fontSize: 10, fontWeight: pointsReason === r ? 700 : 400, background: pointsReason === r ? "rgba(62,207,110,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${pointsReason === r ? "rgba(62,207,110,0.4)" : "rgba(255,255,255,0.08)"}`, color: pointsReason === r ? "#3ecf6e" : "rgba(144,128,176,0.6)" }}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                {pointsReason === "Tự nhập" && (
+                  <input value={pointsCustom} onChange={e => setPointsCustom(e.target.value)} placeholder="Nhập lý do..."
+                    style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: "8px 13px", color: "#f0eaff", fontSize: 11, fontFamily: "Lexend", marginBottom: 10, boxSizing: "border-box" }} />
+                )}
+
+                {pointsMsg && <div style={{ fontSize: 10, color: pointsMsg.startsWith("✅") ? "#3ecf6e" : "#ff6060", marginBottom: 10, textAlign: "center", background: pointsMsg.startsWith("✅") ? "rgba(62,207,110,0.08)" : "rgba(255,64,64,0.08)", borderRadius: 8, padding: "6px 10px" }}>{pointsMsg}</div>}
+
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <button onClick={() => setPointsModal(null)} style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(144,128,176,0.6)", fontSize: 11, fontWeight: 600 }}>Hủy</button>
+                  <button onClick={addPoints} disabled={pointsSaving} style={{ flex: 2, height: 40, borderRadius: 10, cursor: pointsSaving ? "default" : "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.12)", border: "1px solid rgba(62,207,110,0.3)", color: "#3ecf6e", fontSize: 11, fontWeight: 800, opacity: pointsSaving ? 0.6 : 1 }}>{pointsSaving ? "Đang xử lý..." : "✅ Xác nhận"}</button>
                 </div>
               </motion.div>
             </>

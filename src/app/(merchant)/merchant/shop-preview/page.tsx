@@ -258,134 +258,138 @@ export default function ShopPreviewPage() {
           <div style={{position:"absolute",bottom:0,left:0,right:0,height:100,background:"linear-gradient(to top,#080806,transparent)"}} />
         </div>
 
-        {/* ── Shop info ── */}
-        <div style={{padding:"0 16px",marginTop:-40,position:"relative",zIndex:10}}>
-          <div style={{display:"flex",alignItems:"flex-end",gap:14,marginBottom:14}}>
-            {/* Logo */}
-            <div onClick={() => logoRef.current?.click()}
-              style={{width:76,height:76,borderRadius:18,border:"3px solid rgba(255,107,0,0.4)",background:"rgba(8,8,6,0.9)",flexShrink:0,cursor:"pointer",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,boxShadow:"0 4px 20px rgba(0,0,0,0.5)"}}>
-              {logoUrl
-                ? <img src={logoUrl} alt="Logo" style={{width:"100%",height:"100%",objectFit:"cover"}} />
-                : <div style={{textAlign:"center"}}><div style={{fontSize:28}}>🏪</div><div style={{color:"#FF8C00",fontSize:7,fontWeight:700}}>300×300px</div></div>
-              }
-            </div>
-
-            {/* Name + status */}
-            <div style={{flex:1,paddingBottom:4}}>
-              <div style={{color:"#f8f0e0",fontSize:18,fontWeight:800,marginBottom:4}}>
+        {/* ── Shop info card (glass, overlaps hero) ── */}
+        <div style={{padding:"0 14px"}}>
+          <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:16,padding:"14px",marginTop:-24,position:"relative",zIndex:10}}>
+            <div style={{marginBottom:10}}>
+              <div style={{color:"#f8f0e0",fontSize:17,fontWeight:800,marginBottom:4}}>
                 {shopName || "Tên cửa hàng"}
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <div style={{display:"flex",alignItems:"center",gap:4,background:isOpen?"rgba(62,207,110,0.12)":"rgba(255,64,64,0.1)",border:`1px solid ${isOpen?"rgba(62,207,110,0.3)":"rgba(255,64,64,0.25)"}`,borderRadius:6,padding:"2px 8px"}}>
-                  <div style={{width:6,height:6,borderRadius:"50%",background:isOpen?"#3ecf6e":"#ff4040",boxShadow:isOpen?"0 0 5px #3ecf6e":"none"}} />
-                  <span style={{color:isOpen?"#3ecf6e":"#ff4040",fontSize:9,fontWeight:700}}>{isOpen?"Đang mở":"Đã đóng"}</span>
-                </div>
+              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                 {category && <span style={{color:"#6a5a40",fontSize:9}}>{category}</span>}
+                <span style={{color:"#6a5a40",fontSize:8.5}}>· {address.split(",")[0]}</span>
               </div>
             </div>
-          </div>
-
-          {/* Stats row */}
-          <div style={{display:"flex",gap:16,marginBottom:10}}>
-            <div style={{display:"flex",alignItems:"center",gap:5}}>
-              <span style={{color:"#FFB347",fontSize:13}}>★</span>
-              <span style={{color:"#f8f0e0",fontSize:12,fontWeight:700}}>{rating.toFixed(1)}</span>
-              <span style={{color:"#6a5a40",fontSize:10}}>({totalReviews} đánh giá)</span>
+            <div style={{display:"flex",gap:8,marginBottom:12}}>
+              {[
+                { icon:"⭐", val: rating.toFixed(1), sub:`(${totalReviews} đánh giá)` },
+                { icon:"⏱️", val:`${prepTime} phút`, sub:"chuẩn bị" },
+                { icon:"🕐", val: todayClosed ? "Hôm nay nghỉ" : todayLabel, sub:"giờ mở" },
+              ].map(s => (
+                <div key={s.icon} style={{flex:1,textAlign:"center",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,padding:"7px 4px"}}>
+                  <div style={{fontSize:15,marginBottom:2}}>{s.icon}</div>
+                  <div style={{color: todayClosed && s.icon==="🕐" ? "#ff4040" : "#f8f0e0",fontSize:10,fontWeight:700,lineHeight:1.2}}>{s.val}</div>
+                  <div style={{color:"#6a5a40",fontSize:7.5}}>{s.sub}</div>
+                </div>
+              ))}
             </div>
-            {address && (
-              <div style={{color:"#6a5a40",fontSize:10,display:"flex",alignItems:"center",gap:4}}>
-                <span>📍</span><span>{address}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Info chips */}
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
-            <span style={{
-              background: todayClosed ? "rgba(255,64,64,0.08)" : "rgba(255,255,255,0.05)",
-              border: `1px solid ${todayClosed ? "rgba(255,64,64,0.2)" : "rgba(255,255,255,0.08)"}`,
-              borderRadius:8, padding:"4px 10px",
-              color: todayClosed ? "#ff4040" : "#b0956a", fontSize:9 }}>
-              🕐 {todayClosed ? "Hôm nay nghỉ" : todayLabel}
-            </span>
-            <span style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"4px 10px",color:"#b0956a",fontSize:9}}>
-              ⏱️ Chuẩn bị {prepTime} phút
-            </span>
+            <div style={{display:"flex",gap:8}}>
+              {[
+                { label:"Phí ship", val:fmt(15000), color:"#FF8C00" },
+                { label:"Đơn tối thiểu", val:fmt(30000), color:"#b0956a" },
+                { label:"Trạng thái", val:isOpen?"Đang mở":"Đã đóng", color:isOpen?"#3ecf6e":"#ff4040" },
+              ].map(d => (
+                <div key={d.label} style={{flex:1,textAlign:"center"}}>
+                  <div style={{color:d.color,fontSize:11,fontWeight:700}}>{d.val}</div>
+                  <div style={{color:"#6a5a40",fontSize:7.5}}>{d.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* ── Category tabs ── */}
+        {/* ── Category tabs (sticky) ── */}
         {cats.length > 1 && (
-          <div style={{display:"flex",gap:6,padding:"0 16px 10px",overflowX:"auto"} as React.CSSProperties}>
-            {cats.map(c => (
-              <button key={c} onClick={() => setActiveTab(c)}
-                style={{flexShrink:0,padding:"6px 16px",borderRadius:20,
-                  background:activeTab===c?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
-                  border:activeTab===c?"1px solid rgba(255,107,0,0.35)":"1px solid rgba(255,255,255,0.06)",
-                  color:activeTab===c?"#FF8C00":"#6a5a40",fontSize:10,fontWeight:activeTab===c?700:400,cursor:"pointer",fontFamily:"Lexend",whiteSpace:"nowrap"}}>
-                {c}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* ── Product grid ── */}
-        {displayed.length === 0 ? (
-          <div style={{margin:"32px 16px",textAlign:"center",color:"#6a5a40"}}>
-            <div style={{fontSize:40,marginBottom:8}}>🍽️</div>
-            <div style={{fontSize:12}}>Chưa có sản phẩm nào</div>
-            <div style={{fontSize:10,marginTop:4}}>Thêm món ăn trong mục Menu để hiển thị ở đây</div>
-          </div>
-        ) : (
-          <div style={{padding:"0 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {displayed.map((p, idx) => {
-              const bc = p.badge ? BADGE_CFG[p.badge] : null
-              return (
-                <motion.div key={p.id} initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{delay:idx*0.05}}
-                  style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,overflow:"hidden",cursor:"pointer"}}>
-                  {/* Image */}
-                  <div style={{height:100,background:"rgba(255,107,0,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,position:"relative",overflow:"hidden"}}>
-                    {p.imagePreview
-                      ? <img src={p.imagePreview} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}} />
-                      : <div style={{textAlign:"center"}}><div>🍽️</div><div style={{color:"#FF8C00",fontSize:7,fontWeight:700,marginTop:2}}>400×400px</div></div>}
-                    {bc && (
-                      <div style={{position:"absolute",top:6,left:6,background:bc.bg,borderRadius:6,padding:"2px 6px",fontSize:8,fontWeight:800,color:bc.color}}>{bc.label}</div>
-                    )}
-                    {p.originalPrice && p.originalPrice > p.price && (
-                      <div style={{position:"absolute",top:6,right:6,background:"#ff4040",borderRadius:5,padding:"2px 6px",fontSize:8,fontWeight:800,color:"#fff"}}>
-                        -{Math.round((1-p.price/p.originalPrice)*100)}%
-                      </div>
-                    )}
-                  </div>
-                  {/* Info */}
-                  <div style={{padding:"9px 10px 11px"}}>
-                    <div style={{color:"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <span style={{background:"linear-gradient(90deg,#FF6B00,#FFB347)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontSize:12,fontWeight:800}}>{fmt(p.price)}</span>
-                      {p.originalPrice && p.originalPrice > p.price && (
-                        <span style={{color:"rgba(255,255,255,0.25)",fontSize:9,textDecoration:"line-through"}}>{fmt(p.originalPrice)}</span>
-                      )}
-                    </div>
-                    <button style={{width:"100%",height:30,borderRadius:8,background:"linear-gradient(90deg,#FF6B00,#FF8C00)",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",marginTop:8,fontFamily:"Lexend"}}>
-                      + Thêm
-                    </button>
-                  </div>
-                </motion.div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Upload hint when no cover */}
-        {!coverUrl && (
-          <div style={{margin:"20px 16px 0",background:"rgba(255,107,0,0.06)",border:"1px dashed rgba(255,107,0,0.25)",borderRadius:14,padding:14,display:"flex",gap:10,alignItems:"center"}}>
-            <div style={{fontSize:22}}>💡</div>
-            <div>
-              <div style={{color:"#FF8C00",fontSize:11,fontWeight:700,marginBottom:2}}>Thêm ảnh bìa & logo để thu hút khách</div>
-              <div style={{color:"#6a5a40",fontSize:9}}>Nhấn "Đổi ảnh bìa" hoặc "Đổi logo" ở thanh trên cùng</div>
+          <div style={{position:"sticky",top:56,zIndex:30,background:"rgba(8,8,6,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid rgba(255,255,255,0.06)",padding:"10px 14px",marginTop:12}}>
+            <div style={{display:"flex",gap:6,overflowX:"auto",scrollbarWidth:"none"} as React.CSSProperties}>
+              {cats.map(c => {
+                const cnt = c === "Tất cả" ? products.length : products.filter(p => p.category === c).length
+                return (
+                  <button key={c} onClick={() => setActiveTab(c)}
+                    style={{display:"flex",alignItems:"center",gap:4,flexShrink:0,padding:"5px 12px",borderRadius:20,border:"none",
+                      background:activeTab===c?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
+                      outline:`${activeTab===c?1.5:1}px solid ${activeTab===c?"rgba(255,107,0,0.4)":"rgba(255,255,255,0.08)"}`,
+                      color:activeTab===c?"#FF8C00":"#6a5a40",fontSize:10,fontWeight:activeTab===c?600:400,
+                      cursor:"pointer",fontFamily:"Lexend",transition:"all .2s",whiteSpace:"nowrap"}}>
+                    <span>{c}</span>
+                    <span style={{color:"#6a5a40",fontSize:8.5}}>({cnt})</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
+
+        {/* ── Product list (1-column horizontal, same as customer) ── */}
+        <div style={{padding:"4px 14px 0"}}>
+          {displayed.length === 0 ? (
+            <div style={{textAlign:"center",padding:"40px 0",color:"#6a5a40"}}>
+              <div style={{fontSize:40,marginBottom:8}}>🍽️</div>
+              <div style={{fontSize:12}}>Chưa có sản phẩm nào</div>
+              <div style={{fontSize:10,marginTop:4}}>Thêm món ăn trong mục Menu để hiển thị ở đây</div>
+            </div>
+          ) : (
+            cats.filter(c => c !== "Tất cả").map(c => {
+              const items = activeTab === "Tất cả"
+                ? (c === cats.find(x => x !== "Tất cả") ? displayed : [])
+                : []
+              const sectionItems = activeTab === "Tất cả"
+                ? products.filter(p => p.category === c)
+                : (activeTab === c ? displayed : [])
+              if (sectionItems.length === 0 && activeTab !== "Tất cả") return null
+              if (sectionItems.length === 0) return null
+              return (
+                <div key={c}>
+                  {activeTab === "Tất cả" && (
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"16px 0 4px"}}>
+                      <div style={{color:"#f8f0e0",fontSize:13,fontWeight:700}}>{c}</div>
+                      <div style={{flex:1,height:1,background:"rgba(255,255,255,0.06)"}} />
+                      <span style={{color:"#6a5a40",fontSize:9}}>{sectionItems.length} món</span>
+                    </div>
+                  )}
+                  {sectionItems.map((p, idx) => {
+                    const bc = p.badge ? BADGE_CFG[p.badge] : null
+                    const disc = p.originalPrice && p.originalPrice > p.price
+                      ? Math.round((1 - p.price / p.originalPrice) * 100) : null
+                    return (
+                      <motion.div key={p.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:idx*0.04}}
+                        style={{display:"flex",gap:12,padding:"13px 0",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                        {/* Image */}
+                        <div style={{position:"relative",flexShrink:0}}>
+                          <div style={{width:82,height:82,borderRadius:12,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:36}}>
+                            {p.imagePreview
+                              ? <img src={p.imagePreview} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}} />
+                              : "🍽️"}
+                          </div>
+                          {disc && (
+                            <div style={{position:"absolute",top:-4,left:-4,background:"#ff4040",color:"#fff",borderRadius:6,padding:"1px 6px",fontSize:8,fontWeight:800}}>-{disc}%</div>
+                          )}
+                          {bc && (
+                            <div style={{position:"absolute",bottom:-4,right:-4,background:bc.bg,borderRadius:6,padding:"1px 6px",fontSize:7,fontWeight:700,color:bc.color}}>{bc.label}</div>
+                          )}
+                        </div>
+                        {/* Info */}
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{color:"#f8f0e0",fontSize:12.5,fontWeight:600,marginBottom:3,lineHeight:1.3,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"} as React.CSSProperties}>{p.name}</div>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                            <div>
+                              <span style={{background:"linear-gradient(90deg,#FF6B00,#FFB347)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontSize:14,fontWeight:800}}>{fmt(p.price)}</span>
+                              {p.originalPrice && p.originalPrice > p.price && (
+                                <span style={{color:"#6a5a40",fontSize:9,textDecoration:"line-through",marginLeft:5}}>{fmt(p.originalPrice)}</span>
+                              )}
+                            </div>
+                            <button style={{width:36,height:36,borderRadius:10,border:"none",background:"linear-gradient(135deg,#FF6B00,#FF8C00)",color:"#fff",fontSize:20,fontWeight:300,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 10px rgba(255,107,0,0.4)",flexShrink:0,fontFamily:"Lexend"}}>+</button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              )
+            })
+          )}
+          <div style={{height:20}} />
+        </div>
       </div>
     </>
   )

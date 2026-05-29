@@ -6,19 +6,17 @@ import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 
 const NAV_ITEMS = [
-  { icon: "🏠",  label: "Dashboard",    href: "/admin" },
-  { icon: "✅",  label: "Phê duyệt",   href: "/admin/approvals" },
-  { icon: "📦",  label: "Đơn hàng",    href: "/admin/orders" },
-  { icon: "🛵",  label: "Tài xế",      href: "/admin/drivers" },
-  { icon: "🏪",  label: "Cửa hàng",    href: "/admin/merchants" },
-  { icon: "👤",  label: "Tài khoản",   href: "/admin/users" },
-  { icon: "💳",  label: "Rút/Nạp",     href: "/admin/wallet-history" },
-  { icon: "💰",  label: "Tài chính",   href: "/admin/finance" },
-  { icon: "🗺️", label: "Bản đồ live", href: "/admin/map" },
-  { icon: "🏷️", label: "Khuyến mãi",  href: "/admin/promotions" },
-  { icon: "⚖️",  label: "Tranh chấp",  href: "/admin/disputes" },
-  { icon: "📣",  label: "Thông báo",   href: "/admin/notifications" },
-  { icon: "⚙️",  label: "Cài đặt",     href: "/admin/settings" },
+  { icon: "🏠",  label: "Dashboard",        href: "/admin" },
+  { icon: "✅",  label: "Phê duyệt",        href: "/admin/approvals" },
+  { icon: "📦",  label: "Đơn hàng",         href: "/admin/orders" },
+  { icon: "👤",  label: "Tài khoản",        href: "/admin/users" },
+  { icon: "💰",  label: "Tài chính",        href: "/admin/finance" },
+  { icon: "🗺️", label: "Bản đồ live",      href: "/admin/map" },
+  { icon: "🏷️", label: "Khuyến mãi",       href: "/admin/promotions" },
+  { icon: "⚖️",  label: "Tranh chấp",       href: "/admin/disputes" },
+  { icon: "📣",  label: "Thông báo",        href: "/admin/notifications" },
+  { icon: "💳",  label: "Lịch sử nạp/rút", href: "/admin/wallet-history" },
+  { icon: "⚙️",  label: "Cài đặt",          href: "/admin/settings" },
 ]
 
 interface AdminShellProps {

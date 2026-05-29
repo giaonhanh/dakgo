@@ -129,7 +129,7 @@ export default function AdminNotificationsPage() {
       pageTitle="📣 Thông báo"
       pageSubtitle="Push notification · Broadcast · Lên lịch gửi"
     >
-      <div style={{ display:"flex", flexDirection: isMobile ? "column" : "row", height:"100%", overflow:"hidden" }}>
+      <div style={{ display:"flex", flexDirection: isMobile ? "column" : "row", height: isMobile ? "auto" : "100%", overflow: isMobile ? "visible" : "hidden" }}>
 
         {/* Compose panel */}
         <div style={{ width: isMobile ? "100%" : 420, flexShrink:0, borderRight: isMobile ? "none" : "1px solid rgba(255,255,255,0.06)", borderBottom: isMobile ? "1px solid rgba(255,255,255,0.06)" : "none", display:"flex", flexDirection:"column", overflow: isMobile ? "visible" : "hidden", maxHeight: isMobile ? "none" : "100%" }}>
@@ -138,22 +138,6 @@ export default function AdminNotificationsPage() {
           </div>
           <div style={{ flex:1, overflowY:"auto", padding:"16px 20px" }}>
 
-            {/* RLS SQL hint */}
-            <details style={{ marginBottom:16, background:"rgba(74,143,245,0.06)", border:"1px solid rgba(74,143,245,0.2)", borderRadius:10, padding:"10px 14px", cursor:"pointer" }}>
-              <summary style={{ color:"#4a8ff5", fontSize:10, fontWeight:700, listStyle:"none", display:"flex", alignItems:"center", gap:6 }}>
-                <span>⚙️</span> Yêu cầu cấu hình Supabase (bấm để xem SQL)
-              </summary>
-              <div style={{ marginTop:10, color:"#6a5a40", fontSize:9, lineHeight:1.8 }}>
-                Chạy SQL này trong Supabase SQL Editor để admin có thể gửi và xem thông báo:
-              </div>
-              <pre style={{ marginTop:8, padding:"10px 12px", background:"rgba(0,0,0,0.3)", borderRadius:8, fontSize:9, color:"#3ecf6e", overflowX:"auto", lineHeight:1.7, userSelect:"text" as React.CSSProperties["userSelect"] }}>{`CREATE POLICY "notif_admin" ON notifications
-FOR ALL USING (
-  EXISTS (
-    SELECT 1 FROM profiles
-    WHERE id = auth.uid() AND role = 'admin'
-  )
-);`}</pre>
-            </details>
 
             {/* KPI */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:20 }}>
@@ -244,7 +228,7 @@ FOR ALL USING (
         </div>
 
         {/* History panel */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", overflow: isMobile ? "visible" : "hidden" }}>
           <div style={{ padding:"14px 20px", borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
             <div style={{ color:"#f0eaff", fontSize:13, fontWeight:700 }}>Lịch sử thông báo</div>
             <div style={{ display:"flex", gap:6 }}>

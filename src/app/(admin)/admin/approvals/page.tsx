@@ -68,6 +68,7 @@ export default function ApprovalsPage() {
       const { data: rows } = await supabase
         .from("drivers")
         .select("id, vehicle_type, vehicle_model, license_plate, id_card_number, license_number, is_approved, rating_avg, total_trips, commission_rate, created_at, profiles(full_name, phone)")
+        .eq("is_approved", false)
         .order("created_at", { ascending: false })
 
       if (!rows) { setDriverLoading(false); return }
@@ -102,6 +103,7 @@ export default function ApprovalsPage() {
       const { data: rows } = await supabase
         .from("shops")
         .select("id, name, address, category, status, commission_rate, rating_avg, is_open, created_at, owner:profiles(full_name, phone), orders(count)")
+        .eq("status", "pending")
         .order("created_at", { ascending: false })
 
       if (!rows) { setShopLoading(false); return }
@@ -157,8 +159,8 @@ export default function ApprovalsPage() {
       })
     }
 
-    setDrivers(prev => prev.map(d => d.id === id ? { ...d, status: approve ? "approved" : "pending" } : d))
-    setSelectedDriver(prev => prev?.id === id ? { ...prev, status: approve ? "approved" : "pending" } : prev)
+    setDrivers(prev => prev.filter(d => d.id !== id))
+    setSelectedDriver(prev => prev?.id === id ? null : prev)
     fireToast(approve ? "✅ Đã duyệt tài xế" : "❌ Đã từ chối tài xế")
     setSaving(false)
   }
@@ -195,8 +197,8 @@ export default function ApprovalsPage() {
       }
     }
 
-    setShops(prev => prev.map(s => s.id === id ? { ...s, status, ...(commissionRate !== undefined ? { commissionRate } : {}) } : s))
-    setSelectedShop(prev => prev?.id === id ? { ...prev, status, ...(commissionRate !== undefined ? { commissionRate } : {}) } : prev)
+    setShops(prev => prev.filter(s => s.id !== id))
+    setSelectedShop(prev => prev?.id === id ? null : prev)
     const msg = status === "approved" ? "✅ Đã duyệt cửa hàng" : status === "suspended" ? "🔒 Đã tạm khóa" : "⏳ Đã chuyển về chờ duyệt"
     fireToast(msg)
     setSaving(false)
@@ -363,19 +365,6 @@ function DriversTab({ drivers, filter, loading, selected, saving, onFilterChange
     <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
       {/* List */}
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
-        {/* Filter */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-          {(["pending", "approved", "all"] as const).map(f => (
-            <button key={f} onClick={() => onFilterChange(f)} style={{
-              height: 28, padding: "0 12px", borderRadius: 8, border: "none", cursor: "pointer",
-              background: filter === f ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.04)",
-              color: filter === f ? "#FF8C00" : "#6a5a40", fontSize: 10, fontWeight: filter === f ? 700 : 400,
-            }}>
-              {f === "pending" ? "⏳ Chờ duyệt" : f === "approved" ? "✅ Đã duyệt" : "Tất cả"}
-            </button>
-          ))}
-        </div>
-
         {loading ? (
           <div style={{ color: "#6a5a40", fontSize: 12, textAlign: "center", paddingTop: 40 }}>Đang tải...</div>
         ) : drivers.length === 0 ? (
@@ -488,19 +477,6 @@ function ShopsTab({ shops, filter, loading, selected, saving, onFilterChange, on
     <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
       {/* List */}
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
-        {/* Filter */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-          {(["pending", "approved", "suspended", "all"] as const).map(f => (
-            <button key={f} onClick={() => onFilterChange(f)} style={{
-              height: 28, padding: "0 12px", borderRadius: 8, border: "none", cursor: "pointer",
-              background: filter === f ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.04)",
-              color: filter === f ? "#FF8C00" : "#6a5a40", fontSize: 10, fontWeight: filter === f ? 700 : 400,
-            }}>
-              {f === "pending" ? "⏳ Chờ duyệt" : f === "approved" ? "✅ Hoạt động" : f === "suspended" ? "🔒 Tạm khóa" : "Tất cả"}
-            </button>
-          ))}
-        </div>
-
         {loading ? (
           <div style={{ color: "#6a5a40", fontSize: 12, textAlign: "center", paddingTop: 40 }}>Đang tải...</div>
         ) : shops.length === 0 ? (
