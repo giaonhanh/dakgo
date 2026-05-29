@@ -184,6 +184,11 @@ CREATE TABLE products (
   category       TEXT,                          -- nhóm menu nội bộ (= menuGroupId)
   tags           TEXT[]      DEFAULT ARRAY[]::TEXT[],  -- danh mục trang chủ
   badge          TEXT        CHECK (badge IN ('hot', 'bigsale', 'bestseller')),
+  toppings       JSONB       DEFAULT '[]'::jsonb,
+  sizes          JSONB       DEFAULT '[]'::jsonb,
+  all_day        BOOLEAN     NOT NULL DEFAULT true,
+  start_hour     TEXT,
+  end_hour       TEXT,
   is_available   BOOLEAN     NOT NULL DEFAULT true,
   sort_order     INT         NOT NULL DEFAULT 0,
   sold_count     INT         DEFAULT 0,

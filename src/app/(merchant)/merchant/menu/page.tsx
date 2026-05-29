@@ -225,17 +225,22 @@ export default function MerchantMenuPage() {
   const loadProducts = useCallback(async (sid: string): Promise<Product[]> => {
     const { data } = await supabase
       .from("products")
-      .select("id,name,description,price,original_price,category,tags,is_available,sold_count,sort_order,image_url")
+      .select("id,name,description,price,original_price,category,tags,is_available,sold_count,sort_order,image_url,badge,toppings,sizes,all_day,start_hour,end_hour")
       .eq("shop_id", sid)
       .order("sort_order", { ascending: true })
 
     const mapped: Product[] = (data ?? []).map(p => ({
       id: p.id, name: p.name, description: p.description ?? "", imagePreview: p.image_url ?? null,
       price: p.price, categories: (p.tags as string[]) ?? [], menuGroupId: p.category ?? "",
-      allDay: true, startHour: "", endHour: "", toppings: [], sizes: [],
+      allDay: p.all_day ?? true,
+      startHour: p.start_hour ?? "06:00",
+      endHour: p.end_hour ?? "22:00",
+      toppings: (p.toppings as Topping[]) ?? [],
+      sizes: (p.sizes as SizeOpt[]) ?? [],
       promoEnabled: !!(p.original_price && p.original_price < p.price),
       promoPrice: p.original_price ?? null, promoStart: "", promoEnd: "", promoPerPerson: null,
-      badge: null, available: p.is_available, soldCount: p.sold_count, sortOrder: p.sort_order,
+      badge: (p.badge as Product["badge"]) ?? null,
+      available: p.is_available, soldCount: p.sold_count, sortOrder: p.sort_order,
     }))
     setProducts(mapped)
     return mapped
@@ -509,8 +514,18 @@ export default function MerchantMenuPage() {
 
     const payload = {
       name: pModal.name, description: pModal.description || null,
-      price: pModal.price, original_price: pModal.promoEnabled && pModal.promoPrice ? pModal.promoPrice : null,
-      category, tags: pModal.categories, is_available: pModal.available, sort_order: pModal.sortOrder,
+      price: pModal.price,
+      original_price: pModal.promoEnabled && pModal.promoPrice ? pModal.promoPrice : null,
+      category,
+      tags: pModal.categories,
+      badge: pModal.badge,
+      toppings: pModal.toppings,
+      sizes: pModal.sizes,
+      all_day: pModal.allDay,
+      start_hour: pModal.allDay ? null : (pModal.startHour || null),
+      end_hour: pModal.allDay ? null : (pModal.endHour || null),
+      is_available: pModal.available,
+      sort_order: pModal.sortOrder,
       ...(imageUrl ? { image_url: imageUrl } : {}),
     }
     if (pEditing) {

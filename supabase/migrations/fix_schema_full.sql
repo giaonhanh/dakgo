@@ -38,7 +38,12 @@ ALTER TABLE products
   ADD COLUMN IF NOT EXISTS original_price INT,
   ADD COLUMN IF NOT EXISTS tags           TEXT[]       DEFAULT ARRAY[]::TEXT[],
   ADD COLUMN IF NOT EXISTS sort_order     INT          DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS badge          TEXT,
+  ADD COLUMN IF NOT EXISTS badge          TEXT         CHECK (badge IN ('hot','bigsale','bestseller')),
+  ADD COLUMN IF NOT EXISTS toppings       JSONB        DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS sizes          JSONB        DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS all_day        BOOLEAN      NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS start_hour     TEXT,
+  ADD COLUMN IF NOT EXISTS end_hour       TEXT,
   ADD COLUMN IF NOT EXISTS updated_at     TIMESTAMPTZ  DEFAULT now();
 
 -- Index cho tags (GIN) để tìm theo danh mục
