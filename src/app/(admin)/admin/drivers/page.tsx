@@ -396,7 +396,7 @@ export default function AdminDriversPage() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelected(null)}
                 style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 60, backdropFilter: "blur(5px)" }} />
               <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 24, stiffness: 300 }}
-                style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: 380, background: "#0d0b19", borderLeft: "1px solid rgba(255,255,255,0.08)", zIndex: 61, display: "flex", flexDirection: "column" }}>
+                style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "100%", maxWidth: 400, background: "#0d0b19", borderLeft: "1px solid rgba(255,255,255,0.08)", zIndex: 61, display: "flex", flexDirection: "column" }}>
 
                 {/* Header */}
                 <div style={{ padding: "16px 18px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
@@ -510,29 +510,82 @@ export default function AdminDriversPage() {
                   </div>
 
                   {/* Ví xu */}
-                  <div style={{ background: "rgba(180,100,255,0.05)", border: "1px solid rgba(180,100,255,0.2)", borderRadius: 12, padding: "14px", marginBottom: 10 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <div style={{ background: "rgba(180,100,255,0.05)", border: "1px solid rgba(180,100,255,0.2)", borderRadius: 14, padding: "16px", marginBottom: 10 }}>
+                    {/* Header */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                       <span style={{ color: "#b464ff", fontSize: 10, fontWeight: 700 }}>🪙 Ví xu tài xế</span>
-                      <span style={{ color: "#b464ff", fontSize: 16, fontWeight: 800 }}>{fmt(selected.xuBalance)}</span>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ color: "#b464ff", fontSize: 18, fontWeight: 800, lineHeight: 1 }}>{fmt(selected.xuBalance)}</div>
+                        <div style={{ color: "rgba(180,100,255,0.45)", fontSize: 8, marginTop: 2 }}>số dư hiện tại</div>
+                      </div>
                     </div>
 
-                    <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                      {([["topup", "💰 Nạp", "#3ecf6e"], ["withdraw", "📤 Rút", "#ff4040"]] as const).map(([key, label, color]) => (
+                    {/* Tab nạp / rút */}
+                    <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                      {([["topup", "💰 Nạp tiền", "#3ecf6e"], ["withdraw", "📤 Rút tiền", "#ff4040"]] as const).map(([key, label, color]) => (
                         <button key={key} onClick={() => setXuTab(key)}
-                          style={{ flex: 1, height: 34, borderRadius: 9, background: xuTab === key ? `${color}1a` : "rgba(255,255,255,0.04)", border: xuTab === key ? `1px solid ${color}55` : "1px solid rgba(255,255,255,0.07)", color: xuTab === key ? color : "rgba(144,128,176,0.6)", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>
+                          style={{ flex: 1, height: 38, borderRadius: 10,
+                            background: xuTab === key ? `${color}22` : "rgba(255,255,255,0.04)",
+                            border: xuTab === key ? `1.5px solid ${color}66` : "1px solid rgba(255,255,255,0.08)",
+                            color: xuTab === key ? color : "rgba(144,128,176,0.5)",
+                            fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend",
+                            transition: "all .15s" }}>
                           {label}
                         </button>
                       ))}
                     </div>
 
-                    <input type="number" value={xuAmount} onChange={e => setXuAmount(e.target.value)} placeholder="Số tiền (VND)"
-                      style={{ width: "100%", height: 38, padding: "0 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(180,100,255,0.25)", borderRadius: 9, color: "#f0eaff", fontSize: 12, marginBottom: 7, fontFamily: "Lexend", boxSizing: "border-box" }} />
-                    <input type="text" value={xuNote} onChange={e => setXuNote(e.target.value)} placeholder="Ghi chú (không bắt buộc)"
-                      style={{ width: "100%", height: 34, padding: "0 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, color: "#f0eaff", fontSize: 11, marginBottom: 10, fontFamily: "Lexend", boxSizing: "border-box" }} />
+                    {/* Inputs */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+                      <div>
+                        <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 9, marginBottom: 5, fontWeight: 600 }}>
+                          {xuTab === "topup" ? "Số tiền nạp (VND)" : "Số tiền rút (VND)"}
+                        </div>
+                        <input
+                          type="number"
+                          value={xuAmount}
+                          onChange={e => setXuAmount(e.target.value)}
+                          placeholder="Nhập số tiền..."
+                          style={{ display: "block", width: "100%", boxSizing: "border-box",
+                            height: 44, padding: "0 14px",
+                            background: "rgba(255,255,255,0.06)",
+                            border: `1.5px solid ${xuTab === "topup" ? "rgba(62,207,110,0.3)" : "rgba(255,64,64,0.3)"}`,
+                            borderRadius: 10, color: "#f0eaff", fontSize: 14, fontWeight: 700,
+                            fontFamily: "Lexend" }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 9, marginBottom: 5, fontWeight: 600 }}>Ghi chú (không bắt buộc)</div>
+                        <input
+                          type="text"
+                          value={xuNote}
+                          onChange={e => setXuNote(e.target.value)}
+                          placeholder="Lý do nạp/rút..."
+                          style={{ display: "block", width: "100%", boxSizing: "border-box",
+                            height: 40, padding: "0 14px",
+                            background: "rgba(255,255,255,0.04)",
+                            border: "1px solid rgba(255,255,255,0.1)",
+                            borderRadius: 10, color: "#f0eaff", fontSize: 12,
+                            fontFamily: "Lexend" }}
+                        />
+                      </div>
+                    </div>
 
-                    <button onClick={handleWallet} disabled={xuSaving || !xuAmount}
-                      style={{ width: "100%", height: 40, borderRadius: 10, border: "none", background: xuTab === "topup" ? "linear-gradient(90deg,#3ecf6e,#2aad58)" : "linear-gradient(90deg,#ff4040,#cc2020)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend", opacity: (!xuAmount || xuSaving) ? 0.5 : 1 }}>
-                      {xuSaving ? "Đang xử lý..." : xuTab === "topup" ? "✅ Xác nhận nạp" : "📤 Xác nhận rút"}
+                    {/* Nút xác nhận */}
+                    <button
+                      onClick={handleWallet}
+                      disabled={xuSaving || !xuAmount}
+                      style={{ display: "block", width: "100%", boxSizing: "border-box",
+                        height: 44, borderRadius: 11, border: "none",
+                        background: xuTab === "topup"
+                          ? "linear-gradient(90deg,#3ecf6e,#2aad58)"
+                          : "linear-gradient(90deg,#ff4040,#cc2020)",
+                        color: "#fff", fontSize: 13, fontWeight: 700,
+                        cursor: (!xuAmount || xuSaving) ? "not-allowed" : "pointer",
+                        fontFamily: "Lexend",
+                        opacity: (!xuAmount || xuSaving) ? 0.45 : 1,
+                        transition: "opacity .15s" }}>
+                      {xuSaving ? "⏳ Đang xử lý..." : xuTab === "topup" ? "✅ Xác nhận nạp" : "📤 Xác nhận rút"}
                     </button>
                   </div>
 
