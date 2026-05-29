@@ -973,30 +973,6 @@ export default function MerchantMenuPage() {
                   )}
                 </div>
 
-                {/* ─ Danh mục hiển thị trên trang chủ khách (max 3) ─ */}
-                <div style={{marginBottom:14}}>
-                  <FLabel>
-                    📍 Danh mục trang chủ khách
-                    <span style={{color:"#6a5a40"}}> · chọn 1–3 · đã chọn {pModal.categories.length}/3</span>
-                  </FLabel>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                    {CATEGORY_LIST.map(c => {
-                      const on       = pModal.categories.includes(c)
-                      const disabled = !on && pModal.categories.length >= 3
-                      return (
-                        <button key={c} onClick={() => toggleCat(c)} disabled={disabled}
-                          style={{padding:"5px 11px",borderRadius:20,
-                            background:on?"rgba(255,107,0,0.14)":"rgba(255,255,255,0.04)",
-                            border:on?"1px solid rgba(255,107,0,0.4)":"1px solid rgba(255,255,255,0.07)",
-                            color:on?"#FF8C00":disabled?"rgba(106,90,64,0.4)":"#6a5a40",
-                            fontSize:10,fontWeight:on?700:400,cursor:disabled?"not-allowed":"pointer",fontFamily:"Lexend",opacity:disabled?0.5:1}}>
-                          {on && "✓ "}{c}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
                 {/* ─ Badge / Ghim ─ */}
                 <div style={{marginBottom:14}}>
                   <FLabel>Ghim / Badge nổi bật</FLabel>

@@ -22,6 +22,8 @@ interface Product {
   hot?:      boolean
 }
 
+interface MenuGroupMeta { id: string; name: string; sortOrder: number }
+
 interface ShopInfo {
   name:          string
   description:   string | null
@@ -34,6 +36,7 @@ interface ShopInfo {
   phone:         string | null
   opening_hours: { open?: string; close?: string } | null
   prep_time:     string | null
+  menu_groups:   MenuGroupMeta[] | null
 }
 
 interface ComboVoucher {
@@ -224,7 +227,7 @@ export default function ShopPage() {
       // Shop info
       const { data: shopData } = await supabase
         .from("shops")
-        .select("name,description,address,rating_avg,total_reviews,is_open,logo_url,cover_image_url,phone,opening_hours")
+        .select("name,description,address,rating_avg,total_reviews,is_open,logo_url,cover_image_url,phone,opening_hours,menu_groups_data")
         .eq("id", shopId)
         .single()
       if (shopData) setShop({
@@ -235,6 +238,7 @@ export default function ShopPage() {
         cover_url: shopData.cover_image_url,
         opening_hours: shopData.opening_hours ?? null,
         prep_time: null,
+        menu_groups: (shopData.menu_groups_data as MenuGroupMeta[] | null) ?? null,
       } as ShopInfo)
 
       // Products
@@ -254,10 +258,28 @@ export default function ShopPage() {
       }))
       setProducts(mapped)
 
-      // Derive categories from products
-      const catMap = new Map<string, string>()
-      mapped.forEach(p => { if (!catMap.has(p.category)) catMap.set(p.category, p.category) })
-      const cats = [{ id:"__all__", label:"Tất cả" }, ...Array.from(catMap.entries()).map(([id, label]) => ({ id, label }))]
+      // Derive category tabs — prefer menu_groups_data names (merchant-defined order & labels)
+      const rawGroups = (shopData?.menu_groups_data as MenuGroupMeta[] | null) ?? []
+      let cats: { id: string; label: string }[]
+      if (rawGroups.length > 0) {
+        const sorted = [...rawGroups].sort((a, b) => a.sortOrder - b.sortOrder)
+        const usedIds = new Set(mapped.map(p => p.category).filter(Boolean))
+        // Tabs: only groups that actually have products
+        cats = [
+          { id: "__all__", label: "Tất cả" },
+          ...sorted.filter(g => usedIds.has(g.id)).map(g => ({ id: g.id, label: g.name })),
+        ]
+        // Products whose group was deleted / not in groups list → "Khác"
+        const knownIds = new Set(sorted.map(g => g.id))
+        if (mapped.some(p => p.category && !knownIds.has(p.category))) {
+          cats.push({ id: "__other__", label: "Khác" })
+        }
+      } else {
+        // Fallback: derive directly from product category field
+        const catMap = new Map<string, string>()
+        mapped.forEach(p => { if (p.category && !catMap.has(p.category)) catMap.set(p.category, p.category) })
+        cats = [{ id: "__all__", label: "Tất cả" }, ...Array.from(catMap.entries()).map(([id, label]) => ({ id, label }))]
+      }
       setCategories(cats)
       setActiveTab(cats[0]?.id ?? "")
 
@@ -350,8 +372,14 @@ export default function ShopPage() {
     }
   }
 
-  const productsByCategory = (catId: string) =>
-    catId === "__all__" ? products : products.filter(p => p.category === catId)
+  const productsByCategory = (catId: string) => {
+    if (catId === "__all__") return products
+    if (catId === "__other__") {
+      const knownIds = new Set(categories.filter(c => c.id !== "__all__" && c.id !== "__other__").map(c => c.id))
+      return products.filter(p => !p.category || !knownIds.has(p.category))
+    }
+    return products.filter(p => p.category === catId)
+  }
 
   return (
     <>
