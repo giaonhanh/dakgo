@@ -507,7 +507,7 @@ export default function ShopPage() {
           )}
 
           {/* Hero */}
-          <div style={{ height:200, position:"relative", overflow:"hidden",
+          <div style={{ height:220, position:"relative", overflow:"hidden",
             background: shop?.cover_url
               ? `url(${shop.cover_url}) center/cover`
               : "linear-gradient(135deg,#1a0800 0%,#2d1500 50%,#0d0600 100%)" }}>
@@ -537,56 +537,77 @@ export default function ShopPage() {
             )}
           </div>
 
-          {/* Shop info card */}
+          {/* Shop info */}
           {shop && (
-            <div style={{ padding:"0 14px" }}>
-              <div style={{ background:"rgba(255,255,255,0.04)",
-                border:"1px solid rgba(255,255,255,0.08)",
-                borderRadius:16, padding:"14px", marginTop:-24,
+            <div style={{ padding:"0 16px" }}>
+
+              {/* Avatar + Name row — avatar overlaps banner bottom */}
+              <div style={{ display:"flex", alignItems:"flex-end", gap:12,
+                marginTop:-40, marginBottom:14,
                 position:"relative", zIndex:10 }}>
-                <div style={{ marginBottom:10 }}>
-                  <div style={{ color:"#f8f0e0", fontSize:17, fontWeight:800, marginBottom:4 }}>
+
+                {/* Logo circle */}
+                <div style={{ width:78, height:78, borderRadius:"50%",
+                  border:"3px solid #080806", overflow:"hidden", flexShrink:0,
+                  background:"rgba(255,255,255,0.06)",
+                  display:"flex", alignItems:"center", justifyContent:"center", fontSize:34,
+                  boxShadow:"0 0 0 1px rgba(255,107,0,0.25),0 4px 20px rgba(0,0,0,0.6)" }}>
+                  {shop.avatar_url
+                    ? <img src={shop.avatar_url} alt={shop.name}
+                        style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                    : "🏪"}
+                </div>
+
+                {/* Name + address */}
+                <div style={{ flex:1, minWidth:0, paddingBottom:6 }}>
+                  <div style={{ color:"#f8f0e0", fontSize:18, fontWeight:800, lineHeight:1.2,
+                    marginBottom:4,
+                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                     {shop.name}
                   </div>
-                  <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
-                    {shop.description && (
-                      <span style={{ color:"#6a5a40", fontSize:9 }}>{shop.description}</span>
-                    )}
-                    <span style={{ color:"#6a5a40", fontSize:8.5 }}>· {shop.address.split(",")[0]}</span>
+                  <div style={{ color:"#6a5a40", fontSize:9.5, lineHeight:1.5,
+                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                    {shop.description ? `${shop.description} · ` : ""}{shop.address.split(",")[0]}
                   </div>
                 </div>
-                <div style={{ display:"flex", gap:8, marginBottom:12 }}>
-                  {[
-                    { icon:"⭐", val: shop.rating?.toFixed(1) ?? "Mới", sub:`(${shop.rating_count ?? 0} đánh giá)` },
-                    { icon:"⏱️", val: shop.prep_time ?? "10–15 phút", sub:"chuẩn bị" },
-                    { icon:"🕐", val: (() => {
-                        if (!shop.opening_hours) return "07:00–21:00"
-                        const hours = shop.opening_hours as { open?: string; close?: string } | null
-                        if (hours?.open && hours?.close) return `${hours.open}–${hours.close}`
-                        return "07:00–21:00"
-                      })(), sub:"giờ mở" },
-                  ].map(s => (
-                    <div key={s.icon} style={{ flex:1, textAlign:"center",
-                      background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)",
-                      borderRadius:10, padding:"7px 4px" }}>
-                      <div style={{ fontSize:15, marginBottom:2 }}>{s.icon}</div>
-                      <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:700, lineHeight:1.2 }}>{s.val}</div>
-                      <div style={{ color:"#6a5a40", fontSize:7.5 }}>{s.sub}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display:"flex", gap:8 }}>
-                  {[
-                    { label:"Phí ship", val:fmt(15000), color:"#FF8C00" },
-                    { label:"Đơn tối thiểu", val:fmt(30000), color:"#b0956a" },
-                    { label:"Trạng thái", val: shop.is_open ? "Đang mở" : "Đã đóng", color: shop.is_open ? "#3ecf6e" : "#ff4040" },
-                  ].map(d => (
-                    <div key={d.label} style={{ flex:1, textAlign:"center" }}>
-                      <div style={{ color:d.color, fontSize:11, fontWeight:700 }}>{d.val}</div>
-                      <div style={{ color:"#6a5a40", fontSize:8 }}>{d.label}</div>
-                    </div>
-                  ))}
-                </div>
+              </div>
+
+              {/* Stats row */}
+              <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+                {[
+                  { icon:"⭐", val: shop.rating?.toFixed(1) ?? "Mới", sub:`(${shop.rating_count ?? 0} đánh giá)` },
+                  { icon:"⏱️", val: shop.prep_time ?? "10–15 phút", sub:"chế biến" },
+                  { icon:"🕐", val: (() => {
+                      if (!shop.opening_hours) return "07:00–21:00"
+                      const hours = shop.opening_hours as { open?: string; close?: string } | null
+                      if (hours?.open && hours?.close) return `${hours.open}–${hours.close}`
+                      return "07:00–21:00"
+                    })(), sub:"giờ mở" },
+                ].map(s => (
+                  <div key={s.icon} style={{ flex:1, textAlign:"center",
+                    background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)",
+                    borderRadius:10, padding:"8px 4px" }}>
+                    <div style={{ fontSize:15, marginBottom:2 }}>{s.icon}</div>
+                    <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:700, lineHeight:1.2 }}>{s.val}</div>
+                    <div style={{ color:"#6a5a40", fontSize:7.5 }}>{s.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Info strip */}
+              <div style={{ display:"flex", gap:8, marginBottom:4 }}>
+                {[
+                  { label:"Phí ship", val:fmt(15000), color:"#FF8C00" },
+                  { label:"Đơn tối thiểu", val:fmt(30000), color:"#b0956a" },
+                  { label:"Trạng thái", val: shop.is_open ? "Đang mở" : "Đã đóng", color: shop.is_open ? "#3ecf6e" : "#ff4040" },
+                ].map(d => (
+                  <div key={d.label} style={{ flex:1, textAlign:"center",
+                    background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.05)",
+                    borderRadius:10, padding:"6px 4px" }}>
+                    <div style={{ color:d.color, fontSize:11, fontWeight:700 }}>{d.val}</div>
+                    <div style={{ color:"#6a5a40", fontSize:7.5 }}>{d.label}</div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

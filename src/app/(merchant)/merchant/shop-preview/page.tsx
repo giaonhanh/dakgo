@@ -243,7 +243,7 @@ export default function ShopPreviewPage() {
         </div>
 
         {/* ── Cover image ── */}
-        <div style={{position:"relative",height:200,background:"linear-gradient(135deg,#1a0a00,#2d1200,#0d0600)",overflow:"hidden",cursor:"pointer"}}
+        <div style={{position:"relative",height:220,background:"linear-gradient(135deg,#1a0a00,#2d1200,#0d0600)",overflow:"hidden",cursor:"pointer"}}
           onClick={() => coverRef.current?.click()}>
           {coverUrl
             ? <img src={coverUrl} alt="Cover" style={{width:"100%",height:"100%",objectFit:"cover"}} />
@@ -258,43 +258,82 @@ export default function ShopPreviewPage() {
           <div style={{position:"absolute",bottom:0,left:0,right:0,height:100,background:"linear-gradient(to top,#080806,transparent)"}} />
         </div>
 
-        {/* ── Shop info card (glass, overlaps hero) ── */}
-        <div style={{padding:"0 14px"}}>
-          <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:16,padding:"14px",marginTop:-24,position:"relative",zIndex:10}}>
-            <div style={{marginBottom:10}}>
-              <div style={{color:"#f8f0e0",fontSize:17,fontWeight:800,marginBottom:4}}>
+        {/* ── Shop info — avatar + name + stats ── */}
+        <div style={{padding:"0 16px"}}>
+
+          {/* Avatar + Name row */}
+          <div style={{display:"flex",alignItems:"flex-end",gap:12,
+            marginTop:-40,marginBottom:14,position:"relative",zIndex:10}}>
+
+            {/* Logo circle — clickable to change */}
+            <div
+              onClick={() => logoRef.current?.click()}
+              style={{width:78,height:78,borderRadius:"50%",
+                border:"3px solid #080806",overflow:"hidden",flexShrink:0,
+                background:"rgba(255,255,255,0.06)",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,
+                boxShadow:"0 0 0 1px rgba(255,107,0,0.25),0 4px 20px rgba(0,0,0,0.6)",
+                cursor:"pointer",position:"relative"}}>
+              {logoUrl
+                ? <img src={logoUrl} alt="Logo" style={{width:"100%",height:"100%",objectFit:"cover"}} />
+                : "🏪"}
+              {uploading === "logo" && (
+                <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.55)",
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>⏳</div>
+              )}
+              {!uploading && (
+                <div style={{position:"absolute",bottom:0,left:0,right:0,height:24,
+                  background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <span style={{fontSize:10,color:"#FF8C00",fontWeight:700}}>✏️</span>
+                </div>
+              )}
+            </div>
+
+            {/* Name + address */}
+            <div style={{flex:1,minWidth:0,paddingBottom:6}}>
+              <div style={{color:"#f8f0e0",fontSize:18,fontWeight:800,lineHeight:1.2,
+                marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {shopName || "Tên cửa hàng"}
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                {category && <span style={{color:"#6a5a40",fontSize:9}}>{category}</span>}
-                <span style={{color:"#6a5a40",fontSize:8.5}}>· {address.split(",")[0]}</span>
+              <div style={{color:"#6a5a40",fontSize:9.5,lineHeight:1.5,
+                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {category ? `${category} · ` : ""}{address.split(",")[0]}
               </div>
             </div>
-            <div style={{display:"flex",gap:8,marginBottom:12}}>
-              {[
-                { icon:"⭐", val: rating.toFixed(1), sub:`(${totalReviews} đánh giá)` },
-                { icon:"⏱️", val:`${prepTime} phút`, sub:"chuẩn bị" },
-                { icon:"🕐", val: todayClosed ? "Hôm nay nghỉ" : todayLabel, sub:"giờ mở" },
-              ].map(s => (
-                <div key={s.icon} style={{flex:1,textAlign:"center",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,padding:"7px 4px"}}>
-                  <div style={{fontSize:15,marginBottom:2}}>{s.icon}</div>
-                  <div style={{color: todayClosed && s.icon==="🕐" ? "#ff4040" : "#f8f0e0",fontSize:10,fontWeight:700,lineHeight:1.2}}>{s.val}</div>
-                  <div style={{color:"#6a5a40",fontSize:7.5}}>{s.sub}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{display:"flex",gap:8}}>
-              {[
-                { label:"Phí ship", val:fmt(15000), color:"#FF8C00" },
-                { label:"Đơn tối thiểu", val:fmt(30000), color:"#b0956a" },
-                { label:"Trạng thái", val:isOpen?"Đang mở":"Đã đóng", color:isOpen?"#3ecf6e":"#ff4040" },
-              ].map(d => (
-                <div key={d.label} style={{flex:1,textAlign:"center"}}>
-                  <div style={{color:d.color,fontSize:11,fontWeight:700}}>{d.val}</div>
-                  <div style={{color:"#6a5a40",fontSize:7.5}}>{d.label}</div>
-                </div>
-              ))}
-            </div>
+          </div>
+
+          {/* Stats row */}
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            {[
+              { icon:"⭐", val: rating.toFixed(1), sub:`(${totalReviews} đánh giá)` },
+              { icon:"⏱️", val:`${prepTime} phút`, sub:"chế biến" },
+              { icon:"🕐", val: todayClosed ? "Hôm nay nghỉ" : todayLabel, sub:"giờ mở" },
+            ].map(s => (
+              <div key={s.icon} style={{flex:1,textAlign:"center",
+                background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",
+                borderRadius:10,padding:"8px 4px"}}>
+                <div style={{fontSize:15,marginBottom:2}}>{s.icon}</div>
+                <div style={{color: todayClosed && s.icon==="🕐" ? "#ff4040" : "#f8f0e0",
+                  fontSize:10,fontWeight:700,lineHeight:1.2}}>{s.val}</div>
+                <div style={{color:"#6a5a40",fontSize:7.5}}>{s.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Info strip */}
+          <div style={{display:"flex",gap:8,marginBottom:4}}>
+            {[
+              { label:"Phí ship", val:fmt(15000), color:"#FF8C00" },
+              { label:"Đơn tối thiểu", val:fmt(30000), color:"#b0956a" },
+              { label:"Trạng thái", val:isOpen?"Đang mở":"Đã đóng", color:isOpen?"#3ecf6e":"#ff4040" },
+            ].map(d => (
+              <div key={d.label} style={{flex:1,textAlign:"center",
+                background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.05)",
+                borderRadius:10,padding:"6px 4px"}}>
+                <div style={{color:d.color,fontSize:11,fontWeight:700}}>{d.val}</div>
+                <div style={{color:"#6a5a40",fontSize:7.5}}>{d.label}</div>
+              </div>
+            ))}
           </div>
         </div>
 
