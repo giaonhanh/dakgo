@@ -20,6 +20,8 @@ interface Product {
   imageUrl:  string | null
   sold:      number
   hot?:      boolean
+  toppings:  Topping[]
+  sizes:     SizeOpt[]
 }
 
 interface MenuGroupMeta { id: string; name: string; sortOrder: number }
@@ -38,6 +40,9 @@ interface ShopInfo {
   prep_time:     string | null
   menu_groups:   MenuGroupMeta[] | null
 }
+
+interface Topping { id: string; name: string; price: number }
+interface SizeOpt { id: string; label: string; priceDiff: number }
 
 interface ComboVoucher {
   id:       string
@@ -82,6 +87,183 @@ function spawnParticle(btn: HTMLElement, badge: HTMLElement | null) {
       }, 16)
     }, i * 40)
   }
+}
+
+// ─── ProductSheet (size + topping selector) ───────────────
+function ProductSheet({
+  product, selSize, selTops, qty,
+  onSizeChange, onToggleTop, onQtyChange, onClose, onConfirm,
+}: {
+  product:      Product
+  selSize:      string | null
+  selTops:      string[]
+  qty:          number
+  onSizeChange: (id: string) => void
+  onToggleTop:  (id: string) => void
+  onQtyChange:  (q: number) => void
+  onClose:      () => void
+  onConfirm:    () => void
+}) {
+  const sizeDiff  = product.sizes.find(s => s.id === selSize)?.priceDiff ?? 0
+  const topTotal  = selTops.reduce((s, tid) => s + (product.toppings.find(t => t.id === tid)?.price ?? 0), 0)
+  const unitPrice = product.price + sizeDiff + topTotal
+  const total     = unitPrice * qty
+
+  return (
+    <>
+      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+        onClick={onClose}
+        style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.72)",
+          zIndex:120, backdropFilter:"blur(4px)" }} />
+      <motion.div initial={{ y:"100%" }} animate={{ y:0 }} exit={{ y:"100%" }}
+        transition={{ type:"spring", damping:26, stiffness:280 }}
+        style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:121,
+          background:"#0e0c09", borderRadius:"22px 22px 0 0",
+          border:"1px solid rgba(255,107,0,0.18)",
+          maxHeight:"88svh", display:"flex", flexDirection:"column" }}>
+
+        {/* Handle + header */}
+        <div style={{ padding:"12px 16px 10px", flexShrink:0 }}>
+          <div style={{ width:36, height:4, background:"rgba(255,255,255,0.12)",
+            borderRadius:2, margin:"0 auto 12px" }} />
+          <div style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
+            {product.imageUrl && (
+              <div style={{ width:56, height:56, borderRadius:12, overflow:"hidden", flexShrink:0,
+                background:"rgba(255,255,255,0.05)" }}>
+                <img src={product.imageUrl} alt={product.name}
+                  style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+              </div>
+            )}
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ color:"#f8f0e0", fontSize:14, fontWeight:700, lineHeight:1.3, marginBottom:3 }}>
+                {product.name}
+              </div>
+              <div style={{ background:"linear-gradient(90deg,#FF6B00,#FFB347)",
+                WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                backgroundClip:"text", fontSize:13, fontWeight:800 }}>
+                {product.price.toLocaleString("vi-VN")}đ
+              </div>
+            </div>
+            <button onClick={onClose}
+              style={{ width:32, height:32, borderRadius:9, border:"none",
+                background:"rgba(255,255,255,0.06)", color:"#6a5a40",
+                fontSize:18, cursor:"pointer", flexShrink:0,
+                display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+          </div>
+        </div>
+
+        {/* Scrollable body */}
+        <div style={{ flex:1, overflowY:"auto", padding:"0 16px 8px" }}>
+
+          {/* Size */}
+          {product.sizes.length > 0 && (
+            <div style={{ marginBottom:18 }}>
+              <div style={{ color:"rgba(176,149,106,0.7)", fontSize:9.5, fontWeight:700,
+                letterSpacing:".4px", textTransform:"uppercase", marginBottom:8 }}>
+                Chọn size <span style={{ color:"#ff4040", marginLeft:2 }}>*</span>
+              </div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
+                {product.sizes.map(s => {
+                  const active = selSize === s.id
+                  return (
+                    <div key={s.id} onClick={() => onSizeChange(s.id)}
+                      style={{ padding:"8px 14px", borderRadius:10, cursor:"pointer",
+                        background: active ? "rgba(255,107,0,0.14)" : "rgba(255,255,255,0.04)",
+                        border:`1.5px solid ${active ? "#FF6B00" : "rgba(255,255,255,0.1)"}`,
+                        transition:"all .15s" }}>
+                      <div style={{ color: active ? "#FF8C00" : "#b0956a",
+                        fontSize:11, fontWeight: active ? 700 : 400 }}>{s.label}</div>
+                      {s.priceDiff !== 0 && (
+                        <div style={{ color: active ? "#FF8C00" : "#6a5a40", fontSize:9, marginTop:1 }}>
+                          {s.priceDiff > 0 ? "+" : ""}{s.priceDiff.toLocaleString("vi-VN")}đ
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Toppings */}
+          {product.toppings.length > 0 && (
+            <div style={{ marginBottom:18 }}>
+              <div style={{ color:"rgba(176,149,106,0.7)", fontSize:9.5, fontWeight:700,
+                letterSpacing:".4px", textTransform:"uppercase", marginBottom:8 }}>
+                Chọn topping
+              </div>
+              <div style={{ background:"rgba(255,255,255,0.02)",
+                border:"1px solid rgba(255,255,255,0.07)", borderRadius:12, overflow:"hidden" }}>
+                {product.toppings.map((t, i) => {
+                  const checked = selTops.includes(t.id)
+                  const isLast  = i === product.toppings.length - 1
+                  return (
+                    <div key={t.id} onClick={() => onToggleTop(t.id)}
+                      style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 12px",
+                        borderBottom: isLast ? "none" : "1px solid rgba(255,255,255,0.05)",
+                        background: checked ? "rgba(255,107,0,0.05)" : "transparent",
+                        cursor:"pointer", transition:"background .12s" }}>
+                      <div style={{ width:22, height:22, borderRadius:7, flexShrink:0,
+                        background: checked ? "#FF6B00" : "rgba(255,255,255,0.06)",
+                        border:`1.5px solid ${checked ? "#FF6B00" : "rgba(255,255,255,0.12)"}`,
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        transition:"all .12s" }}>
+                        {checked && <span style={{ color:"#fff", fontSize:10, fontWeight:900 }}>✓</span>}
+                      </div>
+                      <span style={{ flex:1, color: checked ? "#f8f0e0" : "#b0956a",
+                        fontSize:12, fontWeight: checked ? 600 : 400 }}>{t.name}</span>
+                      <span style={{ color:"#FF8C00", fontSize:10, fontWeight:600, flexShrink:0 }}>
+                        +{t.price.toLocaleString("vi-VN")}đ
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Qty stepper */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+            marginBottom:12 }}>
+            <div style={{ color:"rgba(176,149,106,0.7)", fontSize:9.5, fontWeight:700,
+              letterSpacing:".4px", textTransform:"uppercase" }}>Số lượng</div>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <button onClick={() => onQtyChange(Math.max(1, qty - 1))}
+                style={{ width:34, height:34, borderRadius:10, border:"none",
+                  background: qty > 1 ? "rgba(255,107,0,0.14)" : "rgba(255,255,255,0.05)",
+                  color: qty > 1 ? "#FF8C00" : "#6a5a40",
+                  fontSize:18, cursor: qty > 1 ? "pointer" : "default",
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontFamily:"Lexend", transition:"all .12s" }}>−</button>
+              <span style={{ color:"#f8f0e0", fontSize:15, fontWeight:700,
+                minWidth:24, textAlign:"center" }}>{qty}</span>
+              <button onClick={() => onQtyChange(qty + 1)}
+                style={{ width:34, height:34, borderRadius:10, border:"none",
+                  background:"rgba(255,107,0,0.14)", color:"#FF8C00",
+                  fontSize:18, cursor:"pointer",
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontFamily:"Lexend" }}>+</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Confirm button */}
+        <div style={{ padding:"10px 16px", paddingBottom:"max(20px,env(safe-area-inset-bottom))",
+          borderTop:"1px solid rgba(255,255,255,0.06)", flexShrink:0 }}>
+          <button onClick={onConfirm}
+            style={{ width:"100%", height:50, borderRadius:14, border:"none",
+              background:"linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)",
+              color:"#fff", fontSize:13, fontWeight:700, fontFamily:"Lexend",
+              cursor:"pointer", boxShadow:"0 4px 18px rgba(255,107,0,0.4)",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+            <span>🛒 Thêm {qty > 1 ? `${qty} × ` : ""}vào giỏ</span>
+            <span style={{ opacity:.85, fontSize:12 }}>•</span>
+            <span>{total.toLocaleString("vi-VN")}đ</span>
+          </button>
+        </div>
+      </motion.div>
+    </>
+  )
 }
 
 // ─── ProductCard ──────────────────────────────────────────
@@ -168,17 +350,26 @@ function ProductCard({
           </div>
 
           {/* Add button */}
-          <button ref={btnRef}
-            onClick={() => btnRef.current && onAdd(product, btnRef.current)}
-            style={{ width:36, height:36, borderRadius:10, border:"none",
-              background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
-              color:"#fff", fontSize:20, fontWeight:300, cursor:"pointer",
-              display:"flex", alignItems:"center", justifyContent:"center",
-              boxShadow:"0 2px 10px rgba(255,107,0,0.4)",
-              flexShrink:0, transition:"transform .15s, box-shadow .15s",
-              lineHeight:1 }}>
-            +
-          </button>
+          {(() => {
+            const hasOpts = product.toppings.length > 0 || product.sizes.length > 0
+            return (
+              <button ref={btnRef}
+                onClick={() => btnRef.current && onAdd(product, btnRef.current)}
+                style={{ height:36, borderRadius:10, border:"none",
+                  padding: hasOpts ? "0 10px" : "0",
+                  width: hasOpts ? "auto" : 36,
+                  background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
+                  color:"#fff", fontSize: hasOpts ? 10 : 20,
+                  fontWeight: hasOpts ? 700 : 300, cursor:"pointer",
+                  fontFamily:"Lexend",
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  boxShadow:"0 2px 10px rgba(255,107,0,0.4)",
+                  flexShrink:0, transition:"transform .15s, box-shadow .15s",
+                  whiteSpace:"nowrap", lineHeight:1 }}>
+                {hasOpts ? "Chọn ›" : "+"}
+              </button>
+            )
+          })()}
         </div>
       </div>
     </div>
@@ -200,7 +391,7 @@ export default function ShopPage() {
   const totalItems    = useCartStore(s => s.totalQty())
   const totalPrice    = useCartStore(s => s.totalPrice())
 
-  type PendingItem = { id:string; name:string; price:number; shop:string; shopId:string }
+  type PendingItem = { id:string; name:string; price:number; shop:string; shopId:string; imageUrl?:string }
   const [shop,          setShop]          = useState<ShopInfo | null>(null)
   const [products,      setProducts]      = useState<Product[]>([])
   const [categories,    setCategories]    = useState<{id:string; label:string}[]>([])
@@ -212,6 +403,10 @@ export default function ShopPage() {
   const [favoured,      setFavoured]      = useState(false)
   const [conflictItem,  setConflictItem]  = useState<PendingItem | null>(null)
   const [uploading,     setUploading]     = useState<"cover"|"logo"|null>(null)
+  const [optSheet,      setOptSheet]      = useState<Product | null>(null)
+  const [selSize,       setSelSize]       = useState<string | null>(null)
+  const [selTops,       setSelTops]       = useState<string[]>([])
+  const [optQty,        setOptQty]        = useState(1)
   const coverRef = useRef<HTMLInputElement>(null)
   const logoRef  = useRef<HTMLInputElement>(null)
 
@@ -244,17 +439,20 @@ export default function ShopPage() {
       // Products
       const { data: prodData } = await supabase
         .from("products")
-        .select("id,name,description,price,original_price,category,is_available,sold_count,image_url")
+        .select("id,name,description,price,original_price,category,is_available,sold_count,image_url,toppings,sizes")
         .eq("shop_id", shopId)
         .eq("is_available", true)
         .order("sort_order", { ascending: true })
 
-      const mapped: Product[] = (prodData ?? []).map((p: {id:string;name:string;description:string|null;price:number;original_price:number|null;category:string|null;sold_count:number;image_url:string|null}) => ({
+      type ProdRow = { id:string; name:string; description:string|null; price:number; original_price:number|null; category:string|null; sold_count:number; image_url:string|null; toppings:unknown; sizes:unknown }
+      const mapped: Product[] = (prodData ?? [] as ProdRow[]).map((p: ProdRow) => ({
         id: p.id, name: p.name, desc: p.description ?? "",
         price: p.price, origPrice: p.original_price ?? null,
         category: p.category ?? "Thực đơn",
         imageUrl: p.image_url,
         sold: p.sold_count, hot: p.sold_count > 50,
+        toppings: (p.toppings as Topping[] | null) ?? [],
+        sizes: (p.sizes as SizeOpt[] | null) ?? [],
       }))
       setProducts(mapped)
 
@@ -345,15 +543,40 @@ export default function ShopPage() {
 
   // Add to cart — kiểm tra conflict shop khác
   const handleAdd = useCallback((product: Product, btn: HTMLElement) => {
-    const newItem = { id: product.id, name: product.name, price: product.price, shop: shop?.name ?? "", shopId }
-    if (storeShopId && storeShopId !== shopId) {
-      setConflictItem(newItem)
+    if (product.toppings.length > 0 || product.sizes.length > 0) {
+      setOptSheet(product)
+      setSelSize(product.sizes[0]?.id ?? null)
+      setSelTops([])
+      setOptQty(1)
       return
     }
+    const newItem = { id: product.id, name: product.name, price: product.price, shop: shop?.name ?? "", shopId, imageUrl: product.imageUrl ?? undefined }
+    if (storeShopId && storeShopId !== shopId) { setConflictItem(newItem); return }
     spawnParticle(btn, cartBadgeRef.current)
     addItem(newItem)
     fireToast(`Đã thêm ${product.name}`)
   }, [addItem, shopId, storeShopId, shop])
+
+  const confirmOptions = useCallback(() => {
+    if (!optSheet) return
+    const sizeDiff = optSheet.sizes.find(s => s.id === selSize)?.priceDiff ?? 0
+    const topTotal = selTops.reduce((s, tid) => s + (optSheet.toppings.find(t => t.id === tid)?.price ?? 0), 0)
+    const unitPrice = optSheet.price + sizeDiff + topTotal
+    const sizeLabel = optSheet.sizes.find(s => s.id === selSize)?.label
+    const topLabels = selTops.map(tid => optSheet.toppings.find(t => t.id === tid)?.name).filter(Boolean)
+    const optSuffix = [...(sizeLabel ? [sizeLabel] : []), ...topLabels].join(" · ")
+    const itemName  = optSuffix ? `${optSheet.name} (${optSuffix})` : optSheet.name
+    const itemId    = `${optSheet.id}__${selSize ?? "ns"}__${[...selTops].sort().join(",")}`
+    const newItem   = { id: itemId, name: itemName, price: unitPrice, shop: shop?.name ?? "", shopId, imageUrl: optSheet.imageUrl ?? undefined }
+    if (storeShopId && storeShopId !== shopId) {
+      setConflictItem(newItem)
+      setOptSheet(null)
+      return
+    }
+    for (let i = 0; i < optQty; i++) addItem(newItem)
+    setOptSheet(null)
+    fireToast(`Đã thêm ${itemName}`)
+  }, [optSheet, selSize, selTops, optQty, shop, shopId, storeShopId, addItem])
 
   const confirmReplace = () => {
     if (!conflictItem) return
@@ -852,6 +1075,23 @@ export default function ShopPage() {
           ))}
         </div>
       </div>
+
+      {/* ── Options Sheet — size + topping ── */}
+      <AnimatePresence>
+        {optSheet && (
+          <ProductSheet
+            product={optSheet}
+            selSize={selSize}
+            selTops={selTops}
+            qty={optQty}
+            onSizeChange={id => setSelSize(id)}
+            onToggleTop={id => setSelTops(ts => ts.includes(id) ? ts.filter(x => x !== id) : [...ts, id])}
+            onQtyChange={q => setOptQty(q)}
+            onClose={() => setOptSheet(null)}
+            onConfirm={confirmOptions}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Conflict Modal — đổi quán ── */}
       <AnimatePresence>
