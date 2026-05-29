@@ -27,11 +27,16 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function Row({ icon, label, sub, children, danger = false, onClick, arrow = false }: {
-  icon: string; label: string; sub?: string; children?: React.ReactNode; danger?: boolean; onClick?: () => void; arrow?: boolean
+function Row({ icon, label, sub, children, danger = false, onClick, arrow = false, last = false }: {
+  icon: string; label: string; sub?: string; children?: React.ReactNode
+  danger?: boolean; onClick?: () => void; arrow?: boolean; last?: boolean
 }) {
   return (
-    <div onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", cursor: onClick ? "pointer" : "default" }}>
+    <div onClick={onClick} style={{
+      display: "flex", alignItems: "center", gap: 12, padding: "13px 0",
+      borderBottom: last ? "none" : "1px solid rgba(255,255,255,0.05)",
+      cursor: onClick ? "pointer" : "default",
+    }}>
       <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: danger ? "rgba(255,64,64,0.1)" : "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>{icon}</div>
       <div style={{ flex: 1 }}>
         <div style={{ color: danger ? "#ff4040" : "#f8f0e0", fontSize: 13, fontWeight: 600 }}>{label}</div>
@@ -42,6 +47,8 @@ function Row({ icon, label, sub, children, danger = false, onClick, arrow = fals
     </div>
   )
 }
+
+const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
 /* ── password sheet ── */
 function PwSheet({ onClose }: { onClose: () => void }) {
@@ -82,7 +89,7 @@ function PwSheet({ onClose }: { onClose: () => void }) {
         <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 8 }}>{labels[step - 1]}</div>
         <div style={{ position: "relative" }}>
           <input type={show ? "text" : "password"} value={vals[step - 1]} onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === "Enter" && next()} placeholder="••••••••" autoFocus
-            style={{ width: "100%", height: 48, padding: "0 48px 0 16px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.25)", borderRadius: 12, color: "#f8f0e0", fontSize: 14, fontFamily: "Lexend" }} />
+            style={{ width: "100%", height: 48, padding: "0 48px 0 16px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.25)", borderRadius: 12, color: "#f8f0e0", fontSize: 14, fontFamily: "Lexend", boxSizing: "border-box" }} />
           <button onClick={() => setShow(s => !s)} style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>{show ? "🙈" : "👁"}</button>
         </div>
         {err && <div style={{ color: "#ff4040", fontSize: 11, marginTop: 8 }}>⚠ {err}</div>}
@@ -95,7 +102,7 @@ function PwSheet({ onClose }: { onClose: () => void }) {
   )
 }
 
-/* ── vehicle edit sheet ── */
+/* ── vehicle sheet ── */
 function VehicleSheet({ onClose }: { onClose: () => void }) {
   const supabase = createClient()
   const [type, setType]   = useState("motorbike")
@@ -123,11 +130,8 @@ function VehicleSheet({ onClose }: { onClose: () => void }) {
   const save = async () => {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await supabase.from("drivers").update({ vehicle_type: type, license_plate: plate, vehicle_model: model }).eq("id", user.id)
-    }
-    setSaving(false)
-    onClose()
+    if (user) await supabase.from("drivers").update({ vehicle_type: type, license_plate: plate, vehicle_model: model }).eq("id", user.id)
+    setSaving(false); onClose()
   }
   return (
     <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 26, stiffness: 280 }}
@@ -147,7 +151,7 @@ function VehicleSheet({ onClose }: { onClose: () => void }) {
         {[{ label: "Biển số xe", value: plate, set: setPlate, ph: "VD: 47B1-23456" }, { label: "Model xe", value: model, set: setModel, ph: "VD: Honda Wave Alpha 2022" }].map(f => (
           <div key={f.label} style={{ marginBottom: 12 }}>
             <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 6 }}>{f.label}</div>
-            <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend" }} />
+            <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", boxSizing: "border-box" }} />
           </div>
         ))}
         <button onClick={save} disabled={saving} style={{ width: "100%", height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend", marginTop: 8, opacity: saving ? 0.7 : 1 }}>{saving ? "Đang lưu..." : "✓ Lưu thay đổi"}</button>
@@ -158,28 +162,22 @@ function VehicleSheet({ onClose }: { onClose: () => void }) {
 
 /* ── bank sheet ── */
 const BANK_LIST = ["Vietcombank","Techcombank","MB Bank","BIDV","VPBank","Agribank","ACB","VietinBank","TPBank","HDBank","Sacombank","MSB","SHB","OCB","Eximbank","Nam A Bank"]
-
-function maskAcct(s: string) {
-  if (s.length <= 5) return s
-  return s.slice(0, 2) + "••••" + s.slice(-3)
-}
+function maskAcct(s: string) { return s.length <= 5 ? s : s.slice(0, 2) + "••••" + s.slice(-3) }
 
 function BankSheet({ onClose, onSaved }: { onClose: () => void; onSaved?: () => void }) {
   const supabase = createClient()
-  const [bank,    setBank]    = useState("Vietcombank")
-  const [acct,    setAcct]    = useState("")
-  const [name,    setName]    = useState("")
-  const [saving,  setSaving]  = useState(false)
+  const [bank, setBank]     = useState("Vietcombank")
+  const [acct, setAcct]     = useState("")
+  const [name, setName]     = useState("")
+  const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [err,     setErr]     = useState("")
+  const [err, setErr]       = useState("")
   const [editing, setEditing] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); setEditing(true); return }
-      supabase.from("drivers")
-        .select("bank_name, bank_account_number, bank_account_name")
-        .eq("id", user.id).single()
+      supabase.from("drivers").select("bank_name, bank_account_number, bank_account_name").eq("id", user.id).single()
         .then(({ data }) => {
           if (data?.bank_name)           setBank(data.bank_name)
           if (data?.bank_account_number) setAcct(data.bank_account_number)
@@ -198,97 +196,54 @@ function BankSheet({ onClose, onSaved }: { onClose: () => void; onSaved?: () => 
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return setErr("Chưa đăng nhập") }
-    const { error } = await supabase.from("drivers").update({
-      bank_name:           bank,
-      bank_account_number: acct.trim(),
-      bank_account_name:   name.trim().toUpperCase(),
-    }).eq("id", user.id)
+    const { error } = await supabase.from("drivers").update({ bank_name: bank, bank_account_number: acct.trim(), bank_account_name: name.trim().toUpperCase() }).eq("id", user.id)
     setSaving(false)
     if (error) return setErr("Lưu thất bại, thử lại sau")
-    setEditing(false)
-    onSaved?.()
+    setEditing(false); onSaved?.()
   }
 
   return (
     <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 26, stiffness: 280 }}
       style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
       <div style={{ background: "#0e0b07", borderTop: "1px solid rgba(255,107,0,0.3)", borderRadius: "22px 22px 0 0", padding: "20px 20px calc(env(safe-area-inset-bottom) + 20px)", maxHeight: "85dvh", overflowY: "auto" }}>
-
-        {/* header */}
         <div style={{ display: "flex", alignItems: "center", marginBottom: 18 }}>
           <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🏦 Tài khoản ngân hàng</div>
           <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
         </div>
-
         {loading ? (
           <div style={{ textAlign: "center", padding: "24px 0", color: "#6a5a40", fontSize: 12 }}>Đang tải...</div>
         ) : !editing ? (
-          /* ── VIEW MODE ── */
           <>
             <div style={{ background: "rgba(62,207,110,0.07)", border: "1px solid rgba(62,207,110,0.2)", borderRadius: 16, padding: "18px 16px", marginBottom: 16 }}>
-              <div style={{ color: "#6a5a40", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>Thông tin tài khoản nhận tiền</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "#6a5a40", fontSize: 11 }}>Ngân hàng</span>
-                  <span style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 700 }}>{bank}</span>
+              <div style={{ color: "#6a5a40", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>Tài khoản nhận tiền</div>
+              {[["Ngân hàng", bank, "#f8f0e0"], ["Số tài khoản", maskAcct(acct), "#3ecf6e"], ["Chủ tài khoản", name, "#f8f0e0"]].map(([k, v, c]) => (
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ color: "#6a5a40", fontSize: 11 }}>{k}</span>
+                  <span style={{ color: c, fontSize: 11, fontWeight: 700 }}>{v}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "#6a5a40", fontSize: 11 }}>Số tài khoản</span>
-                  <span style={{ color: "#3ecf6e", fontSize: 13, fontWeight: 800, letterSpacing: 1 }}>{maskAcct(acct)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "#6a5a40", fontSize: 11 }}>Chủ tài khoản</span>
-                  <span style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600 }}>{name}</span>
-                </div>
-              </div>
+              ))}
             </div>
-            <div style={{ background: "rgba(255,107,0,0.07)", border: "1px solid rgba(255,107,0,0.18)", borderRadius: 12, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 10, alignItems: "center" }}>
-              <span style={{ fontSize: 15 }}>💰</span>
-              <span style={{ color: "#FF8C00", fontSize: 10, lineHeight: 1.5, flex: 1 }}>Tiền nhận sau khi hoàn thành đơn và trừ chiết khấu nền tảng.</span>
-            </div>
-            <button onClick={() => setEditing(true)}
-              style={{ width: "100%", height: 46, borderRadius: 13, border: "1px solid rgba(255,107,0,0.3)", background: "rgba(255,107,0,0.08)", color: "#FF8C00", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>
-              ✏️ Sửa tài khoản
-            </button>
+            <button onClick={() => setEditing(true)} style={{ width: "100%", height: 46, borderRadius: 13, border: "1px solid rgba(255,107,0,0.3)", background: "rgba(255,107,0,0.08)", color: "#FF8C00", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>✏️ Sửa tài khoản</button>
           </>
         ) : (
-          /* ── EDIT MODE ── */
           <>
-            {acct && (
-              <div style={{ background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)", borderRadius: 11, padding: "9px 13px", marginBottom: 14, display: "flex", gap: 8, alignItems: "center" }}>
-                <span style={{ fontSize: 14 }}>⚠️</span>
-                <span style={{ color: "#f5c542", fontSize: 10, lineHeight: 1.5 }}>Đang sửa tài khoản. Hãy kiểm tra kỹ trước khi lưu.</span>
-              </div>
-            )}
+            {acct && <div style={{ background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)", borderRadius: 11, padding: "9px 13px", marginBottom: 14, display: "flex", gap: 8, alignItems: "center" }}><span style={{ fontSize: 14 }}>⚠️</span><span style={{ color: "#f5c542", fontSize: 10, lineHeight: 1.5 }}>Đang sửa tài khoản. Hãy kiểm tra kỹ trước khi lưu.</span></div>}
             <div style={{ marginBottom: 12 }}>
               <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 8 }}>Ngân hàng</div>
-              <select value={bank} onChange={e => setBank(e.target.value)}
-                style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", appearance: "auto" }}>
+              <select value={bank} onChange={e => setBank(e.target.value)} style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", appearance: "auto" }}>
                 {BANK_LIST.map(b => <option key={b} value={b} style={{ background: "#0e0b07" }}>{b}</option>)}
               </select>
             </div>
-            {[
-              { label: "Số tài khoản", value: acct, set: setAcct, ph: "VD: 1234567890" },
-              { label: "Tên chủ tài khoản (IN HOA)", value: name, set: setName, ph: "VD: PHAM HONG MY" },
-            ].map(f => (
+            {[{ label: "Số tài khoản", value: acct, set: setAcct, ph: "VD: 1234567890" }, { label: "Tên chủ tài khoản (IN HOA)", value: name, set: setName, ph: "VD: PHAM HONG MY" }].map(f => (
               <div key={f.label} style={{ marginBottom: 12 }}>
                 <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 6 }}>{f.label}</div>
-                <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.ph}
-                  style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", boxSizing: "border-box" }} />
+                <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", boxSizing: "border-box" }} />
               </div>
             ))}
             {err && <div style={{ color: "#ff4040", fontSize: 11, marginBottom: 10 }}>⚠ {err}</div>}
             <div style={{ display: "flex", gap: 8 }}>
-              {acct && (
-                <button onClick={() => setEditing(false)}
-                  style={{ flex: 1, height: 48, borderRadius: 13, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#6a5a40", fontSize: 12, cursor: "pointer", fontFamily: "Lexend" }}>
-                  Huỷ
-                </button>
-              )}
-              <button onClick={save} disabled={saving}
-                style={{ flex: 2, height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: saving ? "default" : "pointer", fontFamily: "Lexend", opacity: saving ? 0.7 : 1 }}>
-                {saving ? "Đang lưu..." : "✓ Lưu tài khoản"}
-              </button>
+              {acct && <button onClick={() => setEditing(false)} style={{ flex: 1, height: 48, borderRadius: 13, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#6a5a40", fontSize: 12, cursor: "pointer", fontFamily: "Lexend" }}>Huỷ</button>}
+              <button onClick={save} disabled={saving} style={{ flex: 2, height: 48, borderRadius: 14, border: "none", background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: saving ? "default" : "pointer", fontFamily: "Lexend", opacity: saving ? 0.7 : 1 }}>{saving ? "Đang lưu..." : "✓ Lưu tài khoản"}</button>
             </div>
           </>
         )}
@@ -297,27 +252,27 @@ function BankSheet({ onClose, onSaved }: { onClose: () => void; onSaved?: () => 
   )
 }
 
-/* ── document sheet ── */
+/* ── doc sheet ── */
 function DocSheet({ onClose }: { onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState<string | null>(null)
   const DOCS = [
-    { id: "cccd",    icon: "🪪", label: "CMND / CCCD",   status: "verified",  exp: "15/07/2029" },
-    { id: "license", icon: "📋", label: "Bằng lái xe",    status: "verified",  exp: "30/12/2027" },
-    { id: "regist",  icon: "📄", label: "Đăng ký xe",     status: "verified",  exp: "20/03/2026" },
-    { id: "insure",  icon: "🛡", label: "Bảo hiểm xe",    status: "expiring",  exp: "10/06/2025" },
-    { id: "avatar",  icon: "🤳", label: "Ảnh chân dung",  status: "verified",  exp: "" },
+    { id: "cccd",    icon: "🪪", label: "CMND / CCCD",  status: "verified", exp: "15/07/2029" },
+    { id: "license", icon: "📋", label: "Bằng lái xe",   status: "verified", exp: "30/12/2027" },
+    { id: "regist",  icon: "📄", label: "Đăng ký xe",    status: "verified", exp: "20/03/2026" },
+    { id: "insure",  icon: "🛡", label: "Bảo hiểm xe",   status: "expiring", exp: "10/06/2025" },
+    { id: "avatar",  icon: "🤳", label: "Ảnh chân dung", status: "verified", exp: "" },
   ]
   const statusCfg = {
-    verified: { color: "#3ecf6e", bg: "rgba(62,207,110,0.1)",   bd: "rgba(62,207,110,0.25)",  label: "✅ Đã xác minh" },
-    expiring: { color: "#FFB347", bg: "rgba(255,179,71,0.1)",   bd: "rgba(255,179,71,0.25)",  label: "⏳ Sắp hết hạn" },
-    pending:  { color: "#4a8ff5", bg: "rgba(74,143,245,0.1)",   bd: "rgba(74,143,245,0.25)",  label: "⏺ Đang duyệt" },
-    rejected: { color: "#ff4040", bg: "rgba(255,64,64,0.1)",    bd: "rgba(255,64,64,0.25)",   label: "❌ Bị từ chối" },
+    verified: { color: "#3ecf6e", bg: "rgba(62,207,110,0.1)",  bd: "rgba(62,207,110,0.25)", label: "✅ Đã xác minh" },
+    expiring: { color: "#FFB347", bg: "rgba(255,179,71,0.1)",  bd: "rgba(255,179,71,0.25)", label: "⏳ Sắp hết hạn" },
+    pending:  { color: "#4a8ff5", bg: "rgba(74,143,245,0.1)",  bd: "rgba(74,143,245,0.25)", label: "⏺ Đang duyệt" },
+    rejected: { color: "#ff4040", bg: "rgba(255,64,64,0.1)",   bd: "rgba(255,64,64,0.25)",  label: "❌ Bị từ chối" },
   }
   return (
     <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 26, stiffness: 280 }}
       style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-      <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) { setTimeout(() => setUploading(null), 2000) } e.target.value = "" }} />
+      <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) setTimeout(() => setUploading(null), 2000); e.target.value = "" }} />
       <div style={{ background: "#0e0b07", borderTop: "1px solid rgba(255,107,0,0.3)", borderRadius: "22px 22px 0 0", padding: "20px 20px calc(env(safe-area-inset-bottom) + 20px)", maxHeight: "85dvh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 18 }}>
           <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>📄 Giấy tờ tài xế</div>
@@ -346,23 +301,132 @@ function DocSheet({ onClose }: { onClose: () => void }) {
   )
 }
 
-/* ── main ── */
+/* ── wallet history sheet ── */
+interface WalletTx {
+  id: string; type: string; amount: number; balance_after: number
+  note: string | null; created_at: string
+}
+
+const TX_CFG: Record<string, { label: string; color: string; sign: string }> = {
+  topup:      { label: "Nạp tiền",   color: "#3ecf6e", sign: "+" },
+  withdrawal: { label: "Rút tiền",   color: "#ff4040", sign: "−" },
+  payment:    { label: "Thanh toán", color: "#4a8ff5", sign: "−" },
+  commission: { label: "Hoa hồng",   color: "#b464ff", sign: "−" },
+  refund:     { label: "Hoàn tiền",  color: "#FFB347", sign: "+" },
+}
+
+function WalletHistorySheet({ onClose, walletBalance }: { onClose: () => void; walletBalance: number }) {
+  const supabase = createClient()
+  const [txs,     setTxs]     = useState<WalletTx[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { setLoading(false); return }
+      const { data: wallet } = await supabase.from("wallets")
+        .select("id").eq("user_id", user.id).eq("type", "driver").maybeSingle()
+      if (!wallet?.id) { setLoading(false); return }
+      const { data } = await supabase.from("transactions")
+        .select("id, type, amount, balance_after, note, created_at")
+        .eq("wallet_id", wallet.id)
+        .order("created_at", { ascending: false })
+        .limit(50)
+      setTxs((data ?? []) as WalletTx[])
+      setLoading(false)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const fmtDate = (s: string) => {
+    const d = new Date(s)
+    return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }) + " · " +
+      d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+  }
+
+  return (
+    <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 26, stiffness: 280 }}
+      style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div style={{ background: "#0e0b07", borderTop: "1px solid rgba(180,100,255,0.3)", borderRadius: "22px 22px 0 0", maxHeight: "88dvh", display: "flex", flexDirection: "column" }}>
+
+        {/* header */}
+        <div style={{ padding: "20px 20px 16px", flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🪙 Lịch sử Nạp / Rút</div>
+            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
+          </div>
+          {/* balance card */}
+          <div style={{ background: "linear-gradient(135deg,rgba(180,100,255,0.12),rgba(180,100,255,0.04))", border: "1px solid rgba(180,100,255,0.25)", borderRadius: 14, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ color: "rgba(180,100,255,0.6)", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>Số dư hiện tại</div>
+              <div style={{ color: "#b464ff", fontSize: 22, fontWeight: 800 }}>{fmt(walletBalance)}</div>
+            </div>
+            <div style={{ fontSize: 32 }}>🪙</div>
+          </div>
+        </div>
+
+        {/* list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px calc(env(safe-area-inset-bottom) + 20px)" }}>
+          {loading ? (
+            [1,2,3,4].map(i => (
+              <div key={i} style={{ height: 60, borderRadius: 12, background: "rgba(255,255,255,0.04)", marginBottom: 8 }} />
+            ))
+          ) : txs.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 0" }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>📭</div>
+              <div style={{ color: "#6a5a40", fontSize: 12 }}>Chưa có giao dịch nào</div>
+            </div>
+          ) : txs.map((tx, i) => {
+            const cfg = TX_CFG[tx.type] ?? { label: tx.type, color: "#6a5a40", sign: "" }
+            const isIncome = cfg.sign === "+"
+            return (
+              <div key={tx.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 0", borderBottom: i < txs.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                {/* icon */}
+                <div style={{ width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: isIncome ? "rgba(62,207,110,0.1)" : "rgba(255,64,64,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+                  {isIncome ? "💰" : "📤"}
+                </div>
+                {/* info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 600 }}>{cfg.label}</div>
+                  <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 2 }}>
+                    {tx.note || fmtDate(tx.created_at)}
+                  </div>
+                  {tx.note && <div style={{ color: "rgba(106,90,64,0.6)", fontSize: 8.5, marginTop: 1 }}>{fmtDate(tx.created_at)}</div>}
+                </div>
+                {/* amount + balance */}
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ color: cfg.color, fontSize: 13, fontWeight: 800 }}>
+                    {cfg.sign}{fmt(tx.amount)}
+                  </div>
+                  <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 2 }}>
+                    Còn {fmt(tx.balance_after)}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════
+   MAIN PAGE
+══════════════════════════════════════════════════════ */
 export default function DriverProfilePage() {
   const supabase = createClient()
-  const [name, setName]       = useState("")
-  const [phone, setPhone]     = useState("")
-  const [userId, setUserId]   = useState<string | null>(null)
-  const [editing, setEditing] = useState(false)
-  const [avatar, setAvatar]   = useState<string | null>(null)
-  const avatarRef             = useRef<HTMLInputElement>(null)
-  const [bankInfo, setBankInfo] = useState<{ bank_name: string | null; bank_account_number: string | null } | null>(null)
-  const [driverStats, setDriverStats] = useState({ rating: 0, trips: 0, walletBal: 0, joinDate: "" })
-  const [vehicleSub,  setVehicleSub]  = useState("Chưa cập nhật thông tin xe")
+  const [name,      setName]      = useState("")
+  const [phone,     setPhone]     = useState("")
+  const [userId,    setUserId]    = useState<string | null>(null)
+  const [editing,   setEditing]   = useState(false)
+  const [avatar,    setAvatar]    = useState<string | null>(null)
+  const avatarRef                 = useRef<HTMLInputElement>(null)
+  const [bankInfo,  setBankInfo]  = useState<{ bank_name: string | null; bank_account_number: string | null } | null>(null)
+  const [stats,     setStats]     = useState({ rating: 0, trips: 0, walletBal: 0, joinDate: "" })
+  const [vehicleSub, setVehicleSub] = useState("Chưa cập nhật thông tin xe")
 
   const loadBankInfo = async (uid: string) => {
-    const { data } = await supabase.from("drivers")
-      .select("bank_name, bank_account_number")
-      .eq("id", uid).single()
+    const { data } = await supabase.from("drivers").select("bank_name, bank_account_number").eq("id", uid).single()
     setBankInfo(data ?? null)
   }
 
@@ -370,91 +434,44 @@ export default function DriverProfilePage() {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
       setUserId(user.id)
-
-      // profile info
-      const { data: prof } = await supabase.from("profiles")
-        .select("full_name, phone, avatar_url, created_at").eq("id", user.id).single()
-      if (prof) {
-        setName(prof.full_name ?? "")
-        setPhone(prof.phone ?? "")
-        if (prof.avatar_url) setAvatar(prof.avatar_url)
-      }
-
-      // driver stats + vehicle
-      const { data: drv } = await supabase.from("drivers")
-        .select("rating_avg, total_trips, vehicle_type, vehicle_model, license_plate, bank_name, bank_account_number")
-        .eq("id", user.id).single()
-
-      // wallet balance
-      const { data: wallet } = await supabase.from("wallets")
-        .select("balance").eq("user_id", user.id).eq("type", "driver").maybeSingle()
-
-      const joinDate = prof?.created_at
-        ? new Date(prof.created_at).toLocaleDateString("vi-VN", { month:"2-digit", year:"numeric" })
-        : ""
-
-      setDriverStats({
-        rating:    (drv as { rating_avg?: number } | null)?.rating_avg ?? 5.0,
-        trips:     (drv as { total_trips?: number } | null)?.total_trips ?? 0,
-        walletBal: (wallet as { balance?: number } | null)?.balance ?? 0,
-        joinDate,
-      })
-
+      const { data: prof } = await supabase.from("profiles").select("full_name, phone, avatar_url, created_at").eq("id", user.id).single()
+      if (prof) { setName(prof.full_name ?? ""); setPhone(prof.phone ?? ""); if (prof.avatar_url) setAvatar(prof.avatar_url) }
+      const { data: drv } = await supabase.from("drivers").select("rating_avg, total_trips, vehicle_type, vehicle_model, license_plate, bank_name, bank_account_number").eq("id", user.id).single()
+      const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "driver").maybeSingle()
+      const joinDate = prof?.created_at ? new Date(prof.created_at).toLocaleDateString("vi-VN", { month: "2-digit", year: "numeric" }) : ""
+      setStats({ rating: (drv as { rating_avg?: number } | null)?.rating_avg ?? 5.0, trips: (drv as { total_trips?: number } | null)?.total_trips ?? 0, walletBal: (wallet as { balance?: number } | null)?.balance ?? 0, joinDate })
       if (drv) {
         const d = drv as { vehicle_model?: string; license_plate?: string }
-        const parts = [d.vehicle_model, d.license_plate].filter(Boolean)
-        setVehicleSub(parts.length ? parts.join(" · ") : "Chưa cập nhật thông tin xe")
+        setVehicleSub([d.vehicle_model, d.license_plate].filter(Boolean).join(" · ") || "Chưa cập nhật thông tin xe")
         setBankInfo({ bank_name: (drv as { bank_name?: string }).bank_name ?? null, bank_account_number: (drv as { bank_account_number?: string }).bank_account_number ?? null })
       }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /* work settings — loaded from localStorage */
-  const [work, setWork] = useState({
-    soundNewOrder:    true,
-    vibrationOrder:   true,
-    showPopup:        true,
-    autoOnline:       false,
-    nightMode:        false,
-  })
+  /* settings — persisted to localStorage */
+  const [work, setWork] = useState({ sound: true, vibrate: true, autoOnline: false, nightMode: false })
+  const [notif, setNotif] = useState({ orders: true, earnings: true, system: true })
 
-  /* notification settings — loaded from localStorage */
-  const [notif, setNotif] = useState({
-    orderAlerts: true,
-    earnings:    true,
-    promos:      false,
-    system:      true,
-  })
-
-  /* load persisted settings on mount */
   useEffect(() => {
     try {
-      const w = localStorage.getItem("driver_work_settings")
-      if (w) setWork(JSON.parse(w))
-      const n = localStorage.getItem("driver_notif_settings")
-      if (n) setNotif(JSON.parse(n))
+      const w = localStorage.getItem("driver_work_settings"); if (w) setWork(JSON.parse(w))
+      const n = localStorage.getItem("driver_notif_settings"); if (n) setNotif(JSON.parse(n))
     } catch { /* ignore */ }
   }, [])
+
+  const wk = (k: keyof typeof work) => setWork(p => { const next = { ...p, [k]: !p[k] }; try { localStorage.setItem("driver_work_settings", JSON.stringify(next)) } catch { /* */ } return next })
+  const nt = (k: keyof typeof notif) => setNotif(p => { const next = { ...p, [k]: !p[k] }; try { localStorage.setItem("driver_notif_settings", JSON.stringify(next)) } catch { /* */ } return next })
 
   /* sheets */
   const [showPw,      setShowPw]      = useState(false)
   const [showVehicle, setShowVehicle] = useState(false)
   const [showBank,    setShowBank]    = useState(false)
   const [showDocs,    setShowDocs]    = useState(false)
-  const [toast, setToast]             = useState("")
+  const [showWallet,  setShowWallet]  = useState(false)
+  const [toast,       setToast]       = useState("")
 
   const fire = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2200) }
-  const wk = (k: keyof typeof work) => setWork(p => {
-    const next = { ...p, [k]: !p[k] }
-    try { localStorage.setItem("driver_work_settings", JSON.stringify(next)) } catch { /* ignore */ }
-    return next
-  })
-  const nt = (k: keyof typeof notif) => setNotif(p => {
-    const next = { ...p, [k]: !p[k] }
-    try { localStorage.setItem("driver_notif_settings", JSON.stringify(next)) } catch { /* ignore */ }
-    return next
-  })
 
   return (
     <>
@@ -462,8 +479,7 @@ export default function DriverProfilePage() {
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
         html,body{background:#080806;font-family:'Lexend',sans-serif}
         ::-webkit-scrollbar{display:none}
-        input{font-family:'Lexend',sans-serif;outline:none}
-        button{font-family:'Lexend',sans-serif}
+        input,select,button{font-family:'Lexend',sans-serif;outline:none}
       `}</style>
 
       <AnimatePresence>
@@ -475,24 +491,23 @@ export default function DriverProfilePage() {
         )}
       </AnimatePresence>
 
+      {/* hidden file input for avatar */}
       <input ref={avatarRef} type="file" accept="image/*" style={{ display: "none" }} onChange={async e => {
         const f = e.target.files?.[0]; if (!f || !userId) { e.target.value = ""; return }
-        setAvatar(URL.createObjectURL(f))
-        e.target.value = ""
+        setAvatar(URL.createObjectURL(f)); e.target.value = ""
         const ext = f.name.split(".").pop() ?? "jpg"
         const path = `${userId}/avatar.${ext}`
         const { error: upErr } = await supabase.storage.from("avatars").upload(path, f, { upsert: true })
-        if (upErr) { fire("❌ Không upload được ảnh: " + upErr.message); return }
+        if (upErr) { fire("❌ Không upload được ảnh"); return }
         const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path)
         const { error: dbErr } = await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", userId)
-        if (dbErr) { fire("❌ Không lưu được ảnh vào hồ sơ"); return }
-        setAvatar(publicUrl)
-        fire("Đã cập nhật ảnh đại diện")
+        if (dbErr) { fire("❌ Không lưu được ảnh"); return }
+        setAvatar(publicUrl); fire("Đã cập nhật ảnh đại diện")
       }} />
 
       <div style={{ minHeight: "100dvh", background: "#080806", paddingBottom: 100 }}>
 
-        {/* header */}
+        {/* ── header ── */}
         <div style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(8,8,6,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 16px", height: 56, display: "flex", alignItems: "center", gap: 12 }}>
           <a href="/driver" style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", color: "#f8f0e0", fontSize: 15 }}>←</a>
           <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>Hồ sơ & Cài đặt</div>
@@ -502,37 +517,41 @@ export default function DriverProfilePage() {
               fire(error ? "❌ Lỗi lưu thông tin" : "Đã lưu thông tin!")
             }
             setEditing(e => !e)
-          }}
-            style={{ padding: "7px 14px", borderRadius: 9, background: editing ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.06)", border: editing ? "1px solid rgba(255,107,0,0.3)" : "1px solid rgba(255,255,255,0.1)", color: editing ? "#FF8C00" : "#6a5a40", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
+          }} style={{ padding: "7px 14px", borderRadius: 9, background: editing ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.06)", border: editing ? "1px solid rgba(255,107,0,0.3)" : "1px solid rgba(255,255,255,0.1)", color: editing ? "#FF8C00" : "#6a5a40", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
             {editing ? "💾 Lưu" : "✏️ Sửa"}
           </button>
         </div>
 
         <div style={{ padding: "16px 16px 0" }}>
 
-          {/* avatar + stats */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 0 24px" }}>
+          {/* ── avatar + info ── */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 0 20px" }}>
             <div onClick={() => avatarRef.current?.click()} style={{ position: "relative", marginBottom: 14, cursor: "pointer" }}>
               <div style={{ width: 90, height: 90, borderRadius: 24, background: "linear-gradient(135deg,rgba(255,107,0,0.2),rgba(255,107,0,0.05))", border: "2.5px solid rgba(255,107,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, overflow: "hidden" }}>
                 {avatar ? <img src={avatar} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🧑‍💼"}
               </div>
               <div style={{ position: "absolute", bottom: -4, right: -4, width: 28, height: 28, borderRadius: 9, background: "rgba(255,107,0,0.12)", border: "2px solid #080806", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>📷</div>
             </div>
+
             {editing ? (
-              <input value={name} onChange={e => setName(e.target.value)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,107,0,0.3)", borderRadius: 10, padding: "6px 14px", color: "#f8f0e0", fontSize: 16, fontWeight: 800, textAlign: "center", marginBottom: 8 }} />
+              <input value={name} onChange={e => setName(e.target.value)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,107,0,0.3)", borderRadius: 10, padding: "6px 14px", color: "#f8f0e0", fontSize: 16, fontWeight: 800, textAlign: "center", marginBottom: 6, boxSizing: "border-box" }} />
             ) : (
-              <div style={{ color: "#f8f0e0", fontSize: 18, fontWeight: 800, marginBottom: 8 }}>{name}</div>
+              <div style={{ color: "#f8f0e0", fontSize: 18, fontWeight: 800, marginBottom: 6 }}>{name || "Tài xế"}</div>
             )}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 16 }}>
+
+            {/* name + phone inline */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
               <span style={{ background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.3)", borderRadius: 6, padding: "2px 10px", color: "#3ecf6e", fontSize: 9, fontWeight: 700 }}>🟢 Tài xế</span>
-              {driverStats.joinDate && <span style={{ color: "#6a5a40", fontSize: 9 }}>· Tham gia {driverStats.joinDate}</span>}
+              {phone && <span style={{ color: "#6a5a40", fontSize: 9 }}>· {phone}</span>}
+              {stats.joinDate && <span style={{ color: "#6a5a40", fontSize: 9 }}>· Từ {stats.joinDate}</span>}
             </div>
-            {/* quick stats — real data */}
+
+            {/* quick stats */}
             <div style={{ display: "flex", gap: 8, width: "100%" }}>
               {[
-                { icon: "⭐", val: driverStats.rating.toFixed(1), label: "Đánh giá" },
-                { icon: "📦", val: String(driverStats.trips),     label: "Chuyến" },
-                { icon: "💳", val: driverStats.walletBal >= 1000 ? `${Math.round(driverStats.walletBal/1000)}k` : `${driverStats.walletBal}đ`, label: "Số dư ví" },
+                { icon: "⭐", val: stats.rating.toFixed(1), label: "Đánh giá" },
+                { icon: "📦", val: String(stats.trips),     label: "Chuyến" },
+                { icon: "🪙", val: stats.walletBal >= 1000 ? `${Math.round(stats.walletBal / 1000)}k` : `${stats.walletBal}đ`, label: "Số dư ví" },
               ].map(s => (
                 <div key={s.label} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "10px 0", textAlign: "center" }}>
                   <div style={{ fontSize: 16, marginBottom: 3 }}>{s.icon}</div>
@@ -543,26 +562,26 @@ export default function DriverProfilePage() {
             </div>
           </div>
 
-          {/* personal info */}
-          <Section title="Thông tin cá nhân">
-            <Row icon="👤" label="Họ và tên" sub={name || "Chưa cập nhật"} />
-            <Row icon="📞" label="Số điện thoại" sub={phone || "Chưa cập nhật"} />
-          </Section>
+          {/* ── 1. Ví & Thu nhập ── */}
+          <Section title="Ví & Thu nhập">
+            {/* wallet balance highlight */}
+            <div style={{ padding: "12px 0 10px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div>
+                  <div style={{ color: "#6a5a40", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>Số dư ví tài xế</div>
+                  <div style={{ color: "#b464ff", fontSize: 22, fontWeight: 800 }}>{fmt(stats.walletBal)}</div>
+                </div>
+                <button onClick={() => setShowWallet(true)} style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.25)", color: "#b464ff", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
+                  🕐 Lịch sử
+                </button>
+              </div>
+            </div>
 
-          {/* vehicle & docs */}
-          <Section title="Phương tiện & Giấy tờ">
-            <Row icon="🛵" label="Thông tin xe" sub={vehicleSub} onClick={() => setShowVehicle(true)} arrow />
-            <Row icon="📄" label="Giấy tờ & Hồ sơ" sub="Xem và cập nhật giấy tờ" onClick={() => setShowDocs(true)} arrow />
-          </Section>
-
-          {/* earnings shortcut */}
-          <Section title="Thu nhập">
-            <Row icon="💰" label="Xem thu nhập chi tiết" sub="Tuần · Tháng · Lịch sử chuyến đi" onClick={() => { window.location.href = "/driver/earnings" }} arrow />
+            <Row icon="📊" label="Thu nhập chi tiết" sub="Tuần · Tháng · Lịch sử chuyến đi"
+              onClick={() => { window.location.href = "/driver/earnings" }} arrow />
             <Row icon="🏦" label="Tài khoản ngân hàng"
-              sub={bankInfo?.bank_account_number
-                ? `${bankInfo.bank_name ?? "Ngân hàng"} · Đã liên kết`
-                : "Chưa liên kết tài khoản nhận tiền"}
-              onClick={() => setShowBank(true)} arrow>
+              sub={bankInfo?.bank_account_number ? `${bankInfo.bank_name ?? "Ngân hàng"} · Đã liên kết` : "Chưa liên kết tài khoản nhận tiền"}
+              onClick={() => setShowBank(true)} arrow last>
               {bankInfo?.bank_account_number
                 ? <span style={{ background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 5, padding: "2px 7px", color: "#3ecf6e", fontSize: 8, fontWeight: 700 }}>Đã liên kết</span>
                 : <span style={{ background: "rgba(255,64,64,0.1)", border: "1px solid rgba(255,64,64,0.2)", borderRadius: 5, padding: "2px 7px", color: "#ff4040", fontSize: 8, fontWeight: 700 }}>Chưa liên kết</span>
@@ -570,66 +589,44 @@ export default function DriverProfilePage() {
             </Row>
           </Section>
 
-          {/* work settings */}
-          <Section title="Cài đặt công việc">
-            <Row icon="🔊" label="Âm thanh đơn mới" sub="Phát âm khi có đơn mới đến">
-              <Toggle on={work.soundNewOrder} onToggle={() => wk("soundNewOrder")} />
-            </Row>
-            <Row icon="📳" label="Rung khi có đơn" sub="Rung thiết bị khi nhận đơn mới">
-              <Toggle on={work.vibrationOrder} onToggle={() => wk("vibrationOrder")} />
-            </Row>
-            <Row icon="📲" label="Hiển thị popup đơn hàng" sub="Popup toàn màn hình khi có đơn mới">
-              <Toggle on={work.showPopup} onToggle={() => wk("showPopup")} />
-            </Row>
-            <Row icon="⚡" label="Tự động online khi mở app" sub="Tự bật trạng thái khi khởi động app">
-              <Toggle on={work.autoOnline} onToggle={() => wk("autoOnline")} color="#FFB347" />
-            </Row>
-            <Row icon="🌙" label="Chế độ ban đêm (22h–6h)" sub="Không nhận đơn trong khung giờ này">
-              <Toggle on={work.nightMode} onToggle={() => wk("nightMode")} color="#b464ff" />
-            </Row>
+          {/* ── 2. Phương tiện & Giấy tờ ── */}
+          <Section title="Phương tiện & Giấy tờ">
+            <Row icon="🛵" label="Thông tin xe" sub={vehicleSub} onClick={() => setShowVehicle(true)} arrow />
+            <Row icon="📄" label="Giấy tờ & Hồ sơ" sub="Xem và cập nhật giấy tờ" onClick={() => setShowDocs(true)} arrow last />
           </Section>
 
-          {/* notification settings */}
-          <Section title="Thông báo">
-            <Row icon="📦" label="Cập nhật đơn hàng" sub="Trạng thái giao hàng, xác nhận">
-              <Toggle on={notif.orderAlerts} onToggle={() => nt("orderAlerts")} />
+          {/* ── 3. Cài đặt (gộp công việc + thông báo) ── */}
+          <Section title="Cài đặt">
+            <Row icon="🔊" label="Âm thanh & Rung" sub="Phát âm, rung khi có đơn mới">
+              <Toggle on={work.sound} onToggle={() => wk("sound")} />
             </Row>
-            <Row icon="💰" label="Thông báo thu nhập" sub="Tổng kết ca, chuyển khoản thành công">
+            <Row icon="⚡" label="Tự động online" sub="Bật sẵn sàng nhận đơn khi mở app">
+              <Toggle on={work.autoOnline} onToggle={() => wk("autoOnline")} color="#FFB347" />
+            </Row>
+            <Row icon="🌙" label="Chế độ ban đêm" sub="Không nhận đơn từ 22h–6h">
+              <Toggle on={work.nightMode} onToggle={() => wk("nightMode")} color="#b464ff" />
+            </Row>
+            <Row icon="📦" label="Thông báo đơn hàng" sub="Trạng thái giao hàng, xác nhận">
+              <Toggle on={notif.orders} onToggle={() => nt("orders")} />
+            </Row>
+            <Row icon="💰" label="Thông báo thu nhập" sub="Tổng kết ca, chuyển khoản">
               <Toggle on={notif.earnings} onToggle={() => nt("earnings")} />
             </Row>
-            <Row icon="🎁" label="Ưu đãi tài xế" sub="Bonus, thưởng hiệu suất">
-              <Toggle on={notif.promos} onToggle={() => nt("promos")} color="#b464ff" />
-            </Row>
-            <Row icon="📢" label="Thông báo hệ thống" sub="Cập nhật app, bảo trì">
+            <Row icon="📢" label="Thông báo hệ thống" sub="Cập nhật app, bảo trì" last>
               <Toggle on={notif.system} onToggle={() => nt("system")} color="#4a8ff5" />
             </Row>
           </Section>
 
-          {/* security */}
-          <Section title="Bảo mật">
+          {/* ── 4. Hỗ trợ & Tài khoản ── */}
+          <Section title="Hỗ trợ & Tài khoản">
             <Row icon="🔑" label="Đổi mật khẩu" sub="Cập nhật mật khẩu đăng nhập" onClick={() => setShowPw(true)} arrow />
-            <Row icon="📱" label="Phiên đăng nhập" sub="1 thiết bị đang hoạt động" onClick={() => fire("Tính năng đang phát triển...")} arrow />
-            <Row icon="🛡" label="Xác thực 2 lớp" sub="Bảo vệ tài khoản bằng OTP" onClick={() => fire("Tính năng đang phát triển...")} arrow />
+            <Row icon="💬" label="Chat với hỗ trợ" sub="Phản hồi trong vòng 30 phút" onClick={() => fire("Đang kết nối hỗ trợ...")} arrow />
+            <Row icon="⚠️" label="Báo cáo vấn đề" sub="Khiếu nại, sự cố khi giao hàng" onClick={() => fire("Đang mở form báo cáo...")} arrow />
+            <Row icon="🚀" label="Giao Nhanh v1.0" sub="© 2025 Giao Nhanh · Phước An" />
+            <Row icon="🚪" label="Đăng xuất" danger last
+              onClick={async () => { await createClient().auth.signOut(); window.location.href = "/login" }} arrow />
           </Section>
 
-          {/* support */}
-          <Section title="Hỗ trợ">
-            <Row icon="❓" label="Câu hỏi thường gặp" sub="Hướng dẫn tài xế" onClick={() => fire("Đang mở FAQ...")} arrow />
-            <Row icon="💬" label="Chat với hỗ trợ" sub="Phản hồi trong vòng 30 phút" onClick={() => fire("Đang kết nối...")} arrow />
-            <Row icon="⚠️" label="Báo cáo vấn đề" sub="Khiếu nại, sự cố khi giao hàng" onClick={() => fire("Đang mở form...")} arrow />
-            <Row icon="📝" label="Quy tắc tài xế" sub="Chính sách, điều khoản dịch vụ" onClick={() => fire("Đang mở tài liệu...")} arrow />
-          </Section>
-
-          {/* about */}
-          <Section title="Về ứng dụng">
-            <Row icon="🚀" label="Giao Nhanh Tài xế" sub="Phiên bản 1.0.0" />
-            <Row icon="⚖️" label="Điều khoản & Chính sách" onClick={() => fire("Đang mở...")} arrow />
-          </Section>
-
-          {/* account */}
-          <Section title="Tài khoản">
-            <Row icon="🚪" label="Đăng xuất" sub="Đăng xuất khỏi thiết bị này" danger onClick={async () => { const sb = createClient(); await sb.auth.signOut(); window.location.href = "/login" }} arrow />
-          </Section>
         </div>
       </div>
 
@@ -648,10 +645,11 @@ export default function DriverProfilePage() {
       </nav>
 
       <AnimatePresence>
-        {showPw      && <PwSheet      onClose={() => setShowPw(false)}      />}
+        {showPw      && <PwSheet      onClose={() => setShowPw(false)} />}
         {showVehicle && <VehicleSheet onClose={() => setShowVehicle(false)} />}
-        {showBank    && <BankSheet    onClose={() => setShowBank(false)}    onSaved={async () => { if (!userId) return; const { data } = await supabase.from("drivers").select("bank_name,bank_account_number").eq("id", userId).single(); setBankInfo(data ?? null) }} />}
-        {showDocs    && <DocSheet     onClose={() => setShowDocs(false)}    />}
+        {showBank    && <BankSheet    onClose={() => setShowBank(false)} onSaved={async () => { if (!userId) return; await loadBankInfo(userId) }} />}
+        {showDocs    && <DocSheet     onClose={() => setShowDocs(false)} />}
+        {showWallet  && <WalletHistorySheet onClose={() => setShowWallet(false)} walletBalance={stats.walletBal} />}
       </AnimatePresence>
     </>
   )
