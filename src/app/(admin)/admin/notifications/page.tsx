@@ -87,9 +87,13 @@ export default function AdminNotificationsPage() {
       const map = new Map<string, HistoryItem>()
       for (const n of notifData.data) {
         const d = (n.data ?? {}) as Record<string, string>
-        const key = n.title + "|" + (d.audience ?? "all")
+        // chỉ nhóm thông báo do admin gửi (có sent_by)
+        const sentBy = d.sent_by ?? ""
+        if (!sentBy.startsWith("admin")) continue
+        const audience = d.audience ?? "all"
+        const key = n.title + "|" + audience
         if (!map.has(key)) {
-          map.set(key, { id: key, title: n.title, body: n.body, type: n.type, audience: d.audience ?? "all", imageUrl: d.image_url ?? null, sentCount: 0, openedCount: 0, sentAt: n.created_at, scheduled: false })
+          map.set(key, { id: key, title: n.title, body: n.body, type: n.type, audience, imageUrl: d.image_url ?? null, sentCount: 0, openedCount: 0, sentAt: n.created_at, scheduled: false })
         }
         const entry = map.get(key)!
         entry.sentCount++
@@ -162,6 +166,16 @@ export default function AdminNotificationsPage() {
   const deleteScheduled = async (id: string) => {
     await supabase.from("notification_schedules").delete().eq("id", id)
     setScheduled(p => p.filter(s => s.id !== id))
+  }
+
+  /* ── delete history item (xoá tất cả notification rows cùng title+audience) ── */
+  const deleteHistory = async (item: HistoryItem) => {
+    const admin = createClient()
+    await admin.from("notifications")
+      .delete()
+      .eq("title", item.title)
+      .filter("data->>audience", "eq", item.audience)
+    setHistory(p => p.filter(h => h.id !== item.id))
   }
 
   const totalSent   = history.reduce((s, n) => s + n.sentCount, 0)
@@ -277,8 +291,19 @@ export default function AdminNotificationsPage() {
             {/* Schedule */}
             <div style={{ marginBottom: 14 }}>
               <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 6 }}>Lên lịch gửi (để trống = gửi ngay)</div>
-              <input type="datetime-local" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)}
-                style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, color: "#f0eaff", fontSize: 12, colorScheme: "dark", fontFamily: "Lexend" }} />
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input type="datetime-local" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)}
+                  style={{ flex: 1, boxSizing: "border-box", padding: "10px 14px", background: "rgba(255,255,255,0.04)", border: `1px solid ${scheduleTime ? "rgba(255,193,7,0.35)" : "rgba(255,255,255,0.08)"}`, borderRadius: 10, color: scheduleTime ? "#f5c542" : "#f0eaff", fontSize: 12, colorScheme: "dark", fontFamily: "Lexend" }} />
+                {scheduleTime && (
+                  <button onClick={() => setScheduleTime("")}
+                    style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0, background: "rgba(255,64,64,0.1)", border: "1px solid rgba(255,64,64,0.25)", color: "#ff4040", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+                )}
+              </div>
+              {scheduleTime && (
+                <div style={{ color: "#f5c542", fontSize: 9, marginTop: 4 }}>
+                  🕐 Sẽ gửi vào {new Date(scheduleTime).toLocaleString("vi-VN")}
+                </div>
+              )}
             </div>
 
             {/* Preview */}
@@ -370,6 +395,8 @@ export default function AdminNotificationsPage() {
                       <div style={{ color: "#6a5a40", fontSize: 10 }}>{n.body}</div>
                     </div>
                     <span style={{ padding: "2px 7px", borderRadius: 6, background: `${audCfg.color}18`, color: audCfg.color, fontSize: 8.5, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}>{audCfg.icon} {audCfg.label}</span>
+                    <button onClick={() => deleteHistory(n)}
+                      style={{ width: 26, height: 26, borderRadius: 7, background: "rgba(255,64,64,0.08)", border: "1px solid rgba(255,64,64,0.2)", color: "#ff4040", fontSize: 13, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>🗑</button>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ display: "flex", gap: 12 }}>
@@ -392,3 +419,4 @@ export default function AdminNotificationsPage() {
     </AdminShell>
   )
 }
+
