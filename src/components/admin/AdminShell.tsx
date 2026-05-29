@@ -101,17 +101,19 @@ export default function AdminShell({ pageTitle, pageSubtitle, actions, children 
       <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: "#06050a", overflow: "hidden", fontFamily: "'Lexend',sans-serif" }}>
         <style>{`*,*::before,*::after{box-sizing:border-box;margin:0;padding:0} html,body{background:#06050a;font-family:'Lexend',sans-serif;height:100%;overflow:hidden} ::-webkit-scrollbar{width:4px} ::-webkit-scrollbar-thumb{background:rgba(255,107,0,.3);border-radius:2px} input{font-family:'Lexend',sans-serif;outline:none}`}</style>
 
-        {/* Mobile top bar */}
-        <div style={{ height: 56, display: "flex", alignItems: "center", padding: "0 16px", gap: 12, background: "rgba(12,11,20,0.97)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,107,0,0.12)", flexShrink: 0, zIndex: 40 }}>
-          <button onClick={() => setDrawer(true)}
-            style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#f0eaff", fontSize: 18, cursor: "pointer", flexShrink: 0 }}>
-            ☰
-          </button>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pageTitle}</div>
-            {pageSubtitle && <div style={{ color: "#6a5a40", fontSize: 9 }}>{pageSubtitle}</div>}
+        {/* Mobile top bar — outer div handles safe-area-inset-top (notch/status bar) */}
+        <div style={{ paddingTop: "env(safe-area-inset-top)", background: "rgba(12,11,20,0.97)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,107,0,0.12)", flexShrink: 0, zIndex: 40 }}>
+          <div style={{ height: 56, display: "flex", alignItems: "center", padding: "0 16px", gap: 12 }}>
+            <button onClick={() => setDrawer(true)}
+              style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#f0eaff", fontSize: 18, cursor: "pointer", flexShrink: 0 }}>
+              ☰
+            </button>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pageTitle}</div>
+              {pageSubtitle && <div style={{ color: "#6a5a40", fontSize: 9 }}>{pageSubtitle}</div>}
+            </div>
+            {actions}
           </div>
-          {actions}
         </div>
 
         {/* Content */}

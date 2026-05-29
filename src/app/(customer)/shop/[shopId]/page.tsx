@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useCartStore } from "@/store/cartStore"
 import { createClient } from "@/lib/supabase/client"
 
@@ -184,10 +184,12 @@ function ProductCard({
 
 // ─── Main page ────────────────────────────────────────────
 export default function ShopPage() {
-  const router   = useRouter()
-  const params   = useParams()
-  const shopId   = (params?.shopId as string) ?? ""
-  const supabase = createClient()
+  const router       = useRouter()
+  const params       = useParams()
+  const searchParams = useSearchParams()
+  const shopId       = (params?.shopId as string) ?? ""
+  const isEditMode   = searchParams?.get("edit") === "1"
+  const supabase     = createClient()
   const addItem       = useCartStore(s => s.addItem)
   const clearAndAdd   = useCartStore(s => s.clearAndAdd)
   const storeShopId   = useCartStore(s => s.shopId)
@@ -206,6 +208,9 @@ export default function ShopPage() {
   const [toast,         setToast]         = useState("")
   const [favoured,      setFavoured]      = useState(false)
   const [conflictItem,  setConflictItem]  = useState<PendingItem | null>(null)
+  const [uploading,     setUploading]     = useState<"cover"|"logo"|null>(null)
+  const coverRef = useRef<HTMLInputElement>(null)
+  const logoRef  = useRef<HTMLInputElement>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const cartBadgeRef = useRef<HTMLElement | null>(null)
@@ -219,22 +224,30 @@ export default function ShopPage() {
       // Shop info
       const { data: shopData } = await supabase
         .from("shops")
-        .select("name,description,address,rating,rating_count,is_open,avatar_url,cover_url,phone")
+        .select("name,description,address,rating_avg,total_reviews,is_open,logo_url,cover_image_url,phone,opening_hours")
         .eq("id", shopId)
         .single()
-      if (shopData) setShop(shopData as ShopInfo)
+      if (shopData) setShop({
+        ...shopData,
+        rating: shopData.rating_avg,
+        rating_count: shopData.total_reviews,
+        avatar_url: shopData.logo_url,
+        cover_url: shopData.cover_image_url,
+        opening_hours: shopData.opening_hours ?? null,
+        prep_time: null,
+      } as ShopInfo)
 
       // Products
       const { data: prodData } = await supabase
         .from("products")
-        .select("id,name,description,price,category,is_available,sold_count,image_url")
+        .select("id,name,description,price,original_price,category,is_available,sold_count,image_url")
         .eq("shop_id", shopId)
         .eq("is_available", true)
         .order("sort_order", { ascending: true })
 
-      const mapped: Product[] = (prodData ?? []).map((p: {id:string;name:string;description:string|null;price:number;category:string|null;sold_count:number;image_url:string|null}) => ({
+      const mapped: Product[] = (prodData ?? []).map((p: {id:string;name:string;description:string|null;price:number;original_price:number|null;category:string|null;sold_count:number;image_url:string|null}) => ({
         id: p.id, name: p.name, desc: p.description ?? "",
-        price: p.price, origPrice: null,
+        price: p.price, origPrice: p.original_price ?? null,
         category: p.category ?? "Thực đơn",
         imageUrl: p.image_url,
         sold: p.sold_count, hot: p.sold_count > 50,
@@ -255,7 +268,6 @@ export default function ShopPage() {
         .select("id,title,discount_value,valid_to")
         .eq("shop_id", shopId)
         .eq("is_active", true)
-        .eq("is_combo", true)
         .gte("valid_to", now)
       if (vouchers && vouchers.length > 0) {
         const vIds = vouchers.map((v: {id:string}) => v.id)
@@ -292,6 +304,21 @@ export default function ShopPage() {
 
   const fireToast = (msg: string) => {
     setToast(msg); setTimeout(() => setToast(""), 1800)
+  }
+
+  const uploadImage = async (file: File, type: "cover" | "logo") => {
+    setUploading(type)
+    const ext  = file.name.split(".").pop() ?? "jpg"
+    const path = `${shopId}/${type}.${ext}`
+    const bucket = type === "cover" ? "shop-covers" : "shop-logos"
+    const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
+    if (error) { fireToast("Lỗi tải ảnh!"); setUploading(null); return }
+    const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(path)
+    const col = type === "cover" ? "cover_image_url" : "logo_url"
+    await supabase.from("shops").update({ [col]: publicUrl, updated_at: new Date().toISOString() }).eq("id", shopId)
+    setShop(s => s ? { ...s, cover_url: type === "cover" ? publicUrl : s.cover_url, avatar_url: type === "logo" ? publicUrl : s.avatar_url } : s)
+    fireToast(type === "cover" ? "Đã cập nhật ảnh bìa" : "Đã cập nhật logo")
+    setUploading(null)
   }
 
   // Add to cart — kiểm tra conflict shop khác
@@ -531,15 +558,20 @@ export default function ShopPage() {
                 <div style={{ display:"flex", gap:8, marginBottom:12 }}>
                   {[
                     { icon:"⭐", val: shop.rating?.toFixed(1) ?? "Mới", sub:`(${shop.rating_count ?? 0} đánh giá)` },
-                    { icon:"📍", val: shop.address.split(",").slice(-1)[0]?.trim() ?? "Phước An", sub:"địa chỉ" },
-                    { icon:"⏱️", val:"15–25 phút", sub:"giao hàng" },
+                    { icon:"⏱️", val: shop.prep_time ?? "10–15 phút", sub:"chuẩn bị" },
+                    { icon:"🕐", val: (() => {
+                        if (!shop.opening_hours) return "07:00–21:00"
+                        const hours = shop.opening_hours as { open?: string; close?: string } | null
+                        if (hours?.open && hours?.close) return `${hours.open}–${hours.close}`
+                        return "07:00–21:00"
+                      })(), sub:"giờ mở" },
                   ].map(s => (
                     <div key={s.icon} style={{ flex:1, textAlign:"center",
                       background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)",
                       borderRadius:10, padding:"7px 4px" }}>
                       <div style={{ fontSize:15, marginBottom:2 }}>{s.icon}</div>
-                      <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:700 }}>{s.val}</div>
-                      <div style={{ color:"#6a5a40", fontSize:8 }}>{s.sub}</div>
+                      <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:700, lineHeight:1.2 }}>{s.val}</div>
+                      <div style={{ color:"#6a5a40", fontSize:7.5 }}>{s.sub}</div>
                     </div>
                   ))}
                 </div>
@@ -547,7 +579,7 @@ export default function ShopPage() {
                   {[
                     { label:"Phí ship", val:fmt(15000), color:"#FF8C00" },
                     { label:"Đơn tối thiểu", val:fmt(30000), color:"#b0956a" },
-                    { label:"Chuẩn bị", val:"10–15 phút", color:"#b0956a" },
+                    { label:"Trạng thái", val: shop.is_open ? "Đang mở" : "Đã đóng", color: shop.is_open ? "#3ecf6e" : "#ff4040" },
                   ].map(d => (
                     <div key={d.label} style={{ flex:1, textAlign:"center" }}>
                       <div style={{ color:d.color, fontSize:11, fontWeight:700 }}>{d.val}</div>

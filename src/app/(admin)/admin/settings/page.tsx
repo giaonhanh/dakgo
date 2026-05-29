@@ -152,13 +152,12 @@ export default function AdminSettingsPage() {
     const { data: updatedShops, error } = await supabase.from("shops")
       .update({ commission_rate: rate, updated_at: new Date().toISOString() })
       .eq("status", "approved")
-      .or("is_negotiated_commission.is.null,is_negotiated_commission.eq.false")
       .select("id")
     const count = updatedShops?.length ?? 0
     if (error) {
       setApplyCommissionMsg("❌ Lỗi: " + error.message)
     } else {
-      setApplyCommissionMsg(`✅ Đã cập nhật ${count} cửa hàng → ${rate}% (bỏ qua cửa hàng hoa hồng thoả thuận)`)
+      setApplyCommissionMsg(`✅ Đã cập nhật ${count} cửa hàng → ${rate}%`)
     }
     setApplyingCommission(false)
     setTimeout(() => setApplyCommissionMsg(""), 5000)

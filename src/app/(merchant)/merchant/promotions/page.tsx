@@ -232,7 +232,7 @@ export default function MerchantPromotionsPage() {
     const now = new Date()
     const start = new Date(form.startAt)
     const dbType = form.type === "combo" ? "fixed" : form.type
-    const { data, error } = await supabase.from("vouchers").insert({
+    const insertPayload: Record<string, unknown> = {
       code: genCode(),
       title: form.title,
       discount_type: dbType,
@@ -240,17 +240,17 @@ export default function MerchantPromotionsPage() {
       min_order: parseInt(form.minOrder) || 0,
       max_discount: form.maxDiscount ? parseInt(form.maxDiscount) : null,
       usage_limit: form.usageLimit ? parseInt(form.usageLimit) : null,
-      per_person_limit: form.perPersonLimit ? parseInt(form.perPersonLimit) : null,
       valid_from: new Date(form.startAt).toISOString(),
       valid_to: new Date(form.endAt).toISOString(),
       is_active: true,
-      is_combo: form.type === "combo",
       shop_id: shopId,
       created_by: user?.id,
-    }).select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,used_count,valid_from,valid_to,is_active").single()
+    }
+    const { data, error } = await supabase.from("vouchers").insert(insertPayload)
+      .select("id,title,discount_type,discount_value,min_order,max_discount,usage_limit,used_count,valid_from,valid_to,is_active").single()
     if (error || !data) { setSaving(false); fireToast("Lỗi tạo chương trình!", true); return }
 
-    // Lưu combo_items nếu là combo
+    // Lưu combo_items nếu bảng tồn tại
     if (form.type === "combo" && form.comboItems.length > 0) {
       await supabase.from("combo_items").insert(
         form.comboItems.map(ci => ({
@@ -258,7 +258,7 @@ export default function MerchantPromotionsPage() {
           product_id: ci.productId,
           min_quantity: ci.minQty,
         }))
-      )
+      ).then(() => { /* ignore error nếu bảng chưa tạo */ })
     }
 
     setSaving(false)
@@ -347,9 +347,18 @@ export default function MerchantPromotionsPage() {
                 display:"flex", flexDirection:"column" }}>
               <div style={{ padding:"14px 18px 10px", flexShrink:0 }}>
                 <div style={{ width:36, height:4, background:"rgba(255,255,255,0.12)",
-                  borderRadius:2, margin:"0 auto 14px" }} />
-                <div style={{ color:"#f8f0e0", fontSize:14, fontWeight:700 }}>
-                  ➕ Tạo chương trình khuyến mãi
+                  borderRadius:2, margin:"0 auto 12px" }} />
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                  <div style={{ color:"#f8f0e0", fontSize:14, fontWeight:700 }}>
+                    ➕ Tạo chương trình khuyến mãi
+                  </div>
+                  <button onClick={() => setShowCreate(false)}
+                    style={{ width:32, height:32, borderRadius:9, border:"none",
+                      background:"rgba(255,255,255,0.06)", color:"#6a5a40",
+                      fontSize:18, cursor:"pointer", display:"flex",
+                      alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    ×
+                  </button>
                 </div>
               </div>
 

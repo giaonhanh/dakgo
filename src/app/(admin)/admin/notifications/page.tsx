@@ -91,31 +91,24 @@ export default function AdminNotificationsPage() {
     }
 
     setSending(true); setSendMsg("")
-    const supabase = createClient()
-
-    let query = supabase.from("profiles").select("id").eq("is_active", true)
-    if (audience === "customers") query = query.eq("role","customer")
-    else if (audience === "drivers")   query = query.eq("role","driver")
-    else if (audience === "merchants") query = query.eq("role","merchant")
-
-    const { data: users } = await query
-    if (!users || users.length === 0) { setSendMsg("⚠️ Không có người dùng để gửi"); setSending(false); return }
-
-    const rows = users.map(u => ({
-      user_id: u.id,
-      type: "system" as const,
-      title,
-      body,
-      data: { sent_by: "admin", audience },
-    }))
-
-    const { error } = await supabase.from("notifications").insert(rows)
-    if (error) {
-      setSendMsg("❌ Lỗi: " + error.message)
-    } else {
-      setSendMsg(`✅ Đã gửi đến ${users.length} người`)
-      setTitle(""); setBody(""); setScheduleTime("")
-      await loadData()
+    try {
+      const res = await fetch("/api/admin/notify-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, body, audience }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        setSendMsg("❌ Lỗi: " + (json.error ?? "Không gửi được"))
+      } else if (json.count === 0) {
+        setSendMsg("⚠️ Không có người dùng để gửi")
+      } else {
+        setSendMsg(`✅ Đã gửi đến ${json.count} người`)
+        setTitle(""); setBody(""); setScheduleTime("")
+        await loadData()
+      }
+    } catch {
+      setSendMsg("❌ Lỗi kết nối server")
     }
     setSending(false)
   }
