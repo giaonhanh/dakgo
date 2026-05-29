@@ -1160,6 +1160,7 @@ export default function CheckoutPage() {
       if (voucherData) setDbVouchers(voucherData as DbVoucher[])
 
       if (addrs && addrs.length > 0) {
+        // Có địa chỉ đã lưu → dùng địa chỉ mặc định
         const mapped: AddrOption[] = addrs.map(a => ({
           id: a.id, label: a.label, address: a.address,
           isDefault: a.is_default, lat: a.lat, lng: a.lng,
@@ -1167,6 +1168,32 @@ export default function CheckoutPage() {
         setSavedAddrs(mapped)
         const def = mapped.find(a => a.isDefault) ?? mapped[0]
         setSelectedAddr(def.id)
+      } else {
+        // Không có địa chỉ lưu → fallback GPS (đã được cấp phép từ trang chủ)
+        await new Promise<void>(resolve => {
+          if (!navigator.geolocation) { resolve(); return }
+          navigator.geolocation.getCurrentPosition(
+            async ({ coords }) => {
+              try {
+                const VM_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
+                const res  = await fetch(
+                  `https://maps.vietmap.vn/api/reverse/v3?apikey=${VM_KEY}&lat=${coords.latitude}&lng=${coords.longitude}`
+                )
+                const list = await res.json() as Array<{ display?: string; address?: string }>
+                const label = list[0]?.display ?? list[0]?.address ?? "Vị trí hiện tại"
+                setMapAddress({ address: label, lat: coords.latitude, lng: coords.longitude })
+                setSelectedAddr("map")
+              } catch {
+                // VietMap lỗi → vẫn dùng tọa độ thô
+                setMapAddress({ address: "Vị trí hiện tại", lat: coords.latitude, lng: coords.longitude })
+                setSelectedAddr("map")
+              }
+              resolve()
+            },
+            () => resolve(), // User từ chối → không có địa chỉ, vẫn mở trang
+            { timeout: 5000, maximumAge: 60000 }
+          )
+        })
       }
 
       if (wallet) {
