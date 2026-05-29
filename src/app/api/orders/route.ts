@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createClient as adminClient } from "@supabase/supabase-js"
+import { sendPushToUser } from "@/lib/webpush"
 
 export async function POST(req: NextRequest) {
   try {
@@ -99,6 +101,28 @@ export async function POST(req: NextRequest) {
       await supabase.from("orders").delete().eq("id", order.id)
       return NextResponse.json({ error: "Không thể lưu danh sách món" }, { status: 500 })
     }
+
+    // ── Notify merchant ──────────────────────────────────
+    try {
+      const db = adminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      )
+      const { data: shop } = await db
+        .from("shops").select("owner_id").eq("id", shop_id).single()
+      if (shop?.owner_id) {
+        const preview = (orderItems as { name: string; quantity: number }[])
+          .slice(0, 2).map(i => `${i.name} ×${i.quantity}`).join(", ")
+        const more  = orderItems.length > 2 ? ` +${orderItems.length - 2} món` : ""
+        const title = "🍜 Bạn có đơn mới!"
+        const body  = `${preview}${more} · ${total_amount.toLocaleString("vi-VN")}đ`
+        await db.from("notifications").insert({
+          user_id: shop.owner_id, type: "order", title, body,
+          data: { order_id: order.id, url: "/merchant" },
+        })
+        await sendPushToUser(shop.owner_id, { title, body, url: "/merchant", tag: `order-${order.id}` })
+      }
+    } catch { /* never fail the order */ }
 
     return NextResponse.json({ orderId: order.id, total_amount, payment_code }, { status: 201 })
   } catch (err) {

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { usePushNotification } from "@/hooks/usePushNotification"
 import { motion, AnimatePresence } from "framer-motion"
 import { Power, ShoppingBag, TrendingUp, Star } from "lucide-react"
 import Link from "next/link"
@@ -62,6 +63,8 @@ export default function MerchantDashboard() {
   const [shopStatus, setShopStatus] = useState<"pending" | "approved" | "suspended" | null>(null)
   const [unreadNotif, setUnreadNotif] = useState(0)
 
+  const { requestPermission } = usePushNotification()
+
   const fireToast = (msg: string, ok = true) => {
     setToast(msg); setToastOk(ok); setTimeout(() => setToast(""), 3000)
   }
@@ -71,6 +74,7 @@ export default function MerchantDashboard() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
+      requestPermission(user.id)   // xin quyền push notification
 
       // Get merchant's shop
       const { data: shop } = await supabase

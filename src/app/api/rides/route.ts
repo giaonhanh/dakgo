@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { sendPushToDrivers } from "@/lib/webpush"
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,6 +46,24 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error || !ride) return NextResponse.json({ error: "Không thể tạo chuyến xe" }, { status: 500 })
+
+    // ── Notify all drivers ────────────────────────────────
+    try {
+      const typeLabel: Record<string, string> = {
+        xe_om: "🛵 Xe ôm", taxi: "🚕 Taxi", car: "🚗 Xe hơi",
+      }
+      const label   = typeLabel[vehicle_type] ?? "🚗 Chuyến"
+      const from    = pickup_address.split(",")[0]
+      const to      = dropoff_address.split(",")[0]
+      const fareStr = estimated_fare
+        ? ` · ${Number(estimated_fare).toLocaleString("vi-VN")}đ` : ""
+      await sendPushToDrivers({
+        title: `${label} mới!`,
+        body:  `${from} → ${to}${fareStr}`,
+        url:   "/driver",
+        tag:   `ride-${ride.id}`,
+      })
+    } catch { /* never fail */ }
 
     return NextResponse.json({ rideId: ride.id }, { status: 201 })
   } catch {

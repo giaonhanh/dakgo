@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { usePushNotification } from "@/hooks/usePushNotification"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -776,6 +777,7 @@ export default function DriverDashboard() {
   const [showOrder,     setShowOrder]     = useState(false)
   const [pendingOrder,  setPendingOrder]  = useState<OrderData | null>(null)
   const [accepted,      setAccepted]      = useState<string | null>(null)
+  const { requestPermission } = usePushNotification()
   const [driverName,    setDriverName]    = useState("Tài xế")
   const [driverId,      setDriverId]      = useState<string | null>(null)
   const [todayStats,    setTodayStats]    = useState({ orders: 0, earnings: 0, rating: 5.0 })
@@ -796,6 +798,7 @@ export default function DriverDashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setDriverId(user.id)
+      requestPermission(user.id)   // xin quyền push notification
 
       const [{ data: profile }, { data: driver }] = await Promise.all([
         supabase.from("profiles").select("full_name").eq("id", user.id).single(),
