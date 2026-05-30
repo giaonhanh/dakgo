@@ -115,8 +115,7 @@ export interface OrderItem {
   product_id: string
   name: string
   price: number
-  quantity: number
-  subtotal: number
+  qty: number
   note: string | null
 }
 
