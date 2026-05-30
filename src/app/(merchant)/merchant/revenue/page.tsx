@@ -315,7 +315,7 @@ export default function MerchantRevenuePage() {
                 {recentOrders.length === 0 ? (
                   <div style={{ textAlign:"center",padding:"24px 0",color:"#6a5a40",fontSize:11 }}>Chưa có đơn nào hôm nay</div>
                 ) : recentOrders.map((o, i) => {
-                  const { commission, net } = calcNet(o.total, o.voucherDiscount, commRate)
+                  const { commission, net } = calcNet(o.subtotal, o.voucherDiscount, commRate)
                   const isExpanded = expandOrder === o.id
                   const payIcon = o.payMethod === "wallet" ? "💙" : o.payMethod === "vietqr" ? "🏦" : "💵"
                   return (
