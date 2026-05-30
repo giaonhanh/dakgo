@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
 type VoucherType = "percent" | "fixed" | "freeship"
@@ -18,6 +19,7 @@ interface Voucher {
   usageLimit: number | null
   usedCount: number
   validTo: string
+  shopId: string | null
   shopName: string | null
   used: boolean    // đã dùng bởi user hiện tại
   saved: boolean   // đã bookmark (localStorage)
@@ -48,7 +50,7 @@ function useCountdown(isoDate: string) {
   return { text: `Còn ${h}h ${String(m).padStart(2,"0")}m ${String(s).padStart(2,"0")}s`, urgent: true, expired: false }
 }
 
-function VoucherCard({ v, onSave, onCopy }: { v: Voucher; onSave: () => void; onCopy: () => void }) {
+function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () => void; onCopy: () => void; onUseNow: () => void }) {
   const countdown = useCountdown(v.validTo)
   const cfg = TYPE_CFG[v.type]
   const totalLeft = v.usageLimit !== null ? Math.max(0, v.usageLimit - v.usedCount) : null
@@ -124,9 +126,9 @@ function VoucherCard({ v, onSave, onCopy }: { v: Voucher; onSave: () => void; on
               </button>
             )}
             {!disabled && (
-              <a href="/cart" style={{ textDecoration:"none", background:"linear-gradient(90deg,#FF6B00,#FF8C00)", borderRadius:8, padding:"5px 14px", color:"#fff", fontSize:9, fontWeight:700, boxShadow:"0 2px 8px rgba(255,107,0,0.3)" }}>
+              <button onClick={onUseNow} style={{ background:"linear-gradient(90deg,#FF6B00,#FF8C00)", borderRadius:8, padding:"5px 14px", color:"#fff", fontSize:9, fontWeight:700, boxShadow:"0 2px 8px rgba(255,107,0,0.3)", border:"none", cursor:"pointer", fontFamily:"Lexend" }}>
                 Dùng ngay →
-              </a>
+              </button>
             )}
           </div>
         </div>
@@ -136,6 +138,7 @@ function VoucherCard({ v, onSave, onCopy }: { v: Voucher; onSave: () => void; on
 }
 
 export default function VouchersPage() {
+  const router = useRouter()
   const [vouchers, setVouchers]   = useState<Voucher[]>([])
   const [loading,  setLoading]    = useState(true)
   const [filter,   setFilter]     = useState<"all"|"saved"|VoucherType>("all")
@@ -189,6 +192,7 @@ export default function VouchersPage() {
         usageLimit:   v.usage_limit,
         usedCount:    v.used_count,
         validTo:      v.valid_to,
+        shopId:       v.shop_id,
         shopName:     v.shop_id ? (shopMap[v.shop_id] ?? null) : null,
         used:         usedSet.has(v.id),
         saved:        savedIds.includes(v.id),
@@ -216,6 +220,18 @@ export default function VouchersPage() {
       ))
     } catch { /* */ }
     fireToast(willSave ? "Đã lưu mã thành công!" : "Đã bỏ lưu mã")
+  }
+
+  const handleUseNow = (v: Voucher) => {
+    // Lưu voucher vào sessionStorage để checkout tự động gợi ý áp dụng
+    try {
+      sessionStorage.setItem("pending_voucher", JSON.stringify({ code: v.code, title: v.title, type: v.type, value: v.value }))
+    } catch { /* */ }
+    if (v.shopId) {
+      router.push(`/shop/${v.shopId}`)
+    } else {
+      router.push("/")
+    }
   }
 
   const handleApply = () => {
@@ -339,7 +355,7 @@ export default function VouchersPage() {
                     <div style={{ fontSize:12 }}>{vouchers.length===0 ? "Chưa có voucher nào" : "Không có voucher phù hợp"}</div>
                   </motion.div>
                 ) : filtered.map(v => (
-                  <VoucherCard key={v.id} v={v} onSave={() => handleSave(v.id)} onCopy={() => handleCopy(v.code)} />
+                  <VoucherCard key={v.id} v={v} onSave={() => handleSave(v.id)} onCopy={() => handleCopy(v.code)} onUseNow={() => handleUseNow(v)} />
                 ))}
               </AnimatePresence>
             </div>

@@ -1169,6 +1169,22 @@ export default function CheckoutPage() {
         const umap: Record<string, number> = {}
         for (const u of usages ?? []) umap[u.voucher_id] = (umap[u.voucher_id] ?? 0) + 1
         setUserUsageMap(umap)
+
+        // Gợi ý voucher từ trang "Dùng ngay"
+        try {
+          const raw = sessionStorage.getItem("pending_voucher")
+          if (raw) {
+            const pv = JSON.parse(raw) as { code: string; title: string }
+            sessionStorage.removeItem("pending_voucher")
+            const found = (voucherData as DbVoucher[]).find(v => v.code === pv.code)
+            if (found) {
+              setTimeout(() => {
+                const yes = window.confirm(`Bạn có muốn áp dụng mã "${pv.code}" (${pv.title}) không?`)
+                if (yes) applyVoucherCode(pv.code)
+              }, 600)
+            }
+          }
+        } catch { /* */ }
       }
 
       if (addrs && addrs.length > 0) {
