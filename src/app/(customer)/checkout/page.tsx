@@ -1150,6 +1150,7 @@ export default function CheckoutPage() {
   const [refApplied, setRefApplied]             = useState(false)
   const [refLoading, setRefLoading]             = useState(false)
   const [refMsg,     setRefMsg]                 = useState<{ ok: boolean; text: string } | null>(null)
+  const [refAlready, setRefAlready]             = useState(false)  // đã dùng từ session trước
 
   // ── Load user, saved addresses, xu balance ──
   useEffect(() => {
@@ -1158,11 +1159,13 @@ export default function CheckoutPage() {
       if (!user) return
       setUserId(user.id)
 
-      const [{ data: addrs }, { data: wallet }, { data: voucherData }] = await Promise.all([
+      const [{ data: addrs }, { data: wallet }, { data: voucherData }, { data: refUsage }] = await Promise.all([
         supabase.from("saved_addresses").select("id, label, address, lat, lng, is_default").eq("user_id", user.id).order("is_default", { ascending: false }),
         supabase.from("wallets").select("id, balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
         supabase.from("vouchers").select("id,code,title,discount_type,discount_value,min_order,max_discount,valid_to,shop_id,is_active,per_person_limit").eq("is_active", true).gte("valid_to", new Date().toISOString()).limit(30),
+        supabase.from("referral_usages").select("id").eq("referee_id", user.id).maybeSingle(),
       ])
+      if (refUsage) setRefAlready(true)
       if (voucherData) {
         setDbVouchers(voucherData as DbVoucher[])
         const { data: usages } = await supabase.from("voucher_usages").select("voucher_id").eq("user_id", user.id)
@@ -1959,7 +1962,7 @@ export default function CheckoutPage() {
           </SectionCard>
 
           {/* 5.5 Mã giới thiệu */}
-          {!refApplied && (
+          {!refApplied && !refAlready && (
             <SectionCard title="Mã giới thiệu" icon="🎁">
               <div style={{ display: "flex", gap: 8 }}>
                 <input
