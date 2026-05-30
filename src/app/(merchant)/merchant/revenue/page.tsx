@@ -60,7 +60,7 @@ export default function MerchantRevenuePage() {
         // Fetch delivered orders in range
         const { data: orders } = await supabase
           .from("orders")
-          .select("id,total,ship_fee,pay_method,created_at")
+          .select("id,total_amount,delivery_fee,pay_method,created_at")
           .eq("shop_id", shop.id)
           .eq("status", "delivered")
           .gte("created_at", startDate.toISOString())
@@ -81,7 +81,7 @@ export default function MerchantRevenuePage() {
             const label = DAY_LABELS[d.getDay()]
             days.push({
               day: label,
-              subtotal: dayOrders.reduce((s, o) => s + (o.total ?? 0), 0),
+              subtotal: dayOrders.reduce((s, o) => s + (o.total_amount ?? 0), 0),
               orders: dayOrders.length,
               voucherDiscount: 0,
             })
@@ -100,7 +100,7 @@ export default function MerchantRevenuePage() {
             if (wOrders.length > 0 || w < Math.ceil(now.getDate() / 7)) {
               weeks.push({
                 day: `T${w+1}`,
-                subtotal: wOrders.reduce((s, o) => s + (o.total ?? 0), 0),
+                subtotal: wOrders.reduce((s, o) => s + (o.total_amount ?? 0), 0),
                 orders: wOrders.length,
                 voucherDiscount: 0,
               })
@@ -135,7 +135,7 @@ export default function MerchantRevenuePage() {
             return {
               id: o.id.slice(-4).toUpperCase(),
               time: `${t.getHours().toString().padStart(2,"0")}:${t.getMinutes().toString().padStart(2,"0")}`,
-              items: summary, subtotal: o.total ?? 0,
+              items: summary, subtotal: o.total_amount ?? 0,
               voucherDiscount: 0,
               payMethod: o.pay_method ?? "cash",
             }
@@ -340,7 +340,7 @@ export default function MerchantRevenuePage() {
                         <div style={{ padding:"0 14px 12px" }}>
                           <div style={{ background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,padding:"10px 12px" }}>
                             {[
-                              { label:"Tiền hàng", value:o.total, color:"#f8f0e0", prefix:"" },
+                              { label:"Tiền hàng", value:o.subtotal, color:"#f8f0e0", prefix:"" },
                               { label:`Hoa hồng app ${Math.round(commRate*100)}%`, value:commission, color:"#ff4040", prefix:"−" },
                               ...(o.voucherDiscount > 0 ? [{ label:"Voucher giảm giá", value:o.voucherDiscount, color:"#FFB347", prefix:"−" }] : []),
                             ].map(r => (
