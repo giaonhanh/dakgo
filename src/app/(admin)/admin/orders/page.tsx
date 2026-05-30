@@ -270,6 +270,13 @@ export default function AdminOrdersPage() {
     // Load pricing settings
     supabase.from("app_settings").select("value").eq("key","pricing").maybeSingle()
       .then(({ data }) => { if (data?.value) setPricing(data.value as PricingMap) })
+
+    const ch = supabase
+      .channel("admin-orders-watch")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => { load() })
+      .subscribe()
+
+    return () => { supabase.removeChannel(ch) }
   }, [load])
 
   // Tính khoảng cách qua VietMap Route API (fallback Haversine × 1.3 nếu lỗi)
