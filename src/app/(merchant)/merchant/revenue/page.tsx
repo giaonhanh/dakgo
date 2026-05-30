@@ -83,7 +83,7 @@ export default function MerchantRevenuePage() {
               day: label,
               subtotal: dayOrders.reduce((s, o) => s + (o.total ?? 0), 0),
               orders: dayOrders.length,
-              voucherDiscount: dayOrders.reduce((s, o) => s + (0 ?? 0), 0),
+              voucherDiscount: 0,
             })
           }
           setDaily(days)
