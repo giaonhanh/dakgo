@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ───────────────────────────────────────────────
 type Status = "delivering" | "preparing" | "pending" | "accepted" | "ready" | "completed" | "cancelled"
+type ServiceType = "food" | "errand_deliver" | "errand_buy" | "ride_motorbike" | "ride_car"
 
 interface Topping { name: string; price: number }
 interface Item {
@@ -19,12 +20,17 @@ interface Item {
 interface Order {
   id: string; shopId: string; shopName: string; shopEmoji: string; shopColor: string
   driverId: string | null
+  serviceType: ServiceType
   status: Status; items: Item[]
   subtotal: number; deliveryFee: number; discount: number
   nightFee?: number; weatherFee?: string
   createdAt: string; address: string; note?: string
   driver?: { name: string; plate: string; phone: string; rating: number; eta: number }
   payMethod: string; rating?: number; cancelReason?: string
+  // Errand-specific
+  senderName?: string; senderPhone?: string
+  recipientName?: string; recipientPhone?: string
+  packagePhotoUrl?: string; pickupAddress?: string
 }
 
 // ─── UI Config (không phải data) ────────────────────────
@@ -53,7 +59,7 @@ const STATUS_CFG: Record<Status, { label: string; c: string; bg: string; bd: str
 
 // ─── Helpers ─────────────────────────────────────────────
 const calcTotal = (o: Order) =>
-  o.subtotal + o.deliveryFee - o.discount + (o.nightFee ?? 0) + (o.weatherFee ? 8000 : 0)
+  (o.subtotal ?? 0) + (o.deliveryFee ?? 0) - (o.discount ?? 0) + (o.nightFee ?? 0)
 
 const SHOP_COLORS = ["#FF8C00","#4a8ff5","#3ecf6e","#FFB347","#b464ff","#ff6060"]
 function shopColor(idx: number) { return SHOP_COLORS[idx % SHOP_COLORS.length] }
@@ -169,10 +175,10 @@ export default function OrdersPage() {
       const { data: rows } = await supabase
         .from("orders")
         .select(`
-          id, status, delivery_address, note, subtotal, delivery_fee, discount_amount,
-          payment_method, cancel_reason, created_at, driver_id, shop_id,
+          id, status, drop_address, note, total, ship_fee,
+          pay_method, cancel_reason, created_at, driver_id, shop_id,
           shops(id, name, category),
-          order_items(id, product_id, name, price, quantity, note),
+          order_items(id, product_id, name, price, qty),
           drivers(id, license_plate, rating_avg)
         `)
         .eq("customer_id", user.id)
@@ -213,10 +219,12 @@ export default function OrdersPage() {
         const shop = Array.isArray(o.shops) ? o.shops[0] : o.shops
         const driverRow = Array.isArray(o.drivers) ? o.drivers[0] : o.drivers
         const driverProfile = driverProfiles.find(p => p.id === o.driver_id)
-        const items = (o.order_items ?? []) as { id: string; product_id: string | null; name: string; price: number; quantity: number; note: string | null }[]
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const items = (o.order_items ?? []) as { id: string; product_id: string | null; name: string; price: number; qty: number }[]
 
         return {
           id: o.id,
+          serviceType: "food" as ServiceType,
           shopId: o.shop_id ?? "",
           driverId: o.driver_id ?? null,
           shopName: shop?.name ?? "Cửa hàng",
@@ -226,15 +234,18 @@ export default function OrdersPage() {
           items: items.map(i => ({
             emoji: "🍽️",
             name: i.name,
-            qty: i.quantity,
+            qty: i.qty,
             price: i.price,
             productId: i.product_id ?? i.id,
           })),
-          subtotal: o.subtotal,
-          deliveryFee: o.delivery_fee,
-          discount: o.discount_amount ?? 0,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          subtotal:    (o as any).total    ?? 0,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          deliveryFee: (o as any).ship_fee ?? 0,
+          discount:    0,
           createdAt: fmtDate(o.created_at),
-          address: o.delivery_address,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          address:   (o as any).drop_address ?? "",
           note: o.note ?? undefined,
           driver: driverRow ? {
             name: driverProfile?.full_name ?? "Tài xế",
@@ -243,13 +254,93 @@ export default function OrdersPage() {
             rating: Number(driverRow.rating_avg ?? 5),
             eta: 0,
           } : undefined,
-          payMethod: fmtPayMethod(o.payment_method),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          payMethod: fmtPayMethod((o as any).pay_method ?? "cash"),
           rating: reviewMap[o.id] ?? undefined,
           cancelReason: o.cancel_reason ?? undefined,
         }
       })
 
-      setOrders(mapped)
+      // ── Fetch errands (giao hộ / mua hộ) ──────────────────
+      const { data: errandRows } = await supabase
+        .from("errands")
+        .select("id, type, status, pickup_address, delivery_address, package_description, items_description, service_fee, payment_method, note, created_at, driver_id, sender_name, sender_phone, recipient_name, recipient_phone, package_photo_url")
+        .eq("customer_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(30)
+
+      const errandMapped: Order[] = (errandRows ?? []).map((e, idx) => ({
+        id:          e.id,
+        serviceType: (e.type === "buy_for_me" ? "errand_buy" : "errand_deliver") as ServiceType,
+        shopId:      "",
+        shopName:    e.type === "buy_for_me" ? "Mua hộ" : "Giao hộ",
+        shopEmoji:   e.type === "buy_for_me" ? "🛍️" : "📦",
+        shopColor:   shopColor(idx + 100),
+        driverId:    e.driver_id ?? null,
+        status:      mapStatus(e.status ?? "pending"),
+        items: [{
+          emoji: e.type === "buy_for_me" ? "🛒" : "📦",
+          name:  e.type === "buy_for_me"
+            ? (e.items_description ?? "Danh sách mua")
+            : (e.package_description ?? "Gói hàng"),
+          qty:   1,
+          price: e.service_fee ?? 0,
+        }],
+        subtotal:    e.service_fee ?? 0,
+        deliveryFee: 0,
+        discount:    0,
+        createdAt:   fmtDate(e.created_at),
+        address:     e.delivery_address ?? "",
+        pickupAddress: e.pickup_address ?? undefined,
+        note:          e.note ?? undefined,
+        payMethod:     fmtPayMethod(e.payment_method ?? "cash"),
+        senderName:    e.sender_name    ?? undefined,
+        senderPhone:   e.sender_phone   ?? undefined,
+        recipientName: e.recipient_name ?? undefined,
+        recipientPhone:e.recipient_phone ?? undefined,
+        packagePhotoUrl: e.package_photo_url ?? undefined,
+      }))
+
+      // ── Fetch rides (xe ôm / taxi) ─────────────────────────
+      const { data: rideRows } = await supabase
+        .from("rides")
+        .select("id, vehicle_type, status, pickup_address, dropoff_address, estimated_fare, payment_method, note, created_at, driver_id")
+        .eq("customer_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(30)
+
+      const rideMapped: Order[] = (rideRows ?? []).map((r, idx) => {
+        const isMoto = r.vehicle_type === "motorbike"
+        return {
+          id:          r.id,
+          serviceType: (isMoto ? "ride_motorbike" : "ride_car") as ServiceType,
+          shopId:      "",
+          shopName:    isMoto ? "Xe ôm" : "Taxi",
+          shopEmoji:   isMoto ? "🛵" : "🚕",
+          shopColor:   shopColor(idx + 200),
+          driverId:    r.driver_id ?? null,
+          status:      r.status === "searching" ? "pending" : mapStatus(r.status ?? "pending"),
+          items: [{
+            emoji: isMoto ? "🛵" : "🚕",
+            name:  `${(r.pickup_address ?? "").split(",")[0]} → ${(r.dropoff_address ?? "").split(",")[0]}`,
+            qty:   1,
+            price: r.estimated_fare ?? 0,
+          }],
+          subtotal:     r.estimated_fare ?? 0,
+          deliveryFee:  0,
+          discount:     0,
+          createdAt:    fmtDate(r.created_at),
+          address:      r.dropoff_address ?? "",
+          pickupAddress:r.pickup_address ?? undefined,
+          note:         r.note ?? undefined,
+          payMethod:    fmtPayMethod(r.payment_method ?? "cash"),
+        }
+      })
+
+      const allOrders = [...mapped, ...errandMapped, ...rideMapped]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+      setOrders(allOrders)
       setLoading(false)
     }
     load()
@@ -798,9 +889,21 @@ export default function OrdersPage() {
                               </div>
                             </div>
 
+                            {/* Ảnh gói hàng (errand_deliver) */}
+                            {order.packagePhotoUrl && (
+                              <>
+                                <SLabel>Ảnh gói hàng</SLabel>
+                                <img src={order.packagePhotoUrl} alt="Gói hàng"
+                                  style={{ width:"100%",borderRadius:10,marginBottom:10,objectFit:"cover",maxHeight:200 }} />
+                              </>
+                            )}
+
                             <SLabel>Thông tin giao hàng</SLabel>
                             <InfoBox rows={[
-                              { icon: "📍", key: "Địa chỉ",    val: order.address   },
+                              ...(order.pickupAddress ? [{ icon: "📍", key: "Lấy tại",    val: order.pickupAddress }] : []),
+                              { icon: "📍", key: order.serviceType === "food" ? "Địa chỉ" : "Giao đến", val: order.address },
+                              ...(order.senderName   ? [{ icon: "👤", key: "Người gửi",   val: `${order.senderName} · ${order.senderPhone ?? ""}` }] : []),
+                              ...(order.recipientName ? [{ icon: "📬", key: "Người nhận", val: `${order.recipientName} · ${order.recipientPhone ?? ""}` }] : []),
                               ...(order.note   ? [{ icon: "📝", key: "Ghi chú",     val: order.note! }] : []),
                               { icon: "💳", key: "Thanh toán", val: order.payMethod },
                               ...(order.driver ? [{ icon: "🛵", key: "Tài xế",

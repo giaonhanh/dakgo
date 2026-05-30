@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import AddressPicker from "@/components/map/AddressPicker"
@@ -9,22 +9,59 @@ import type { AddressPickerResult } from "@/types"
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
+async function compressImage(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const MAX = 800
+        const scale = Math.min(MAX / img.width, MAX / img.height, 1)
+        const canvas = document.createElement("canvas")
+        canvas.width  = img.width  * scale
+        canvas.height = img.height * scale
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL("image/jpeg", 0.72))
+      }
+      img.src = e.target!.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
 export default function GiaoHoPage() {
   const router   = useRouter()
   const supabase = createClient()
+  const photoRef = useRef<HTMLInputElement>(null)
+
+  // Địa chỉ
   const [pickup,        setPickup]        = useState("")
   const [delivery,      setDelivery]      = useState("")
   const [pickupCoord,   setPickupCoord]   = useState<{ lat: number; lng: number } | null>(null)
   const [deliveryCoord, setDeliveryCoord] = useState<{ lat: number; lng: number } | null>(null)
-  const [pkgDesc,       setPkgDesc]       = useState("")
-  const [weight,        setWeight]        = useState<"nhe" | "vua" | "nang">("nhe")
-  const [note,          setNote]          = useState("")
-  const [hasPhoto,      setHasPhoto]      = useState(false)
   const [mapMode,       setMapMode]       = useState<null | "pickup" | "delivery">(null)
-  const [loading,       setLoading]       = useState(false)
-  const [toast,         setToast]         = useState("")
 
-  const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2300) }
+  // Người gửi
+  const [senderName,  setSenderName]  = useState("")
+  const [senderPhone, setSenderPhone] = useState("")
+
+  // Người nhận
+  const [recipientName,  setRecipientName]  = useState("")
+  const [recipientPhone, setRecipientPhone] = useState("")
+
+  // Gói hàng
+  const [pkgDesc, setPkgDesc] = useState("")
+  const [weight,  setWeight]  = useState<"nhe" | "vua" | "nang">("nhe")
+  const [note,    setNote]    = useState("")
+
+  // Ảnh gói hàng
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoBase64,  setPhotoBase64]  = useState<string | null>(null)
+
+  const [loading, setLoading] = useState(false)
+  const [toast,   setToast]   = useState("")
+
+  const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
 
   const WEIGHTS = [
     { key: "nhe",  label: "< 3kg",   emoji: "📦", fee: 20000 },
@@ -34,32 +71,48 @@ export default function GiaoHoPage() {
 
   const serviceFee = WEIGHTS.find(w => w.key === weight)?.fee ?? 20000
 
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const b64 = await compressImage(file)
+    setPhotoPreview(b64)
+    setPhotoBase64(b64)
+  }
+
   const handleSubmit = async () => {
-    if (!pickup.trim())   { fireToast("Vui lòng nhập địa chỉ lấy hàng"); return }
-    if (!delivery.trim()) { fireToast("Vui lòng nhập địa chỉ giao đến"); return }
-    if (!pkgDesc.trim())  { fireToast("Vui lòng mô tả gói hàng cần giao"); return }
+    if (!senderName.trim())    { fireToast("Vui lòng nhập tên người gửi"); return }
+    if (!senderPhone.trim())   { fireToast("Vui lòng nhập SĐT người gửi"); return }
+    if (!pickup.trim())        { fireToast("Vui lòng nhập địa chỉ lấy hàng"); return }
+    if (!recipientName.trim()) { fireToast("Vui lòng nhập tên người nhận"); return }
+    if (!recipientPhone.trim()){ fireToast("Vui lòng nhập SĐT người nhận"); return }
+    if (!delivery.trim())      { fireToast("Vui lòng nhập địa chỉ giao đến"); return }
+    if (!pkgDesc.trim())       { fireToast("Vui lòng mô tả gói hàng"); return }
+    if (!photoBase64)          { fireToast("Vui lòng chụp ảnh gói hàng"); return }
+
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { fireToast("Vui lòng đăng nhập để đặt dịch vụ"); setLoading(false); return }
-      const pLat = pickupCoord?.lat ?? 12.683
-      const pLng = pickupCoord?.lng ?? 108.483
-      const dLat = deliveryCoord?.lat ?? 12.683
-      const dLng = deliveryCoord?.lng ?? 108.483
+      if (!user) { fireToast("Vui lòng đăng nhập"); setLoading(false); return }
+
       const { error } = await supabase.from("errands").insert({
-        customer_id:       user.id,
-        type:              "deliver_for_me",
-        status:            "pending",
-        pickup_address:    pickup,
-        pickup_lat:        pLat,
-        pickup_lng:        pLng,
-        delivery_address:  delivery,
-        delivery_lat:      dLat,
-        delivery_lng:      dLng,
-        package_description: pkgDesc,
-        note:              note || null,
-        service_fee:       serviceFee,
-        payment_method:    "cash",
+        customer_id:          user.id,
+        type:                 "deliver_for_me",
+        status:               "pending",
+        pickup_address:       pickup,
+        pickup_lat:           pickupCoord?.lat ?? 12.683,
+        pickup_lng:           pickupCoord?.lng ?? 108.483,
+        delivery_address:     delivery,
+        delivery_lat:         deliveryCoord?.lat ?? 12.683,
+        delivery_lng:         deliveryCoord?.lng ?? 108.483,
+        package_description:  pkgDesc,
+        note:                 note || null,
+        service_fee:          serviceFee,
+        payment_method:       "cash",
+        sender_name:          senderName,
+        sender_phone:         senderPhone,
+        recipient_name:       recipientName,
+        recipient_phone:      recipientPhone,
+        package_photo_url:    photoBase64,
       })
       if (error) { fireToast("Lỗi: " + (error?.message ?? "Không thể đặt dịch vụ")); setLoading(false); return }
       fireToast("✅ Đặt giao hộ thành công! Đang tìm tài xế...")
@@ -70,16 +123,24 @@ export default function GiaoHoPage() {
     }
   }
 
+  const inputStyle: React.CSSProperties = {
+    width: "100%", background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10,
+    padding: "10px 12px", color: "#f8f0e0", fontSize: 12,
+    fontFamily: "Lexend", outline: "none",
+  }
+  const labelStyle: React.CSSProperties = { color: "#6a5a40", fontSize: 9, marginBottom: 5, fontWeight: 600 }
+
   return (
     <>
       <style>{`
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
         html,body{background:#080806;font-family:'Lexend',sans-serif}
         textarea,input{outline:none;font-family:'Lexend',sans-serif}
+        input::placeholder,textarea::placeholder{color:#4a3a28}
         @keyframes ghShim{0%{left:-60%}100%{left:120%}}
       `}</style>
 
-      {/* Toast */}
       {toast && (
         <div style={{ position:"fixed",top:"calc(env(safe-area-inset-top,0px) + 12px)",left:"50%",
           transform:"translateX(-50%)",zIndex:9999,whiteSpace:"nowrap",
@@ -100,16 +161,10 @@ export default function GiaoHoPage() {
             <button onClick={() => router.back()}
               style={{ width:40,height:40,borderRadius:12,background:"rgba(255,255,255,0.06)",
                 border:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"center",
-                justifyContent:"center",fontSize:18,cursor:"pointer",flexShrink:0 }}>
-              ←
-            </button>
+                justifyContent:"center",fontSize:18,cursor:"pointer",flexShrink:0 }}>←</button>
             <div style={{ flex:1 }}>
               <div style={{ color:"#f8f0e0",fontSize:16,fontWeight:800 }}>📦 Giao hộ</div>
               <div style={{ color:"#6a5a40",fontSize:9,marginTop:1 }}>Tài xế lấy và giao hàng nhanh cho bạn</div>
-            </div>
-            <div style={{ background:"rgba(255,107,0,0.12)",border:"1px solid rgba(255,107,0,0.25)",
-              borderRadius:8,padding:"3px 10px",color:"#FF8C00",fontSize:9,fontWeight:700 }}>
-              ⚡ Nhanh
             </div>
           </div>
         </div>
@@ -117,53 +172,65 @@ export default function GiaoHoPage() {
         {/* Scrollable body */}
         <div style={{ flex:1,overflowY:"auto",padding:"12px 16px 140px" }}>
 
-          {/* How it works */}
-          <div style={{ display:"flex",gap:8,marginBottom:12,padding:"10px 12px",
-            background:"rgba(255,107,0,0.05)",border:"1px solid rgba(255,107,0,0.12)",borderRadius:12 }}>
-            {["📍 Chỉ điểm lấy","📦 Mô tả hàng","🛵 Tài xế giao đến"].map((s,i) => (
-              <div key={i} style={{ flex:1,textAlign:"center",color:"#6a5a40",fontSize:8.5,lineHeight:1.5 }}>{s}</div>
-            ))}
-          </div>
-
-          {/* Địa chỉ */}
+          {/* ── Người gửi ── */}
           <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
             borderRadius:14,padding:14,marginBottom:10 }}>
-            <div style={{ color:"#6a5a40",fontSize:9,marginBottom:10,fontWeight:600,letterSpacing:.5 }}>ĐỊA CHỈ</div>
-
-            <div style={{ display:"flex",gap:10,alignItems:"flex-start",marginBottom:10 }}>
-              <div style={{ width:8,height:8,borderRadius:"50%",background:"#FF6B00",marginTop:6,
-                flexShrink:0,boxShadow:"0 0 8px #FF6B00" }} />
+            <div style={{ color:"#FF8C00",fontSize:10,fontWeight:700,marginBottom:10 }}>👤 Thông tin người gửi</div>
+            <div style={{ display:"flex",gap:8,marginBottom:8 }}>
               <div style={{ flex:1 }}>
-                <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:3 }}>Lấy hàng tại</div>
-                <input value={pickup} onChange={e=>setPickup(e.target.value)}
-                  placeholder="Địa chỉ lấy hàng..."
-                  style={{ width:"100%",background:"none",border:"none",color:"#f8f0e0",fontSize:11.5,padding:0 }} />
+                <div style={labelStyle}>Họ tên *</div>
+                <input value={senderName} onChange={e=>setSenderName(e.target.value)}
+                  placeholder="Nguyễn Văn A" style={inputStyle} />
               </div>
-              <button onClick={() => setMapMode("pickup")}
-                style={{ width:40,height:40,borderRadius:10,border:"none",cursor:"pointer",
-                  background:"rgba(255,107,0,0.12)",flexShrink:0,
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>📍</button>
+              <div style={{ flex:1 }}>
+                <div style={labelStyle}>Số điện thoại *</div>
+                <input value={senderPhone} onChange={e=>setSenderPhone(e.target.value)}
+                  placeholder="0901..." type="tel" style={inputStyle} />
+              </div>
             </div>
-
-            <div style={{ height:1,background:"rgba(255,255,255,0.05)",margin:"8px 0 8px 18px" }} />
-
-            <div style={{ display:"flex",gap:10,alignItems:"flex-start" }}>
-              <div style={{ width:8,height:8,borderRadius:2,background:"#3ecf6e",marginTop:6,
-                flexShrink:0,boxShadow:"0 0 8px #3ecf6e" }} />
-              <div style={{ flex:1 }}>
-                <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:3 }}>Giao đến</div>
-                <input value={delivery} onChange={e=>setDelivery(e.target.value)}
-                  placeholder="Địa chỉ người nhận..."
-                  style={{ width:"100%",background:"none",border:"none",color:"#f8f0e0",fontSize:11.5,padding:0 }} />
-              </div>
-              <button onClick={() => setMapMode("delivery")}
-                style={{ width:40,height:40,borderRadius:10,border:"none",cursor:"pointer",
-                  background:"rgba(62,207,110,0.12)",flexShrink:0,
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>🗺️</button>
+            {/* Địa chỉ lấy hàng */}
+            <div style={labelStyle}>Địa chỉ lấy hàng *</div>
+            <div style={{ display:"flex",gap:8 }}>
+              <input value={pickup} onChange={e=>setPickup(e.target.value)}
+                placeholder="Số nhà, tên đường, phường/xã..."
+                style={{ ...inputStyle, flex:1 }} />
+              <button onClick={() => setMapMode("pickup")}
+                style={{ width:44,height:44,borderRadius:10,border:"1px solid rgba(255,107,0,0.25)",
+                  background:"rgba(255,107,0,0.08)",flexShrink:0,cursor:"pointer",
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:18 }}>📍</button>
             </div>
           </div>
 
-          {/* Cân nặng */}
+          {/* ── Người nhận ── */}
+          <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
+            borderRadius:14,padding:14,marginBottom:10 }}>
+            <div style={{ color:"#3ecf6e",fontSize:10,fontWeight:700,marginBottom:10 }}>📬 Thông tin người nhận</div>
+            <div style={{ display:"flex",gap:8,marginBottom:8 }}>
+              <div style={{ flex:1 }}>
+                <div style={labelStyle}>Họ tên *</div>
+                <input value={recipientName} onChange={e=>setRecipientName(e.target.value)}
+                  placeholder="Trần Thị B" style={inputStyle} />
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={labelStyle}>Số điện thoại *</div>
+                <input value={recipientPhone} onChange={e=>setRecipientPhone(e.target.value)}
+                  placeholder="0901..." type="tel" style={inputStyle} />
+              </div>
+            </div>
+            {/* Địa chỉ giao đến */}
+            <div style={labelStyle}>Địa chỉ giao đến *</div>
+            <div style={{ display:"flex",gap:8 }}>
+              <input value={delivery} onChange={e=>setDelivery(e.target.value)}
+                placeholder="Số nhà, tên đường, phường/xã..."
+                style={{ ...inputStyle, flex:1 }} />
+              <button onClick={() => setMapMode("delivery")}
+                style={{ width:44,height:44,borderRadius:10,border:"1px solid rgba(62,207,110,0.25)",
+                  background:"rgba(62,207,110,0.06)",flexShrink:0,cursor:"pointer",
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:18 }}>🗺️</button>
+            </div>
+          </div>
+
+          {/* ── Cân nặng ── */}
           <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
             borderRadius:14,padding:14,marginBottom:10 }}>
             <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:10 }}>⚖️ Trọng lượng gói hàng</div>
@@ -186,52 +253,70 @@ export default function GiaoHoPage() {
             </div>
           </div>
 
-          {/* Mô tả gói hàng */}
+          {/* ── Mô tả gói hàng ── */}
           <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
             borderRadius:14,padding:14,marginBottom:10 }}>
-            <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:8 }}>📝 Mô tả gói hàng</div>
+            <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:8 }}>📝 Mô tả gói hàng *</div>
             <textarea value={pkgDesc} onChange={e=>setPkgDesc(e.target.value)}
               placeholder="VD: 1 túi quần áo khoảng 2kg, 1 hộp bánh không dễ vỡ..."
               rows={3} style={{ width:"100%",background:"none",border:"none",
-                color:"#b0956a",fontSize:10.5,resize:"none",lineHeight:1.7 }} />
+                color:"#b0956a",fontSize:11,resize:"none",lineHeight:1.7 }} />
           </div>
 
-          {/* Ảnh gói hàng */}
-          <motion.div whileTap={{ scale: 0.97 }} onClick={() => setHasPhoto(p => !p)}
-            style={{ background:"rgba(255,255,255,0.04)",border:`1px solid ${hasPhoto?"rgba(62,207,110,0.3)":"rgba(255,255,255,0.08)"}`,
-              borderRadius:14,padding:14,marginBottom:10,display:"flex",gap:12,alignItems:"center",cursor:"pointer" }}>
-            <div style={{ width:56,height:56,borderRadius:12,
-              background:hasPhoto?"rgba(62,207,110,0.1)":"rgba(255,255,255,0.04)",
-              border:`1px ${hasPhoto?"solid rgba(62,207,110,0.3)":"dashed rgba(255,255,255,0.15)"}`,
-              display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,flexShrink:0 }}>
-              <span style={{ fontSize:22 }}>{hasPhoto ? "✅" : "📷"}</span>
-              <span style={{ color:"#6a5a40",fontSize:7 }}>{hasPhoto ? "Đã chụp" : "Ảnh"}</span>
+          {/* ── Ảnh gói hàng (bắt buộc) ── */}
+          <div style={{ background:"rgba(255,255,255,0.04)",
+            border:`1px solid ${photoPreview ? "rgba(62,207,110,0.3)" : "rgba(255,107,0,0.25)"}`,
+            borderRadius:14,padding:14,marginBottom:10 }}>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10 }}>
+              <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:700 }}>📷 Ảnh gói hàng *</div>
+              {!photoPreview && (
+                <span style={{ background:"rgba(255,107,0,0.12)",border:"1px solid rgba(255,107,0,0.3)",
+                  borderRadius:6,padding:"2px 8px",color:"#FF8C00",fontSize:8,fontWeight:600 }}>Bắt buộc</span>
+              )}
             </div>
-            <div>
-              <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:3 }}>
-                {hasPhoto ? "Ảnh gói hàng đã thêm ✓" : "Chụp ảnh gói hàng"}
-              </div>
-              <div style={{ color:"#6a5a40",fontSize:9,lineHeight:1.5 }}>
-                Giúp tài xế nhận dạng hàng chính xác hơn
-              </div>
-            </div>
-          </motion.div>
 
-          {/* Ghi chú */}
+            <input ref={photoRef} type="file" accept="image/*" capture="environment"
+              onChange={handlePhoto} style={{ display:"none" }} />
+
+            {photoPreview ? (
+              <div style={{ position:"relative" }}>
+                <img src={photoPreview} alt="Gói hàng"
+                  style={{ width:"100%",maxHeight:200,objectFit:"cover",borderRadius:10 }} />
+                <button onClick={() => { setPhotoPreview(null); setPhotoBase64(null); if(photoRef.current) photoRef.current.value="" }}
+                  style={{ position:"absolute",top:8,right:8,width:28,height:28,borderRadius:8,
+                    background:"rgba(0,0,0,0.65)",border:"none",color:"#fff",fontSize:14,
+                    cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center" }}>✕</button>
+                <div style={{ position:"absolute",bottom:8,left:8,
+                  background:"rgba(62,207,110,0.85)",borderRadius:6,padding:"3px 8px",
+                  color:"#fff",fontSize:9,fontWeight:600 }}>✓ Đã chụp ảnh</div>
+              </div>
+            ) : (
+              <motion.button whileTap={{ scale:0.97 }} onClick={() => photoRef.current?.click()}
+                style={{ width:"100%",height:100,borderRadius:12,cursor:"pointer",
+                  background:"rgba(255,107,0,0.04)",
+                  border:"2px dashed rgba(255,107,0,0.25)",
+                  display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6 }}>
+                <span style={{ fontSize:32 }}>📷</span>
+                <span style={{ color:"#FF8C00",fontSize:10,fontWeight:600 }}>Chụp / chọn ảnh gói hàng</span>
+                <span style={{ color:"#6a5a40",fontSize:8.5 }}>Giúp tài xế nhận dạng chính xác</span>
+              </motion.button>
+            )}
+          </div>
+
+          {/* ── Ghi chú ── */}
           <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
             borderRadius:14,padding:14,marginBottom:10 }}>
             <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:8 }}>📋 Ghi chú cho tài xế</div>
             <textarea value={note} onChange={e=>setNote(e.target.value)}
-              placeholder="VD: Gọi trước 5 phút, hàng dễ vỡ cần nhẹ tay, người nhận tên Lan..."
-              rows={3} style={{ width:"100%",background:"none",border:"none",
-                color:"#b0956a",fontSize:10.5,resize:"none",lineHeight:1.7 }} />
+              placeholder="VD: Gọi trước 5 phút, hàng dễ vỡ cần nhẹ tay..."
+              rows={2} style={{ width:"100%",background:"none",border:"none",
+                color:"#b0956a",fontSize:11,resize:"none",lineHeight:1.7 }} />
           </div>
 
-          {/* Chi phí */}
+          {/* ── Chi phí ── */}
           <div style={{ background:"rgba(255,107,0,0.06)",border:"1px solid rgba(255,107,0,0.18)",
             borderRadius:14,padding:14 }}>
-            <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:10 }}>💰 Chi phí dịch vụ</div>
-            <div style={{ display:"flex",justifyContent:"space-between",marginBottom:7 }}>
+            <div style={{ display:"flex",justifyContent:"space-between" }}>
               <span style={{ color:"#6a5a40",fontSize:10 }}>Phí giao hộ ({WEIGHTS.find(w=>w.key===weight)?.label})</span>
               <span style={{ color:"#b0956a",fontSize:10,fontWeight:600 }}>{fmt(serviceFee)}</span>
             </div>
@@ -241,9 +326,6 @@ export default function GiaoHoPage() {
               <span style={{ background:"linear-gradient(90deg,#FF6B00,#FFB347)",
                 WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
                 backgroundClip:"text",fontSize:14,fontWeight:800 }}>{fmt(serviceFee)}</span>
-            </div>
-            <div style={{ color:"#6a5a40",fontSize:8.5,marginTop:6 }}>
-              * Phí tính theo trọng lượng thực tế khi giao
             </div>
           </div>
         </div>
@@ -271,7 +353,6 @@ export default function GiaoHoPage() {
         </div>
       </div>
 
-      {/* AddressPicker overlay */}
       {mapMode && (
         <div style={{ position:"fixed",inset:0,zIndex:300 }}>
           <AddressPicker height="100dvh"
