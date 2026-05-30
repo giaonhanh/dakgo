@@ -1336,6 +1336,7 @@ export default function CheckoutPage() {
           name:       item.name,                 // giữ nguyên tên có suffix "(Size L · Trân châu)"
           price:      item.price,                // giá đã gồm surcharge
           qty:        item.qty,
+          note:       item.note || null,
         }))
       )
 

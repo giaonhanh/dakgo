@@ -36,8 +36,10 @@ export default function CartPage() {
         const matched: AppliedCombo[] = []
         data.forEach((v: { id: string; title: string; discount_value: number; combo_items: { product_id: string; min_quantity: number }[] }) => {
           const allMet = v.combo_items.every(ci => {
-            const cartItem = items.find(i => i.id === ci.product_id)
-            return cartItem && cartItem.qty >= ci.min_quantity
+            const totalQty = items
+              .filter(i => i.id.split("__")[0] === ci.product_id)
+              .reduce((s, i) => s + i.qty, 0)
+            return totalQty >= ci.min_quantity
           })
           if (allMet && v.combo_items.length > 0) {
             matched.push({ title: v.title, discount: v.discount_value })

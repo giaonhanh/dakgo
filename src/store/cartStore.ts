@@ -15,8 +15,8 @@ interface CartStore {
   items: CartItem[];
   note: string;
   shopId: string | null;
-  addItem: (item: Omit<CartItem, "qty" | "note">) => void;
-  clearAndAdd: (item: Omit<CartItem, "qty" | "note">) => void;
+  addItem: (item: Omit<CartItem, "qty">) => void;
+  clearAndAdd: (item: Omit<CartItem, "qty">) => void;
   removeItem: (id: string) => void;
   updateQty: (id: string, qty: number) => void;
   setItemNote: (id: string, note: string) => void;
