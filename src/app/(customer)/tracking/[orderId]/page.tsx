@@ -121,7 +121,7 @@ export default function TrackingPage() {
         paymentMethod: order.pay_method,
       })
       setStatus((order.status === "delivered" ? "delivered" : order.status) as OrderStatus)
-      if (order.payment_status === "paid") setPaymentStatus("paid")
+      if (order.pay_method !== "cash") setPaymentStatus("paid")
 
       // Fetch driver
       if (order.driver_id) {
@@ -174,9 +174,8 @@ export default function TrackingPage() {
       }, (payload) => {
         const newStatus = payload.new.status as OrderStatus
         setStatus(newStatus === "delivered" ? "delivered" : newStatus)
-        if (payload.new.payment_status === "paid") {
+        if ((payload.new as { pay_method?: string }).pay_method !== "cash") {
           setPaymentStatus("paid")
-          fireToast("Thanh toán thành công!")
         }
       })
       .subscribe()
