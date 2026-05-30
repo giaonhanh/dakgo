@@ -1,7 +1,8 @@
 -- ============================================================
 -- FIX SCHEMA FULL — Giao Nhanh
--- Chạy toàn bộ file này trong Supabase SQL Editor
+-- Migration cho DB đang chạy (không cần chạy lại từ đầu)
 -- An toàn: dùng IF NOT EXISTS / DO NOTHING ở mọi bước
+-- Tham chiếu schema đầy đủ: supabase/schema.sql
 -- ============================================================
 
 
@@ -57,29 +58,83 @@ CREATE INDEX IF NOT EXISTS idx_products_sort_order ON products(sort_order);
 -- ════════════════════════════════════════════════
 
 ALTER TABLE vouchers
-  ADD COLUMN IF NOT EXISTS title           TEXT,
-  ADD COLUMN IF NOT EXISTS shop_id         UUID REFERENCES shops(id) ON DELETE CASCADE,
-  ADD COLUMN IF NOT EXISTS discount_type   TEXT    DEFAULT 'percent',
-  ADD COLUMN IF NOT EXISTS discount_value  INT     DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS max_discount    INT,
-  ADD COLUMN IF NOT EXISTS usage_limit     INT,
+  ADD COLUMN IF NOT EXISTS title            TEXT,
+  ADD COLUMN IF NOT EXISTS shop_id          UUID REFERENCES shops(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS discount_type    TEXT    DEFAULT 'percent',
+  ADD COLUMN IF NOT EXISTS discount_value   INT     DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS max_discount     INT,
+  ADD COLUMN IF NOT EXISTS usage_limit      INT,
   ADD COLUMN IF NOT EXISTS per_person_limit INT,
-  ADD COLUMN IF NOT EXISTS valid_from      TIMESTAMPTZ DEFAULT now(),
-  ADD COLUMN IF NOT EXISTS valid_to        TIMESTAMPTZ DEFAULT now() + INTERVAL '30 days',
-  ADD COLUMN IF NOT EXISTS is_combo        BOOLEAN DEFAULT false,
-  ADD COLUMN IF NOT EXISTS created_at      TIMESTAMPTZ DEFAULT now();
+  ADD COLUMN IF NOT EXISTS used_count       INT     NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS valid_from       TIMESTAMPTZ DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS valid_to         TIMESTAMPTZ DEFAULT now() + INTERVAL '30 days',
+  ADD COLUMN IF NOT EXISTS is_combo         BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS is_active        BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS created_at       TIMESTAMPTZ DEFAULT now();
 
 -- Xoá cột discount_pct cũ nếu không dùng nữa (comment out nếu muốn giữ)
 -- ALTER TABLE vouchers DROP COLUMN IF EXISTS discount_pct;
 
--- RLS: cho phép shop owner quản lý voucher của mình
-DROP POLICY IF EXISTS "Shop owner manages vouchers" ON vouchers;
-CREATE POLICY "Shop owner manages vouchers" ON vouchers
-  FOR ALL
+-- Fix RLS: shop_id IS NULL không nên cho mọi user INSERT global voucher
+-- Global vouchers (shop_id=NULL) chỉ admin mới được tạo/sửa
+DROP POLICY IF EXISTS "Shop owner manages vouchers"   ON vouchers;
+DROP POLICY IF EXISTS "vouchers_shop_manage"          ON vouchers;
+DROP POLICY IF EXISTS "vouchers_admin_all"            ON vouchers;
+DROP POLICY IF EXISTS "vouchers_public_active"        ON vouchers;
+
+CREATE POLICY "vouchers_public_active"  ON vouchers FOR SELECT USING (is_active = true);
+CREATE POLICY "vouchers_shop_manage"    ON vouchers FOR ALL
   USING (
-    shop_id IS NULL OR
+    shop_id IS NOT NULL AND
+    auth.uid() = (SELECT owner_id FROM shops WHERE id = shop_id)
+  )
+  WITH CHECK (
+    shop_id IS NOT NULL AND
     auth.uid() = (SELECT owner_id FROM shops WHERE id = shop_id)
   );
+CREATE POLICY "vouchers_admin_all"      ON vouchers FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+
+-- ════════════════════════════════════════════════
+-- 3b. BẢNG VOUCHER_USAGES — theo dõi per_person_limit + used_count
+-- ════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS voucher_usages (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  voucher_id UUID        NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
+  user_id    UUID        NOT NULL REFERENCES profiles(id),
+  order_id   UUID        REFERENCES orders(id),
+  used_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE voucher_usages ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "voucher_usages_own"       ON voucher_usages;
+DROP POLICY IF EXISTS "voucher_usages_insert"    ON voucher_usages;
+DROP POLICY IF EXISTS "voucher_usages_admin_all" ON voucher_usages;
+
+CREATE POLICY "voucher_usages_own"       ON voucher_usages FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "voucher_usages_insert"    ON voucher_usages FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "voucher_usages_admin_all" ON voucher_usages FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+CREATE INDEX IF NOT EXISTS idx_voucher_usages_user    ON voucher_usages(user_id);
+CREATE INDEX IF NOT EXISTS idx_voucher_usages_voucher ON voucher_usages(voucher_id);
+
+-- Trigger: tự động tăng used_count khi voucher được dùng
+CREATE OR REPLACE FUNCTION increment_voucher_used_count() RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE vouchers SET used_count = used_count + 1 WHERE id = NEW.voucher_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_voucher_usage_count ON voucher_usages;
+CREATE TRIGGER trg_voucher_usage_count
+  AFTER INSERT ON voucher_usages
+  FOR EACH ROW EXECUTE FUNCTION increment_voucher_used_count();
 
 
 -- ════════════════════════════════════════════════

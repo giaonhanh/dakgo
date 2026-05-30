@@ -432,8 +432,15 @@ giaonhanh/
 
 ## 4. Database Schema
 
-> Chạy theo thứ tự này trong Supabase SQL Editor.
-> Bước đầu tiên: `CREATE EXTENSION IF NOT EXISTS postgis;`
+> ⚠️ **NGUỒN SỰ THẬT DUY NHẤT: `supabase/schema.sql`**
+> Các snippet SQL trong phần này là tài liệu thiết kế ban đầu và có thể không khớp hoàn toàn với schema thực tế.
+> Trước khi đọc các bảng bên dưới, hãy luôn kiểm tra `supabase/schema.sql`.
+>
+> **Những điểm khác biệt quan trọng so với schema thực:**
+> - Bảng `vouchers`: KHÔNG có cột `created_by`; có `per_person_limit`, `is_combo`; `discount_type` hỗ trợ thêm `'combo'`
+> - Bảng `orders`: KHÔNG có cột `voucher_id` (voucher tracking qua `voucher_usages`)
+> - Bảng `voucher_usages`: có `id` riêng (UUID PK); dùng trigger `trg_voucher_usage_count` để tự tăng `used_count`
+> - Migration file duy nhất cho DB đang chạy: `supabase/migrations/fix_schema_full.sql`
 
 ### 4.0 Extensions & Enums
 
@@ -719,33 +726,51 @@ CREATE INDEX idx_tx_wallet ON transactions(wallet_id, created_at DESC);
 
 ### 4.11 vouchers & usages
 
+> Schema thực tế — tham chiếu `supabase/schema.sql` để có full SQL.
+
 ```sql
 CREATE TABLE vouchers (
-  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code           TEXT UNIQUE NOT NULL,
-  title          TEXT NOT NULL,
-  discount_type  TEXT NOT NULL CHECK (discount_type IN ("percent","fixed","freeship")),
-  discount_value INTEGER NOT NULL,
-  min_order      INTEGER NOT NULL DEFAULT 0,
-  max_discount   INTEGER,
-  usage_limit    INTEGER,
-  used_count     INTEGER NOT NULL DEFAULT 0,
-  valid_from     TIMESTAMPTZ NOT NULL,
-  valid_to       TIMESTAMPTZ NOT NULL,
-  created_by     UUID REFERENCES profiles(id),
-  shop_id        UUID REFERENCES shops(id),
-  is_active      BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  shop_id          UUID REFERENCES shops(id) ON DELETE CASCADE,  -- NULL = toàn hệ thống (chỉ admin tạo)
+  code             TEXT UNIQUE NOT NULL,
+  title            TEXT,
+  discount_type    TEXT NOT NULL DEFAULT 'percent'
+                   CHECK (discount_type IN ('percent','fixed','freeship','combo')),
+  discount_value   INT  NOT NULL DEFAULT 0,
+  min_order        INT  NOT NULL DEFAULT 0,
+  max_discount     INT,
+  usage_limit      INT,            -- NULL = không giới hạn tổng lượt
+  per_person_limit INT,            -- NULL = không giới hạn theo người
+  used_count       INT  NOT NULL DEFAULT 0,  -- auto-increment qua trigger
+  valid_from       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  valid_to         TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '30 days',
+  is_active        BOOLEAN NOT NULL DEFAULT true,
+  is_combo         BOOLEAN NOT NULL DEFAULT false,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+  -- LƯU Ý: không có cột created_by
 );
 
+-- RLS:
+-- vouchers_public_active: SELECT WHERE is_active = true (tất cả)
+-- vouchers_shop_manage:   ALL WHERE shop_id IS NOT NULL AND owner_id = auth.uid() (merchant)
+-- vouchers_admin_all:     ALL (admin)
+
 CREATE TABLE voucher_usages (
-  voucher_id UUID NOT NULL REFERENCES vouchers(id),
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  voucher_id UUID NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
   user_id    UUID NOT NULL REFERENCES profiles(id),
   order_id   UUID REFERENCES orders(id),
-  used_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (voucher_id, user_id)
+  used_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  -- Trigger trg_voucher_usage_count: auto tăng vouchers.used_count khi INSERT
 );
 ```
+
+> **Quan trọng khi INSERT voucher** (admin/merchant):
+> - KHÔNG có `created_by` → bỏ qua field này
+> - Dùng `per_person_limit` (không phải `per_user_limit`)
+> - `valid_from`: truyền `"YYYY-MM-DDT00:00:00"` (không bỏ giờ)
+> - `valid_to`: truyền `"YYYY-MM-DDT23:59:59"` (append giờ)
+> - Merchant INSERT phải có `shop_id`; Admin global voucher KHÔNG có `shop_id` (NULL)
 
 ### 4.12 loyalty_points + trigger
 

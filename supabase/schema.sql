@@ -1,5 +1,5 @@
 -- ============================================================
--- GIAO NHANH KRONG PAC — Database Schema v3.0
+-- GIAO NHANH KRONG PAC — Database Schema v3.1
 -- Single source of truth — tổng hợp base + tất cả migrations
 -- Safe to run from scratch (DROP → CREATE)
 -- ============================================================
@@ -18,6 +18,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 DROP TRIGGER  IF EXISTS trigger_referral_reward    ON orders;
 DROP TRIGGER  IF EXISTS trg_update_shop_rating     ON reviews;
 DROP TRIGGER  IF EXISTS trg_handle_new_user        ON auth.users;
+DROP TRIGGER  IF EXISTS trg_voucher_usage_count    ON voucher_usages;
 
 DROP FUNCTION IF EXISTS process_referral_reward();
 DROP FUNCTION IF EXISTS update_shop_rating();
@@ -27,6 +28,7 @@ DROP FUNCTION IF EXISTS search_catalog(TEXT);
 DROP FUNCTION IF EXISTS add_to_wallet(UUID, wallet_type, INTEGER, UUID, TEXT, tx_type);
 DROP FUNCTION IF EXISTS subtract_from_wallet(UUID, wallet_type, INTEGER, UUID, TEXT, tx_type);
 DROP FUNCTION IF EXISTS apply_referral_code(TEXT, UUID);
+DROP FUNCTION IF EXISTS increment_voucher_used_count();
 
 DROP TABLE IF EXISTS referral_usages    CASCADE;
 DROP TABLE IF EXISTS referral_codes     CASCADE;
@@ -35,6 +37,7 @@ DROP TABLE IF EXISTS transactions       CASCADE;
 DROP TABLE IF EXISTS wallets            CASCADE;
 DROP TABLE IF EXISTS push_subscriptions CASCADE;
 DROP TABLE IF EXISTS chat_messages      CASCADE;
+DROP TABLE IF EXISTS voucher_usages     CASCADE;
 DROP TABLE IF EXISTS combo_items        CASCADE;
 DROP TABLE IF EXISTS vouchers           CASCADE;
 DROP TABLE IF EXISTS app_settings       CASCADE;
@@ -349,14 +352,39 @@ ALTER TABLE vouchers ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "vouchers_public_active"  ON vouchers FOR SELECT USING (is_active = true);
 CREATE POLICY "vouchers_shop_manage"    ON vouchers FOR ALL
   USING (
-    shop_id IS NULL OR
+    shop_id IS NOT NULL AND
+    auth.uid() = (SELECT owner_id FROM shops WHERE id = shop_id)
+  )
+  WITH CHECK (
+    shop_id IS NOT NULL AND
     auth.uid() = (SELECT owner_id FROM shops WHERE id = shop_id)
   );
 CREATE POLICY "vouchers_admin_all"      ON vouchers FOR ALL
-  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
 CREATE INDEX IF NOT EXISTS idx_vouchers_shop      ON vouchers(shop_id);
 CREATE INDEX IF NOT EXISTS idx_vouchers_active    ON vouchers(is_active, valid_to);
+
+
+-- ════════════════════════════════════════════════
+-- VOUCHER USAGES  (theo dõi per_person_limit + used_count)
+-- ════════════════════════════════════════════════
+CREATE TABLE voucher_usages (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  voucher_id UUID        NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
+  user_id    UUID        NOT NULL REFERENCES profiles(id),
+  order_id   UUID        REFERENCES orders(id),
+  used_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE voucher_usages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "voucher_usages_own"       ON voucher_usages FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "voucher_usages_insert"    ON voucher_usages FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "voucher_usages_admin_all" ON voucher_usages FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+CREATE INDEX IF NOT EXISTS idx_voucher_usages_user    ON voucher_usages(user_id);
+CREATE INDEX IF NOT EXISTS idx_voucher_usages_voucher ON voucher_usages(voucher_id);
 
 
 -- ════════════════════════════════════════════════
@@ -646,7 +674,20 @@ CREATE TRIGGER trg_handle_new_user
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
 
--- ── 2. Auto update rating shop khi có review mới ──
+-- ── 2. Auto increment used_count khi voucher được dùng ──
+CREATE OR REPLACE FUNCTION increment_voucher_used_count() RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE vouchers SET used_count = used_count + 1 WHERE id = NEW.voucher_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER trg_voucher_usage_count
+  AFTER INSERT ON voucher_usages
+  FOR EACH ROW EXECUTE FUNCTION increment_voucher_used_count();
+
+
+-- ── 3. Auto update rating shop khi có review mới ──
 CREATE OR REPLACE FUNCTION update_shop_rating() RETURNS TRIGGER AS $$
 BEGIN
   UPDATE shops SET
@@ -664,7 +705,7 @@ CREATE TRIGGER trg_update_shop_rating
   FOR EACH ROW EXECUTE FUNCTION update_shop_rating();
 
 
--- ── 3. Cộng tiền vào ví ──
+-- ── 4. Cộng tiền vào ví ──
 CREATE OR REPLACE FUNCTION add_to_wallet(
   p_user_id  UUID,
   p_type     wallet_type,
@@ -695,7 +736,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
--- ── 4. Trừ tiền khỏi ví ──
+-- ── 5. Trừ tiền khỏi ví ──
 CREATE OR REPLACE FUNCTION subtract_from_wallet(
   p_user_id  UUID,
   p_type     wallet_type,
@@ -730,7 +771,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
--- ── 5. Smart recommendations ──
+-- ── 6. Smart recommendations ──
 CREATE OR REPLACE FUNCTION get_recommendations(uid UUID, lim INTEGER DEFAULT 10)
 RETURNS TABLE (
   id             UUID, name TEXT, price INTEGER,
@@ -757,7 +798,7 @@ END;
 $$;
 
 
--- ── 6. Full-text search catalog ──
+-- ── 7. Full-text search catalog ──
 CREATE OR REPLACE FUNCTION search_catalog(query TEXT)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
@@ -792,7 +833,7 @@ END;
 $$;
 
 
--- ── 7. Referral code ──
+-- ── 8. Referral code ──
 CREATE OR REPLACE FUNCTION apply_referral_code(p_code TEXT, p_referee_id UUID)
 RETURNS JSONB AS $$
 DECLARE
@@ -815,7 +856,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
--- ── 8. Referral reward trigger ──
+-- ── 9. Referral reward trigger ──
 CREATE OR REPLACE FUNCTION process_referral_reward() RETURNS TRIGGER AS $$
 DECLARE
   v_usage    referral_usages%ROWTYPE;
@@ -873,6 +914,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE orders;
 ALTER PUBLICATION supabase_realtime ADD TABLE drivers;
 ALTER PUBLICATION supabase_realtime ADD TABLE chat_messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+ALTER PUBLICATION supabase_realtime ADD TABLE voucher_usages;
 
 
 -- ════════════════════════════════════════════════

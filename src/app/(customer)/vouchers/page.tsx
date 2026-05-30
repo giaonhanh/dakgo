@@ -159,7 +159,7 @@ export default function VouchersPage() {
 
       const [{ data: vData }, { data: usages }, { data: shops }] = await Promise.all([
         supabase.from("vouchers")
-          .select("id, code, title, discount_type, discount_value, min_order, max_discount, per_user_limit, usage_limit, used_count, valid_to, shop_id")
+          .select("id, code, title, discount_type, discount_value, min_order, max_discount, per_person_limit, usage_limit, used_count, valid_to, shop_id")
           .eq("is_active", true)
           .gte("valid_to", now)
           .order("valid_to", { ascending: true }),
@@ -175,7 +175,7 @@ export default function VouchersPage() {
 
       const mapped: Voucher[] = (vData ?? []).map((v: {
         id: string; code: string; title: string; discount_type: string; discount_value: number
-        min_order: number; max_discount: number | null; per_user_limit: number | null
+        min_order: number; max_discount: number | null; per_person_limit: number | null
         usage_limit: number | null; used_count: number; valid_to: string; shop_id: string | null
       }) => ({
         id:           v.id,
@@ -185,7 +185,7 @@ export default function VouchersPage() {
         value:        v.discount_value,
         minOrder:     v.min_order,
         maxDiscount:  v.max_discount,
-        perUserLimit: v.per_user_limit,
+        perUserLimit: v.per_person_limit,
         usageLimit:   v.usage_limit,
         usedCount:    v.used_count,
         validTo:      v.valid_to,

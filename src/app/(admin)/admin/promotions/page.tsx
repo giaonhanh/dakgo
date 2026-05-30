@@ -107,37 +107,53 @@ export default function AdminPromotionsPage() {
     if (!form.code || !form.title || !form.validFrom || !form.validTo) {
       setCreateMsg({ ok: false, text: "Vui lòng điền đủ các trường có dấu *" }); return
     }
-    if (form.type !== "freeship" && !form.value) {
-      setCreateMsg({ ok: false, text: "Vui lòng nhập giá trị giảm" }); return
+    if (form.type !== "freeship") {
+      const val = Number(form.value)
+      if (!form.value || val <= 0) {
+        setCreateMsg({ ok: false, text: "Giá trị giảm phải lớn hơn 0" }); return
+      }
+      if (form.type === "percent" && (val < 1 || val > 100)) {
+        setCreateMsg({ ok: false, text: "Tỉ lệ giảm phải từ 1% đến 100%" }); return
+      }
+    }
+    if (new Date(form.validFrom) >= new Date(form.validTo)) {
+      setCreateMsg({ ok: false, text: "Ngày hết hạn phải sau ngày hiệu lực" }); return
     }
     setSaving(true); setCreateMsg(null)
     const supabase = createClient()
     const { error } = await supabase.from("vouchers").insert({
-      code:           form.code.toUpperCase().trim(),
-      title:          form.title.trim(),
-      discount_type:  form.type,
-      discount_value: form.type === "freeship" ? 0 : Number(form.value),
-      min_order:      Number(form.minOrder) || 0,
-      max_discount:   form.maxDiscount ? Number(form.maxDiscount) : null,
-      usage_limit:      form.limit ? Number(form.limit) : null,
-      per_person_limit: form.perUserLimit ? Number(form.perUserLimit) : null,
-      valid_from:       new Date(form.validFrom).toISOString(),
+      code:             form.code.toUpperCase().trim(),
+      title:            form.title.trim(),
+      discount_type:    form.type,
+      discount_value:   form.type === "freeship" ? 0 : Math.floor(Number(form.value)),
+      min_order:        Number(form.minOrder) || 0,
+      max_discount:     form.maxDiscount ? Number(form.maxDiscount) : null,
+      usage_limit:      form.limit !== "" && form.limit !== "0" ? Number(form.limit) : null,
+      per_person_limit: form.perUserLimit !== "" && form.perUserLimit !== "0" ? Number(form.perUserLimit) : null,
+      valid_from:       new Date(form.validFrom + "T00:00:00").toISOString(),
       valid_to:         new Date(form.validTo + "T23:59:59").toISOString(),
       is_active:        true,
     })
     setSaving(false)
     if (error) {
-      setCreateMsg({ ok: false, text: error.message.includes("duplicate") ? `Mã "${form.code.toUpperCase()}" đã tồn tại, dùng mã khác` : "Lỗi: " + error.message })
+      const errText = error.code === "23505"
+        ? `Mã "${form.code.toUpperCase()}" đã tồn tại, dùng mã khác`
+        : error.code === "42501"
+        ? "Không có quyền tạo voucher — kiểm tra RLS policy"
+        : error.code === "23514"
+        ? "Giá trị không hợp lệ — kiểm tra lại các trường số"
+        : "Lỗi: " + error.message
+      setCreateMsg({ ok: false, text: errText })
     } else {
       setCreateMsg({ ok: true, text: `✓ Tạo voucher ${form.code.toUpperCase()} thành công!` })
       setForm({ code:"", title:"", type:"percent", value:"", minOrder:"", maxDiscount:"", limit:"", perUserLimit:"", validFrom:"", validTo:"" })
       load()
-      setTimeout(() => { setShowCreate(false); setCreateMsg(null) }, 1800)
+      setTimeout(() => { setShowCreate(false); setCreateMsg(null) }, 1200)
     }
   }
 
   async function handleToggle(v: Voucher) {
-    const nowActive = v.status === "active"
+    const nowActive = v.is_active
     setVouchers(prev => prev.map(x => x.id === v.id ? { ...x, is_active: !nowActive, status: deriveStatus({ is_active: !nowActive, valid_from: x.validFrom, valid_to: x.validTo }) } : x))
     if (selected?.id === v.id) setSelected(s => s ? { ...s, is_active: !nowActive, status: deriveStatus({ is_active: !nowActive, valid_from: s.validFrom, valid_to: s.validTo }) } : s)
     const supabase = createClient()
@@ -146,6 +162,7 @@ export default function AdminPromotionsPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!confirm("Xác nhận xóa voucher này? Hành động không thể hoàn tác.")) return
     const backup = vouchers
     setVouchers(prev => prev.filter(x => x.id !== id))
     setSelected(null)
@@ -369,7 +386,7 @@ export default function AdminPromotionsPage() {
         <AnimatePresence>
           {showCreate && (
             <>
-              <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} onClick={() => setShowCreate(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:100, backdropFilter:"blur(4px)" }} />
+              <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} onClick={() => { if (!saving) setShowCreate(false) }} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:100, backdropFilter:"blur(4px)" }} />
               <motion.div initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.95 }} transition={{ type:"spring", damping:24, stiffness:300 }} style={{ position:"fixed", inset:0, display:"flex", alignItems:"center", justifyContent:"center", padding:12, zIndex:101, pointerEvents:"none" }}>
               <div style={{ width:"min(480px, calc(100vw - 24px))", maxHeight:"calc(100dvh - 24px)", background:"#0d0b12", borderRadius:18, border:"1px solid rgba(255,107,0,0.2)", display:"flex", flexDirection:"column", overflow:"hidden", pointerEvents:"auto" }}>
                 <div style={{ padding:"16px 20px", borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
@@ -382,7 +399,7 @@ export default function AdminPromotionsPage() {
                     <div style={{ color:"#6a5a40", fontSize:10, marginBottom:6 }}>Loại khuyến mãi <span style={{ color:"#ff4040" }}>*</span></div>
                     <div style={{ display:"flex", gap:8 }}>
                       {(["percent","fixed","freeship"] as VoucherType[]).map(t => (
-                        <button key={t} onClick={() => setForm(p => ({ ...p, type:t, value: t==="freeship"?"0":p.value }))}
+                        <button key={t} onClick={() => setForm(p => ({ ...p, type:t, value: t==="freeship" ? "0" : (p.type==="freeship" ? "" : p.value) }))}
                           style={{ flex:1, height:40, borderRadius:10, background: form.type===t?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)", border: form.type===t?"1px solid rgba(255,107,0,0.35)":"1px solid rgba(255,255,255,0.08)", color: form.type===t?"#FF8C00":"#6a5a40", fontSize:10, cursor:"pointer", fontFamily:"Lexend", fontWeight: form.type===t?700:400 }}>
                           {TYPE_CFG[t].icon} {TYPE_CFG[t].label}
                         </button>
