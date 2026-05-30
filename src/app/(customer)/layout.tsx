@@ -175,7 +175,7 @@ const SELF_NAV_PATHS = [
   '/addresses', '/wallet', '/vouchers', '/loyalty', '/notifications', '/errand',
   '/checkout', '/order-success', '/review',
   '/bestsellers', '/promo-items', '/nearby-shops',
-  '/mua-ho', '/giao-ho', '/xe-om', '/taxi', '/ride',
+  '/mua-ho', '/giao-ho', '/xe-om', '/taxi', '/ride', '/invite',
   '/danh-muc', '/favorites',
 ]
 
