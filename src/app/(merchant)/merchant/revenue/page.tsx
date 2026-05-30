@@ -102,7 +102,7 @@ export default function MerchantRevenuePage() {
                 day: `T${w+1}`,
                 subtotal: wOrders.reduce((s, o) => s + (o.total ?? 0), 0),
                 orders: wOrders.length,
-                voucherDiscount: wOrders.reduce((s, o) => s + (0 ?? 0), 0),
+                voucherDiscount: 0,
               })
             }
           }
