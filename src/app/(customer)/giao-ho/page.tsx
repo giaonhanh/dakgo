@@ -9,6 +9,8 @@ import type { AddressPickerResult } from "@/types"
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
+const VM_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
+
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -17,11 +19,18 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-function calcFee(km: number): number {
-  if (km <= 2)       return 15000
-  if (km <= 5)       return 15000 + Math.round((km - 2) * 3500)
-  if (km <= 10)      return 15000 + 10500 + Math.round((km - 5) * 3000)
-  return 15000 + 10500 + 15000 + Math.round((km - 10) * 2500)
+function calcFeeFromRows(km: number, rows: string[], extra: string): number {
+  const kmInt = Math.ceil(km)
+  let total = 0
+  for (let i = 0; i < Math.min(kmInt, 10); i++) {
+    let price = 0
+    for (let j = i; j >= 0; j--) {
+      if (rows[j] && rows[j] !== "") { price = parseInt(rows[j]) || 0; break }
+    }
+    total += price
+  }
+  if (kmInt > 10) total += (kmInt - 10) * (parseInt(extra) || 0)
+  return total
 }
 
 async function compressImage(file: File): Promise<string> {
@@ -61,8 +70,15 @@ export default function GiaoHoPage() {
   const [senderPhone,    setSenderPhone]    = useState("")
   const [senderEditable, setSenderEditable] = useState(false)
 
+  // Pricing từ admin settings
+  const [pricingRows,    setPricingRows]    = useState<string[]>(["18000","15000","12000","10000","9000","8500","8000","7500","7000","6500"])
+  const [pricingExtra,   setPricingExtra]   = useState("6000")
+  const [weightMidFee,   setWeightMidFee]   = useState(5000)   // 3–5kg
+  const [weightHeavyFee, setWeightHeavyFee] = useState(10000)  // 5–10kg
+
   // Khoảng cách & phí
-  const [distanceKm, setDistanceKm] = useState<number | null>(null)
+  const [distanceKm,   setDistanceKm]   = useState<number | null>(null)
+  const [pickupLoading, setPickupLoading] = useState(true)
 
   // Người nhận
   const [recipientName,  setRecipientName]  = useState("")
@@ -83,18 +99,20 @@ export default function GiaoHoPage() {
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
 
   const WEIGHTS = [
-    { key: "nhe",  label: "< 3kg",   emoji: "📦", surcharge: 0     },
-    { key: "vua",  label: "3–10kg",  emoji: "📫", surcharge: 5000  },
-    { key: "nang", label: "> 10kg",  emoji: "🗃️", surcharge: 15000 },
+    { key: "nhe",  label: "0–3kg",   emoji: "📦" },
+    { key: "vua",  label: "3–5kg",   emoji: "📫" },
+    { key: "nang", label: "5–10kg",  emoji: "🗃️" },
   ] as const
 
-  const weightSurcharge = WEIGHTS.find(w => w.key === weight)?.surcharge ?? 0
-  const baseFee    = distanceKm !== null ? calcFee(distanceKm) : 15000
+  const weightSurcharge = weight === "vua" ? weightMidFee : weight === "nang" ? weightHeavyFee : 0
+  const baseFee    = distanceKm !== null ? calcFeeFromRows(distanceKm, pricingRows, pricingExtra) : calcFeeFromRows(2, pricingRows, pricingExtra)
   const serviceFee = baseFee + weightSurcharge
 
-  // Load user profile để pre-fill người gửi
+  // Load user profile + pricing + pickup GPS
   useEffect(() => {
     const supabase = createClient()
+
+    // Profile
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       supabase.from("profiles").select("full_name, phone").eq("id", user.id).single()
@@ -103,6 +121,42 @@ export default function GiaoHoPage() {
           if (data?.phone)     setSenderPhone(data.phone)
         })
     })
+
+    // Pricing từ admin settings
+    supabase.from("app_settings").select("value").eq("key", "pricing").maybeSingle()
+      .then(({ data }) => {
+        const dp = (data?.value as Record<string, { rows?: string[]; extra?: string; weightMid?: string; weightHeavy?: string } | undefined> | null)?.delivery_pkg
+        if (dp?.rows)        setPricingRows(dp.rows)
+        if (dp?.extra)       setPricingExtra(dp.extra)
+        if (dp?.weightMid)   setWeightMidFee(Number(dp.weightMid))
+        if (dp?.weightHeavy) setWeightHeavyFee(Number(dp.weightHeavy))
+      })
+
+    // Auto-fill địa chỉ lấy hàng từ GPS
+    if (!navigator.geolocation) { setPickupLoading(false); return }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const { latitude: lat, longitude: lng } = coords
+        setPickupCoord({ lat, lng })
+        fetch(`https://maps.vietmap.vn/api/reverse/v3?apikey=${VM_KEY}&lat=${lat}&lng=${lng}`)
+          .then(r => r.json())
+          .then((list: Array<{ display?: string; hs_num?: string; street?: string; ward?: string; district?: string; city?: string }>) => {
+            const d = list[0]
+            if (!d) return
+            const parts: string[] = []
+            if (d.hs_num && d.street) parts.push(`${d.hs_num} ${d.street}`)
+            else if (d.street)        parts.push(d.street)
+            if (d.ward)               parts.push(d.ward)
+            if (d.district)           parts.push(d.district)
+            if (d.city)               parts.push(d.city)
+            setPickup(parts.length > 0 ? parts.join(", ") : (d.display ?? ""))
+          })
+          .catch(() => {})
+          .finally(() => setPickupLoading(false))
+      },
+      () => setPickupLoading(false),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    )
   }, [])
 
   // Tính khoảng cách khi có đủ 2 toạ độ
@@ -255,8 +309,9 @@ export default function GiaoHoPage() {
             <div style={labelStyle}>Địa chỉ lấy hàng *</div>
             <div style={{ display:"flex",gap:8 }}>
               <input value={pickup} onChange={e=>setPickup(e.target.value)}
-                placeholder="Số nhà, tên đường, phường/xã..."
-                style={{ ...inputStyle, flex:1 }} />
+                placeholder={pickupLoading ? "Đang định vị vị trí của bạn..." : "Số nhà, tên đường, phường/xã..."}
+                disabled={pickupLoading}
+                style={{ ...inputStyle, flex:1, opacity: pickupLoading ? 0.6 : 1 }} />
               <button onClick={() => setMapMode("pickup")}
                 style={{ width:44,height:44,borderRadius:10,border:"1px solid rgba(255,107,0,0.25)",
                   background:"rgba(255,107,0,0.08)",flexShrink:0,cursor:"pointer",
@@ -309,7 +364,7 @@ export default function GiaoHoPage() {
                     {w.label}
                   </div>
                   <div style={{ color:weight===w.key?"#FF8C00":"#4a3a28",fontSize:8,marginTop:2 }}>
-                    {w.surcharge > 0 ? `+${fmt(w.surcharge)}` : "Không phụ thu"}
+                    {w.key==="nhe" ? "Miễn phí" : w.key==="vua" ? `+${fmt(weightMidFee)}` : `+${fmt(weightHeavyFee)}`}
                   </div>
                 </button>
               ))}
@@ -394,12 +449,14 @@ export default function GiaoHoPage() {
                   <span style={{ color:"#6a5a40",fontSize:10 }}>Phí vận chuyển ({distanceKm.toFixed(1)}km)</span>
                   <span style={{ color:"#b0956a",fontSize:10,fontWeight:600 }}>{fmt(baseFee)}</span>
                 </div>
-                {weightSurcharge > 0 && (
-                  <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
-                    <span style={{ color:"#6a5a40",fontSize:10 }}>Phụ thu cân nặng ({WEIGHTS.find(w=>w.key===weight)?.label})</span>
-                    <span style={{ color:"#b0956a",fontSize:10,fontWeight:600 }}>+{fmt(weightSurcharge)}</span>
-                  </div>
-                )}
+                <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
+                  <span style={{ color:"#6a5a40",fontSize:10 }}>
+                    Phụ phí cân nặng ({WEIGHTS.find(w=>w.key===weight)?.label})
+                  </span>
+                  <span style={{ color:weightSurcharge>0?"#b0956a":"#3ecf6e",fontSize:10,fontWeight:600 }}>
+                    {weightSurcharge > 0 ? `+${fmt(weightSurcharge)}` : "Miễn phí"}
+                  </span>
+                </div>
               </>
             )}
             <div style={{ height:1,background:"rgba(255,255,255,0.06)",margin:"8px 0" }} />
@@ -409,9 +466,6 @@ export default function GiaoHoPage() {
               <span style={{ background:"linear-gradient(90deg,#FF6B00,#FFB347)",
                 WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
                 backgroundClip:"text",fontSize:14,fontWeight:800 }}>{fmt(serviceFee)}</span>
-            </div>
-            <div style={{ color:"#4a3a28",fontSize:8,marginTop:6 }}>
-              Bảng giá: 2km đầu 15.000đ · 2–5km: +3.500đ/km · 5–10km: +3.000đ/km · &gt;10km: +2.500đ/km
             </div>
           </div>
         </div>

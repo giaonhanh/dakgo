@@ -70,10 +70,10 @@ export default function AdminSettingsPage() {
   }, [])
 
   /* ── Pricing ── */
-  const [pricing, setPricing] = useState<Record<ServiceType, { rows: string[]; extra: string }>>({
+  const [pricing, setPricing] = useState<Record<ServiceType, { rows: string[]; extra: string; weightMid?: string; weightHeavy?: string }>>({
     food:         { rows: ["15000","12000","10000","9000","8000","7500","7000","6500","6000","5500"], extra: "5000" },
-    delivery_pkg: { rows: ["18000","15000","12000","10000","9000","8500","8000","7500","7000","6500"], extra: "6000" },
-    errand:       { rows: ["20000","17000","14000","12000","11000","10000","9000","8500","8000","7500"], extra: "7000" },
+    delivery_pkg: { rows: ["18000","15000","12000","10000","9000","8500","8000","7500","7000","6500"], extra: "6000", weightMid: "5000", weightHeavy: "10000" },
+    errand:       { rows: ["20000","17000","14000","12000","11000","10000","9000","8500","8000","7500"], extra: "7000", weightMid: "5000", weightHeavy: "10000" },
     motorbike:    { rows: ["10000","8000","7000","6500","6000","5500","5000","4800","4600","4500"],    extra: "4000" },
     taxi:         { rows: ["15000","13000","11000","10000","9500","9000","8500","8000","7500","7000"], extra: "6500" },
   })
@@ -391,6 +391,37 @@ export default function AdminSettingsPage() {
                   <div style={{ textAlign:"right", paddingRight:8 }}><span style={{ fontSize:10, color:"#6a5a40" }}>cộng thêm mỗi km</span></div>
                 </div>
               </div>
+
+              {/* Weight surcharge — chỉ cho delivery_pkg và errand */}
+              {(activeService === "delivery_pkg" || activeService === "errand") && (
+                <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
+                  <div style={{ padding:"12px 0 4px", color:"#f0eaff", fontSize:12, fontWeight:700 }}>⚖️ Phụ thu theo cân nặng</div>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 0", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+                    <div>
+                      <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600 }}>Hàng nặng 3–5kg</div>
+                      <div style={{ color:"#6a5a40", fontSize:10 }}>Phụ phí cộng thêm ngoài phí vận chuyển</div>
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      <input type="number" value={pricing[activeService].weightMid ?? "5000"}
+                        onChange={e => setPricing(p => ({ ...p, [activeService]: { ...p[activeService], weightMid: e.target.value } }))}
+                        style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right", fontFamily:"Lexend", outline:"none" }} />
+                      <span style={{ color:"#6a5a40", fontSize:10 }}>đ</span>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 0" }}>
+                    <div>
+                      <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600 }}>Hàng nặng 5–10kg</div>
+                      <div style={{ color:"#6a5a40", fontSize:10 }}>Phụ phí cộng thêm ngoài phí vận chuyển</div>
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      <input type="number" value={pricing[activeService].weightHeavy ?? "15000"}
+                        onChange={e => setPricing(p => ({ ...p, [activeService]: { ...p[activeService], weightHeavy: e.target.value } }))}
+                        style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right", fontFamily:"Lexend", outline:"none" }} />
+                      <span style={{ color:"#6a5a40", fontSize:10 }}>đ</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
                 <div style={{ padding:"12px 0 4px", color:"#f0eaff", fontSize:12, fontWeight:700 }}>🛵 Điều chỉnh & hệ số</div>
