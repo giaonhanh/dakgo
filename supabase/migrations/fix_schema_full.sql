@@ -623,7 +623,113 @@ ON CONFLICT (id) DO NOTHING;
 
 
 -- ════════════════════════════════════════════════
--- 22. KIỂM TRA SAU KHI CHẠY
+-- 22. ERRANDS — giao hộ / mua hộ
+-- ════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS errands (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id          UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  driver_id            UUID REFERENCES profiles(id),
+  type                 TEXT NOT NULL DEFAULT 'deliver_for_me', -- 'deliver_for_me' | 'buy_for_me'
+  status               TEXT NOT NULL DEFAULT 'pending',
+  pickup_address       TEXT NOT NULL,
+  pickup_lat           NUMERIC(10,6) NOT NULL DEFAULT 12.683,
+  pickup_lng           NUMERIC(10,6) NOT NULL DEFAULT 108.483,
+  delivery_address     TEXT NOT NULL,
+  delivery_lat         NUMERIC(10,6) NOT NULL DEFAULT 12.683,
+  delivery_lng         NUMERIC(10,6) NOT NULL DEFAULT 108.483,
+  items_description    TEXT,
+  estimated_items_cost NUMERIC(12,0),
+  package_description  TEXT,
+  package_photo_url    TEXT,
+  note                 TEXT,
+  service_fee          NUMERIC(12,0) NOT NULL DEFAULT 20000,
+  actual_items_cost    NUMERIC(12,0),
+  total_amount         NUMERIC(12,0),
+  payment_method       TEXT NOT NULL DEFAULT 'cash',
+  sender_name          TEXT,
+  sender_phone         TEXT,
+  recipient_name       TEXT,
+  recipient_phone      TEXT,
+  created_at           TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE errands
+  ADD COLUMN IF NOT EXISTS sender_name    TEXT,
+  ADD COLUMN IF NOT EXISTS sender_phone   TEXT,
+  ADD COLUMN IF NOT EXISTS recipient_name TEXT,
+  ADD COLUMN IF NOT EXISTS recipient_phone TEXT;
+
+DROP POLICY IF EXISTS "errands_customer_all" ON errands;
+DROP POLICY IF EXISTS "errands_driver_read"  ON errands;
+
+ALTER TABLE errands ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "errands_customer_all" ON errands
+  FOR ALL USING (customer_id = auth.uid()) WITH CHECK (customer_id = auth.uid());
+CREATE POLICY "errands_driver_read" ON errands
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('driver','admin'))
+  );
+CREATE POLICY "errands_driver_update" ON errands
+  FOR UPDATE USING (
+    driver_id = auth.uid() OR
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+
+-- ════════════════════════════════════════════════
+-- 23. RIDES — xe ôm / taxi
+-- ════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS rides (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id      UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  driver_id        UUID REFERENCES profiles(id),
+  status           TEXT NOT NULL DEFAULT 'searching',
+  vehicle_type     TEXT NOT NULL DEFAULT 'motorbike', -- 'motorbike' | 'car'
+  pickup_address   TEXT NOT NULL,
+  pickup_lat       NUMERIC(10,6) NOT NULL DEFAULT 12.683,
+  pickup_lng       NUMERIC(10,6) NOT NULL DEFAULT 108.483,
+  dropoff_address  TEXT NOT NULL,
+  dropoff_lat      NUMERIC(10,6) NOT NULL DEFAULT 12.683,
+  dropoff_lng      NUMERIC(10,6) NOT NULL DEFAULT 108.483,
+  distance_km      NUMERIC(6,2),
+  estimated_fare   NUMERIC(12,0),
+  final_fare       NUMERIC(12,0),
+  payment_method   TEXT NOT NULL DEFAULT 'cash',
+  note             TEXT,
+  cancel_reason    TEXT,
+  created_at       TIMESTAMPTZ DEFAULT now()
+);
+
+DROP POLICY IF EXISTS "rides_customer_all"  ON rides;
+DROP POLICY IF EXISTS "rides_driver_read"   ON rides;
+DROP POLICY IF EXISTS "rides_driver_update" ON rides;
+
+ALTER TABLE rides ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "rides_customer_all" ON rides
+  FOR ALL USING (customer_id = auth.uid()) WITH CHECK (customer_id = auth.uid());
+CREATE POLICY "rides_driver_read" ON rides
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('driver','admin'))
+  );
+CREATE POLICY "rides_driver_update" ON rides
+  FOR UPDATE USING (
+    driver_id = auth.uid() OR
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+DO $rt2$
+BEGIN
+  BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE errands; EXCEPTION WHEN others THEN NULL; END;
+  BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE rides;   EXCEPTION WHEN others THEN NULL; END;
+END$rt2$;
+
+
+-- ════════════════════════════════════════════════
+-- 24. KIỂM TRA SAU KHI CHẠY
 -- ════════════════════════════════════════════════
 
 -- Chạy từng câu để xác nhận:
