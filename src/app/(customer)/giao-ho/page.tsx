@@ -69,6 +69,7 @@ export default function GiaoHoPage() {
   const [senderName,     setSenderName]     = useState("")
   const [senderPhone,    setSenderPhone]    = useState("")
   const [senderEditable, setSenderEditable] = useState(false)
+  const [pickupEditable, setPickupEditable] = useState(false)
 
   // Pricing từ admin settings
   const [pricingRows,    setPricingRows]    = useState<string[]>(["18000","15000","12000","10000","9000","8500","8000","7500","7000","6500"])
@@ -274,7 +275,7 @@ export default function GiaoHoPage() {
           <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
             borderRadius:14,padding:14,marginBottom:10 }}>
             <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10 }}>
-              <div style={{ color:"#FF8C00",fontSize:10,fontWeight:700 }}>👤 Người gửi (bạn)</div>
+              <div style={{ color:"#FF8C00",fontSize:10,fontWeight:700 }}>👤 Thông tin người gửi</div>
               {!senderEditable && (senderName || senderPhone) && (
                 <button onClick={() => setSenderEditable(true)}
                   style={{ background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.3)",
@@ -306,17 +307,36 @@ export default function GiaoHoPage() {
               </div>
             )}
             {/* Địa chỉ lấy hàng */}
-            <div style={labelStyle}>Địa chỉ lấy hàng *</div>
-            <div style={{ display:"flex",gap:8 }}>
-              <input value={pickup} onChange={e=>setPickup(e.target.value)}
-                placeholder={pickupLoading ? "Đang định vị vị trí của bạn..." : "Số nhà, tên đường, phường/xã..."}
-                disabled={pickupLoading}
-                style={{ ...inputStyle, flex:1, opacity: pickupLoading ? 0.6 : 1 }} />
-              <button onClick={() => setMapMode("pickup")}
-                style={{ width:44,height:44,borderRadius:10,border:"1px solid rgba(255,107,0,0.25)",
-                  background:"rgba(255,107,0,0.08)",flexShrink:0,cursor:"pointer",
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:18 }}>📍</button>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5,marginTop:10 }}>
+              <div style={labelStyle}>Địa chỉ lấy hàng *</div>
+              {!pickupEditable && pickup && !pickupLoading && (
+                <button onClick={() => setPickupEditable(true)}
+                  style={{ background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.3)",
+                    borderRadius:8,padding:"3px 10px",color:"#FF8C00",fontSize:9,fontWeight:600,
+                    cursor:"pointer",fontFamily:"Lexend" }}>Đổi</button>
+              )}
             </div>
+            {pickupLoading ? (
+              <div style={{ ...inputStyle, color:"#6a5a40", display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ fontSize:12 }}>📍</span> Đang định vị vị trí của bạn...
+              </div>
+            ) : !pickupEditable && pickup ? (
+              <div style={{ display:"flex",alignItems:"center",gap:10,
+                background:"rgba(255,107,0,0.06)",borderRadius:10,padding:"10px 12px" }}>
+                <span style={{ fontSize:18 }}>📍</span>
+                <div style={{ color:"#f8f0e0",fontSize:11,flex:1 }}>{pickup}</div>
+              </div>
+            ) : (
+              <div style={{ display:"flex",gap:8 }}>
+                <input value={pickup} onChange={e=>setPickup(e.target.value)}
+                  placeholder="Số nhà, tên đường, phường/xã..."
+                  style={{ ...inputStyle, flex:1 }} />
+                <button onClick={() => setMapMode("pickup")}
+                  style={{ width:44,height:44,borderRadius:10,border:"1px solid rgba(255,107,0,0.25)",
+                    background:"rgba(255,107,0,0.08)",flexShrink:0,cursor:"pointer",
+                    display:"flex",alignItems:"center",justifyContent:"center",fontSize:18 }}>📍</button>
+              </div>
+            )}
           </div>
 
           {/* ── Người nhận ── */}
