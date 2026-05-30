@@ -1204,7 +1204,7 @@ export default function CheckoutPage() {
     ? { id: "map", label: "📍 Bản đồ", address: mapAddress.address, isDefault: false, lat: mapAddress.lat, lng: mapAddress.lng }
     : null
   const allAddrs: AddrOption[] = [...savedAddrs, ...(tempAddr ? [tempAddr] : [])]
-  const currentAddr = allAddrs.find(a => a.id === selectedAddr) ?? allAddrs[0]
+  const currentAddr = allAddrs.find(a => a.id === selectedAddr) ?? allAddrs[0] ?? null
   const TIER_ADDR_LIMIT = 3
 
   // ── Shop hours (mock — replace from shops.opening_hours[weekday]) ──
@@ -1553,18 +1553,26 @@ export default function CheckoutPage() {
               display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
             }}>📍</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                <span style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700 }}>{currentAddr.label}</span>
-                {currentAddr.isDefault && (
-                  <span style={{
-                    background: "rgba(62,207,110,0.12)", color: "#3ecf6e",
-                    borderRadius: 4, padding: "1px 6px", fontSize: 7.5, fontWeight: 700,
-                  }}>Mặc định</span>
-                )}
-              </div>
-              <div style={{ color: "#6a5a40", fontSize: 10.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {currentAddr.address}
-              </div>
+              {currentAddr ? (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                    <span style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700 }}>{currentAddr.label}</span>
+                    {currentAddr.isDefault && (
+                      <span style={{
+                        background: "rgba(62,207,110,0.12)", color: "#3ecf6e",
+                        borderRadius: 4, padding: "1px 6px", fontSize: 7.5, fontWeight: 700,
+                      }}>Mặc định</span>
+                    )}
+                  </div>
+                  <div style={{ color: "#6a5a40", fontSize: 10.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {currentAddr.address}
+                  </div>
+                </>
+              ) : (
+                <div style={{ color: "#FF8C00", fontSize: 11, fontWeight: 600 }}>
+                  Chưa có địa chỉ — nhấn Đổi để chọn
+                </div>
+              )}
             </div>
             <button type="button" onClick={() => setShowAddressSheet(true)} style={{
               height: 30, padding: "0 12px", borderRadius: 8, cursor: "pointer",
