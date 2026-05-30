@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
 /* ── helpers ── */
@@ -265,6 +266,8 @@ function PaymentSheet({ onClose, walletBalance }: { onClose: () => void; walletB
 
 /* ── main ── */
 export default function CustomerSettingsPage() {
+  const router = useRouter()
+
   /* realtime data */
   const [userId,        setUserId]        = useState<string | null>(null)
   const [fullName,      setFullName]      = useState("Đang tải...")
@@ -274,32 +277,42 @@ export default function CustomerSettingsPage() {
   const [tier,          setTier]          = useState<TierLevel>("bronze")
   const [dataLoading,   setDataLoading]   = useState(true)
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
+    setDataLoading(true)
     const supabase = createClient()
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return
-      setUserId(user.id)
-      const [
-        { data: profile },
-        { data: wallet },
-        { data: loyalty },
-      ] = await Promise.all([
-        supabase.from("profiles").select("full_name, phone").eq("id", user.id).single(),
-        supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "customer").single(),
-        supabase.from("loyalty_points").select("total_points, tier").eq("user_id", user.id).single(),
-      ])
-      if (profile) {
-        setFullName(profile.full_name ?? "Khách hàng")
-        setPhone(profile.phone ?? "")
-      }
-      if (wallet) setWalletBalance(wallet.balance ?? 0)
-      if (loyalty) {
-        setLoyaltyPoints(loyalty.total_points ?? 0)
-        setTier((loyalty.tier as TierLevel) ?? "bronze")
-      }
-      setDataLoading(false)
-    })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setDataLoading(false); return }
+    setUserId(user.id)
+    const [
+      { data: profile },
+      { data: wallet },
+      { data: loyalty },
+    ] = await Promise.all([
+      supabase.from("profiles").select("full_name, phone").eq("id", user.id).single(),
+      supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "customer").single(),
+      supabase.from("loyalty_points").select("total_points, tier").eq("user_id", user.id).single(),
+    ])
+    if (profile) {
+      setFullName(profile.full_name ?? "Khách hàng")
+      setPhone(profile.phone ?? "")
+    }
+    if (wallet) setWalletBalance(wallet.balance ?? 0)
+    if (loyalty) {
+      setLoyaltyPoints(loyalty.total_points ?? 0)
+      setTier((loyalty.tier as TierLevel) ?? "bronze")
+    }
+    setDataLoading(false)
   }, [])
+
+  useEffect(() => {
+    router.refresh()   // bust Next.js router cache
+    void loadData()
+
+    // Reload khi user quay lại tab/trang
+    const onVisible = () => { if (document.visibilityState === "visible") void loadData() }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => document.removeEventListener("visibilitychange", onVisible)
+  }, [loadData, router])
 
   const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
   const tierCfg = TIER_CFG[tier]

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
@@ -118,40 +118,47 @@ export default function ProfilePage() {
   const [editMode,    setEditMode]    = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.replace("/login"); return }
-      setUserId(user.id)
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.replace("/login"); return }
+    setUserId(user.id)
 
-      const [
-        { data: profile },
-        { data: loyalty },
-        { data: wallet },
-        { data: orderCount },
-        { data: activeCount },
-      ] = await Promise.all([
-        supabase.from("profiles").select("full_name, phone, avatar_url, created_at").eq("id", user.id).single(),
-        supabase.from("loyalty_points").select("total_points, tier").eq("user_id", user.id).maybeSingle(),
-        supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
-        supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", user.id).neq("status", "cancelled"),
-        supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", user.id).in("status", ["pending","accepted","preparing","ready","delivering"]),
-      ])
+    const [
+      { data: profile },
+      { data: loyalty },
+      { data: wallet },
+      { data: orderCount },
+      { data: activeCount },
+    ] = await Promise.all([
+      supabase.from("profiles").select("full_name, phone, avatar_url, created_at").eq("id", user.id).single(),
+      supabase.from("loyalty_points").select("total_points, tier").eq("user_id", user.id).maybeSingle(),
+      supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
+      supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", user.id).neq("status", "cancelled"),
+      supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", user.id).in("status", ["pending","accepted","preparing","ready","delivering"]),
+    ])
 
-      setName(profile?.full_name ?? "")
-      setPhone(profile?.phone ?? "")
-      setEmail(user.email ?? "")
-      setAvatarUrl(profile?.avatar_url ?? "")
-      setJoinYear(profile?.created_at ? new Date(profile.created_at).getFullYear().toString() : "")
-      setTier(loyalty?.tier ?? "bronze")
-      setPoints(loyalty?.total_points ?? 0)
-      setWalletXu(wallet?.balance ?? 0)
-      setTotalOrders((orderCount as { count?: number } | null)?.count ?? 0)
-      setActiveOrderCount((activeCount as { count?: number } | null)?.count ?? 0)
-      setLoading(false)
-    }
-    load()
+    setName(profile?.full_name ?? "")
+    setPhone(profile?.phone ?? "")
+    setEmail(user.email ?? "")
+    setAvatarUrl(profile?.avatar_url ?? "")
+    setJoinYear(profile?.created_at ? new Date(profile.created_at).getFullYear().toString() : "")
+    setTier(loyalty?.tier ?? "bronze")
+    setPoints(loyalty?.total_points ?? 0)
+    setWalletXu(wallet?.balance ?? 0)
+    setTotalOrders((orderCount as { count?: number } | null)?.count ?? 0)
+    setActiveOrderCount((activeCount as { count?: number } | null)?.count ?? 0)
+    setLoading(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    router.refresh()
+    void load()
+    const onVisible = () => { if (document.visibilityState === "visible") void load() }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => document.removeEventListener("visibilitychange", onVisible)
+  }, [load, router])
 
   const tierCfg  = TIER_CFG[tier as keyof typeof TIER_CFG] ?? TIER_CFG.bronze
   const nextTier = NEXT_TIER[tier] ?? "Gold"
