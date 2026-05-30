@@ -114,8 +114,8 @@ export default function MerchantDashboard() {
     const { data: rows } = await supabase
       .from("orders")
       .select(`
-        id, status, total_amount, subtotal, discount_amount, payment_method, note, created_at, scheduled_at, customer_id,
-        order_items(name, price, quantity)
+        id, status, total_amount, total, pay_method, note, created_at, scheduled_at, customer_id,
+        order_items(name, price, qty)
       `)
       .eq("shop_id", sid)
       .gte("created_at", today.toISOString())
@@ -140,19 +140,19 @@ export default function MerchantDashboard() {
 
     const mapped: MOrder[] = rows.map(o => {
       const profile = profileMap[o.customer_id] ?? {}
-      const items = (o.order_items ?? []) as { name: string; price: number; quantity: number }[]
-      const itemStr = items.map(i => `${i.name} x${i.quantity}`).join(", ")
-      const pm = o.payment_method as PayMethod
+      const items = (o.order_items ?? []) as { name: string; price: number; qty: number }[]
+      const itemStr = items.map(i => `${i.name} x${i.qty}`).join(", ")
+      const pm = o.pay_method as PayMethod
       return {
         id: o.id,
         shortId: o.id.slice(0,8).toUpperCase(),
         customerName: profile.full_name ?? "Khách hàng",
         customerPhone: profile.phone ?? "",
         items: itemStr || "—",
-        itemList: items.map(i => ({ name: i.name, qty: i.quantity, price: i.price })),
+        itemList: items.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
         total: o.total_amount,
-        subtotal: o.subtotal ?? o.total_amount,
-        discountAmount: o.discount_amount ?? 0,
+        subtotal: o.total ?? o.total_amount,
+        discountAmount: 0,
         payMethod: pm === "wallet" ? "wallet" : pm === "vietqr" ? "vietqr" : "cash",
         status: (o.status === "delivered" ? "ready" : o.status === "cancelled" ? "rejected" : o.status) as OrderStatus,
         time: fmtTime(o.created_at),

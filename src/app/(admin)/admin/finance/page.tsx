@@ -45,15 +45,15 @@ export default function AdminFinancePage() {
 
     // Period orders with shop commission_rate and driver_id
     const { data: periodOrders } = await supabase.from("orders")
-      .select("id, subtotal, delivery_fee, driver_id, shop_id, created_at, shops!shop_id(name, commission_rate)")
+      .select("id, total, ship_fee, driver_id, shop_id, created_at, shops!shop_id(name, commission_rate)")
       .gte("created_at", periodStart.toISOString())
       .neq("status", "cancelled")
 
     const orders = periodOrders ?? []
-    const rev = orders.reduce((s,o) => s+(o.subtotal??0), 0)
+    const rev = orders.reduce((s,o) => s+(o.total??0), 0)
     const comm = orders.reduce((s,o) => {
       const sh = Array.isArray(o.shops)?o.shops[0]:o.shops as {commission_rate?:number}|null
-      return s + (o.subtotal??0)*((sh?.commission_rate??15)/100)
+      return s + (o.total??0)*((sh?.commission_rate??15)/100)
     }, 0)
     setTotalRevenue(rev); setTotalCommission(Math.round(comm))
     setTotalOrders(orders.length); setAvgOrderValue(orders.length > 0 ? Math.round(rev/orders.length) : 0)
@@ -62,10 +62,10 @@ export default function AdminFinancePage() {
     const last7 = getLast7Labels()
     setWeeklyData(last7.map(({label, iso}) => {
       const dayOrders = orders.filter(o => o.created_at.startsWith(iso))
-      const dayRev = dayOrders.reduce((s,o) => s+(o.subtotal??0), 0)
+      const dayRev = dayOrders.reduce((s,o) => s+(o.total??0), 0)
       const dayComm = dayOrders.reduce((s,o) => {
         const sh = Array.isArray(o.shops)?o.shops[0]:o.shops as {commission_rate?:number}|null
-        return s + (o.subtotal??0)*((sh?.commission_rate??15)/100)
+        return s + (o.total??0)*((sh?.commission_rate??15)/100)
       }, 0)
       return { day: label, rev: dayRev, comm: Math.round(dayComm) }
     }))
@@ -77,8 +77,8 @@ export default function AdminFinancePage() {
       if (!sh || !o.shop_id) return
       if (!shopAgg[o.shop_id]) shopAgg[o.shop_id] = { name:sh.name??'—', rate:sh.commission_rate??15, orders:0, revenue:0, commission:0 }
       shopAgg[o.shop_id].orders++
-      shopAgg[o.shop_id].revenue += o.subtotal??0
-      shopAgg[o.shop_id].commission += Math.round((o.subtotal??0)*((sh.commission_rate??15)/100))
+      shopAgg[o.shop_id].revenue += o.total??0
+      shopAgg[o.shop_id].commission += Math.round((o.total??0)*((sh.commission_rate??15)/100))
     })
     setMerchantComm(Object.values(shopAgg).sort((a,b)=>b.revenue-a.revenue))
 
@@ -92,7 +92,7 @@ export default function AdminFinancePage() {
     orders.filter(o=>o.driver_id).forEach(o => {
       const did = o.driver_id as string
       if (!drvAgg[did]) drvAgg[did] = {trips:0, earnings:0}
-      drvAgg[did].trips++; drvAgg[did].earnings += o.delivery_fee??0
+      drvAgg[did].trips++; drvAgg[did].earnings += o.ship_fee??0
     })
     const payouts = Object.entries(drvAgg)
       .map(([id,v]) => ({ name: nameMap[id]??'Tài xế', trips:v.trips, earnings:v.earnings }))

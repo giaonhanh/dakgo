@@ -157,7 +157,7 @@ export default function AdminUsersPage() {
     ] = await Promise.all([
       supabase.from("loyalty_points").select("user_id, total_points, tier").in("user_id", ids),
       supabase.from("blacklist").select("user_id, reason").in("user_id", ids),
-      supabase.from("orders").select("customer_id, driver_id, shop_id, total_amount, subtotal, delivery_fee, status"),
+      supabase.from("orders").select("customer_id, driver_id, shop_id, total_amount, total, ship_fee, status"),
       supabase.from("shops").select("id, owner_id, commission_rate"),
       supabase.from("wallets").select("user_id, type, balance").in("user_id", ids),
     ])
@@ -185,7 +185,7 @@ export default function AdminUsersPage() {
         if (!dOrdMap[o.driver_id]) dOrdMap[o.driver_id] = { count: 0, earned: 0 }
         dOrdMap[o.driver_id].count++
         const shop = shopById[o.shop_id]
-        dOrdMap[o.driver_id].earned += Math.round((o.delivery_fee ?? 0) * (1 - (shop?.commission_rate ?? 15) / 100))
+        dOrdMap[o.driver_id].earned += Math.round((o.ship_fee ?? 0) * (1 - (shop?.commission_rate ?? 15) / 100))
       }
       if (o.shop_id && o.status !== "cancelled") {
         const shop = shopById[o.shop_id]
@@ -193,7 +193,7 @@ export default function AdminUsersPage() {
           if (!mOrdMap[shop.owner_id]) mOrdMap[shop.owner_id] = { count: 0, revenue: 0, commission: 0 }
           mOrdMap[shop.owner_id].count++
           mOrdMap[shop.owner_id].revenue    += o.total_amount ?? 0
-          mOrdMap[shop.owner_id].commission += Math.round((o.subtotal ?? 0) * (shop.commission_rate ?? 15) / 100)
+          mOrdMap[shop.owner_id].commission += Math.round((o.total ?? 0) * (shop.commission_rate ?? 15) / 100)
         }
       }
     }
