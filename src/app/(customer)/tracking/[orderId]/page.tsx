@@ -120,8 +120,9 @@ export default function TrackingPage() {
         items: items.map(i => ({ name: `${i.name} ×${i.qty}`, emoji: "🍽️" })),
         paymentMethod: order.pay_method,
       })
-      setStatus((order.status === "delivered" ? "delivered" : order.status) as OrderStatus)
-      if (order.pay_method !== "cash") setPaymentStatus("paid")
+      const st = (order.status === "delivered" ? "delivered" : order.status) as OrderStatus
+      setStatus(st)
+      if (order.pay_method !== "cash" && (st === "delivered" || st === "done")) setPaymentStatus("paid")
 
       // Fetch driver
       if (order.driver_id) {
@@ -174,7 +175,8 @@ export default function TrackingPage() {
       }, (payload) => {
         const newStatus = payload.new.status as OrderStatus
         setStatus(newStatus === "delivered" ? "delivered" : newStatus)
-        if ((payload.new as { pay_method?: string }).pay_method !== "cash") {
+        if ((payload.new as { pay_method?: string; status?: string }).pay_method !== "cash"
+            && ["delivered","done"].includes((payload.new as { status?: string }).status ?? "")) {
           setPaymentStatus("paid")
         }
       })
