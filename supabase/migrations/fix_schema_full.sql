@@ -299,7 +299,12 @@ DROP POLICY IF EXISTS "Authenticated users upload shop covers"    ON storage.obj
 DROP POLICY IF EXISTS "Authenticated users upload shop logos"     ON storage.objects;
 DROP POLICY IF EXISTS "Authenticated users upload product images" ON storage.objects;
 DROP POLICY IF EXISTS "Authenticated users upload avatars"        ON storage.objects;
-DROP POLICY IF EXISTS "Public can view all images"               ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users update own images"     ON storage.objects;
+DROP POLICY IF EXISTS "Public can view all images"                ON storage.objects;
+DROP POLICY IF EXISTS "storage_public_view"                       ON storage.objects;
+DROP POLICY IF EXISTS "storage_auth_upload"                       ON storage.objects;
+DROP POLICY IF EXISTS "storage_auth_update"                       ON storage.objects;
+DROP POLICY IF EXISTS "storage_auth_delete"                       ON storage.objects;
 
 CREATE POLICY "Public can view all images" ON storage.objects
   FOR SELECT USING (bucket_id IN ('shop-covers','shop-logos','product-images','avatars'));
