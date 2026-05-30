@@ -115,7 +115,7 @@ export default function MerchantDashboard() {
       .from("orders")
       .select(`
         id, status, total_amount, total, pay_method, note, created_at, scheduled_at, customer_id,
-        order_items(name, price, qty)
+        order_items(id, name, price, qty, note)
       `)
       .eq("shop_id", sid)
       .gte("created_at", today.toISOString())
