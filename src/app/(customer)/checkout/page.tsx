@@ -36,7 +36,7 @@ interface DbVoucher {
   discount_type: "percent" | "fixed" | "freeship"
   discount_value: number; min_order: number; max_discount: number | null
   valid_to: string; shop_id: string | null; is_active: boolean
-  per_user_limit: number | null
+  per_person_limit: number | null
 }
 
 function calcVoucherDiscount(v: DbVoucher, sub: number, fee: number): number {
@@ -676,7 +676,7 @@ function VoucherPickerSheet({
     if (appliedVouchers.some(x => x.code === code))                                           return "applied"
     if (appliedVouchers.length >= 2)                                                          return "full"
     if (appliedVouchers.some(x => x.type === type))                                           return "conflict"
-    if (v.per_user_limit !== null && (userUsageMap[v.id] ?? 0) >= v.per_user_limit)          return "maxed"
+    if (v.per_person_limit !== null && (userUsageMap[v.id] ?? 0) >= v.per_person_limit)          return "maxed"
     return "available"
   }
 
@@ -724,7 +724,7 @@ function VoucherPickerSheet({
         ) : status === "full" ? (
           <span style={{ color: "#6a5a40", fontSize: 9, flexShrink: 0 }}>Đã đủ</span>
         ) : status === "maxed" ? (
-          <span style={{ color: "#ff4040", fontSize: 9, flexShrink: 0, textAlign: "right", maxWidth: 68, lineHeight: 1.3 }}>Đã dùng<br/>tối đa {v.per_user_limit} lần</span>
+          <span style={{ color: "#ff4040", fontSize: 9, flexShrink: 0, textAlign: "right", maxWidth: 68, lineHeight: 1.3 }}>Đã dùng<br/>tối đa {v.per_person_limit} lần</span>
         ) : (
           <button type="button" onClick={() => { onApply(v.code); onClose() }} style={{
             height: 28, padding: "0 10px", borderRadius: 8, border: "none",
@@ -1161,7 +1161,7 @@ export default function CheckoutPage() {
       const [{ data: addrs }, { data: wallet }, { data: voucherData }] = await Promise.all([
         supabase.from("saved_addresses").select("id, label, address, lat, lng, is_default").eq("user_id", user.id).order("is_default", { ascending: false }),
         supabase.from("wallets").select("id, balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
-        supabase.from("vouchers").select("id,code,title,discount_type,discount_value,min_order,max_discount,valid_to,shop_id,is_active,per_user_limit").eq("is_active", true).gte("valid_to", new Date().toISOString()).limit(30),
+        supabase.from("vouchers").select("id,code,title,discount_type,discount_value,min_order,max_discount,valid_to,shop_id,is_active,per_person_limit").eq("is_active", true).gte("valid_to", new Date().toISOString()).limit(30),
       ])
       if (voucherData) {
         setDbVouchers(voucherData as DbVoucher[])
@@ -1309,21 +1309,18 @@ export default function CheckoutPage() {
       const { data: order, error: orderErr } = await supabase
         .from("orders")
         .insert({
-          customer_id:     uid,
-          shop_id:         shopId,
-          status:          "pending",
-          delivery_address: currentAddr.address,
-          delivery_lat:    deliveryLat,
-          delivery_lng:    deliveryLng,
-          note:            driverNote || null,
-          subtotal,
-          delivery_fee:    deliveryFee,
-          discount_amount: discount,
-          total_amount:    total,
-          payment_method:  payment,
-          payment_status:  "pending",
-          payment_code:    payment === "vietqr" ? orderCode : null,
-          scheduled_at:    scheduledAt,
+          customer_id:  uid,
+          shop_id:      shopId,
+          service_type: "food",
+          status:       "pending",
+          drop_address: currentAddr.address,
+          note:         driverNote || null,
+          total:        subtotal,
+          ship_fee:     deliveryFee,
+          total_amount: total,
+          pay_method:   payment,
+          payment_code: payment === "vietqr" ? orderCode : null,
+          scheduled_at: scheduledAt,
         })
         .select("id")
         .single()
@@ -1333,12 +1330,10 @@ export default function CheckoutPage() {
       await supabase.from("order_items").insert(
         cartItems.map(item => ({
           order_id:   order.id,
-          product_id: item.id,
-          name:       item.name,
-          price:      item.price,
-          quantity:   item.qty,
-          subtotal:   item.price * item.qty,
-          note:       item.note ?? null,
+          product_id: item.id.split("__")[0],   // extract real UUID (tách khỏi composite id size/topping)
+          name:       item.name,                 // giữ nguyên tên có suffix "(Size L · Trân châu)"
+          price:      item.price,                // giá đã gồm surcharge
+          qty:        item.qty,
         }))
       )
 
