@@ -56,7 +56,7 @@ export default function XeOmPage() {
         payment_method:  "cash",
         status:          "searching",
       })
-      if (error) { fireToast("Không thể đặt xe. Thử lại sau."); setLoading(false); return }
+      if (error) { fireToast("Lỗi: " + (error?.message ?? "Không thể đặt xe")); setLoading(false); return }
       fireToast("✅ Đang tìm xe ôm cho bạn...")
       setTimeout(() => router.push("/orders"), 2000)
     } catch {

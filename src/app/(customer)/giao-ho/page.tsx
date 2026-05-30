@@ -61,7 +61,7 @@ export default function GiaoHoPage() {
         service_fee:       serviceFee,
         payment_method:    "cash",
       })
-      if (error) { fireToast("Không thể đặt dịch vụ. Thử lại sau."); setLoading(false); return }
+      if (error) { fireToast("Lỗi: " + (error?.message ?? "Không thể đặt dịch vụ")); setLoading(false); return }
       fireToast("✅ Đặt giao hộ thành công! Đang tìm tài xế...")
       setTimeout(() => router.push("/orders"), 2000)
     } catch {
