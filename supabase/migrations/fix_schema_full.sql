@@ -729,7 +729,33 @@ END$rt2$;
 
 
 -- ════════════════════════════════════════════════
--- 24. KIỂM TRA SAU KHI CHẠY
+-- 24. APPLY REFERRAL CODE FUNCTION
+-- ════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION apply_referral_code(p_code TEXT, p_referee_id UUID)
+RETURNS JSONB AS $$
+DECLARE
+  v_referrer_id UUID;
+BEGIN
+  SELECT user_id INTO v_referrer_id FROM referral_codes WHERE code = p_code;
+  IF NOT FOUND THEN
+    RETURN '{"ok":false,"error":"Mã giới thiệu không tồn tại"}'::JSONB;
+  END IF;
+  IF v_referrer_id = p_referee_id THEN
+    RETURN '{"ok":false,"error":"Không thể dùng mã của chính mình"}'::JSONB;
+  END IF;
+  IF EXISTS (SELECT 1 FROM referral_usages WHERE referee_id = p_referee_id) THEN
+    RETURN '{"ok":false,"error":"Bạn đã sử dụng mã giới thiệu trước đây"}'::JSONB;
+  END IF;
+  INSERT INTO referral_usages (code, referee_id)
+  VALUES (p_code, p_referee_id) ON CONFLICT (referee_id) DO NOTHING;
+  RETURN '{"ok":true}'::JSONB;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ════════════════════════════════════════════════
+-- 25. KIỂM TRA SAU KHI CHẠY
 -- ════════════════════════════════════════════════
 
 -- Chạy từng câu để xác nhận:
