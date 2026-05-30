@@ -56,7 +56,7 @@ export default function DriverEarningsPage() {
 
       const { data: orders } = await supabase
         .from("orders")
-        .select("id, delivery_fee, status, delivery_address, created_at, shop_id")
+        .select("id, ship_fee, status, delivery_address, created_at, shop_id")
         .eq("driver_id", user.id)
         .eq("status", "delivered")
         .gte("created_at", startOfMonth.toISOString())
@@ -64,9 +64,9 @@ export default function DriverEarningsPage() {
 
       if (!orders) return
 
-      const todayRevenue = orders.filter(o => new Date(o.created_at) >= startOfDay).reduce((s, o) => s + (o.delivery_fee ?? 0), 0)
-      const weekRevenue  = orders.filter(o => new Date(o.created_at) >= startOfWeek).reduce((s, o) => s + (o.delivery_fee ?? 0), 0)
-      const monthRevenue = orders.reduce((s, o) => s + (o.delivery_fee ?? 0), 0)
+      const todayRevenue = orders.filter(o => new Date(o.created_at) >= startOfDay).reduce((s, o) => s + (o.ship_fee ?? 0), 0)
+      const weekRevenue  = orders.filter(o => new Date(o.created_at) >= startOfWeek).reduce((s, o) => s + (o.ship_fee ?? 0), 0)
+      const monthRevenue = orders.reduce((s, o) => s + (o.ship_fee ?? 0), 0)
       const todayTrips   = orders.filter(o => new Date(o.created_at) >= startOfDay).length
       const weekTrips    = orders.filter(o => new Date(o.created_at) >= startOfWeek).length
 
@@ -84,7 +84,7 @@ export default function DriverEarningsPage() {
       for (const o of orders) {
         const key = new Date(o.created_at).toDateString()
         if (weekMap[key]) {
-          weekMap[key].amount += o.delivery_fee ?? 0
+          weekMap[key].amount += o.ship_fee ?? 0
           weekMap[key].trips++
         }
       }
@@ -96,7 +96,7 @@ export default function DriverEarningsPage() {
         from: "Cửa hàng",
         to: o.delivery_address ?? "—",
         time: new Date(o.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
-        amount: o.delivery_fee ?? 0,
+        amount: o.ship_fee ?? 0,
         type: "food",
       })))
     }

@@ -373,7 +373,7 @@ export default function DriverNavigatePage() {
       if (!orderId) return
       const { data: o } = await supabase
         .from("orders")
-        .select("id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng, subtotal, delivery_fee, total_amount, payment_method, note, order_items(name, quantity, price)")
+        .select("id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng, total, ship_fee, total_amount, pay_method, note, order_items(name, qty, price)")
         .eq("id", orderId)
         .single()
 
@@ -385,7 +385,7 @@ export default function DriverNavigatePage() {
       ])
 
       const commRate = Number(shop?.commission_rate ?? 15)
-      const earning  = Math.round((o.delivery_fee ?? 0) * (1 - commRate / 100))
+      const earning  = Math.round((o.ship_fee ?? 0) * (1 - commRate / 100))
 
       setOrder({
         id:       o.id.slice(0, 8).toUpperCase(),
@@ -399,12 +399,12 @@ export default function DriverNavigatePage() {
         custNote: o.note ?? "",
         custLat:  o.delivery_lat ?? DEFAULT_LAT,
         custLng:  o.delivery_lng ?? DEFAULT_LNG,
-        items:    (o.order_items ?? []).map((i: { name: string; quantity: number; price: number }) => ({
-          name: i.name, qty: i.quantity, emoji: "🍜",
+        items:    (o.order_items ?? []).map((i: { name: string; qty: number; price: number }) => ({
+          name: i.name, qty: i.qty, emoji: "🍜",
         })),
         total:   o.total_amount ?? 0,
         earning,
-        payment: o.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+        payment: o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
       })
     }
     load()

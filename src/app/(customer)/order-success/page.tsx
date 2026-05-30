@@ -82,7 +82,7 @@ function OrderSuccessContent() {
         .select(`
           id, total_amount, delivery_address, driver_id,
           shops(name, category),
-          order_items(name, quantity)
+          order_items(name, qty)
         `)
         .eq("id", orderId)
         .single()
@@ -90,7 +90,7 @@ function OrderSuccessContent() {
       if (!order) { setLoading(false); return }
 
       const shop = Array.isArray(order.shops) ? order.shops[0] : order.shops
-      const items = (order.order_items ?? []) as { name: string; quantity: number }[]
+      const items = (order.order_items ?? []) as { name: string; qty: number }[]
 
       let driver = null
       if (order.driver_id) {
@@ -113,7 +113,7 @@ function OrderSuccessContent() {
         shopName: shop?.name ?? "Cửa hàng",
         shopEmoji: "🍽️",
         total: order.total_amount,
-        items: items.map(i => ({ name: i.name, qty: i.quantity, emoji: "🍽️" })),
+        items: items.map(i => ({ name: i.name, qty: i.qty, emoji: "🍽️" })),
         driver,
         address: order.delivery_address,
       })

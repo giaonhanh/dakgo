@@ -888,7 +888,7 @@ export default function DriverDashboard() {
       const today = new Date().toISOString().split("T")[0]
       const { count, data: delivered } = await supabase
         .from("orders")
-        .select("delivery_fee, shops(commission_rate)", { count: "exact" })
+        .select("ship_fee, shops(commission_rate)", { count: "exact" })
         .eq("driver_id", user.id)
         .eq("status", "delivered")
         .gte("created_at", `${today}T00:00:00`)
@@ -897,7 +897,7 @@ export default function DriverDashboard() {
         const commission = Array.isArray(o.shops)
           ? (o.shops[0] as { commission_rate: number })?.commission_rate ?? 15
           : (o.shops as { commission_rate: number } | null)?.commission_rate ?? 15
-        return sum + Math.round(o.delivery_fee * (1 - commission / 100))
+        return sum + Math.round(o.ship_fee * (1 - commission / 100))
       }, 0)
       setTodayStats(s => ({ ...s, orders: count ?? 0, earnings }))
 

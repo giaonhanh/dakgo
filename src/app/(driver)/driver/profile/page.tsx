@@ -439,9 +439,9 @@ export default function DriverProfilePage() {
       const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "driver").maybeSingle()
       const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
       const { data: todayOrders } = await supabase.from("orders")
-        .select("delivery_fee").eq("driver_id", user.id).eq("status", "delivered")
+        .select("ship_fee").eq("driver_id", user.id).eq("status", "delivered")
         .gte("created_at", startOfDay.toISOString())
-      const todayEarnings = (todayOrders ?? []).reduce((s, o) => s + (o.delivery_fee ?? 0), 0)
+      const todayEarnings = (todayOrders ?? []).reduce((s, o) => s + (o.ship_fee ?? 0), 0)
       const walletBal = (wallet as { balance?: number } | null)?.balance ?? 0
       const joinDate = prof?.created_at ? new Date(prof.created_at).toLocaleDateString("vi-VN", { month: "2-digit", year: "numeric" }) : ""
       setStats({ rating: (drv as { rating_avg?: number } | null)?.rating_avg ?? 5.0, trips: (drv as { total_trips?: number } | null)?.total_trips ?? 0, todayEarnings, walletBal, joinDate })

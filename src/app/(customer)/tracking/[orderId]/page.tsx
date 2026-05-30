@@ -65,7 +65,7 @@ export default function TrackingPage() {
     id: string; shopName: string; shopEmoji: string; destAddr: string
     destLat: number; destLng: number; total: number; etaMin: number
     items: { name: string; emoji: string }[]
-    paymentMethod: string; paymentStatus: string
+    paymentMethod: string; paymentStatus?: string
   } | null>(null)
   const [driverData,    setDriverData]    = useState<{
     name: string; phone: string; rating: number; trips: number; plate: string
@@ -96,9 +96,9 @@ export default function TrackingPage() {
         .from("orders")
         .select(`
           id, status, delivery_address, delivery_lat, delivery_lng,
-          total_amount, payment_method, payment_status, driver_id,
+          total_amount, pay_method, driver_id,
           shops(name, category),
-          order_items(name, quantity)
+          order_items(name, qty)
         `)
         .eq("id", orderId)
         .single()
@@ -106,7 +106,7 @@ export default function TrackingPage() {
       if (!order) { setLoading(false); return }
 
       const shop = Array.isArray(order.shops) ? order.shops[0] : order.shops
-      const items = (order.order_items ?? []) as { name: string; quantity: number }[]
+      const items = (order.order_items ?? []) as { name: string; qty: number }[]
 
       setOrderData({
         id: order.id,
@@ -117,9 +117,8 @@ export default function TrackingPage() {
         destLng: order.delivery_lng ?? DEFAULT_LNG,
         total: order.total_amount,
         etaMin: 20,
-        items: items.map(i => ({ name: `${i.name} ×${i.quantity}`, emoji: "🍽️" })),
-        paymentMethod: order.payment_method,
-        paymentStatus: order.payment_status,
+        items: items.map(i => ({ name: `${i.name} ×${i.qty}`, emoji: "🍽️" })),
+        paymentMethod: order.pay_method,
       })
       setStatus((order.status === "delivered" ? "delivered" : order.status) as OrderStatus)
       if (order.payment_status === "paid") setPaymentStatus("paid")
