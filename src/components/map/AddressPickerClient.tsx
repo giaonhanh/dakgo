@@ -95,7 +95,7 @@ async function vietmapSearch(fullQuery: string, rawQuery: string, lat: number, l
     return {
       refId:         item.ref_id,
       mainText:      item.name || parts[0] || item.display,
-      secondaryText: parts.slice(1, 4).join(", "),
+      secondaryText: parts.slice(1).join(", "),
     }
   })
 }
@@ -292,6 +292,7 @@ export default function AddressPickerClient({
         else if (data.street)        parts.push(data.street)
         if (data.ward)               parts.push(data.ward)
         if (data.district)           parts.push(data.district)
+        if (data.city)               parts.push(data.city)
 
         setAddress(parts.length > 0 ? parts.join(", ") : data.display)
         applyNote(houseNum ? `Số ${houseNum}` : "")
@@ -365,7 +366,7 @@ export default function AddressPickerClient({
         setLocating(false)
         void doGeocode(DEFAULT_LAT, DEFAULT_LNG)
       },
-      { enableHighAccuracy: true, timeout: 8000 },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
     )
     return () => {
       clearTimeout(geocodeTimer.current)

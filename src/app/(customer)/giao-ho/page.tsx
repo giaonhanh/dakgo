@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import AddressPicker from "@/components/map/AddressPicker"
@@ -8,6 +8,21 @@ import { createClient } from "@/lib/supabase/client"
 import type { AddressPickerResult } from "@/types"
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function calcFee(km: number): number {
+  if (km <= 2)       return 15000
+  if (km <= 5)       return 15000 + Math.round((km - 2) * 3500)
+  if (km <= 10)      return 15000 + 10500 + Math.round((km - 5) * 3000)
+  return 15000 + 10500 + 15000 + Math.round((km - 10) * 2500)
+}
 
 async function compressImage(file: File): Promise<string> {
   return new Promise((resolve) => {
@@ -41,9 +56,13 @@ export default function GiaoHoPage() {
   const [deliveryCoord, setDeliveryCoord] = useState<{ lat: number; lng: number } | null>(null)
   const [mapMode,       setMapMode]       = useState<null | "pickup" | "delivery">(null)
 
-  // Người gửi
-  const [senderName,  setSenderName]  = useState("")
-  const [senderPhone, setSenderPhone] = useState("")
+  // Người gửi — pre-fill từ profile
+  const [senderName,     setSenderName]     = useState("")
+  const [senderPhone,    setSenderPhone]    = useState("")
+  const [senderEditable, setSenderEditable] = useState(false)
+
+  // Khoảng cách & phí
+  const [distanceKm, setDistanceKm] = useState<number | null>(null)
 
   // Người nhận
   const [recipientName,  setRecipientName]  = useState("")
@@ -64,12 +83,37 @@ export default function GiaoHoPage() {
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
 
   const WEIGHTS = [
-    { key: "nhe",  label: "< 3kg",   emoji: "📦", fee: 20000 },
-    { key: "vua",  label: "3–10kg",  emoji: "📫", fee: 25000 },
-    { key: "nang", label: "> 10kg",  emoji: "🗃️", fee: 35000 },
+    { key: "nhe",  label: "< 3kg",   emoji: "📦", surcharge: 0     },
+    { key: "vua",  label: "3–10kg",  emoji: "📫", surcharge: 5000  },
+    { key: "nang", label: "> 10kg",  emoji: "🗃️", surcharge: 15000 },
   ] as const
 
-  const serviceFee = WEIGHTS.find(w => w.key === weight)?.fee ?? 20000
+  const weightSurcharge = WEIGHTS.find(w => w.key === weight)?.surcharge ?? 0
+  const baseFee    = distanceKm !== null ? calcFee(distanceKm) : 15000
+  const serviceFee = baseFee + weightSurcharge
+
+  // Load user profile để pre-fill người gửi
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from("profiles").select("full_name, phone").eq("id", user.id).single()
+        .then(({ data }) => {
+          if (data?.full_name) setSenderName(data.full_name)
+          if (data?.phone)     setSenderPhone(data.phone)
+        })
+    })
+  }, [])
+
+  // Tính khoảng cách khi có đủ 2 toạ độ
+  useEffect(() => {
+    if (pickupCoord && deliveryCoord) {
+      const km = haversineKm(pickupCoord.lat, pickupCoord.lng, deliveryCoord.lat, deliveryCoord.lng)
+      setDistanceKm(Math.round(km * 10) / 10)
+    } else {
+      setDistanceKm(null)
+    }
+  }, [pickupCoord, deliveryCoord])
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -175,19 +219,38 @@ export default function GiaoHoPage() {
           {/* ── Người gửi ── */}
           <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
             borderRadius:14,padding:14,marginBottom:10 }}>
-            <div style={{ color:"#FF8C00",fontSize:10,fontWeight:700,marginBottom:10 }}>👤 Thông tin người gửi</div>
-            <div style={{ display:"flex",gap:8,marginBottom:8 }}>
-              <div style={{ flex:1 }}>
-                <div style={labelStyle}>Họ tên *</div>
-                <input value={senderName} onChange={e=>setSenderName(e.target.value)}
-                  placeholder="Nguyễn Văn A" style={inputStyle} />
-              </div>
-              <div style={{ flex:1 }}>
-                <div style={labelStyle}>Số điện thoại *</div>
-                <input value={senderPhone} onChange={e=>setSenderPhone(e.target.value)}
-                  placeholder="0901..." type="tel" style={inputStyle} />
-              </div>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10 }}>
+              <div style={{ color:"#FF8C00",fontSize:10,fontWeight:700 }}>👤 Người gửi (bạn)</div>
+              {!senderEditable && (senderName || senderPhone) && (
+                <button onClick={() => setSenderEditable(true)}
+                  style={{ background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.3)",
+                    borderRadius:8,padding:"3px 10px",color:"#FF8C00",fontSize:9,fontWeight:600,
+                    cursor:"pointer",fontFamily:"Lexend" }}>Đổi</button>
+              )}
             </div>
+            {!senderEditable && (senderName || senderPhone) ? (
+              <div style={{ display:"flex",alignItems:"center",gap:10,
+                background:"rgba(255,107,0,0.06)",borderRadius:10,padding:"10px 12px" }}>
+                <span style={{ fontSize:22 }}>👤</span>
+                <div>
+                  <div style={{ color:"#f8f0e0",fontSize:12,fontWeight:700 }}>{senderName}</div>
+                  <div style={{ color:"#b0956a",fontSize:10 }}>{senderPhone}</div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display:"flex",gap:8,marginBottom:8 }}>
+                <div style={{ flex:1 }}>
+                  <div style={labelStyle}>Họ tên *</div>
+                  <input value={senderName} onChange={e=>setSenderName(e.target.value)}
+                    placeholder="Nguyễn Văn A" style={inputStyle} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={labelStyle}>Số điện thoại *</div>
+                  <input value={senderPhone} onChange={e=>setSenderPhone(e.target.value)}
+                    placeholder="0901..." type="tel" style={inputStyle} />
+                </div>
+              </div>
+            )}
             {/* Địa chỉ lấy hàng */}
             <div style={labelStyle}>Địa chỉ lấy hàng *</div>
             <div style={{ display:"flex",gap:8 }}>
@@ -246,7 +309,7 @@ export default function GiaoHoPage() {
                     {w.label}
                   </div>
                   <div style={{ color:weight===w.key?"#FF8C00":"#4a3a28",fontSize:8,marginTop:2 }}>
-                    {fmt(w.fee)}
+                    {w.surcharge > 0 ? `+${fmt(w.surcharge)}` : "Không phụ thu"}
                   </div>
                 </button>
               ))}
@@ -316,16 +379,39 @@ export default function GiaoHoPage() {
           {/* ── Chi phí ── */}
           <div style={{ background:"rgba(255,107,0,0.06)",border:"1px solid rgba(255,107,0,0.18)",
             borderRadius:14,padding:14 }}>
-            <div style={{ display:"flex",justifyContent:"space-between" }}>
-              <span style={{ color:"#6a5a40",fontSize:10 }}>Phí giao hộ ({WEIGHTS.find(w=>w.key===weight)?.label})</span>
-              <span style={{ color:"#b0956a",fontSize:10,fontWeight:600 }}>{fmt(serviceFee)}</span>
-            </div>
+            <div style={{ color:"#FF8C00",fontSize:10,fontWeight:700,marginBottom:10 }}>💰 Chi phí dự kiến</div>
+            {distanceKm === null ? (
+              <div style={{ color:"#6a5a40",fontSize:9,textAlign:"center",padding:"6px 0" }}>
+                📍 Chọn địa chỉ lấy & giao trên bản đồ để tính phí chính xác
+              </div>
+            ) : (
+              <>
+                <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
+                  <span style={{ color:"#6a5a40",fontSize:10 }}>Khoảng cách</span>
+                  <span style={{ color:"#b0956a",fontSize:10,fontWeight:600 }}>{distanceKm.toFixed(1)} km</span>
+                </div>
+                <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
+                  <span style={{ color:"#6a5a40",fontSize:10 }}>Phí vận chuyển ({distanceKm.toFixed(1)}km)</span>
+                  <span style={{ color:"#b0956a",fontSize:10,fontWeight:600 }}>{fmt(baseFee)}</span>
+                </div>
+                {weightSurcharge > 0 && (
+                  <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
+                    <span style={{ color:"#6a5a40",fontSize:10 }}>Phụ thu cân nặng ({WEIGHTS.find(w=>w.key===weight)?.label})</span>
+                    <span style={{ color:"#b0956a",fontSize:10,fontWeight:600 }}>+{fmt(weightSurcharge)}</span>
+                  </div>
+                )}
+              </>
+            )}
             <div style={{ height:1,background:"rgba(255,255,255,0.06)",margin:"8px 0" }} />
             <div style={{ display:"flex",justifyContent:"space-between" }}>
-              <span style={{ color:"#f8f0e0",fontSize:12,fontWeight:700 }}>Tổng</span>
+              <span style={{ color:"#f8f0e0",fontSize:12,fontWeight:700 }}>
+                {distanceKm === null ? "Tối thiểu" : "Tổng"}</span>
               <span style={{ background:"linear-gradient(90deg,#FF6B00,#FFB347)",
                 WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
                 backgroundClip:"text",fontSize:14,fontWeight:800 }}>{fmt(serviceFee)}</span>
+            </div>
+            <div style={{ color:"#4a3a28",fontSize:8,marginTop:6 }}>
+              Bảng giá: 2km đầu 15.000đ · 2–5km: +3.500đ/km · 5–10km: +3.000đ/km · &gt;10km: +2.500đ/km
             </div>
           </div>
         </div>
