@@ -20,6 +20,7 @@ const RING_C = 2 * Math.PI * RING_R
 interface OrderData {
   id:                  string
   fullId:              string
+  orderTable:          "orders" | "errands"
   shopName:            string
   shopAddress:         string
   customerName:        string
@@ -32,6 +33,12 @@ interface OrderData {
   total:               number
   earnerFee:           number
   payMethod:           string
+  // Errand-specific
+  packagePhotoUrl?: string
+  senderName?:      string
+  senderPhone?:     string
+  recipientName?:   string
+  recipientPhone?:  string
 }
 
 /* ── sub-components ── */
@@ -211,6 +218,67 @@ function OrderPopup({
               </div>
             ))}
           </div>
+
+          {/* ── Ảnh gói hàng (errand) ── */}
+          {o.packagePhotoUrl && (
+            <div style={{
+              background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)",
+              borderRadius:14, overflow:"hidden", marginBottom:12,
+            }}>
+              <div style={{ padding:"8px 14px 6px", color:"#b0956a", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px" }}>
+                📷 Ảnh gói hàng — nhận dạng khi lấy
+              </div>
+              <img src={o.packagePhotoUrl} alt="Gói hàng"
+                style={{ width:"100%", maxHeight:200, objectFit:"cover", display:"block" }} />
+            </div>
+          )}
+
+          {/* ── Thông tin người gửi / nhận (errand) ── */}
+          {(o.senderName || o.recipientName) && (
+            <div style={{
+              background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)",
+              borderRadius:14, padding:"10px 14px", marginBottom:12,
+            }}>
+              <div style={{ color:"#b0956a", fontSize:9, fontWeight:700, marginBottom:8, textTransform:"uppercase", letterSpacing:".5px" }}>
+                Thông tin giao nhận
+              </div>
+              {o.senderName && (
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                  <div>
+                    <div style={{ color:"#6a5a40", fontSize:8 }}>👤 Người gửi</div>
+                    <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginTop:1 }}>{o.senderName}</div>
+                  </div>
+                  {o.senderPhone && (
+                    <a href={`tel:${o.senderPhone}`}
+                      style={{ display:"flex", alignItems:"center", gap:5, background:"rgba(74,143,245,0.1)",
+                        border:"1px solid rgba(74,143,245,0.25)", borderRadius:8, padding:"5px 10px",
+                        textDecoration:"none", color:"#4a8ff5", fontSize:10, fontWeight:600 }}>
+                      📞 {o.senderPhone}
+                    </a>
+                  )}
+                </div>
+              )}
+              {o.senderName && o.recipientName && (
+                <div style={{ height:1, background:"rgba(255,255,255,0.05)", margin:"6px 0" }} />
+              )}
+              {o.recipientName && (
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div>
+                    <div style={{ color:"#6a5a40", fontSize:8 }}>📬 Người nhận</div>
+                    <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginTop:1 }}>{o.recipientName}</div>
+                  </div>
+                  {o.recipientPhone && (
+                    <a href={`tel:${o.recipientPhone}`}
+                      style={{ display:"flex", alignItems:"center", gap:5, background:"rgba(62,207,110,0.1)",
+                        border:"1px solid rgba(62,207,110,0.25)", borderRadius:8, padding:"5px 10px",
+                        textDecoration:"none", color:"#3ecf6e", fontSize:10, fontWeight:600 }}>
+                      📞 {o.recipientPhone}
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── fare summary ── */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:16 }}>
@@ -885,35 +953,93 @@ export default function DriverDashboard() {
         if (showOrder || accepted) return
         const o = payload.new as {
           id: string; shop_id: string; customer_id: string
-          delivery_address: string; subtotal: number; delivery_fee: number
-          total_amount: number; payment_method: string
+          drop_address: string; total: number; ship_fee: number
+          total_amount: number; pay_method: string
         }
 
         // Fetch shop + customer + items
         const [{ data: shop }, { data: customer }, { data: items }] = await Promise.all([
           supabase.from("shops").select("name, address, commission_rate").eq("id", o.shop_id).single(),
           supabase.from("profiles").select("full_name").eq("id", o.customer_id).single(),
-          supabase.from("order_items").select("name, quantity, price").eq("order_id", o.id),
+          supabase.from("order_items").select("name, qty, price").eq("order_id", o.id),
         ])
 
         const commRate = Number(shop?.commission_rate ?? 15)
-        const earnerFee = Math.round(o.delivery_fee * (1 - commRate / 100))
+        const earnerFee = Math.round((o.ship_fee ?? 0) * (1 - commRate / 100))
 
         const orderData: OrderData = {
           id:                  o.id.slice(0, 8).toUpperCase(),
           fullId:              o.id,
+          orderTable:          "orders",
           shopName:            shop?.name ?? "Cửa hàng",
           shopAddress:         shop?.address ?? "",
           customerName:        customer?.full_name ?? "Khách hàng",
-          customerAddress:     o.delivery_address,
+          customerAddress:     o.drop_address ?? "",
           distanceToShop:      1.0,
           distanceToCustomer:  2.0,
-          items:               (items ?? []).map(i => ({ name: i.name, qty: i.quantity, price: i.price })),
-          subtotal:            o.subtotal,
-          deliveryFee:         o.delivery_fee,
-          total:               o.total_amount,
+          items:               (items ?? []).map(i => ({ name: i.name, qty: i.qty ?? 1, price: i.price })),
+          subtotal:            o.total    ?? 0,
+          deliveryFee:         o.ship_fee ?? 0,
+          total:               o.total_amount ?? 0,
           earnerFee,
-          payMethod:           o.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+          payMethod:           o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+        }
+        setPendingOrder(orderData)
+        setShowOrder(true)
+      })
+      .subscribe()
+
+    // ── Subscription: errands (giao hộ / mua hộ) ──────────────
+    const chErrands = supabase
+      .channel("driver-pending-errands")
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "errands",
+        filter: "status=eq.pending",
+      }, async (payload) => {
+        if (showOrder || accepted) return
+        const e = payload.new as {
+          id: string; type: string; customer_id: string
+          pickup_address: string; delivery_address: string
+          package_description: string | null; items_description: string | null
+          service_fee: number; payment_method: string
+          sender_name: string | null; sender_phone: string | null
+          recipient_name: string | null; recipient_phone: string | null
+          package_photo_url: string | null
+        }
+
+        const { data: customer } = await supabase
+          .from("profiles").select("full_name").eq("id", e.customer_id).single()
+
+        const isDeliver = e.type === "deliver_for_me"
+        const fee = e.service_fee ?? 0
+
+        const orderData: OrderData = {
+          id:                 e.id.slice(0, 8).toUpperCase(),
+          fullId:             e.id,
+          orderTable:         "errands",
+          shopName:           isDeliver ? "📦 Giao hộ" : "🛍️ Mua hộ",
+          shopAddress:        e.pickup_address ?? "",
+          customerName:       e.recipient_name ?? customer?.full_name ?? "Người nhận",
+          customerAddress:    e.delivery_address ?? "",
+          distanceToShop:     1.0,
+          distanceToCustomer: 2.0,
+          items: [{
+            name:  isDeliver
+              ? (e.package_description ?? "Gói hàng")
+              : (e.items_description   ?? "Danh sách mua"),
+            qty:   1,
+            price: fee,
+          }],
+          subtotal:    fee,
+          deliveryFee: 0,
+          total:       fee,
+          earnerFee:   Math.round(fee * 0.85),
+          payMethod:   e.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+          packagePhotoUrl: e.package_photo_url ?? undefined,
+          senderName:      e.sender_name    ?? undefined,
+          senderPhone:     e.sender_phone   ?? undefined,
+          recipientName:   e.recipient_name ?? undefined,
+          recipientPhone:  e.recipient_phone ?? undefined,
         }
         setPendingOrder(orderData)
         setShowOrder(true)
@@ -921,7 +1047,7 @@ export default function DriverDashboard() {
       .subscribe()
 
     channelRef.current = ch
-    return () => { ch.unsubscribe(); channelRef.current = null }
+    return () => { ch.unsubscribe(); chErrands.unsubscribe(); channelRef.current = null }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, driverId, showOrder, accepted])
 
@@ -929,9 +1055,10 @@ export default function DriverDashboard() {
     if (!pendingOrder || !driverId) return
     setShowOrder(false)
     const orderId = pendingOrder.fullId
-    await supabase.from("orders").update({
-      status: "accepted",
-      driver_id: driverId,
+    const table = pendingOrder.orderTable
+    await supabase.from(table).update({
+      status:      "accepted",
+      driver_id:   driverId,
       accepted_at: new Date().toISOString(),
     }).eq("id", orderId)
     setAccepted(orderId)
