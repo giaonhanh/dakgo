@@ -141,7 +141,9 @@ ALTER TABLE vouchers
   ADD COLUMN IF NOT EXISTS created_at       TIMESTAMPTZ DEFAULT now();
 
 -- Fix cột cũ có NOT NULL mà không có DEFAULT
-ALTER TABLE vouchers ALTER COLUMN discount_pct SET DEFAULT 0;
+DO $$ BEGIN
+  ALTER TABLE vouchers ALTER COLUMN discount_pct SET DEFAULT 0;
+EXCEPTION WHEN others THEN NULL; END$$;
 DO $$ BEGIN
   ALTER TABLE vouchers ALTER COLUMN is_combo SET DEFAULT false;
 EXCEPTION WHEN others THEN NULL; END$$;
