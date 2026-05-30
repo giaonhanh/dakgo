@@ -16,10 +16,11 @@ function adminDb() {
 }
 
 interface PushPayload {
-  title: string
-  body:  string
-  url?:  string
-  tag?:  string
+  title:  string
+  body:   string
+  url?:   string
+  tag?:   string
+  sound?: string
 }
 
 async function dispatchToSubs(
@@ -35,7 +36,7 @@ async function dispatchToSubs(
     vibrate:            [300, 100, 300, 100, 300],
     requireInteraction: true,
     tag:                payload.tag ?? `notif-${Date.now()}`,
-    data:               { url: payload.url ?? "/" },
+    data:               { url: payload.url ?? "/", sound: payload.sound ?? null },
   })
   await Promise.allSettled(
     subs.map(s =>

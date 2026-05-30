@@ -101,17 +101,28 @@ self.addEventListener('fetch', (event) => {
 
 // ── Push Notifications ──
 self.addEventListener('push', (event) => {
-  const data = event.data?.json() ?? {}
+  const data  = event.data?.json() ?? {}
+  const sound = data.data?.sound ?? null
+
   event.waitUntil(
-    self.registration.showNotification(data.title ?? 'Giao Nhanh', {
-      body:     data.body ?? '',
-      icon:     '/icon-192.png',
-      badge:    '/icon-192.png',
-      data:     data.data ?? {},
-      vibrate:  [200, 100, 200],
-      tag:      data.tag  ?? 'default',
-      renotify: true,
-    })
+    Promise.all([
+      // 1. Hiện notification
+      self.registration.showNotification(data.title ?? 'Giao Nhanh', {
+        body:     data.body ?? '',
+        icon:     '/icon-192.png',
+        badge:    '/icon-192.png',
+        data:     data.data ?? {},
+        vibrate:  [300, 100, 300, 100, 300],
+        tag:      data.tag ?? 'default',
+        renotify: true,
+      }),
+      // 2. Báo tab đang mở phát âm thanh
+      sound
+        ? self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+            clients.forEach(c => c.postMessage({ type: 'PLAY_ORDER_SOUND', sound }))
+          })
+        : Promise.resolve(),
+    ])
   )
 })
 

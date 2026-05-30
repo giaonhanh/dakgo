@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { usePushNotification } from "@/hooks/usePushNotification"
+import { useOrderSound } from "@/hooks/useOrderSound"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -778,6 +779,7 @@ export default function DriverDashboard() {
   const [pendingOrder,  setPendingOrder]  = useState<OrderData | null>(null)
   const [accepted,      setAccepted]      = useState<string | null>(null)
   const { requestPermission } = usePushNotification()
+  useOrderSound("driver")
   const [driverName,    setDriverName]    = useState("Tài xế")
   const [driverId,      setDriverId]      = useState<string | null>(null)
   const [todayStats,    setTodayStats]    = useState({ orders: 0, earnings: 0, rating: 5.0 })

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { usePushNotification } from "@/hooks/usePushNotification"
+import { useOrderSound } from "@/hooks/useOrderSound"
 import { motion, AnimatePresence } from "framer-motion"
 import { Power, ShoppingBag, TrendingUp, Star } from "lucide-react"
 import Link from "next/link"
@@ -64,6 +65,7 @@ export default function MerchantDashboard() {
   const [unreadNotif, setUnreadNotif] = useState(0)
 
   const { requestPermission } = usePushNotification()
+  useOrderSound("merchant", shopId)
 
   const fireToast = (msg: string, ok = true) => {
     setToast(msg); setToastOk(ok); setTimeout(() => setToast(""), 3000)

@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
           user_id: shop.owner_id, type: "order", title, body,
           data: { order_id: order.id, url: "/merchant" },
         })
-        await sendPushToUser(shop.owner_id, { title, body, url: "/merchant", tag: `order-${order.id}` })
+        await sendPushToUser(shop.owner_id, { title, body, url: "/merchant", tag: `order-${order.id}`, sound: "merchant" })
       }
     } catch { /* never fail the order */ }
 

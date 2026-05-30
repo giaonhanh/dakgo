@@ -52,6 +52,9 @@ export async function POST(req: NextRequest) {
       const typeLabel: Record<string, string> = {
         xe_om: "🛵 Xe ôm", taxi: "🚕 Taxi", car: "🚗 Xe hơi",
       }
+      const soundMap: Record<string, string> = {
+        xe_om: "xe_om", taxi: "taxi", car: "buy_for",
+      }
       const label   = typeLabel[vehicle_type] ?? "🚗 Chuyến"
       const from    = pickup_address.split(",")[0]
       const to      = dropoff_address.split(",")[0]
@@ -62,6 +65,7 @@ export async function POST(req: NextRequest) {
         body:  `${from} → ${to}${fareStr}`,
         url:   "/driver",
         tag:   `ride-${ride.id}`,
+        sound: soundMap[vehicle_type] ?? "xe_om",
       })
     } catch { /* never fail */ }
 
