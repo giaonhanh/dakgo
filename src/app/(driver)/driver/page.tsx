@@ -953,7 +953,7 @@ export default function DriverDashboard() {
         if (showOrder || accepted) return
         const o = payload.new as {
           id: string; shop_id: string; customer_id: string
-          drop_address: string; total: number; ship_fee: number
+          delivery_address: string; total: number; ship_fee: number
           total_amount: number; pay_method: string
         }
 
@@ -974,7 +974,7 @@ export default function DriverDashboard() {
           shopName:            shop?.name ?? "Cửa hàng",
           shopAddress:         shop?.address ?? "",
           customerName:        customer?.full_name ?? "Khách hàng",
-          customerAddress:     o.drop_address ?? "",
+          customerAddress:     o.delivery_address ?? "",
           distanceToShop:      1.0,
           distanceToCustomer:  2.0,
           items:               (items ?? []).map(i => ({ name: i.name, qty: i.qty ?? 1, price: i.price })),

@@ -175,7 +175,7 @@ export default function OrdersPage() {
       const { data: rows } = await supabase
         .from("orders")
         .select(`
-          id, status, drop_address, note, total, ship_fee,
+          id, status, delivery_address, note, total, ship_fee,
           pay_method, cancel_reason, created_at, driver_id, shop_id,
           shops(id, name, category),
           order_items(id, product_id, name, price, qty),
@@ -245,7 +245,7 @@ export default function OrdersPage() {
           discount:    0,
           createdAt: fmtDate(o.created_at),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          address:   (o as any).drop_address ?? "",
+          address:   (o as any).delivery_address ?? "",
           note: o.note ?? undefined,
           driver: driverRow ? {
             name: driverProfile?.full_name ?? "Tài xế",
