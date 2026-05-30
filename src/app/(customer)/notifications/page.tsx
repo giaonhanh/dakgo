@@ -1,14 +1,14 @@
-﻿"use client"
+"use client"
 
 // src/app/(customer)/notifications/page.tsx
-// Trung tâm thông báo — đầy đủ tính năng
-// Tab lọc · Mark read · Tap → đúng route · Badge unread · Real-time
+// Trung t�m th�ng b�o � d?y d? t�nh nang
+// Tab l?c � Mark read � Tap ? d�ng route � Badge unread � Real-time
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 
-// ─── Types ────────────────────────────────────────────────
+// --- Types ------------------------------------------------
 type NotifType = "order" | "promo" | "system" | "driver"
 
 interface Notif {
@@ -24,34 +24,34 @@ interface Notif {
   iconColor: string
 }
 
-// ─── Helpers ──────────────────────────────────────────────
+// --- Helpers ----------------------------------------------
 function getNotifMeta(type: string): { icon: string; iconBg: string; iconColor: string; href: string } {
   switch (type) {
-    case "order":  return { icon:"📦", iconBg:"rgba(62,207,110,0.12)",   iconColor:"#3ecf6e", href:"/orders"       }
-    case "promo":  return { icon:"🏷️", iconBg:"rgba(255,107,0,0.12)",   iconColor:"#FF8C00", href:"/promo-items"  }
-    case "ride":   return { icon:"🛵", iconBg:"rgba(255,107,0,0.12)",   iconColor:"#FF8C00", href:"/orders"       }
-    case "driver": return { icon:"🛵", iconBg:"rgba(62,207,110,0.12)",   iconColor:"#3ecf6e", href:"/orders"       }
-    default:       return { icon:"🔔", iconBg:"rgba(74,143,245,0.12)",   iconColor:"#4a8ff5", href:"/"             }
+    case "order":  return { icon:"??", iconBg:"rgba(62,207,110,0.12)",   iconColor:"#3ecf6e", href:"/orders"       }
+    case "promo":  return { icon:"???", iconBg:"rgba(255,107,0,0.12)",   iconColor:"#FF8C00", href:"/promo-items"  }
+    case "ride":   return { icon:"??", iconBg:"rgba(255,107,0,0.12)",   iconColor:"#FF8C00", href:"/orders"       }
+    case "driver": return { icon:"??", iconBg:"rgba(62,207,110,0.12)",   iconColor:"#3ecf6e", href:"/orders"       }
+    default:       return { icon:"??", iconBg:"rgba(74,143,245,0.12)",   iconColor:"#4a8ff5", href:"/"             }
   }
 }
 
 function timeAgo(dateStr: string): string {
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
-  if (diff < 60)   return "Vừa xong"
-  if (diff < 3600) return `${Math.floor(diff/60)} phút trước`
-  if (diff < 86400) return `${Math.floor(diff/3600)} giờ trước`
-  if (diff < 172800) return "Hôm qua"
-  return `${Math.floor(diff/86400)} ngày trước`
+  if (diff < 60)   return "V?a xong"
+  if (diff < 3600) return `${Math.floor(diff/60)} ph�t tru?c`
+  if (diff < 86400) return `${Math.floor(diff/3600)} gi? tru?c`
+  if (diff < 172800) return "H�m qua"
+  return `${Math.floor(diff/86400)} ng�y tru?c`
 }
 const TABS = [
-  { key:"all",    label:"Tất cả",     icon:"🔔" },
-  { key:"order",  label:"Đơn hàng",   icon:"📦" },
-  { key:"promo",  label:"Khuyến mãi", icon:"🏷️" },
-  { key:"driver", label:"Tài xế",     icon:"🛵" },
-  { key:"system", label:"Hệ thống",   icon:"⚙️" },
+  { key:"all",    label:"T?t c?",     icon:"??" },
+  { key:"order",  label:"�on h�ng",   icon:"??" },
+  { key:"promo",  label:"Khuy?n m�i", icon:"???" },
+  { key:"driver", label:"T�i x?",     icon:"??" },
+  { key:"system", label:"H? th?ng",   icon:"??" },
 ]
 
-// ─── Main ──────────────────────────────────────────────────
+// --- Main --------------------------------------------------
 export default function NotificationsPage() {
   const supabase = createClient()
   const [notifs,    setNotifs]    = useState<Notif[]>([])
@@ -143,12 +143,12 @@ export default function NotificationsPage() {
           <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:12 }}>
             <a href="/" style={{ width:32,height:32,borderRadius:9,textDecoration:"none",
               background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:14 }}>←</a>
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:14 }}>?</a>
             <div style={{ flex:1 }}>
-              <div style={{ color:"#f8f0e0",fontSize:15,fontWeight:700 }}>Thông báo</div>
+              <div style={{ color:"#f8f0e0",fontSize:15,fontWeight:700 }}>Th�ng b�o</div>
               {unreadCount > 0 && (
                 <div style={{ color:"#6a5a40",fontSize:9,marginTop:1 }}>
-                  {unreadCount} chưa đọc
+                  {unreadCount} chua d?c
                 </div>
               )}
             </div>
@@ -156,13 +156,13 @@ export default function NotificationsPage() {
               {unreadCount > 0 && (
                 <button onClick={markAllRead}
                   style={{ cursor:"pointer", color:"#FF8C00", fontSize:9, fontWeight:700, fontFamily:"Lexend", padding:"6px 10px", borderRadius:8, background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.2)", whiteSpace:"nowrap" }}>
-                  ✓ Đọc hết
+                  ? �?c h?t
                 </button>
               )}
               {filtered.length > 0 && (
                 <button onClick={deleteAll}
                   style={{ cursor:"pointer", color:"#ff4040", fontSize:9, fontWeight:700, fontFamily:"Lexend", padding:"6px 10px", borderRadius:8, background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)", whiteSpace:"nowrap" }}>
-                  🗑 Xoá tất cả
+                  ?? Xo� t?t c?
                 </button>
               )}
             </div>
@@ -202,13 +202,13 @@ export default function NotificationsPage() {
 
           {loading ? (
             <div style={{ display:"flex",alignItems:"center",justifyContent:"center",height:220 }}>
-              <div style={{ color:"#6a5a40",fontSize:11 }}>Đang tải...</div>
+              <div style={{ color:"#6a5a40",fontSize:11 }}>�ang t?i...</div>
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ display:"flex",flexDirection:"column",
               alignItems:"center",justifyContent:"center",height:220,gap:10 }}>
-              <span style={{ fontSize:40 }}>🔕</span>
-              <div style={{ color:"#6a5a40",fontSize:12 }}>Chưa có thông báo nào</div>
+              <span style={{ fontSize:40 }}>??</span>
+              <div style={{ color:"#6a5a40",fontSize:12 }}>Chua c� th�ng b�o n�o</div>
             </div>
           ) : (
             <AnimatePresence>
@@ -255,7 +255,7 @@ export default function NotificationsPage() {
                             background: n.type==="order"?"rgba(255,107,0,0.1)":n.type==="promo"?"rgba(255,179,71,0.1)":n.type==="driver"?"rgba(62,207,110,0.1)":"rgba(74,143,245,0.1)",
                             color: n.type==="order"?"#FF8C00":n.type==="promo"?"#FFB347":n.type==="driver"?"#3ecf6e":"#4a8ff5",
                           }}>
-                            {n.type==="order"?"Đơn hàng":n.type==="promo"?"Khuyến mãi":n.type==="driver"?"Tài xế":"Hệ thống"}
+                            {n.type==="order"?"�on h�ng":n.type==="promo"?"Khuy?n m�i":n.type==="driver"?"T�i x?":"H? th?ng"}
                           </span>
                         </div>
                       </div>
@@ -264,7 +264,7 @@ export default function NotificationsPage() {
                   {/* Delete reveal */}
                   <div onClick={() => deleteNotif(n.id)}
                     style={{ position:"absolute", right:0, top:0, bottom:0, width:72, background:"rgba(255,64,64,0.88)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:22, borderRadius:"0 14px 14px 0" }}>
-                    🗑
+                    ??
                   </div>
                 </motion.div>
               ))}
@@ -275,7 +275,7 @@ export default function NotificationsPage() {
           {unreadCount === 0 && notifs.length > 0 && (
             <div style={{ textAlign:"center",padding:"12px 0",
               color:"#6a5a40",fontSize:9 }}>
-              ✓ Bạn đã đọc tất cả thông báo
+              ? B?n d� d?c t?t c? th�ng b�o
             </div>
           )}
         </div>
@@ -288,10 +288,10 @@ export default function NotificationsPage() {
           display:"flex",alignItems:"center",justifyContent:"space-around",
           padding:"0 6px",zIndex:50,boxShadow:"0 0 20px rgba(255,107,0,0.1)" }}>
           {[
-            { icon:"🏠",label:"Trang chủ",href:"/",        active:false },
-            { icon:"📋",label:"Đơn hàng", href:"/orders",  active:false },
-            { icon:"🛒",label:"Giỏ hàng", href:"/cart",    active:false },
-            { icon:"⚙️",label:"Cài đặt",  href:"/settings",active:false },
+            { icon:"??",label:"Trang ch?",href:"/",        active:false },
+            { icon:"??",label:"�on h�ng", href:"/orders",  active:false },
+            { icon:"??",label:"Gi? h�ng", href:"/cart",    active:false },
+            { icon:"??",label:"C�i d?t",  href:"/profile",active:false },
           ].map(tab => (
             <a key={tab.href} href={tab.href}
               style={{ textDecoration:"none",display:"flex",flexDirection:"column",

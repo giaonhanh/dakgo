@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -25,30 +25,30 @@ const TIER_CFG: Record<TierLevel, {
   label: string; icon: string; color: string; bg: string; border: string
   min: number; max: number; nextTier: string | null; nextMin: number | null
 }> = {
-  bronze:   { label:"Bronze",   icon:"🥉", color:"#cd7f32", bg:"linear-gradient(135deg,#1a0f05,#2a1a09)", border:"rgba(205,127,50,0.35)", min:0,    max:999,  nextTier:"Silver",   nextMin:1000 },
-  silver:   { label:"Silver",   icon:"🥈", color:"#b464ff", bg:"linear-gradient(135deg,#0d0a1a,#160d2a)", border:"rgba(180,100,255,0.35)", min:1000, max:4999, nextTier:"Gold",     nextMin:5000 },
-  gold:     { label:"Gold",     icon:"🥇", color:"#f5c542", bg:"linear-gradient(135deg,#1a1200,#2d1f00)", border:"rgba(245,197,66,0.35)", min:5000, max:14999,nextTier:"Platinum", nextMin:15000},
-  platinum: { label:"Platinum", icon:"💎", color:"#4a8ff5", bg:"linear-gradient(135deg,#050d1a,#0a1530)", border:"rgba(74,143,245,0.35)", min:15000,max:99999,nextTier:null,       nextMin:null },
+  bronze:   { label:"Bronze",   icon:"??", color:"#cd7f32", bg:"linear-gradient(135deg,#1a0f05,#2a1a09)", border:"rgba(205,127,50,0.35)", min:0,    max:999,  nextTier:"Silver",   nextMin:1000 },
+  silver:   { label:"Silver",   icon:"??", color:"#b464ff", bg:"linear-gradient(135deg,#0d0a1a,#160d2a)", border:"rgba(180,100,255,0.35)", min:1000, max:4999, nextTier:"Gold",     nextMin:5000 },
+  gold:     { label:"Gold",     icon:"??", color:"#f5c542", bg:"linear-gradient(135deg,#1a1200,#2d1f00)", border:"rgba(245,197,66,0.35)", min:5000, max:14999,nextTier:"Platinum", nextMin:15000},
+  platinum: { label:"Platinum", icon:"??", color:"#4a8ff5", bg:"linear-gradient(135deg,#050d1a,#0a1530)", border:"rgba(74,143,245,0.35)", min:15000,max:99999,nextTier:null,       nextMin:null },
 }
 
 const HISTORY: PointTx[] = [
-  { id:"p8", points:+120, reason:"Đơn hàng #GN2851 thành công", orderId:"GN2851", time:"Hôm nay · 22:05"     },
-  { id:"p7", points:-500, reason:"Đổi voucher Free Ship",       orderId:null,     time:"Hôm nay · 18:00"     },
-  { id:"p6", points:+85,  reason:"Đơn hàng #GN2849 thành công", orderId:"GN2849", time:"Hôm qua · 21:50"     },
-  { id:"p5", points:+200, reason:"Bonus tháng 5 từ GiaoNhanh",  orderId:null,     time:"15/05 · 09:00"       },
-  { id:"p4", points:+63,  reason:"Đơn hàng #GN2840 thành công", orderId:"GN2840", time:"3 ngày trước · 12:05"},
-  { id:"p3", points:-300, reason:"Đổi quà: Ly cafe miễn phí",   orderId:null,     time:"5 ngày trước · 14:30"},
-  { id:"p2", points:+108, reason:"Đơn hàng #GN2820 thành công", orderId:"GN2820", time:"1 tuần trước"        },
-  { id:"p1", points:+500, reason:"Bonus chào mừng thành viên",  orderId:null,     time:"2 tuần trước"        },
+  { id:"p8", points:+120, reason:"�on h�ng #GN2851 th�nh c�ng", orderId:"GN2851", time:"H�m nay � 22:05"     },
+  { id:"p7", points:-500, reason:"�?i voucher Free Ship",       orderId:null,     time:"H�m nay � 18:00"     },
+  { id:"p6", points:+85,  reason:"�on h�ng #GN2849 th�nh c�ng", orderId:"GN2849", time:"H�m qua � 21:50"     },
+  { id:"p5", points:+200, reason:"Bonus th�ng 5 t? GiaoNhanh",  orderId:null,     time:"15/05 � 09:00"       },
+  { id:"p4", points:+63,  reason:"�on h�ng #GN2840 th�nh c�ng", orderId:"GN2840", time:"3 ng�y tru?c � 12:05"},
+  { id:"p3", points:-300, reason:"�?i qu�: Ly cafe mi?n ph�",   orderId:null,     time:"5 ng�y tru?c � 14:30"},
+  { id:"p2", points:+108, reason:"�on h�ng #GN2820 th�nh c�ng", orderId:"GN2820", time:"1 tu?n tru?c"        },
+  { id:"p1", points:+500, reason:"Bonus ch�o m?ng th�nh vi�n",  orderId:null,     time:"2 tu?n tru?c"        },
 ]
 
 const REWARDS: Reward[] = [
-  { id:"r1", title:"Voucher giảm 20%",            points:500,  icon:"🏷️", category:"voucher", available:true  },
-  { id:"r2", title:"Miễn phí giao hàng 1 đơn",    points:300,  icon:"🚚", category:"voucher", available:true  },
-  { id:"r3", title:"Ly cafe tại Highlands",        points:800,  icon:"☕", category:"gift",    available:true  },
-  { id:"r4", title:"Voucher giảm 50.000đ",         points:1000, icon:"💸", category:"voucher", available:true  },
-  { id:"r5", title:"Hoàn tiền 20.000đ vào ví",     points:2000, icon:"💰", category:"cash",    available:true  },
-  { id:"r6", title:"Áo thun GiaoNhanh",            points:5000, icon:"👕", category:"gift",    available:false },
+  { id:"r1", title:"Voucher gi?m 20%",            points:500,  icon:"???", category:"voucher", available:true  },
+  { id:"r2", title:"Mi?n ph� giao h�ng 1 don",    points:300,  icon:"??", category:"voucher", available:true  },
+  { id:"r3", title:"Ly cafe t?i Highlands",        points:800,  icon:"?", category:"gift",    available:true  },
+  { id:"r4", title:"Voucher gi?m 50.000d",         points:1000, icon:"??", category:"voucher", available:true  },
+  { id:"r5", title:"Ho�n ti?n 20.000d v�o v�",     points:2000, icon:"??", category:"cash",    available:true  },
+  { id:"r6", title:"�o thun GiaoNhanh",            points:5000, icon:"??", category:"gift",    available:false },
 ]
 
 const REWARD_CFG: Record<Reward["category"], { color: string; bg: string }> = {
@@ -98,7 +98,7 @@ export default function LoyaltyPage() {
               background:"rgba(62,207,110,0.15)", border:"1px solid rgba(62,207,110,0.35)",
               borderRadius:12, padding:"7px 18px",
               color:"#3ecf6e", fontSize:11, fontWeight:600, backdropFilter:"blur(10px)" }}>
-            ✓ {toast}
+            ? {toast}
           </motion.div>
         )}
       </AnimatePresence>
@@ -126,25 +126,25 @@ export default function LoyaltyPage() {
                   {redeemReward.title}
                 </div>
                 <div style={{ color:"#6a5a40", fontSize:10 }}>
-                  Bạn sẽ dùng <strong style={{ color:"#b464ff" }}>{redeemReward.points.toLocaleString()} điểm</strong> để đổi quà này.
+                  B?n s? d�ng <strong style={{ color:"#b464ff" }}>{redeemReward.points.toLocaleString()} di?m</strong> d? d?i qu� n�y.
                 </div>
               </div>
               <div style={{ background:"rgba(180,100,255,0.07)",
                 border:"1px solid rgba(180,100,255,0.2)",
                 borderRadius:12, padding:"10px 14px", marginBottom:16,
                 display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                <span style={{ color:"#6a5a40", fontSize:9 }}>Điểm hiện tại</span>
+                <span style={{ color:"#6a5a40", fontSize:9 }}>�i?m hi?n t?i</span>
                 <span style={{ color:"#b464ff", fontSize:14, fontWeight:700 }}>
-                  {points.toLocaleString()} điểm
+                  {points.toLocaleString()} di?m
                 </span>
               </div>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
                 background:"rgba(255,255,255,0.03)",
                 border:"1px solid rgba(255,255,255,0.07)",
                 borderRadius:12, padding:"10px 14px", marginBottom:20 }}>
-                <span style={{ color:"#6a5a40", fontSize:9 }}>Điểm sau khi đổi</span>
+                <span style={{ color:"#6a5a40", fontSize:9 }}>�i?m sau khi d?i</span>
                 <span style={{ color:"#f8f0e0", fontSize:14, fontWeight:700 }}>
-                  {(points - redeemReward.points).toLocaleString()} điểm
+                  {(points - redeemReward.points).toLocaleString()} di?m
                 </span>
               </div>
               <div style={{ display:"flex", gap:8 }}>
@@ -154,18 +154,18 @@ export default function LoyaltyPage() {
                     border:"1px solid rgba(255,255,255,0.1)",
                     color:"#b0956a", fontSize:11, fontWeight:600,
                     fontFamily:"Lexend", cursor:"pointer" }}>
-                  Huỷ
+                  Hu?
                 </button>
                 <button onClick={() => {
                   setPoints(p => p - redeemReward.points)
                   setRedeemId(null)
-                  fireToast(`Đổi ${redeemReward.title} thành công!`)
+                  fireToast(`�?i ${redeemReward.title} th�nh c�ng!`)
                 }} style={{ flex:2, height:44, borderRadius:12, border:"none",
                   background:"linear-gradient(90deg,#b464ff,#d484ff)",
                   color:"#fff", fontSize:11, fontWeight:700,
                   fontFamily:"Lexend", cursor:"pointer",
                   boxShadow:"0 3px 14px rgba(180,100,255,0.35)" }}>
-                  💜 Xác nhận đổi điểm
+                  ?? X�c nh?n d?i di?m
                 </button>
               </div>
             </motion.div>
@@ -183,10 +183,10 @@ export default function LoyaltyPage() {
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <a href="/profile" style={{ width:32, height:32, borderRadius:9, textDecoration:"none",
               background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)",
-              display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>←</a>
+              display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>?</a>
             <div style={{ flex:1 }}>
-              <div style={{ color:"#f8f0e0", fontSize:15, fontWeight:700 }}>Điểm Thưởng</div>
-              <div style={{ color:"#6a5a40", fontSize:9 }}>Tích điểm · Lên hạng · Đổi quà</div>
+              <div style={{ color:"#f8f0e0", fontSize:15, fontWeight:700 }}>�i?m Thu?ng</div>
+              <div style={{ color:"#6a5a40", fontSize:9 }}>T�ch di?m � L�n h?ng � �?i qu�</div>
             </div>
           </div>
         </div>
@@ -214,7 +214,7 @@ export default function LoyaltyPage() {
                   {tierCfg.icon}
                 </div>
                 <div>
-                  <div style={{ color:"#6a5a40", fontSize:9, marginBottom:2 }}>Hạng thành viên</div>
+                  <div style={{ color:"#6a5a40", fontSize:9, marginBottom:2 }}>H?ng th�nh vi�n</div>
                   <div style={{ color:tierCfg.color, fontSize:20, fontWeight:800, lineHeight:1 }}>
                     {tierCfg.label}
                   </div>
@@ -233,7 +233,7 @@ export default function LoyaltyPage() {
                 backgroundClip:"text" }}>
                 {points.toLocaleString()}
                 <span style={{ fontSize:14, fontWeight:400, WebkitTextFillColor:"unset",
-                  background:"none", color:"#6a5a40", marginLeft:6 }}>điểm</span>
+                  background:"none", color:"#6a5a40", marginLeft:6 }}>di?m</span>
               </div>
 
               {tierCfg.nextTier && (
@@ -249,17 +249,17 @@ export default function LoyaltyPage() {
                   </div>
                   <div style={{ display:"flex", justifyContent:"space-between" }}>
                     <span style={{ color:"#6a5a40", fontSize:8 }}>
-                      {tierCfg.label} · {tierCfg.min.toLocaleString()} điểm
+                      {tierCfg.label} � {tierCfg.min.toLocaleString()} di?m
                     </span>
                     <span style={{ color:tierCfg.color, fontSize:8, fontWeight:600 }}>
-                      Còn {pointsToNext.toLocaleString()} điểm → {tierCfg.nextTier} {TIER_CFG[tierCfg.nextTier?.toLowerCase() as TierLevel]?.icon ?? ""}
+                      C�n {pointsToNext.toLocaleString()} di?m ? {tierCfg.nextTier} {TIER_CFG[tierCfg.nextTier?.toLowerCase() as TierLevel]?.icon ?? ""}
                     </span>
                   </div>
                 </>
               )}
               {!tierCfg.nextTier && (
                 <div style={{ color:tierCfg.color, fontSize:9, fontWeight:600 }}>
-                  💎 Bạn đang ở hạng cao nhất!
+                  ?? B?n dang ? h?ng cao nh?t!
                 </div>
               )}
             </div>
@@ -269,14 +269,14 @@ export default function LoyaltyPage() {
           <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)",
             borderRadius:14, padding:"12px 14px", marginBottom:14 }}>
             <div style={{ color:"#b0956a", fontSize:9, fontWeight:600, marginBottom:10 }}>
-              Quyền lợi hạng {tierCfg.label} {tierCfg.icon}
+              Quy?n l?i h?ng {tierCfg.label} {tierCfg.icon}
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:7 }}>
               {[
-                { icon:"💸", text:"Tích 1 điểm / 10.000đ" },
-                { icon:"🎁", text:"Quà sinh nhật đặc biệt" },
-                { icon:"🚚", text:"Ưu tiên ghép đơn" },
-                { icon:"⚡", text:"Hỗ trợ ưu tiên 24/7" },
+                { icon:"??", text:"T�ch 1 di?m / 10.000d" },
+                { icon:"??", text:"Qu� sinh nh?t d?c bi?t" },
+                { icon:"??", text:"Uu ti�n gh�p don" },
+                { icon:"?", text:"H? tr? uu ti�n 24/7" },
               ].map(b => (
                 <div key={b.text} style={{ display:"flex", alignItems:"center", gap:7,
                   background:"rgba(255,255,255,0.03)", borderRadius:9,
@@ -290,7 +290,7 @@ export default function LoyaltyPage() {
 
           {/* Tabs */}
           <div style={{ display:"flex", gap:6, marginBottom:12 }}>
-            {([["rewards","🎁 Đổi quà"],["history","📊 Lịch sử"]] as const).map(([k, l]) => (
+            {([["rewards","?? �?i qu�"],["history","?? L?ch s?"]] as const).map(([k, l]) => (
               <button key={k} onClick={() => setTab(k)}
                 style={{ flex:1, height:36, borderRadius:10,
                   background:tab===k?"rgba(180,100,255,0.15)":"rgba(255,255,255,0.04)",
@@ -331,11 +331,11 @@ export default function LoyaltyPage() {
                           <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:3 }}>
                             <span style={{ fontSize:7.5, padding:"1px 6px", borderRadius:4,
                               background:cfg.bg, color:cfg.color, fontWeight:600 }}>
-                              {r.category === "voucher" ? "Voucher" : r.category === "gift" ? "Quà tặng" : "Hoàn tiền"}
+                              {r.category === "voucher" ? "Voucher" : r.category === "gift" ? "Qu� t?ng" : "Ho�n ti?n"}
                             </span>
                           </div>
                           <div style={{ color:"#b464ff", fontSize:11, fontWeight:700, marginTop:3 }}>
-                            🪙 {r.points.toLocaleString()} điểm
+                            ?? {r.points.toLocaleString()} di?m
                           </div>
                         </div>
                         <button
@@ -350,7 +350,7 @@ export default function LoyaltyPage() {
                             cursor:canRedeem?"pointer":"not-allowed",
                             boxShadow:canRedeem?"0 2px 10px rgba(180,100,255,0.3)":"none",
                             flexShrink:0 }}>
-                          {!r.available ? "Hết" : canRedeem ? "Đổi" : "Thiếu điểm"}
+                          {!r.available ? "H?t" : canRedeem ? "�?i" : "Thi?u di?m"}
                         </button>
                       </div>
                     )
@@ -373,7 +373,7 @@ export default function LoyaltyPage() {
                       <div style={{ width:34, height:34, borderRadius:10, flexShrink:0,
                         background:tx.points>0?"rgba(180,100,255,0.1)":"rgba(255,64,64,0.1)",
                         display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
-                        {tx.points > 0 ? "🪙" : "🎁"}
+                        {tx.points > 0 ? "??" : "??"}
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:500,
@@ -401,10 +401,10 @@ export default function LoyaltyPage() {
           display:"flex", alignItems:"center", justifyContent:"space-around",
           padding:"0 6px", zIndex:50, boxShadow:"0 0 20px rgba(255,107,0,0.1)" }}>
           {[
-            { icon:"🏠", label:"Trang chủ", href:"/",        active:false },
-            { icon:"📋", label:"Đơn hàng",  href:"/orders",  active:false },
-            { icon:"🛒", label:"Giỏ hàng",  href:"/cart",    active:false },
-            { icon:"⚙️", label:"Cài đặt",   href:"/settings",active:false },
+            { icon:"??", label:"Trang ch?", href:"/",        active:false },
+            { icon:"??", label:"�on h�ng",  href:"/orders",  active:false },
+            { icon:"??", label:"Gi? h�ng",  href:"/cart",    active:false },
+            { icon:"??", label:"C�i d?t",   href:"/profile",active:false },
           ].map(tab => (
             <a key={tab.href} href={tab.href}
               style={{ textDecoration:"none", display:"flex", flexDirection:"column",

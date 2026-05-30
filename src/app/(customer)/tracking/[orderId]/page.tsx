@@ -588,7 +588,7 @@ export default function TrackingPage() {
             { icon:"🏠",label:"Trang chủ",href:"/",        active:false },
             { icon:"📋",label:"Đơn hàng", href:"/orders",  active:false },
             { icon:"🗺️",label:"Theo dõi", href:"#",        active:true  },
-            { icon:"⚙️",label:"Cài đặt",  href:"/settings",active:false },
+            { icon:"⚙️",label:"Cài đặt",  href:"/profile",active:false },
           ].map(tab => (
             <a key={tab.label} href={tab.href}
               style={{ textDecoration:"none",display:"flex",flexDirection:"column",

@@ -432,7 +432,7 @@ export default function XuPage() {
             { icon:"🏠", label:"Trang chủ", href:"/",        active:false },
             { icon:"📋", label:"Đơn hàng",  href:"/orders",  active:false },
             { icon:"🛒", label:"Giỏ hàng",  href:"/cart",    active:false },
-            { icon:"⚙️", label:"Cài đặt",   href:"/settings",active:false },
+            { icon:"⚙️", label:"Cài đặt",   href:"/profile",active:false },
           ].map(tab => (
             <a key={tab.href} href={tab.href} style={{ textDecoration:"none",
               display:"flex", flexDirection:"column", alignItems:"center", gap:2,

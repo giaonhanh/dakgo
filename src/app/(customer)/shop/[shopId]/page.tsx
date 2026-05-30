@@ -1095,7 +1095,7 @@ export default function ShopPage() {
             { icon:"🏠", label:"Trang chủ", href:"/",        active:false },
             { icon:"📋", label:"Đơn hàng",  href:"/orders",  active:false },
             { icon:"🛒", label:"Giỏ hàng",  href:"/cart",    active:false, badge: totalItems },
-            { icon:"⚙️", label:"Cài đặt",   href:"/settings",active:false },
+            { icon:"⚙️", label:"Cài đặt",   href:"/profile",active:false },
           ].map(tab => (
             <button key={tab.href} onClick={() => router.push(tab.href)}
               style={{ background: tab.active ? "rgba(255,107,0,0.12)" : "transparent",

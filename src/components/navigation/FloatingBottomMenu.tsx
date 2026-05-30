@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Home, ClipboardList, ShoppingCart, Settings, User } from 'lucide-react'
+import { Home, ClipboardList, ShoppingCart, User } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCartStore } from '@/store/cartStore'
 
@@ -10,8 +10,7 @@ const LEFT_TABS = [
   { id: 'orders', href: '/orders', label: 'Đơn hàng',  Icon: ClipboardList },
 ]
 const RIGHT_TABS = [
-  { id: 'settings', href: '/settings', label: 'Cài đặt',  Icon: Settings },
-  { id: 'profile',  href: '/profile',  label: 'Tài khoản', Icon: User },
+  { id: 'profile', href: '/profile', label: 'Tài khoản', Icon: User },
 ]
 
 export default function FloatingBottomMenu() {
