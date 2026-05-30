@@ -28,11 +28,16 @@ const LABEL_CFG: Record<LabelType, { icon: string; color: string; bg: string; bd
 
 const LABEL_TYPES: LabelType[] = ["Nhà", "Công ty", "Khác"]
 
-interface NominatimResult {
-  display_name: string
-  lat: string
-  lon: string
+interface VmSuggestion {
+  refId:    string
+  name:     string
+  fullAddr: string   // toàn bộ địa chỉ: số nhà, đường, Kp, xã, huyện, tỉnh
 }
+
+const VM_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
+const VM_CTX = "Phước An, Krông Pắc, Đắk Lắk"
+const VM_LAT = 12.7107
+const VM_LNG = 108.3034
 
 // --- Sub-components ---
 function LabelBadge({ label }: { label: string }) {
@@ -130,7 +135,7 @@ export default function AddressesPage() {
 
   // Search
   const [searchQuery,   setSearchQuery]   = useState("")
-  const [searchResults, setSearchResults] = useState<NominatimResult[]>([])
+  const [searchResults, setSearchResults] = useState<VmSuggestion[]>([])
   const [searching,     setSearching]     = useState(false)
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -165,29 +170,49 @@ export default function AddressesPage() {
     setSearching(true)
     searchTimer.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + " Phước An Krông Pắc")}&format=json&limit=4&countrycodes=vn`,
-          { headers: { "Accept-Language": "vi" } }
-        )
-        const data = await res.json() as NominatimResult[]
-        setSearchResults(data)
+        const query = q.toLowerCase().includes("krông pắc") || q.toLowerCase().includes("đắk lắk")
+          ? q : `${q} ${VM_CTX}`
+        const params = new URLSearchParams({
+          apikey: VM_KEY, text: query,
+          "focus.point.lat": VM_LAT.toString(),
+          "focus.point.lon": VM_LNG.toString(),
+        })
+        const res  = await fetch(`https://maps.vietmap.vn/api/autocomplete/v3?${params}`)
+        const data = await res.json() as Array<{ ref_id: string; display: string; name?: string }>
+        const suggestions: VmSuggestion[] = data.slice(0, 6).map(item => {
+          const parts = item.display.split(", ")
+          return {
+            refId:    item.ref_id,
+            name:     item.name || parts[0] || item.display,
+            fullAddr: parts.join(", "),
+          }
+        })
+        setSearchResults(suggestions)
       } catch {
-        setSearchResults([
-          { display_name: "147 Trần Phú, Phước An, Krông Pắc",  lat: "12.681", lon: "108.481" },
-          { display_name: "Chợ Phước An, Krông Pắc, Đắk Lắk",  lat: "12.678", lon: "108.478" },
-        ])
+        setSearchResults([])
       } finally {
         setSearching(false)
       }
-    }, 600)
+    }, 500)
   }
 
-  const selectResult = (r: NominatimResult) => {
-    setFormAddress(r.display_name)
-    setFormLat(parseFloat(r.lat))
-    setFormLng(parseFloat(r.lon))
-    setSearchQuery(r.display_name)
+  const selectResult = async (s: VmSuggestion) => {
     setSearchResults([])
+    setSearchQuery(s.fullAddr)
+    setFormAddress(s.fullAddr)
+    // Lấy toạ độ chính xác từ VietMap place detail
+    try {
+      const res  = await fetch(`https://maps.vietmap.vn/api/place/v3?apikey=${VM_KEY}&refid=${s.refId}`)
+      const data = await res.json() as { lat?: number; lng?: number; display?: string }
+      if (data.lat && data.lng) {
+        setFormLat(data.lat)
+        setFormLng(data.lng)
+      }
+      if (data.display) {
+        setFormAddress(data.display)
+        setSearchQuery(data.display)
+      }
+    } catch { /* giữ nguyên địa chỉ text nếu lỗi */ }
   }
 
   const saveAddress = async () => {
@@ -500,20 +525,27 @@ export default function AddressesPage() {
                             borderRadius: 12, overflow: "hidden", boxShadow: "0 8px 20px rgba(0,0,0,0.4)",
                           }}
                         >
-                          {searchResults.map((r, i) => (
+                          {searchResults.map((s, i) => (
                             <div
-                              key={i}
-                              onClick={() => selectResult(r)}
+                              key={s.refId}
+                              onClick={() => void selectResult(s)}
                               style={{
-                                padding: "9px 12px", cursor: "pointer",
+                                padding: "10px 12px", cursor: "pointer",
                                 borderBottom: i < searchResults.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
-                                display: "flex", alignItems: "center", gap: 8,
+                                display: "flex", alignItems: "flex-start", gap: 8,
                               }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,107,0,0.06)")}
+                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                             >
-                              <span style={{ fontSize: 13, flexShrink: 0 }}>📍</span>
-                              <span style={{ color: "#b0956a", fontSize: 9.5, lineHeight: 1.4 }}>
-                                {r.display_name}
-                              </span>
+                              <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>📍</span>
+                              <div>
+                                <div style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600, lineHeight: 1.4 }}>
+                                  {s.name}
+                                </div>
+                                <div style={{ color: "#6a5a40", fontSize: 9.5, lineHeight: 1.5, marginTop: 2 }}>
+                                  {s.fullAddr}
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </motion.div>
