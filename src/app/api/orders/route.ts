@@ -46,15 +46,14 @@ export async function POST(req: NextRequest) {
         product_id: item.product_id,
         name:       product.name ?? "",
         price:      product.price,
-        quantity:   item.quantity,
-        subtotal:   product.price * item.quantity,
+        qty:        item.quantity,
         note:       item.note ?? null,
       }
     })
 
-    const subtotal      = orderItems.reduce((s: number, i: { subtotal: number }) => s + i.subtotal, 0)
-    const delivery_fee  = 15000
-    const total_amount  = subtotal + delivery_fee
+    const total        = orderItems.reduce((s: number, i: { subtotal: number }) => s + i.subtotal, 0)
+    const ship_fee     = 15000
+    const total_amount = total + ship_fee
 
     // payment_code: số nguyên 8 chữ số, dùng làm orderCode cho PayOS webhook
     const payment_code = payment_method !== "cash"
@@ -72,12 +71,10 @@ export async function POST(req: NextRequest) {
         delivery_lat,
         delivery_lng,
         note:             note ?? null,
-        subtotal,
-        delivery_fee,
-        discount_amount:  0,
+        total,
+        ship_fee,
         total_amount,
-        payment_method,
-        payment_status:   "pending",
+        pay_method:       payment_method,
         payment_code,
         voucher_id:       voucher_id ?? null,
         scheduled_at:     scheduled_at ?? null,
@@ -92,7 +89,7 @@ export async function POST(req: NextRequest) {
     // Tạo order_items
     const { error: itemsErr } = await supabase
       .from("order_items")
-      .insert(orderItems.map((i: { product_id: string; name: string; price: number; quantity: number; subtotal: number; note: string | null }) => ({
+      .insert(orderItems.map((i: { product_id: string; name: string; price: number; qty: number; note: string | null }) => ({
         order_id: order.id,
         ...i,
       })))
@@ -111,8 +108,8 @@ export async function POST(req: NextRequest) {
       const { data: shop } = await db
         .from("shops").select("owner_id").eq("id", shop_id).single()
       if (shop?.owner_id) {
-        const preview = (orderItems as { name: string; quantity: number }[])
-          .slice(0, 2).map(i => `${i.name} ×${i.quantity}`).join(", ")
+        const preview = (orderItems as { name: string; qty: number }[])
+          .slice(0, 2).map(i => `${i.name} ×${i.qty}`).join(", ")
         const more  = orderItems.length > 2 ? ` +${orderItems.length - 2} món` : ""
         const title = "🍜 Bạn có đơn mới!"
         const body  = `${preview}${more} · ${total_amount.toLocaleString("vi-VN")}đ`

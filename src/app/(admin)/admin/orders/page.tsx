@@ -379,13 +379,13 @@ export default function AdminOrdersPage() {
           const { data: order, error: oe } = await supabase.from("orders").insert({
             customer_id: eid, shop_id: slot.shopId, status: "pending",
             delivery_address: delivAddr, delivery_lat: delivLat || PHUOC_AN_LAT, delivery_lng: delivLng || PHUOC_AN_LNG,
-            subtotal: sub, delivery_fee: fee, discount_amount: 0,
-            total_amount: sub + fee, payment_method: payment,
+            total: sub, ship_fee: fee,
+            total_amount: sub + fee, pay_method: payment,
             note: ((i > 0 ? `[+quán ${i+1}/${filledSlots.length}] ` : "") + (note || "")) || null,
           }).select("id").single()
           if (oe || !order) throw new Error(oe?.message ?? "Lỗi tạo đơn " + slot.shopName)
           await supabase.from("order_items").insert(
-            slot.items.map(it => ({ order_id:order.id, product_id:it.productId, name:it.name, price:it.price, quantity:it.qty, subtotal:it.price*it.qty }))
+            slot.items.map(it => ({ order_id:order.id, product_id:it.productId, name:it.name, price:it.price, qty:it.qty }))
           )
           created.push(order.id.slice(0,8).toUpperCase())
         }
