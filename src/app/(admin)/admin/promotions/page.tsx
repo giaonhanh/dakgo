@@ -119,12 +119,11 @@ export default function AdminPromotionsPage() {
       discount_value: form.type === "freeship" ? 0 : Number(form.value),
       min_order:      Number(form.minOrder) || 0,
       max_discount:   form.maxDiscount ? Number(form.maxDiscount) : null,
-      usage_limit:    form.limit ? Number(form.limit) : null,
-      per_user_limit: form.perUserLimit ? Number(form.perUserLimit) : null,
-      valid_from:     new Date(form.validFrom).toISOString(),
-      valid_to:       new Date(form.validTo + "T23:59:59").toISOString(),
-      is_active:      true,
-      created_by:     userId,
+      usage_limit:      form.limit ? Number(form.limit) : null,
+      per_person_limit: form.perUserLimit ? Number(form.perUserLimit) : null,
+      valid_from:       new Date(form.validFrom).toISOString(),
+      valid_to:         new Date(form.validTo + "T23:59:59").toISOString(),
+      is_active:        true,
     })
     setSaving(false)
     if (error) {
