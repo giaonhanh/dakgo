@@ -3,12 +3,6 @@ import { createClient as createServerClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import webpush from "web-push"
 
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!,
-)
-
 function adminDb() {
   return createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -64,6 +58,11 @@ export async function POST(req: NextRequest) {
       .in("user_id", userIds)
 
     if (subs?.length) {
+      webpush.setVapidDetails(
+        process.env.VAPID_EMAIL!,
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+        process.env.VAPID_PRIVATE_KEY!,
+      )
       const payload = JSON.stringify({
         title,
         body,

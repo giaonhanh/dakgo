@@ -2,11 +2,13 @@
 import webpush from "web-push"
 import { createClient } from "@supabase/supabase-js"
 
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!,
-)
+function initVapid() {
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL!,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!,
+  )
+}
 
 function adminDb() {
   return createClient(
@@ -28,6 +30,7 @@ async function dispatchToSubs(
   payload: PushPayload,
 ) {
   if (!subs.length) return
+  initVapid()
   const message = JSON.stringify({
     title:              payload.title,
     body:               payload.body,
