@@ -113,6 +113,7 @@ function OrderPopup({
 }: { order: OrderData; onAccept:()=>void; onReject:()=>void }) {
   const [sec, setSec] = useState(COUNTDOWN_SEC)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     timerRef.current = setInterval(() => {
@@ -123,6 +124,16 @@ function OrderPopup({
     }, 1000)
     return () => clearInterval(timerRef.current!)
   }, [onReject])
+
+  // Phát âm thanh lặp liên tục suốt countdown — dừng khi đóng popup
+  useEffect(() => {
+    const audio = new Audio("/sounds/ban_oi_co_don.mp3")
+    audio.loop = true
+    audio.volume = 0.85
+    audioRef.current = audio
+    audio.play().catch(() => null)
+    return () => { audio.pause(); audio.currentTime = 0 }
+  }, [])
 
   const o = order
   return (
@@ -1319,6 +1330,7 @@ export default function DriverDashboard() {
         }}>
           {[
             { href:"/driver",          icon:"🏠", label:"Trang chủ", active:true  },
+            { href:"/driver/orders",   icon:"📋", label:"Đơn hàng",  active:false },
             { href:"/driver/earnings", icon:"📊", label:"Thu nhập",  active:false },
             { href:"/driver/profile",  icon:"👤", label:"Hồ sơ",     active:false },
           ].map(tab => (
