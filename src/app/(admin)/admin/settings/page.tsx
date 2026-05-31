@@ -152,6 +152,7 @@ export default function AdminSettingsPage() {
     const { data: updatedShops, error } = await supabase.from("shops")
       .update({ commission_rate: rate, updated_at: new Date().toISOString() })
       .eq("status", "approved")
+      .eq("is_negotiated_commission", false)
       .select("id")
     const count = updatedShops?.length ?? 0
     if (error) {

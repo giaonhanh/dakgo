@@ -484,11 +484,14 @@ export default function AdminUsersPage() {
 
   // ── Inline cell helpers ───────────────────────────────────────────────────────
 
-  function CommCell({ id, rate, inline, setInline, onSave, saving: sv }: {
-    id: string; rate: number; inline: { id: string; value: string } | null
+  function CommCell({ id, rate, isNegotiated, inline, setInline, onSave, saving: sv }: {
+    id: string; rate: number; isNegotiated?: boolean; inline: { id: string; value: string } | null
     setInline: (v: { id: string; value: string } | null) => void
     onSave: (id: string, rate: number) => void; saving: boolean
   }) {
+    const c  = isNegotiated ? "#f5c542" : "#9080b0"
+    const bg = isNegotiated ? "rgba(245,197,66,0.12)" : "rgba(144,128,176,0.08)"
+    const bd = isNegotiated ? "rgba(245,197,66,0.35)" : "rgba(144,128,176,0.2)"
     if (inline?.id === id) return (
       <div style={{ display: "flex", alignItems: "center", gap: 3 }} onClick={e => e.stopPropagation()}>
         <input type="number" min={0} max={50} value={inline.value} autoFocus
@@ -497,7 +500,7 @@ export default function AdminUsersPage() {
             if (e.key === "Enter")  onSave(id, parseInt(inline.value) || 0)
             if (e.key === "Escape") setInline(null)
           }}
-          style={{ width: 42, height: 24, borderRadius: 6, background: "rgba(180,100,255,0.14)", border: "1.5px solid rgba(180,100,255,0.6)", color: "#b464ff", fontSize: 11, textAlign: "center", padding: "0 3px", fontFamily: "Lexend", boxShadow: "0 0 0 3px rgba(180,100,255,0.1)" }} />
+          style={{ width: 42, height: 24, borderRadius: 6, background: "rgba(245,197,66,0.14)", border: "1.5px solid rgba(245,197,66,0.6)", color: "#f5c542", fontSize: 11, textAlign: "center", padding: "0 3px", fontFamily: "Lexend", boxShadow: "0 0 0 3px rgba(245,197,66,0.1)" }} />
         <button onClick={() => onSave(id, parseInt(inline.value) || 0)} disabled={sv} title="Lưu (Enter)"
           style={{ width: 22, height: 22, borderRadius: 5, background: "rgba(62,207,110,0.15)", border: "1px solid rgba(62,207,110,0.3)", color: "#3ecf6e", fontSize: 10, cursor: "pointer" }}>✓</button>
         <button onClick={() => setInline(null)} title="Hủy (Esc)"
@@ -506,8 +509,8 @@ export default function AdminUsersPage() {
     )
     return (
       <span onClick={e => { e.stopPropagation(); setInline({ id, value: rate.toString() }) }}
-        title="Click để chỉnh hoa hồng"
-        style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.3)", color: "#b464ff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, transition: "all .15s", userSelect: "none" }}>
+        title={isNegotiated ? "Hoa hồng thoả thuận — click để chỉnh" : "Hoa hồng mặc định — click để chỉnh"}
+        style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: bg, border: `1px solid ${bd}`, color: c, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, transition: "all .15s", userSelect: "none" }}>
         {rate}% <span style={{ fontSize: 8 }}>✏️</span>
       </span>
     )
@@ -831,8 +834,8 @@ export default function AdminUsersPage() {
                             {m.ratingAvg !== null ? <><span style={{ color: "#f5c542", fontSize: 10 }}>⭐</span><span style={{ color: "#f0eaff", fontSize: 10, fontWeight: 700 }}>{m.ratingAvg}</span></> : <span style={{ color: "rgba(144,128,176,0.3)", fontSize: 9 }}>—</span>}
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <CommCell id={m.id} rate={m.commissionRate} inline={merchantInline} setInline={setMerchantInline} onSave={saveMerchantCommission} saving={merchantSaving} />
-                            {m.isNegotiated && <span style={{ fontSize: 7, color: "#b464ff", opacity: 0.7 }}>thoả thuận</span>}
+                            <CommCell id={m.id} rate={m.commissionRate} isNegotiated={m.isNegotiated} inline={merchantInline} setInline={setMerchantInline} onSave={saveMerchantCommission} saving={merchantSaving} />
+                            {m.isNegotiated && <span style={{ fontSize: 7, color: "#f5c542", opacity: 0.8 }}>thoả thuận</span>}
                           </div>
                           <div style={{ color: "rgba(144,128,176,0.45)", fontSize: 9 }}>{m.createdDate}</div>
                         </div>
