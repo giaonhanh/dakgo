@@ -49,6 +49,11 @@ ALTER TABLE drivers
 -- Đồng bộ is_online → status cho tài xế cũ
 UPDATE drivers SET status = 'online' WHERE is_online = true AND status = 'offline';
 
+-- RLS: admin xem được tất cả tài xế
+DROP POLICY IF EXISTS "drivers_admin_all" ON drivers;
+CREATE POLICY "drivers_admin_all" ON drivers FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
 
 -- ════════════════════════════════════════════════
 -- 2. BẢNG PRODUCTS — thêm các cột còn thiếu
