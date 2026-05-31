@@ -26,6 +26,7 @@ DROP FUNCTION IF EXISTS handle_new_user();
 DROP FUNCTION IF EXISTS get_recommendations(UUID, INTEGER);
 DROP FUNCTION IF EXISTS search_catalog(TEXT);
 DROP FUNCTION IF EXISTS add_to_wallet(UUID, wallet_type, INTEGER, UUID, TEXT, tx_type);
+DROP FUNCTION IF EXISTS add_bonus_to_wallet(UUID, wallet_type, INTEGER, UUID, TEXT, tx_type);
 DROP FUNCTION IF EXISTS subtract_from_wallet(UUID, wallet_type, INTEGER, UUID, TEXT, tx_type);
 DROP FUNCTION IF EXISTS apply_referral_code(TEXT, UUID);
 DROP FUNCTION IF EXISTS increment_voucher_used_count();
@@ -435,11 +436,12 @@ CREATE INDEX IF NOT EXISTS idx_notif_user_unread
 -- WALLETS
 -- ════════════════════════════════════════════════
 CREATE TABLE wallets (
-  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  type       wallet_type NOT NULL,
-  balance    INTEGER     NOT NULL DEFAULT 0 CHECK (balance >= 0),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  type          wallet_type NOT NULL,
+  balance       INTEGER     NOT NULL DEFAULT 0 CHECK (balance >= 0),
+  bonus_balance INTEGER     NOT NULL DEFAULT 0 CHECK (bonus_balance >= 0),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(user_id, type)
 );
 ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;
@@ -736,6 +738,36 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
+-- ── 4b. Cộng xu thưởng (không rút được) vào bonus_balance ──
+CREATE OR REPLACE FUNCTION add_bonus_to_wallet(
+  p_user_id  UUID,
+  p_type     wallet_type,
+  p_amount   INTEGER,
+  p_ref_id   UUID    DEFAULT NULL,
+  p_note     TEXT    DEFAULT '',
+  p_tx_type  tx_type DEFAULT 'referral'
+) RETURNS INTEGER AS $$
+DECLARE
+  v_wallet_id UUID;
+  v_bonus     INTEGER;
+BEGIN
+  INSERT INTO wallets (user_id, type, bonus_balance)
+  VALUES (p_user_id, p_type, p_amount)
+  ON CONFLICT (user_id, type) DO UPDATE
+    SET bonus_balance = wallets.bonus_balance + p_amount,
+        updated_at    = now()
+  RETURNING id, bonus_balance INTO v_wallet_id, v_bonus;
+
+  INSERT INTO transactions (wallet_id, type, amount, balance_after, ref_type, ref_id, note)
+  VALUES (
+    v_wallet_id, p_tx_type, p_amount, v_bonus,
+    'referral', p_ref_id, p_note
+  );
+  RETURN v_bonus;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
 -- ── 5. Trừ tiền khỏi ví ──
 CREATE OR REPLACE FUNCTION subtract_from_wallet(
   p_user_id  UUID,
@@ -873,17 +905,17 @@ BEGIN
   UPDATE referral_usages SET qualifying_order_id = NEW.id WHERE id = v_usage.id;
   SELECT * INTO v_ref_code FROM referral_codes WHERE code = v_usage.code;
 
-  -- Thưởng referrer
-  PERFORM add_to_wallet(v_ref_code.user_id, 'customer', 10000, v_usage.id,
-    'Xu thưởng giới thiệu bạn bè thành công', 'referral');
+  -- Thưởng referrer (vào bonus_balance — không rút được)
+  PERFORM add_bonus_to_wallet(v_ref_code.user_id, 'customer', 10000, v_usage.id,
+    'Xu thưởng giới thiệu bạn bè', 'referral');
   INSERT INTO notifications (user_id, type, title, body, data) VALUES (
-    v_ref_code.user_id, 'system', '🎉 Bạn nhận được 10.000đ xu!',
-    'Người bạn giới thiệu vừa hoàn thành đơn đầu tiên.',
+    v_ref_code.user_id, 'system', '🎉 Bạn nhận được 10.000đ xu thưởng!',
+    'Người bạn giới thiệu vừa hoàn thành đơn đầu tiên. Xu thưởng chỉ dùng để thanh toán đơn hàng.',
     jsonb_build_object('xu_amount', 10000)
   );
 
-  -- Thưởng referee
-  PERFORM add_to_wallet(NEW.customer_id, 'customer', 10000, v_usage.id,
+  -- Thưởng referee (vào bonus_balance — không rút được)
+  PERFORM add_bonus_to_wallet(NEW.customer_id, 'customer', 10000, v_usage.id,
     'Xu thưởng dùng mã giới thiệu', 'referral');
   INSERT INTO notifications (user_id, type, title, body, data) VALUES (
     NEW.customer_id, 'system', '🎁 Nhận 10.000đ xu từ mã giới thiệu!',

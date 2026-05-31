@@ -1122,6 +1122,7 @@ export default function CheckoutPage() {
   const [selectedAddr,     setSelectedAddr]     = useState("")
   const [savedAddrs,       setSavedAddrs]       = useState<AddrOption[]>([])
   const [xuBalance,        setXuBalance]        = useState(0)
+  const [xuBonus,          setXuBonus]          = useState(0)
   const [xuWalletId,       setXuWalletId]       = useState<string | null>(null)
   const [userId,           setUserId]           = useState<string | null>(null)
   const [payment,          setPayment]          = useState<Payment>("cash")
@@ -1161,7 +1162,7 @@ export default function CheckoutPage() {
 
       const [{ data: addrs }, { data: wallet }, { data: voucherData }, { data: refUsage }] = await Promise.all([
         supabase.from("saved_addresses").select("id, label, address, lat, lng, is_default").eq("user_id", user.id).order("is_default", { ascending: false }),
-        supabase.from("wallets").select("id, balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
+        supabase.from("wallets").select("id, balance, bonus_balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
         supabase.from("vouchers").select("id,code,title,discount_type,discount_value,min_order,max_discount,valid_to,shop_id,is_active,per_person_limit").eq("is_active", true).gte("valid_to", new Date().toISOString()).limit(30),
         supabase.from("referral_usages").select("id").eq("referee_id", user.id).maybeSingle(),
       ])
@@ -1210,6 +1211,7 @@ export default function CheckoutPage() {
 
       if (wallet) {
         setXuBalance(wallet.balance)
+        setXuBonus((wallet as { bonus_balance?: number }).bonus_balance ?? 0)
         setXuWalletId(wallet.id)
       }
       setPageReady(true)
@@ -1359,19 +1361,27 @@ export default function CheckoutPage() {
         }))
       )
 
-      // Trừ xu nếu dùng
-      if (useXu && xuUsed > 0 && xuWalletId) {
-        const newBal = Math.max(0, xuBalance - xuUsed)
-        await supabase.from("wallets").update({ balance: newBal, updated_at: new Date().toISOString() }).eq("id", xuWalletId)
-        await supabase.from("transactions").insert({
-          wallet_id:    xuWalletId,
-          type:         "payment",
-          amount:       xuUsed,
-          balance_after: newBal,
-          ref_type:     "order",
-          ref_id:       order.id,
-          note:         "Thanh toán bằng xu Giao Nhanh",
-        })
+      // Trừ xu nếu dùng — bonus trước, balance sau
+      if (useXu && xuWalletId && (xuBonusUsed > 0 || xuUsed > 0)) {
+        const newBonus = Math.max(0, xuBonus - xuBonusUsed)
+        const newBal   = Math.max(0, xuBalance - xuUsed)
+        await supabase.from("wallets").update({
+          balance: newBal, bonus_balance: newBonus, updated_at: new Date().toISOString()
+        }).eq("id", xuWalletId)
+        if (xuBonusUsed > 0) {
+          await supabase.from("transactions").insert({
+            wallet_id: xuWalletId, type: "payment", amount: xuBonusUsed,
+            balance_after: newBonus, ref_type: "order", ref_id: order.id,
+            note: "Thanh toán bằng xu thưởng",
+          })
+        }
+        if (xuUsed > 0) {
+          await supabase.from("transactions").insert({
+            wallet_id: xuWalletId, type: "payment", amount: xuUsed,
+            balance_after: newBal, ref_type: "order", ref_id: order.id,
+            note: "Thanh toán bằng xu Giao Nhanh",
+          })
+        }
       }
 
       clearCart()
@@ -1419,8 +1429,9 @@ export default function CheckoutPage() {
     }
   }
 
-  const xuUsed      = useXu ? Math.min(xuBalance, total) : 0
-  const remaining   = total - xuUsed
+  const xuBonusUsed = useXu ? Math.min(xuBonus, total) : 0
+  const xuUsed      = useXu ? Math.min(xuBalance, Math.max(0, total - xuBonusUsed)) : 0
+  const remaining   = total - xuBonusUsed - xuUsed
   const ctaBlocked  = loading || (!deliveryNow && !scheduledTime)
 
   // Spinner chỉ hiện trong lúc đang load dữ liệu từ Supabase
@@ -1761,15 +1772,11 @@ export default function CheckoutPage() {
                 }}>🪙</div>
                 <div>
                   <div style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600 }}>Dùng xu để giảm tiền</div>
-                  <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 2 }}>
-                    Số dư:{" "}
-                    <span style={{
-                      background: "linear-gradient(90deg,#FFD700,#FFB347)",
-                      WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                      backgroundClip: "text", fontWeight: 700,
-                    } as React.CSSProperties}>
-                      {xuBalance.toLocaleString("vi-VN")} xu
-                    </span>
+                  <div style={{ color: "#6a5a40", fontSize: 10, marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <span>Ví: <span style={{ color: "#FFD700", fontWeight: 700 }}>{xuBalance.toLocaleString("vi-VN")}xu</span></span>
+                    {xuBonus > 0 && (
+                      <span>Thưởng: <span style={{ color: "#3ecf6e", fontWeight: 700 }}>{xuBonus.toLocaleString("vi-VN")}xu</span></span>
+                    )}
                   </div>
                 </div>
               </div>

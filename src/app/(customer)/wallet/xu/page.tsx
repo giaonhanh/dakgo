@@ -33,6 +33,7 @@ function timeAgo(dateStr: string): string {
 export default function XuPage() {
   const supabase = createClient()
   const [balance,        setBalance]        = useState(0)
+  const [bonusBalance,   setBonusBalance]   = useState(0)
   const [txs,            setTxs]            = useState<XuTx[]>([])
   const [showTopup,      setShowTopup]      = useState(false)
   const [showWithdraw,   setShowWithdraw]   = useState(false)
@@ -49,9 +50,10 @@ export default function XuPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data: wallet } = await supabase
-        .from("wallets").select("id,balance").eq("user_id", user.id).eq("type", "customer").maybeSingle()
+        .from("wallets").select("id,balance,bonus_balance").eq("user_id", user.id).eq("type", "customer").maybeSingle()
       if (wallet) {
         setBalance(wallet.balance)
+        setBonusBalance((wallet as { bonus_balance?: number }).bonus_balance ?? 0)
         const { data: txData } = await supabase
           .from("transactions")
           .select("id,type,amount,balance_after,note,created_at")
@@ -222,7 +224,14 @@ export default function XuPage() {
               <div style={{ background:"rgba(180,100,255,0.07)", border:"1px solid rgba(180,100,255,0.2)",
                 borderRadius:11, padding:"10px 13px", marginBottom:14,
                 display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                <span style={{ color:"#6a5a40", fontSize:10 }}>Xu khả dụng</span>
+                <div>
+                  <span style={{ color:"#6a5a40", fontSize:10 }}>Xu Giao Nhanh có thể rút</span>
+                  {bonusBalance > 0 && (
+                    <div style={{ color:"rgba(62,207,110,0.6)", fontSize:8.5, marginTop:2 }}>
+                      Xu thưởng {fmt(bonusBalance)}xu — không rút được
+                    </div>
+                  )}
+                </div>
                 <div style={{ textAlign:"right" }}>
                   <span style={{ color:"#b464ff", fontSize:14, fontWeight:700 }}>{fmt(balance)} xu</span>
                   <div style={{ color:"rgba(180,100,255,0.45)", fontSize:9 }}>= {fmt(balance)}đ</div>
@@ -241,7 +250,7 @@ export default function XuPage() {
                 if (!withdrawBank || !withdrawAmount) return
                 const amt = parseInt(withdrawAmount) || 0
                 if (amt <= 0) { fireToast("Số xu không hợp lệ"); return }
-                if (amt > balance) { fireToast("Số xu vượt quá số dư"); return }
+                if (amt > balance) { fireToast(`Chỉ rút được tối đa ${fmt(balance)} xu (xu thưởng không rút được)`); return }
                 if (withdrawBank.replace(/\D/g,"").length < 8) { fireToast("Số tài khoản không hợp lệ"); return }
                 fireToast("Đã gửi yêu cầu rút xu thành công!")
                 setShowWithdraw(false); setWithdrawBank(""); setWithdrawAmount("")
@@ -295,7 +304,7 @@ export default function XuPage() {
               background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)",
               animation:"shimmer 4s infinite" }} />
             <div style={{ color:"rgba(180,100,255,0.5)", fontSize:10, marginBottom:4, position:"relative", zIndex:1 }}>
-              Xu hiện có
+              Xu Giao Nhanh (có thể rút)
             </div>
             <div style={{ display:"flex", alignItems:"baseline", gap:8, marginBottom:4, position:"relative", zIndex:1 }}>
               <div style={{ fontSize:36, fontWeight:800, lineHeight:1,
@@ -305,9 +314,24 @@ export default function XuPage() {
               </div>
               <span style={{ color:"#b464ff", fontSize:16, fontWeight:600 }}>xu</span>
             </div>
-            <div style={{ color:"rgba(180,100,255,0.4)", fontSize:10, marginBottom:10, position:"relative", zIndex:1 }}>
-              = {fmt(balance)}đ · dùng thanh toán đơn hàng
+            <div style={{ color:"rgba(180,100,255,0.4)", fontSize:10, marginBottom:bonusBalance>0?8:10, position:"relative", zIndex:1 }}>
+              = {fmt(balance)}đ · nạp tiền, thanh toán & rút được
             </div>
+            {bonusBalance > 0 && (
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                background:"rgba(62,207,110,0.08)", border:"1px solid rgba(62,207,110,0.2)",
+                borderRadius:10, padding:"8px 12px", marginBottom:6, position:"relative", zIndex:1 }}>
+                <div>
+                  <div style={{ color:"#3ecf6e", fontSize:10, fontWeight:700 }}>🎁 Xu thưởng (referral)</div>
+                  <div style={{ color:"rgba(62,207,110,0.55)", fontSize:8.5, marginTop:2 }}>
+                    Chỉ dùng để thanh toán — không rút được
+                  </div>
+                </div>
+                <div style={{ color:"#3ecf6e", fontSize:16, fontWeight:800 }}>
+                  {fmt(bonusBalance)} xu
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Actions */}

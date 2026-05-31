@@ -729,7 +729,84 @@ END$rt2$;
 
 
 -- ════════════════════════════════════════════════
--- 24. APPLY REFERRAL CODE FUNCTION
+-- 24. BONUS_BALANCE — xu thưởng referral (không rút được)
+-- ════════════════════════════════════════════════
+
+ALTER TABLE wallets ADD COLUMN IF NOT EXISTS
+  bonus_balance INTEGER NOT NULL DEFAULT 0 CHECK (bonus_balance >= 0);
+
+CREATE OR REPLACE FUNCTION add_bonus_to_wallet(
+  p_user_id  UUID,
+  p_type     wallet_type,
+  p_amount   INTEGER,
+  p_ref_id   UUID    DEFAULT NULL,
+  p_note     TEXT    DEFAULT '',
+  p_tx_type  tx_type DEFAULT 'referral'
+) RETURNS INTEGER AS $$
+DECLARE
+  v_wallet_id UUID;
+  v_bonus     INTEGER;
+BEGIN
+  INSERT INTO wallets (user_id, type, bonus_balance)
+  VALUES (p_user_id, p_type, p_amount)
+  ON CONFLICT (user_id, type) DO UPDATE
+    SET bonus_balance = wallets.bonus_balance + p_amount,
+        updated_at    = now()
+  RETURNING id, bonus_balance INTO v_wallet_id, v_bonus;
+
+  INSERT INTO transactions (wallet_id, type, amount, balance_after, ref_type, ref_id, note)
+  VALUES (v_wallet_id, p_tx_type, p_amount, v_bonus, 'referral', p_ref_id, p_note);
+  RETURN v_bonus;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Cập nhật trigger thưởng referral → dùng bonus_balance
+CREATE OR REPLACE FUNCTION process_referral_reward() RETURNS TRIGGER AS $$
+DECLARE
+  v_usage    referral_usages%ROWTYPE;
+  v_ref_code referral_codes%ROWTYPE;
+BEGIN
+  IF NEW.status <> 'delivered' OR OLD.status = 'delivered' THEN RETURN NEW; END IF;
+  IF COALESCE(NEW.total_amount, NEW.total) < 50000 THEN RETURN NEW; END IF;
+
+  SELECT * INTO v_usage FROM referral_usages
+  WHERE referee_id = NEW.customer_id
+    AND qualifying_order_id IS NULL AND referrer_rewarded = false;
+  IF NOT FOUND THEN RETURN NEW; END IF;
+
+  UPDATE referral_usages SET qualifying_order_id = NEW.id WHERE id = v_usage.id;
+  SELECT * INTO v_ref_code FROM referral_codes WHERE code = v_usage.code;
+
+  PERFORM add_bonus_to_wallet(v_ref_code.user_id, 'customer', 10000, v_usage.id,
+    'Xu thưởng giới thiệu bạn bè', 'referral');
+  INSERT INTO notifications (user_id, type, title, body, data) VALUES (
+    v_ref_code.user_id, 'system', '🎉 Bạn nhận được 10.000đ xu thưởng!',
+    'Người bạn giới thiệu vừa hoàn thành đơn đầu tiên. Xu thưởng chỉ dùng để thanh toán đơn hàng.',
+    jsonb_build_object('xu_amount', 10000)
+  );
+
+  PERFORM add_bonus_to_wallet(NEW.customer_id, 'customer', 10000, v_usage.id,
+    'Xu thưởng dùng mã giới thiệu', 'referral');
+  INSERT INTO notifications (user_id, type, title, body, data) VALUES (
+    NEW.customer_id, 'system', '🎁 Nhận 10.000đ xu thưởng từ mã giới thiệu!',
+    'Đơn đầu tiên của bạn hoàn thành. Xu thưởng chỉ dùng để thanh toán đơn hàng.',
+    jsonb_build_object('xu_amount', 10000)
+  );
+
+  UPDATE referral_codes
+  SET total_uses = total_uses + 1, total_earned = total_earned + 10000
+  WHERE code = v_usage.code;
+
+  UPDATE referral_usages SET referrer_rewarded = true, referee_rewarded = true
+  WHERE id = v_usage.id;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ════════════════════════════════════════════════
+-- 25. APPLY REFERRAL CODE FUNCTION
 -- ════════════════════════════════════════════════
 
 CREATE OR REPLACE FUNCTION apply_referral_code(p_code TEXT, p_referee_id UUID)
