@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import FloatingBottomMenu from '@/components/navigation/FloatingBottomMenu'
 import InstallPrompt from '@/components/pwa/InstallPrompt'
 import { useLocationStore } from '@/store/locationStore'
+import MaintenanceGate from '@/components/MaintenanceGate'
 
 const VM_KEY        = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
 const REFRESH_MS    = 5 * 60 * 1000   // 5 phút — tự cập nhật lại vị trí
@@ -239,12 +240,12 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
     SELF_NAV_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
 
   return (
-    <>
+    <MaintenanceGate>
       <GpsManager />
       <AdminPreviewBar />
       {children}
       {!hasSelfNav && <FloatingBottomMenu />}
       <InstallPrompt />
-    </>
+    </MaintenanceGate>
   )
 }
