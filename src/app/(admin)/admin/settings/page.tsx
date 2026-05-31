@@ -274,15 +274,20 @@ export default function AdminSettingsPage() {
     { key:"maintenance", label:"Bảo trì",          icon:"🔧" },
   ]
 
-  const renderInput = (label: string, desc: string, value: string, onChange: (v: string) => void, unit: string, type = "number") => (
+  const fmtNum = (v: string) => { const n = v.replace(/\D/g,""); return n ? Number(n).toLocaleString("vi-VN") : "" }
+  const rawNum = (v: string) => v.replace(/\./g,"").replace(/[^\d]/g,"")
+
+  const renderInput = (label: string, desc: string, value: string, onChange: (v: string) => void, unit: string, isNum = true) => (
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 0", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
       <div style={{ flex:1 }}>
         <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600, marginBottom:2 }}>{label}</div>
         <div style={{ color:"#6a5a40", fontSize:10 }}>{desc}</div>
       </div>
       <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-        <input type={type} value={value} onChange={e=>onChange(e.target.value)}
-          style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right" }} />
+        <input type="text" inputMode={isNum ? "numeric" : "text"}
+          value={isNum ? fmtNum(value) : value}
+          onChange={e => onChange(isNum ? rawNum(e.target.value) : e.target.value)}
+          style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right", fontFamily:"Lexend", outline:"none" }} />
         {unit && <span style={{ color:"#6a5a40", fontSize:11, minWidth:24 }}>{unit}</span>}
       </div>
     </div>
@@ -370,7 +375,10 @@ export default function AdminSettingsPage() {
                         <span style={{ color:"#f0eaff", fontSize:12 }}>Km {i+1}</span>
                       </div>
                       <div style={{ textAlign:"right" }}>
-                        <input type="number" value={price} placeholder={isEmpty && i > 0 ? eff : ""} onChange={e => updateKmPrice(activeService, i, e.target.value)}
+                        <input type="text" inputMode="numeric"
+                          value={fmtNum(price)}
+                          placeholder={isEmpty && i > 0 ? fmtNum(eff) : ""}
+                          onChange={e => updateKmPrice(activeService, i, rawNum(e.target.value))}
                           style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:`1px solid ${isEmpty && i > 0 ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.12)"}`, borderRadius:8, color: isEmpty ? "#6a5a40" : "#f0eaff", fontSize:12, textAlign:"right", fontFamily:"Lexend", outline:"none" }} />
                       </div>
                       <div style={{ textAlign:"right", paddingRight:8 }}>
@@ -386,7 +394,9 @@ export default function AdminSettingsPage() {
                     <span style={{ color:"#FF8C00", fontSize:12, fontWeight:600 }}>Km 11 trở đi</span>
                   </div>
                   <div style={{ textAlign:"right" }}>
-                    <input type="number" value={pricing[activeService].extra} onChange={e => setPricing(p => ({ ...p, [activeService]: { ...p[activeService], extra: e.target.value } }))}
+                    <input type="text" inputMode="numeric"
+                      value={fmtNum(pricing[activeService].extra)}
+                      onChange={e => setPricing(p => ({ ...p, [activeService]: { ...p[activeService], extra: rawNum(e.target.value) } }))}
                       style={{ width:90, padding:"7px 10px", background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.25)", borderRadius:8, color:"#FF8C00", fontSize:12, textAlign:"right", fontFamily:"Lexend", outline:"none" }} />
                   </div>
                   <div style={{ textAlign:"right", paddingRight:8 }}><span style={{ fontSize:10, color:"#6a5a40" }}>cộng thêm mỗi km</span></div>
@@ -403,8 +413,9 @@ export default function AdminSettingsPage() {
                       <div style={{ color:"#6a5a40", fontSize:10 }}>Phụ phí cộng thêm ngoài phí vận chuyển</div>
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                      <input type="number" value={pricing[activeService].weightMid ?? "5000"}
-                        onChange={e => setPricing(p => ({ ...p, [activeService]: { ...p[activeService], weightMid: e.target.value } }))}
+                      <input type="text" inputMode="numeric"
+                        value={fmtNum(pricing[activeService].weightMid ?? "5000")}
+                        onChange={e => setPricing(p => ({ ...p, [activeService]: { ...p[activeService], weightMid: rawNum(e.target.value) } }))}
                         style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right", fontFamily:"Lexend", outline:"none" }} />
                       <span style={{ color:"#6a5a40", fontSize:10 }}>đ</span>
                     </div>
@@ -415,8 +426,9 @@ export default function AdminSettingsPage() {
                       <div style={{ color:"#6a5a40", fontSize:10 }}>Phụ phí cộng thêm ngoài phí vận chuyển</div>
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                      <input type="number" value={pricing[activeService].weightHeavy ?? "15000"}
-                        onChange={e => setPricing(p => ({ ...p, [activeService]: { ...p[activeService], weightHeavy: e.target.value } }))}
+                      <input type="text" inputMode="numeric"
+                        value={fmtNum(pricing[activeService].weightHeavy ?? "15000")}
+                        onChange={e => setPricing(p => ({ ...p, [activeService]: { ...p[activeService], weightHeavy: rawNum(e.target.value) } }))}
                         style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right", fontFamily:"Lexend", outline:"none" }} />
                       <span style={{ color:"#6a5a40", fontSize:10 }}>đ</span>
                     </div>
@@ -427,8 +439,8 @@ export default function AdminSettingsPage() {
               <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
                 <div style={{ padding:"12px 0 4px", color:"#f0eaff", fontSize:12, fontWeight:700 }}>🛵 Điều chỉnh & hệ số</div>
                 {renderInput("Bán kính tối đa",         "Khoảng cách tối đa hệ thống chấp nhận đơn",          deliverySettings.maxRadius,          v => setDeliverySettings(p=>({...p,maxRadius:v})),          "km")}
-                {renderInput("Hệ số giờ cao điểm",      "Nhân phí trong giờ cao điểm (7-9h, 11-13h, 17-19h)",deliverySettings.rushHourMultiplier, v => setDeliverySettings(p=>({...p,rushHourMultiplier:v})), "x")}
-                {renderInput("Hệ số trời mưa",          "Nhân phí khi thời tiết xấu",                         deliverySettings.rainMultiplier,     v => setDeliverySettings(p=>({...p,rainMultiplier:v})),     "x")}
+                {renderInput("Hệ số giờ cao điểm",      "Nhân phí trong giờ cao điểm (7-9h, 11-13h, 17-19h)",deliverySettings.rushHourMultiplier, v => setDeliverySettings(p=>({...p,rushHourMultiplier:v})), "x", false)}
+                {renderInput("Hệ số trời mưa",          "Nhân phí khi thời tiết xấu",                         deliverySettings.rainMultiplier,     v => setDeliverySettings(p=>({...p,rainMultiplier:v})),     "x", false)}
                 {renderInput("Rating tài xế tối thiểu", "Điểm đánh giá tối thiểu để nhận đơn",                deliverySettings.minDriverRating,    v => setDeliverySettings(p=>({...p,minDriverRating:v})),    "⭐")}
               </div>
 

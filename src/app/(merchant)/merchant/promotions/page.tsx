@@ -942,17 +942,23 @@ function MInput({ value, onChange, placeholder, type = "text" }: {
   placeholder?: string; type?: string
 }) {
   const [focused, setFocused] = useState(false)
+  const isNum = type === "number"
+  const fmtNum = (v: string) => { const n = v.replace(/\D/g,""); return n ? Number(n).toLocaleString("vi-VN") : "" }
+  const rawNum = (v: string) => v.replace(/\./g,"").replace(/[^\d]/g,"")
   return (
     <div style={{ display:"flex", alignItems:"center",
       background:"rgba(255,255,255,0.04)",
       border:`1px solid ${focused?"rgba(255,107,0,0.45)":"rgba(255,255,255,0.08)"}`,
       borderRadius:11, padding:"0 12px", height:42, marginBottom:10, transition:"all .2s",
       boxShadow:focused?"0 0 0 3px rgba(255,107,0,0.09)":"none" }}>
-      <input type={type} value={value} placeholder={placeholder}
-        onChange={e => onChange(e.target.value)}
+      <input
+        type="text" inputMode={isNum ? "numeric" : "text"}
+        value={isNum ? fmtNum(value) : value}
+        placeholder={placeholder}
+        onChange={e => onChange(isNum ? rawNum(e.target.value) : e.target.value)}
         onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
         style={{ flex:1, background:"transparent", border:"none",
-          color:"#f8f0e0", fontSize:12 }} />
+          color:"#f8f0e0", fontSize:12, fontFamily:"Lexend", outline:"none" }} />
     </div>
   )
 }
