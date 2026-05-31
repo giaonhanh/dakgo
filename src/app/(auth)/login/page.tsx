@@ -295,13 +295,17 @@ function LoginContent() {
 
         // Tạo hàng shops nếu đăng ký merchant
         if (dbRole === "merchant") {
+          const { data: settingRow } = await supabase
+            .from("app_settings").select("value").eq("key", "commission").maybeSingle()
+          const defaultCommission = parseInt((settingRow?.value as { defaultRate?: string } | null)?.defaultRate ?? "15") || 15
           await supabase.from("shops").insert({
-            owner_id: data.user.id,
-            name:     shopName.trim() || `Cửa hàng của ${name.trim()}`,
-            address:  shopAddr.trim() || "Phước An, Krông Pắc",
-            category: shopCat.replace(/^[^\s]+ /, "").trim() || "Đồ ăn",
-            status:   "pending",
-            is_open:  false,
+            owner_id:        data.user.id,
+            name:            shopName.trim() || `Cửa hàng của ${name.trim()}`,
+            address:         shopAddr.trim() || "Phước An, Krông Pắc",
+            category:        shopCat.replace(/^[^\s]+ /, "").trim() || "Đồ ăn",
+            status:          "pending",
+            is_open:         false,
+            commission_rate: defaultCommission,
           })
         }
       }
