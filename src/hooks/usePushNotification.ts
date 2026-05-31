@@ -27,10 +27,12 @@ export function usePushNotification() {
 
     const result = await Notification.requestPermission()
     setPermission(result as PushPermission)
+    console.log("[Push] Permission:", result)
     if (result !== "granted") return false
 
     try {
       const registration = await navigator.serviceWorker.ready
+      console.log("[Push] SW ready, subscribing...")
       const existing = await registration.pushManager.getSubscription()
       if (existing) await existing.unsubscribe()
       const sub = await registration.pushManager.subscribe({
@@ -53,9 +55,10 @@ export function usePushNotification() {
         auth:     json.keys.auth,
       }, { onConflict: "user_id" })
 
+      console.log("[Push] Subscription saved for", userId)
       return true
     } catch (err) {
-      console.error("Push subscription error:", err)
+      console.error("[Push] Subscription error:", err)
       return false
     }
   }
