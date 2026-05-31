@@ -95,10 +95,10 @@ export default function DriverNotificationsPage() {
             </div>
           </div>
           <div style={{ display:"flex", gap:6, flexShrink:0 }}>
-            {unreadCnt > 0 && (
+            {notifs.length > 0 && (
               <button onClick={markAllRead}
                 style={{ padding:"6px 10px", borderRadius:8, background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.25)", color:"#FF8C00", fontSize:9, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
-                ✓ Đọc hết
+                ✓ Đọc tất cả
               </button>
             )}
           </div>

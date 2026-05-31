@@ -139,10 +139,10 @@ export default function NotificationsPage() {
               )}
             </div>
             <div style={{ display:"flex", gap:6 }}>
-              {unreadCount > 0 && (
+              {notifs.length > 0 && (
                 <button onClick={markAllRead}
                   style={{ cursor:"pointer", color:"#FF8C00", fontSize:9, fontWeight:700, fontFamily:"Lexend", padding:"6px 10px", borderRadius:8, background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.2)", whiteSpace:"nowrap" }}>
-                  ? �?c h?t
+                  ✓ Đọc tất cả
                 </button>
               )}
             </div>
