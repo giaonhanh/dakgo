@@ -906,11 +906,11 @@ export default function AdminUsersPage() {
                   ))}
                 </div>
                 <div style={{ padding: "12px 18px 18px", borderTop: "1px solid rgba(255,255,255,0.07)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {(selected.role === "customer" || selected.role === "driver") && (
+                    <button onClick={() => { setWalletModal({ id: selected.id, name: selected.fullName, role: selected.role === "driver" ? "driver" : "customer", balance: selected.walletBalance }); setWalletAmount(""); setWalletNote(""); setWalletMsg("") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.25)", color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>💰 Nạp / Rút xu Giao Nhanh</button>
+                  )}
                   {selected.role === "customer" && (
-                    <>
-                      <button onClick={() => { setWalletModal({ id: selected.id, name: selected.fullName, role: "customer", balance: selected.walletBalance }); setWalletAmount(""); setWalletNote(""); setWalletMsg("") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.25)", color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>💰 Nạp / Rút xu Giao Nhanh</button>
-                      <button onClick={() => { setPointsModal(selected); setPointsAmount(""); setPointsMsg(""); setPointsCustom(""); setPointsReason("Sự kiện") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(180,100,255,0.08)", border: "1px solid rgba(180,100,255,0.25)", color: "#b464ff", fontSize: 11, fontWeight: 700 }}>⭐ Nạp / Rút điểm tích lũy</button>
-                    </>
+                    <button onClick={() => { setPointsModal(selected); setPointsAmount(""); setPointsMsg(""); setPointsCustom(""); setPointsReason("Sự kiện") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(180,100,255,0.08)", border: "1px solid rgba(180,100,255,0.25)", color: "#b464ff", fontSize: 11, fontWeight: 700 }}>⭐ Nạp / Rút điểm tích lũy</button>
                   )}
                   {selected.role !== "admin" && (
                     <button onClick={() => { setResetModal(selected); setNewPassword(""); setResetMsg("") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.25)", color: "#FF8C00", fontSize: 11, fontWeight: 700 }}>🔑 Đặt lại mật khẩu</button>
@@ -930,19 +930,21 @@ export default function AdminUsersPage() {
           {resetModal && (
             <>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setResetModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 70, backdropFilter: "blur(6px)" }} />
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
-                style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100svh - 48px)", overflowY: "auto", background: "#0d0b19", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 18, padding: "22px 20px 18px", zIndex: 71 }}>
-                <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>🔑</div>
-                <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>Đặt lại mật khẩu</div>
-                <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 10, textAlign: "center", marginBottom: 16 }}>{resetModal.fullName} · {resetModal.phone}</div>
-                <input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="text" placeholder="Mật khẩu mới (tối thiểu 6 ký tự)"
-                  style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: "10px 13px", color: "#f0eaff", fontSize: 12, fontFamily: "Lexend", marginBottom: 8, boxSizing: "border-box" }} />
-                {resetMsg && <div style={{ fontSize: 10, color: resetMsg.startsWith("✅") ? "#3ecf6e" : "#ff6060", marginBottom: 10, textAlign: "center", background: resetMsg.startsWith("✅") ? "rgba(62,207,110,0.08)" : "rgba(255,64,64,0.08)", borderRadius: 8, padding: "6px 10px" }}>{resetMsg}</div>}
-                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                  <button onClick={() => setResetModal(null)} style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(144,128,176,0.6)", fontSize: 11, fontWeight: 600 }}>Hủy</button>
-                  <button onClick={resetPassword} disabled={resetSaving || newPassword.length < 6} style={{ flex: 1, height: 40, borderRadius: 10, cursor: resetSaving ? "default" : "pointer", fontFamily: "Lexend", background: "rgba(255,107,0,0.12)", border: "1px solid rgba(255,107,0,0.3)", color: "#FF8C00", fontSize: 11, fontWeight: 800, opacity: newPassword.length < 6 ? 0.4 : 1 }}>{resetSaving ? "Đang lưu..." : "✅ Xác nhận"}</button>
-                </div>
-              </motion.div>
+              <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 71, width: 320, maxWidth: "calc(100vw - 32px)" }}>
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
+                  style={{ maxHeight: "calc(100svh - 48px)", overflowY: "auto", background: "#0d0b19", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 18, padding: "22px 20px 18px" }}>
+                  <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>🔑</div>
+                  <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>Đặt lại mật khẩu</div>
+                  <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 10, textAlign: "center", marginBottom: 16 }}>{resetModal.fullName} · {resetModal.phone}</div>
+                  <input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="text" placeholder="Mật khẩu mới (tối thiểu 6 ký tự)"
+                    style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: "10px 13px", color: "#f0eaff", fontSize: 12, fontFamily: "Lexend", marginBottom: 8, boxSizing: "border-box" }} />
+                  {resetMsg && <div style={{ fontSize: 10, color: resetMsg.startsWith("✅") ? "#3ecf6e" : "#ff6060", marginBottom: 10, textAlign: "center", background: resetMsg.startsWith("✅") ? "rgba(62,207,110,0.08)" : "rgba(255,64,64,0.08)", borderRadius: 8, padding: "6px 10px" }}>{resetMsg}</div>}
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <button onClick={() => setResetModal(null)} style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(144,128,176,0.6)", fontSize: 11, fontWeight: 600 }}>Hủy</button>
+                    <button onClick={resetPassword} disabled={resetSaving || newPassword.length < 6} style={{ flex: 1, height: 40, borderRadius: 10, cursor: resetSaving ? "default" : "pointer", fontFamily: "Lexend", background: "rgba(255,107,0,0.12)", border: "1px solid rgba(255,107,0,0.3)", color: "#FF8C00", fontSize: 11, fontWeight: 800, opacity: newPassword.length < 6 ? 0.4 : 1 }}>{resetSaving ? "Đang lưu..." : "✅ Xác nhận"}</button>
+                  </div>
+                </motion.div>
+              </div>
             </>
           )}
         </AnimatePresence>
@@ -952,8 +954,9 @@ export default function AdminUsersPage() {
           {pointsModal && (
             <>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPointsModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 70, backdropFilter: "blur(6px)" }} />
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
-                style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 340, maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100svh - 48px)", overflowY: "auto", background: "#0d0b19", border: "1px solid rgba(180,100,255,0.25)", borderRadius: 18, padding: "22px 20px 18px", zIndex: 71 }}>
+              <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 71, width: 340, maxWidth: "calc(100vw - 32px)" }}>
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
+                  style={{ maxHeight: "calc(100svh - 48px)", overflowY: "auto", background: "#0d0b19", border: "1px solid rgba(180,100,255,0.25)", borderRadius: 18, padding: "22px 20px 18px" }}>
                 <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>⭐</div>
                 <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>Nạp / Rút điểm tích lũy</div>
                 <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 10, textAlign: "center", marginBottom: 16 }}>
@@ -985,7 +988,8 @@ export default function AdminUsersPage() {
                   <button onClick={() => setPointsModal(null)} style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(144,128,176,0.6)", fontSize: 11, fontWeight: 600 }}>Hủy</button>
                   <button onClick={addPoints} disabled={pointsSaving} style={{ flex: 2, height: 40, borderRadius: 10, cursor: pointsSaving ? "default" : "pointer", fontFamily: "Lexend", background: "rgba(180,100,255,0.12)", border: "1px solid rgba(180,100,255,0.3)", color: "#b464ff", fontSize: 11, fontWeight: 800, opacity: pointsSaving ? 0.6 : 1 }}>{pointsSaving ? "Đang xử lý..." : "✅ Xác nhận"}</button>
                 </div>
-              </motion.div>
+                </motion.div>
+              </div>
             </>
           )}
         </AnimatePresence>
@@ -995,8 +999,9 @@ export default function AdminUsersPage() {
           {walletModal && (
             <>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setWalletModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 70, backdropFilter: "blur(6px)" }} />
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
-                style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 340, maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100svh - 48px)", overflowY: "auto", background: "#0d0b19", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 18, padding: "22px 20px 18px", zIndex: 71 }}>
+              <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 71, width: 340, maxWidth: "calc(100vw - 32px)" }}>
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
+                  style={{ maxHeight: "calc(100svh - 48px)", overflowY: "auto", background: "#0d0b19", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 18, padding: "22px 20px 18px" }}>
                 <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>💰</div>
                 <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>Nạp / Rút xu Giao Nhanh</div>
                 <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 10, textAlign: "center", marginBottom: 16 }}>
@@ -1017,7 +1022,8 @@ export default function AdminUsersPage() {
                   <button onClick={() => setWalletModal(null)} style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(144,128,176,0.6)", fontSize: 11, fontWeight: 600 }}>Hủy</button>
                   <button onClick={adjustWallet} disabled={walletSaving} style={{ flex: 2, height: 40, borderRadius: 10, cursor: walletSaving ? "default" : "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.12)", border: "1px solid rgba(62,207,110,0.3)", color: "#3ecf6e", fontSize: 11, fontWeight: 800, opacity: walletSaving ? 0.6 : 1 }}>{walletSaving ? "Đang xử lý..." : "✅ Xác nhận"}</button>
                 </div>
-              </motion.div>
+                </motion.div>
+              </div>
             </>
           )}
         </AnimatePresence>
@@ -1027,8 +1033,9 @@ export default function AdminUsersPage() {
           {confirmAction && (
             <>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setConfirmAction(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 70, backdropFilter: "blur(6px)" }} />
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
-                style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 320, maxWidth: "calc(100vw - 32px)", background: "#0d0b19", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, padding: "22px 20px 18px", zIndex: 71 }}>
+              <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 71, width: 320, maxWidth: "calc(100vw - 32px)" }}>
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
+                  style={{ background: "#0d0b19", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, padding: "22px 20px 18px" }}>
                 {(() => {
                   const isLock = confirmAction.type === "lock"
                   const u      = users.find(x => x.id === confirmAction.id)
@@ -1044,7 +1051,8 @@ export default function AdminUsersPage() {
                     </>
                   )
                 })()}
-              </motion.div>
+                </motion.div>
+              </div>
             </>
           )}
         </AnimatePresence>
