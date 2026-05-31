@@ -19,7 +19,7 @@ ALTER TABLE shops
   ADD COLUMN IF NOT EXISTS opening_hours             JSONB,
   ADD COLUMN IF NOT EXISTS prep_time                 TEXT,
   ADD COLUMN IF NOT EXISTS category                  TEXT,
-  ADD COLUMN IF NOT EXISTS status                    TEXT         DEFAULT 'approved',
+  ADD COLUMN IF NOT EXISTS status                    TEXT         DEFAULT 'pending',
   ADD COLUMN IF NOT EXISTS commission_rate           NUMERIC(5,2) DEFAULT 15,
   ADD COLUMN IF NOT EXISTS is_negotiated_commission  BOOLEAN      DEFAULT false,
   ADD COLUMN IF NOT EXISTS updated_at                TIMESTAMPTZ  DEFAULT now();

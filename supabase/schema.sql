@@ -113,7 +113,7 @@ CREATE TABLE shops (
   cover_image_url   TEXT,        -- ảnh bìa banner
 
   is_open           BOOLEAN     NOT NULL DEFAULT true,
-  status            TEXT        NOT NULL DEFAULT 'approved',
+  status            TEXT        NOT NULL DEFAULT 'pending',
 
   -- Ratings
   rating            NUMERIC(3,2) DEFAULT 5.0,   -- cột cũ, giữ tương thích
