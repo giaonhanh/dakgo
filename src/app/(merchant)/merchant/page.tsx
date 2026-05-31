@@ -108,21 +108,33 @@ export default function MerchantDashboard() {
   }, [])
 
   async function fetchOrders(sid: string) {
-    // Lấy đơn hôm nay + đơn đang active
     const today = new Date()
     today.setHours(0,0,0,0)
+
+    // Fetch orders (không join order_items để tránh RLS join issue)
     const { data: rows } = await supabase
       .from("orders")
-      .select(`
-        id, status, total_amount, total, pay_method, note, created_at, scheduled_at, customer_id,
-        order_items(id, name, price, qty, note)
-      `)
+      .select("id, status, total_amount, total, pay_method, note, created_at, scheduled_at, customer_id")
       .eq("shop_id", sid)
       .gte("created_at", today.toISOString())
       .order("created_at", { ascending: false })
       .limit(30)
 
-    if (!rows) return
+    if (!rows || !rows.length) return
+
+    const orderIds = rows.map(o => o.id)
+
+    // Fetch order_items riêng (tránh nested join RLS)
+    const { data: allItems } = await supabase
+      .from("order_items")
+      .select("order_id, name, price, qty, note")
+      .in("order_id", orderIds)
+
+    const itemsByOrder: Record<string, { name: string; price: number; qty: number; note?: string }[]> = {}
+    ;(allItems ?? []).forEach(item => {
+      if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = []
+      itemsByOrder[item.order_id].push({ name: item.name, price: item.price, qty: item.qty, note: item.note ?? undefined })
+    })
 
     // Get customer profiles
     const customerIds = [...new Set(rows.map(o => o.customer_id))]
@@ -132,7 +144,6 @@ export default function MerchantDashboard() {
       .in("id", customerIds)
     const profileMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p]))
 
-    // Calculate today revenue
     const revenue = rows
       .filter(o => o.status !== "cancelled" && o.status !== "rejected")
       .reduce((sum, o) => sum + (o.total_amount ?? 0), 0)
@@ -140,7 +151,7 @@ export default function MerchantDashboard() {
 
     const mapped: MOrder[] = rows.map(o => {
       const profile = profileMap[o.customer_id] ?? {}
-      const items = (o.order_items ?? []) as { name: string; price: number; qty: number }[]
+      const items = itemsByOrder[o.id] ?? []
       const itemStr = items.map(i => `${i.name} x${i.qty}`).join(", ")
       const pm = o.pay_method as PayMethod
       return {
