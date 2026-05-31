@@ -74,16 +74,14 @@ export default function DriverNotificationsPage() {
   async function deleteNotif(id: string) {
     setNotifs(ns => ns.filter(n => n.id !== id))
     setSwipedId(null)
-    await supabase.from("notifications").delete().eq("id", id)
+    await supabase.from("notifications").update({ deleted_at: new Date().toISOString() }).eq("id", id)
   }
 
   async function deleteAll() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
     const ids = (filter === "all" ? notifs : notifs.filter(n => n.type === filter)).map(n => n.id)
     if (!ids.length) return
     setNotifs(ns => filter === "all" ? [] : ns.filter(n => n.type !== filter))
-    await supabase.from("notifications").delete().in("id", ids)
+    await supabase.from("notifications").update({ deleted_at: new Date().toISOString() }).in("id", ids)
   }
 
   const filtered  = filter === "all" ? notifs : notifs.filter(n => n.type === filter)

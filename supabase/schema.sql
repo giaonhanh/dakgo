@@ -440,10 +440,12 @@ CREATE TABLE notifications (
   type       TEXT        NOT NULL DEFAULT 'info',
   is_read    BOOLEAN     NOT NULL DEFAULT false,
   data       JSONB,
+  deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "notif_own_select"  ON notifications FOR SELECT USING (auth.uid() = user_id);
+-- deleted_at IS NULL: ẩn thông báo user đã xoá mà không xoá row thật (admin vẫn thấy)
+CREATE POLICY "notif_own_select"  ON notifications FOR SELECT USING (auth.uid() = user_id AND deleted_at IS NULL);
 CREATE POLICY "notif_own_update"  ON notifications FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "notif_admin_all"   ON notifications FOR ALL
   USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));

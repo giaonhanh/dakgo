@@ -113,14 +113,14 @@ export default function NotificationsPage() {
   const deleteNotif = async (id: string) => {
     setNotifs(prev => prev.filter(n => n.id !== id))
     setSwipedId(null)
-    await supabase.from("notifications").delete().eq("id", id)
+    await supabase.from("notifications").update({ deleted_at: new Date().toISOString() }).eq("id", id)
   }
 
   const deleteAll = async () => {
     const ids = (activeTab === "all" ? notifs : notifs.filter(n => n.type === activeTab)).map(n => n.id)
     if (!ids.length) return
     setNotifs(prev => activeTab === "all" ? [] : prev.filter(n => n.type !== activeTab))
-    await supabase.from("notifications").delete().in("id", ids)
+    await supabase.from("notifications").update({ deleted_at: new Date().toISOString() }).in("id", ids)
   }
 
   return (

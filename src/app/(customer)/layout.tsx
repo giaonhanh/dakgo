@@ -115,6 +115,21 @@ function GpsPermissionModal({ onAllow, onDeny }: { onAllow: () => void; onDeny: 
   )
 }
 
+// ── Sound Player: nghe message từ Service Worker và phát âm thanh ──────────
+function SoundPlayer() {
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type !== 'PLAY_ORDER_SOUND' || !e.data.sound) return
+      const audio = new Audio(`/sounds/${e.data.sound}.mp3`)
+      audio.play().catch(() => {})
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [])
+  return null
+}
+
 // ── GPS Manager: permission prompt + periodic refresh ──────────────────────
 function GpsManager() {
   const { ready, denied, promptShown, lastUpdated, setLocation, setDenied, setPromptShown } =
@@ -243,6 +258,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
   return (
     <MaintenanceGate>
       <GpsManager />
+      <SoundPlayer />
       <PushPermissionPrompt />
       <AdminPreviewBar />
       {children}

@@ -912,7 +912,21 @@ CREATE TRIGGER trg_award_loyalty_points
 
 
 -- ════════════════════════════════════════════════
--- 27. NOTIFICATION SCHEDULES (bảng hẹn giờ thông báo)
+-- 27. SOFT DELETE CHO NOTIFICATIONS
+--     User xoá thông báo → đánh dấu deleted_at, KHÔNG xoá row
+--     Admin vẫn thấy toàn bộ lịch sử thông báo
+-- ════════════════════════════════════════════════
+
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+-- Cập nhật policy SELECT: ẩn thông báo đã xoá với user, admin vẫn thấy qua notif_admin_all
+DROP POLICY IF EXISTS "notif_own_select" ON notifications;
+CREATE POLICY "notif_own_select" ON notifications
+  FOR SELECT USING (auth.uid() = user_id AND deleted_at IS NULL);
+
+
+-- ════════════════════════════════════════════════
+-- 28. NOTIFICATION SCHEDULES (bảng hẹn giờ thông báo)
 -- ════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS notification_schedules (
