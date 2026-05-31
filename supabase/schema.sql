@@ -126,6 +126,10 @@ CREATE TABLE shops (
   opening_hours     JSONB,
   prep_time         TEXT,
 
+  -- Hoa hồng
+  commission_rate          NUMERIC(5,2) NOT NULL DEFAULT 15,
+  is_negotiated_commission BOOLEAN      NOT NULL DEFAULT false,
+
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );

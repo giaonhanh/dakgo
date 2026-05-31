@@ -267,10 +267,11 @@ export default function AdminUsersPage() {
     if (merchantsLoaded) return
     setMerchantsLoading(true)
     const supabase = createClient()
-    const { data: rows } = await supabase
+    const { data: rows, error: shopErr } = await supabase
       .from("shops")
       .select("id, owner_id, name, category, status, is_open, rating_avg, total_reviews, commission_rate, is_negotiated_commission, created_at")
       .order("created_at", { ascending: false })
+    if (shopErr) console.error("[loadMerchants] shops query error:", shopErr)
     if (!rows || rows.length === 0) { setMerchantsLoading(false); setMerchantsLoaded(true); return }
     const ownerIds = [...new Set(rows.map(r => r.owner_id).filter(Boolean))]
     const { data: profiles } = await supabase.from("profiles").select("id, full_name, phone").in("id", ownerIds)

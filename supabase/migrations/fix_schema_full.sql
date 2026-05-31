@@ -11,16 +11,18 @@
 -- ════════════════════════════════════════════════
 
 ALTER TABLE shops
-  ADD COLUMN IF NOT EXISTS logo_url         TEXT,
-  ADD COLUMN IF NOT EXISTS cover_image_url  TEXT,
-  ADD COLUMN IF NOT EXISTS rating_avg       NUMERIC(3,2) DEFAULT 5.0,
-  ADD COLUMN IF NOT EXISTS total_reviews    INT          DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS menu_groups_data JSONB,
-  ADD COLUMN IF NOT EXISTS opening_hours    JSONB,
-  ADD COLUMN IF NOT EXISTS prep_time        TEXT,
-  ADD COLUMN IF NOT EXISTS category         TEXT,
-  ADD COLUMN IF NOT EXISTS status           TEXT         DEFAULT 'approved',
-  ADD COLUMN IF NOT EXISTS updated_at       TIMESTAMPTZ  DEFAULT now();
+  ADD COLUMN IF NOT EXISTS logo_url                  TEXT,
+  ADD COLUMN IF NOT EXISTS cover_image_url           TEXT,
+  ADD COLUMN IF NOT EXISTS rating_avg                NUMERIC(3,2) DEFAULT 5.0,
+  ADD COLUMN IF NOT EXISTS total_reviews             INT          DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS menu_groups_data          JSONB,
+  ADD COLUMN IF NOT EXISTS opening_hours             JSONB,
+  ADD COLUMN IF NOT EXISTS prep_time                 TEXT,
+  ADD COLUMN IF NOT EXISTS category                  TEXT,
+  ADD COLUMN IF NOT EXISTS status                    TEXT         DEFAULT 'approved',
+  ADD COLUMN IF NOT EXISTS commission_rate           NUMERIC(5,2) DEFAULT 15,
+  ADD COLUMN IF NOT EXISTS is_negotiated_commission  BOOLEAN      DEFAULT false,
+  ADD COLUMN IF NOT EXISTS updated_at                TIMESTAMPTZ  DEFAULT now();
 
 UPDATE shops SET rating_avg  = rating       WHERE rating_avg IS NULL AND rating IS NOT NULL;
 UPDATE shops SET total_reviews = rating_count WHERE total_reviews = 0  AND rating_count > 0;
