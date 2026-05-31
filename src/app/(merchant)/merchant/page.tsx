@@ -18,7 +18,8 @@ interface MOrder {
   customerName: string
   customerPhone: string
   items: string
-  itemList: { name: string; qty: number; price: number }[]
+  itemList: { name: string; qty: number; price: number; note?: string }[]
+  shipFee: number
   total: number
   subtotal: number
   discountAmount: number
@@ -121,7 +122,7 @@ export default function MerchantDashboard() {
     // Fetch orders (không join order_items để tránh RLS join issue)
     const { data: rows } = await supabase
       .from("orders")
-      .select("id, status, total_amount, total, pay_method, note, created_at, scheduled_at, customer_id")
+      .select("id, status, total_amount, total, ship_fee, pay_method, note, created_at, scheduled_at, customer_id")
       .eq("shop_id", sid)
       .gte("created_at", today.toISOString())
       .order("created_at", { ascending: false })
@@ -168,9 +169,10 @@ export default function MerchantDashboard() {
         customerName: profile.full_name ?? "Khách hàng",
         customerPhone: profile.phone ?? "",
         items: itemStr || "—",
-        itemList: items.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
+        itemList: items.map(i => ({ name: i.name, qty: i.qty, price: i.price, note: i.note })),
         total: o.total_amount,
         subtotal: o.total ?? o.total_amount,
+        shipFee: o.ship_fee ?? 0,
         discountAmount: 0,
         payMethod: pm === "wallet" ? "wallet" : pm === "vietqr" ? "vietqr" : "cash",
         status: (o.status === "delivered" ? "ready" : o.status === "cancelled" ? "rejected" : o.status) as OrderStatus,
@@ -547,12 +549,6 @@ export default function MerchantDashboard() {
                                 📱 {maskPhone(order.customerPhone)}
                               </div>
                             </div>
-                            {order.customerPhone && (
-                              <a href={`tel:${order.customerPhone}`}
-                                style={{ width: 34, height: 34, borderRadius: 9, textDecoration: "none",
-                                  background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.25)",
-                                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>📞</a>
-                            )}
                           </div>
 
                           {/* ── Chi tiết đơn hàng ── */}
@@ -567,21 +563,28 @@ export default function MerchantDashboard() {
                                 Đang tải món...
                               </div>
                             ) : order.itemList.map((item, i) => (
-                              <div key={i} style={{ display: "flex", justifyContent: "space-between",
-                                alignItems: "center", padding: "8px 12px",
+                              <div key={i} style={{ padding: "8px 12px",
                                 borderBottom: i < order.itemList.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ color: "#f8f0e0", fontSize: 10.5, fontWeight: 600,
-                                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    {item.name}
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ color: "#f8f0e0", fontSize: 10.5, fontWeight: 600 }}>
+                                      {item.name}
+                                    </div>
+                                    <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 1 }}>
+                                      {fmt(item.price)} × {item.qty}
+                                    </div>
                                   </div>
-                                  <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 1 }}>
-                                    {fmt(item.price)} × {item.qty}
+                                  <div style={{ color: "#FF8C00", fontSize: 11, fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>
+                                    {fmt(item.price * item.qty)}
                                   </div>
                                 </div>
-                                <div style={{ color: "#FF8C00", fontSize: 11, fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>
-                                  {fmt(item.price * item.qty)}
-                                </div>
+                                {item.note && (
+                                  <div style={{ marginTop: 4, padding: "3px 7px", borderRadius: 5,
+                                    background: "rgba(245,197,66,0.07)", border: "1px solid rgba(245,197,66,0.15)",
+                                    color: "#f5c542", fontSize: 8.5 }}>
+                                    📝 {item.note}
+                                  </div>
+                                )}
                               </div>
                             ))}
                             {order.note && (
@@ -607,6 +610,9 @@ export default function MerchantDashboard() {
                                 {[
                                   { label: "Tiền hàng",        value: order.subtotal,       color: "#f8f0e0", prefix: "" },
                                   { label: "Hoa hồng app 15%", value: commission,            color: "#ff6060", prefix: "−" },
+                                  ...(order.shipFee > 0
+                                    ? [{ label: "Phụ phí giao hàng", value: order.shipFee,   color: "#b0956a", prefix: "" }]
+                                    : []),
                                   ...(order.discountAmount > 0
                                     ? [{ label: "Voucher giảm giá", value: order.discountAmount, color: "#FFB347", prefix: "−" }]
                                     : []),
