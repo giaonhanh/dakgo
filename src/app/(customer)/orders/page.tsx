@@ -172,10 +172,10 @@ export default function OrdersPage() {
       if (!user) { setLoading(false); return }
       setUserId(user.id)
 
-      const { data: rows } = await supabase
+      const { data: rows, error: ordersErr } = await supabase
         .from("orders")
         .select(`
-          id, status, delivery_address, note, total, ship_fee,
+          id, status, drop_address, note, total, ship_fee,
           pay_method, cancel_reason, created_at, driver_id, shop_id,
           shops(id, name, category),
           order_items(id, product_id, name, price, qty),
@@ -184,6 +184,8 @@ export default function OrdersPage() {
         .eq("customer_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50)
+
+      if (ordersErr) console.error("[Orders] fetch error:", ordersErr.message)
 
       if (!rows) { setLoading(false); return }
 
@@ -245,7 +247,7 @@ export default function OrdersPage() {
           discount:    0,
           createdAt: fmtDate(o.created_at),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          address:   (o as any).delivery_address ?? "",
+          address:   (o as any).drop_address ?? "",
           note: o.note ?? undefined,
           driver: driverRow ? {
             name: driverProfile?.full_name ?? "Tài xế",
