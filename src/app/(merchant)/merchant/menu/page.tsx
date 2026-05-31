@@ -251,7 +251,7 @@ export default function MerchantMenuPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
       const { data: shop } = await supabase
-        .from("shops").select("id, menu_groups_data").eq("owner_id", user.id).single()
+        .from("shops").select("id, menu_groups_data").eq("owner_id", user.id).maybeSingle()
       if (!shop) { setLoading(false); return }
 
       setShopId(shop.id)

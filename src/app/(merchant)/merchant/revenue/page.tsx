@@ -41,7 +41,7 @@ export default function MerchantRevenuePage() {
           .from("shops")
           .select("id,name,commission_rate")
           .eq("owner_id", user.id)
-          .single()
+          .maybeSingle()
         if (!shop) return
 
         setShopName(shop.name ?? "")

@@ -143,7 +143,7 @@ export default function MerchantPromotionsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
       const { data: shop } = await supabase.from("shops")
-        .select("id").eq("owner_id", user.id).single()
+        .select("id").eq("owner_id", user.id).maybeSingle()
       if (!shop) { setLoading(false); return }
       setShopId(shop.id)
       await loadData(shop.id)

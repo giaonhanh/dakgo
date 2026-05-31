@@ -272,7 +272,7 @@ export default function MerchantDashboard() {
           <button onClick={async () => {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
-            const { data: s } = await supabase.from("shops").select("status").eq("owner_id", user.id).single()
+            const { data: s } = await supabase.from("shops").select("status").eq("owner_id", user.id).maybeSingle()
             const st = (s as { status?: string } | null)?.status
             if (st === "approved") setShopStatus("approved")
           }} style={{

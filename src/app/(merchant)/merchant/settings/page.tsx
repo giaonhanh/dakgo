@@ -319,7 +319,7 @@ export default function MerchantSettingsPage() {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-      supabase.from("shops").select("name, address, is_open, rating_avg, commission_rate").eq("owner_id", user.id).single()
+      supabase.from("shops").select("name, address, is_open, rating_avg, commission_rate").eq("owner_id", user.id).maybeSingle()
         .then(({ data }) => {
           if (!data) return
           setShopName(data.name ?? "")
