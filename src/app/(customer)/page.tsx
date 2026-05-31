@@ -31,7 +31,7 @@ type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: numb
 type ProductRow = { id: string; name: string; price: number; sold_count: number; shop_id: string; shops: { name: string } | { name: string }[] | null }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null }
-type LiveOrderRow = { id: string; shops: { name: string } | { name: string }[] | null }
+type LiveOrderRow = { id: string; status: string; shops: { name: string } | { name: string }[] | null }
 type RecoRow = { id: string; name: string; price: number; original_price: number | null; image_url: string | null; sold_count: number; shop_id: string; shop_name: string; order_count: number }
 
 const MEAL_TIMES = [
@@ -163,7 +163,7 @@ export default function HomePage() {
       // Live order (đơn đang giao)
       const { data: live } = await supabase
         .from("orders")
-        .select("id, shops(name)")
+        .select("id, status, shops(name)")
         .eq("customer_id", user.id)
         .in("status", ["accepted","preparing","ready","delivering"])
         .order("created_at", { ascending: false })
@@ -564,7 +564,12 @@ export default function HomePage() {
                       <div style={{ width:6, height:6, borderRadius:"50%",
                         background:"#3ecf6e", boxShadow:"0 0 5px #3ecf6e",
                         animation:"pulse 1.5s infinite" }} />
-                      <span style={{ color:"#3ecf6e", fontSize:9, fontWeight:600 }}>Đơn đang giao</span>
+                      <span style={{ color:"#3ecf6e", fontSize:9, fontWeight:600 }}>
+                        {liveOrder.status === "accepted"   ? "Đã xác nhận · Đang chuẩn bị" :
+                         liveOrder.status === "preparing"  ? "Đang chuẩn bị" :
+                         liveOrder.status === "ready"      ? "Sẵn sàng giao" :
+                         liveOrder.status === "delivering" ? "Đang giao hàng" : "Đang xử lý"}
+                      </span>
                     </div>
                     <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginTop:2 }}>
                       {(liveOrder.shops as {name:string}|null)?.name ?? "Quán đang chuẩn bị"} · #{liveOrder.id.slice(0,8).toUpperCase()}
