@@ -385,7 +385,7 @@ export default function AdminOrdersPage() {
           const fee  = i === 0 ? baseFee : EXTRA_SHOP
           const { data: order, error: oe } = await supabase.from("orders").insert({
             customer_id: eid, shop_id: slot.shopId, status: "pending",
-            delivery_address: delivAddr, delivery_lat: delivLat || PHUOC_AN_LAT, delivery_lng: delivLng || PHUOC_AN_LNG,
+            drop_address: delivAddr,
             total: sub, ship_fee: fee,
             total_amount: sub + fee, pay_method: payment,
             note: ((i > 0 ? `[+quán ${i+1}/${filledSlots.length}] ` : "") + (note || "")) || null,
@@ -615,7 +615,7 @@ export default function AdminOrdersPage() {
                   ["Khách hàng", selected.customerName],
                   ["Cửa hàng",   selected.shopName],
                   ["Tài xế",     selected.driverName ?? "Chưa phân công"],
-                  ["Địa chỉ",    selected.delivery_address],
+                  ["Địa chỉ",    selected.drop_address],
                   ["Số món",     `${selected.itemCount} món`],
                   ["Tổng tiền",  fmt(selected.total_amount)],
                 ].map(([k,v]) => (
