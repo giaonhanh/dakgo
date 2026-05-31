@@ -584,53 +584,72 @@ export default function MerchantDashboard() {
                               </div>
                             ) : order.itemList.map((item, i) => {
                               const { base, size, toppings } = parseItemName(item.name)
+                              const hasOptions = !!(size || toppings.length > 0)
                               return (
                                 <div key={i} style={{ padding: "10px 12px",
                                   borderBottom: i < order.itemList.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
-                                  {/* Số thứ tự + tên + số lượng + giá */}
-                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0 }}>
-                                      <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-                                        background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.3)",
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        color: "#FF8C00", fontSize: 9, fontWeight: 800 }}>{i + 1}</span>
-                                      <span style={{ color: "#f8f0e0", fontSize: 11.5, fontWeight: 700, lineHeight: 1.3 }}>{base}</span>
-                                    </div>
-                                    <div style={{ flexShrink: 0, marginLeft: 8, textAlign: "right" }}>
-                                      <div style={{ color: "#FF8C00", fontSize: 12, fontWeight: 800 }}>{fmt(item.price * item.qty)}</div>
-                                      <div style={{ color: "#6a5a40", fontSize: 8, marginTop: 1 }}>×{item.qty} · {fmt(item.price)}/món</div>
-                                    </div>
+
+                                  {/* Số thứ tự + Tên món */}
+                                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
+                                    <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                                      background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.3)",
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      color: "#FF8C00", fontSize: 9, fontWeight: 800 }}>{i + 1}</span>
+                                    <span style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700 }}>{base}</span>
                                   </div>
 
-                                  {/* Tùy chọn: size + toppings */}
-                                  {(size || toppings.length > 0) && (
-                                    <div style={{ marginLeft: 27, display: "flex", flexDirection: "column", gap: 4 }}>
+                                  {/* Bảng tùy chọn */}
+                                  {hasOptions && (
+                                    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                                      borderRadius: 8, overflow: "hidden", marginBottom: 6 }}>
                                       {size && (
-                                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                          <span style={{ fontSize: 8.5, color: "#6a5a40", minWidth: 40 }}>📐 Size</span>
-                                          <span style={{ padding: "2px 8px", borderRadius: 5, fontSize: 9, fontWeight: 700,
-                                            background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.3)",
-                                            color: "#4a8ff5" }}>{size}</span>
-                                        </div>
-                                      )}
-                                      {toppings.length > 0 && (
-                                        <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
-                                          <span style={{ fontSize: 8.5, color: "#6a5a40", minWidth: 40, paddingTop: 2 }}>🫙 Thêm</span>
-                                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                                            {toppings.map((t, ti) => (
-                                              <span key={ti} style={{ padding: "2px 8px", borderRadius: 5, fontSize: 9, fontWeight: 600,
-                                                background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.25)",
-                                                color: "#3ecf6e" }}>{t}</span>
-                                            ))}
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                          padding: "5px 9px", borderBottom: toppings.length > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                            <span style={{ fontSize: 8.5, color: "#6a5a40" }}>📐 Size</span>
+                                            <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700,
+                                              background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.25)",
+                                              color: "#4a8ff5" }}>{size}</span>
                                           </div>
                                         </div>
                                       )}
+                                      {toppings.map((t, ti) => (
+                                        <div key={ti} style={{ display: "flex", alignItems: "center",
+                                          padding: "5px 9px",
+                                          borderBottom: ti < toppings.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                            <span style={{ fontSize: 8.5, color: "#6a5a40" }}>🫙 Topping</span>
+                                            <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600,
+                                              background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.2)",
+                                              color: "#3ecf6e" }}>{t}</span>
+                                          </div>
+                                        </div>
+                                      ))}
                                     </div>
                                   )}
 
+                                  {/* Thành tiền / Số lượng / Tổng */}
+                                  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                                    borderRadius: 8, overflow: "hidden" }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
+                                      borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                      <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Thành tiền / món</span>
+                                      <span style={{ fontSize: 9.5, color: "#b0956a", fontWeight: 600 }}>{fmt(item.price)}</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
+                                      borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                      <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Số lượng</span>
+                                      <span style={{ fontSize: 11, color: "#f8f0e0", fontWeight: 700 }}>×{item.qty}</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 9px" }}>
+                                      <span style={{ fontSize: 10, color: "#b0956a", fontWeight: 600 }}>Tổng tiền</span>
+                                      <span style={{ fontSize: 12, color: "#FF8C00", fontWeight: 800 }}>{fmt(item.price * item.qty)}</span>
+                                    </div>
+                                  </div>
+
                                   {/* Ghi chú của item */}
                                   {item.note && (
-                                    <div style={{ marginTop: 6, marginLeft: 27, padding: "4px 9px", borderRadius: 6,
+                                    <div style={{ marginTop: 6, padding: "5px 9px", borderRadius: 7,
                                       background: "rgba(245,197,66,0.08)", border: "1px solid rgba(245,197,66,0.2)",
                                       color: "#f5c542", fontSize: 9, display: "flex", gap: 5, alignItems: "flex-start" }}>
                                       <span style={{ flexShrink: 0, fontWeight: 700 }}>📝 Ghi chú:</span>
