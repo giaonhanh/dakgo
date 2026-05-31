@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import PushPermissionPrompt from "@/components/PushPermissionPrompt"
 
 interface ActiveOrder { id: string; status: string }
 
@@ -79,6 +80,7 @@ export default function DriverLayout({ children }: { children: React.ReactNode }
     <>
       {children}
       <ActiveOrderCard />
+      <PushPermissionPrompt />
     </>
   )
 }
