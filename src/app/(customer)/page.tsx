@@ -133,7 +133,8 @@ export default function HomePage() {
   // ─── Real data state ───────────────────────────────────────
   const [userName,      setUserName]      = useState("bạn")
   const [notifCount,    setNotifCount]    = useState(0)
-  const [liveOrder,     setLiveOrder]     = useState<LiveOrderRow | null>(null)
+  const [liveOrders,    setLiveOrders]    = useState<LiveOrderRow[]>([])
+  const [liveIdx,       setLiveIdx]       = useState(0)
   const [vouchers,      setVouchers]      = useState<VoucherRow[]>([])
   const [nearbyShops,   setNearbyShops]   = useState<ShopRow[]>([])
   const [bestSellers,   setBestSellers]   = useState<ProductRow[]>([])
@@ -160,16 +161,15 @@ export default function HomePage() {
         .eq("user_id", user.id).eq("is_read", false)
       setNotifCount(count ?? 0)
 
-      // Live order (đơn đang xử lý / giao)
-      const { data: live } = await supabase
+      // Live orders (tất cả đơn đang xử lý / giao)
+      const { data: liveData } = await supabase
         .from("orders")
         .select("id, status, shops(name)")
         .eq("customer_id", user.id)
         .in("status", ["pending","accepted","preparing","ready","delivering"])
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      setLiveOrder(live as LiveOrderRow | null)
+        .limit(10)
+      setLiveOrders((liveData ?? []) as LiveOrderRow[])
 
       // Vouchers
       const { data: voucherData } = await supabase
@@ -323,6 +323,13 @@ export default function HomePage() {
     const t = setInterval(update, 1000)
     return () => clearInterval(t)
   }, [vouchers, bannerIdx])
+
+  // Live orders carousel auto-cycle
+  useEffect(() => {
+    if (liveOrders.length <= 1) return
+    const t = setInterval(() => setLiveIdx(i => (i + 1) % liveOrders.length), 3000)
+    return () => clearInterval(t)
+  }, [liveOrders])
 
   // Particle effect
   const spawnParticle = (btnEl: HTMLElement) => {
@@ -540,53 +547,115 @@ export default function HomePage() {
           </div>
 
           {/* ──────────────────────────────────────
-              S3 — LiveStatusBanner (điều kiện)
+              S3 — LiveStatusBanner (carousel đa đơn)
           ────────────────────────────────────── */}
           <AnimatePresence>
-            {liveOrder && (
-              <motion.a key="live-banner" href={`/tracking/${liveOrder.id}`}
+            {liveOrders.length > 0 && (
+              <motion.div key="live-banner-wrap"
                 initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }}
-                exit={{ opacity:0, y:-8 }} style={{ textDecoration:"none" }}>
-                <div style={{
-                  margin:"0 16px 12px",
-                  background:"linear-gradient(135deg,#0f1a08,#152010)",
-                  border:"1px solid rgba(62,207,110,0.25)",
-                  borderRadius:14, padding:"10px 13px",
-                  display:"flex", alignItems:"center", gap:10,
-                  position:"relative", overflow:"hidden",
-                }}>
-                  <div style={{ position:"absolute", right:-10, top:-10,
-                    width:70, height:70,
-                    background:"radial-gradient(circle,rgba(62,207,110,0.2) 0%,transparent 65%)" }} />
-                  <span style={{ fontSize:20, position:"relative", zIndex:1 }}>🛵</span>
-                  <div style={{ flex:1, position:"relative", zIndex:1 }}>
+                exit={{ opacity:0, y:-8 }}
+                style={{ margin:"0 16px 12px" }}>
+
+                {/* Header row nếu có nhiều đơn */}
+                {liveOrders.length > 1 && (
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                    marginBottom:6 }}>
                     <div style={{ display:"flex", alignItems:"center", gap:5 }}>
                       <div style={{ width:6, height:6, borderRadius:"50%",
                         background:"#3ecf6e", boxShadow:"0 0 5px #3ecf6e",
                         animation:"pulse 1.5s infinite" }} />
                       <span style={{ color:"#3ecf6e", fontSize:9, fontWeight:600 }}>
-                        {liveOrder.status === "pending"    ? "Chờ quán xác nhận" :
-                         (liveOrder.status === "accepted" || liveOrder.status === "preparing") ? "Đã xác nhận · Đang làm" :
-                         liveOrder.status === "ready"      ? "Đang tìm tài xế" :
-                         liveOrder.status === "delivering" ? "Đang giao hàng" : "Đang xử lý"}
+                        {liveOrders.length} đơn đang xử lý
                       </span>
                     </div>
-                    <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginTop:2 }}>
-                      {(liveOrder.shops as {name:string}|null)?.name ?? "Quán đang chuẩn bị"} · #{liveOrder.id.slice(0,8).toUpperCase()}
-                    </div>
-                    <div style={{ color:"rgba(255,255,255,0.4)", fontSize:8.5, marginTop:1 }}>
-                      Đơn hàng đang được xử lý
+                    {/* Dots */}
+                    <div style={{ display:"flex", gap:4 }}>
+                      {liveOrders.map((_,i) => (
+                        <div key={i} onClick={() => setLiveIdx(i)}
+                          style={{
+                            width: liveIdx===i ? 16 : 5, height:5, borderRadius:3, cursor:"pointer",
+                            background: liveIdx===i ? "#3ecf6e" : "rgba(62,207,110,0.2)",
+                            transition:"all .3s",
+                            boxShadow: liveIdx===i ? "0 0 4px #3ecf6e" : "none",
+                          }} />
+                      ))}
                     </div>
                   </div>
+                )}
+
+                {/* Carousel track */}
+                <div style={{ overflow:"hidden", borderRadius:14 }}>
                   <div style={{
-                    background:"rgba(62,207,110,0.12)",
-                    border:"1px solid rgba(62,207,110,0.25)",
-                    borderRadius:8, padding:"4px 9px",
-                    color:"#3ecf6e", fontSize:9, fontWeight:600,
-                    position:"relative", zIndex:1, flexShrink:0,
-                  }}>Theo dõi →</div>
+                    display:"flex",
+                    transform:`translateX(${-liveIdx * 100}%)`,
+                    transition:"transform 0.4s cubic-bezier(0.4,0,0.2,1)",
+                    willChange:"transform",
+                  }}>
+                    {liveOrders.map(order => {
+                      const shopName = (order.shops as {name:string}|null)?.name ?? "Quán đang chuẩn bị"
+                      const statusLabel =
+                        order.status === "pending"    ? "Chờ quán xác nhận" :
+                        order.status === "accepted" || order.status === "preparing" ? "Đã xác nhận · Đang làm" :
+                        order.status === "ready"      ? "Đang tìm tài xế" :
+                        order.status === "delivering" ? "Đang giao hàng" : "Đang xử lý"
+                      const statusColor =
+                        order.status === "delivering" ? "#FF8C00" :
+                        order.status === "ready"      ? "#FFB347" : "#3ecf6e"
+                      const statusBg =
+                        order.status === "delivering" ? "linear-gradient(135deg,#1a0d00,#2d1a00)" :
+                        order.status === "ready"      ? "linear-gradient(135deg,#1a1000,#2d2000)" :
+                        "linear-gradient(135deg,#0f1a08,#152010)"
+                      const statusBorder =
+                        order.status === "delivering" ? "rgba(255,140,0,0.3)" :
+                        order.status === "ready"      ? "rgba(255,179,71,0.3)" :
+                        "rgba(62,207,110,0.25)"
+                      return (
+                        <a key={order.id} href={`/tracking/${order.id}`}
+                          style={{ textDecoration:"none", width:"100%", flexShrink:0 }}>
+                          <div style={{
+                            background: statusBg,
+                            border:`1px solid ${statusBorder}`,
+                            borderRadius:14, padding:"10px 13px",
+                            display:"flex", alignItems:"center", gap:10,
+                            position:"relative", overflow:"hidden",
+                          }}>
+                            <div style={{ position:"absolute", right:-10, top:-10, width:70, height:70,
+                              background:`radial-gradient(circle,${statusColor}33 0%,transparent 65%)` }} />
+                            <span style={{ fontSize:20, position:"relative", zIndex:1 }}>
+                              {order.status === "delivering" ? "🛵" :
+                               order.status === "ready"      ? "🔍" :
+                               order.status === "pending"    ? "⏳" : "👨‍🍳"}
+                            </span>
+                            <div style={{ flex:1, position:"relative", zIndex:1 }}>
+                              <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                                <div style={{ width:6, height:6, borderRadius:"50%",
+                                  background:statusColor, boxShadow:`0 0 5px ${statusColor}`,
+                                  animation:"pulse 1.5s infinite" }} />
+                                <span style={{ color:statusColor, fontSize:9, fontWeight:600 }}>
+                                  {statusLabel}
+                                </span>
+                              </div>
+                              <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginTop:2 }}>
+                                {shopName} · #{order.id.slice(0,8).toUpperCase()}
+                              </div>
+                              <div style={{ color:"rgba(255,255,255,0.35)", fontSize:8.5, marginTop:1 }}>
+                                Nhấn để theo dõi đơn hàng
+                              </div>
+                            </div>
+                            <div style={{
+                              background:`${statusColor}1a`,
+                              border:`1px solid ${statusColor}44`,
+                              borderRadius:8, padding:"4px 9px",
+                              color:statusColor, fontSize:9, fontWeight:600,
+                              position:"relative", zIndex:1, flexShrink:0,
+                            }}>Xem →</div>
+                          </div>
+                        </a>
+                      )
+                    })}
+                  </div>
                 </div>
-              </motion.a>
+              </motion.div>
             )}
           </AnimatePresence>
 

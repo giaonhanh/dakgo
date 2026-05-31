@@ -24,7 +24,7 @@ interface Order {
   status: Status; items: Item[]
   subtotal: number; deliveryFee: number; discount: number
   nightFee?: number; weatherFee?: string
-  createdAt: string; address: string; note?: string
+  createdAt: string; createdAtRaw: string; address: string; note?: string
   driver?: { name: string; plate: string; phone: string; rating: number; eta: number }
   payMethod: string; rating?: number; cancelReason?: string
   // Errand-specific
@@ -43,8 +43,7 @@ const TABS = [
 ]
 
 const CANCEL_REASONS = [
-  "Đặt nhầm món", "Thay đổi ý định",
-  "Tài xế đến lâu quá", "Cửa hàng không phản hồi", "Khác...",
+  "Đặt nhầm món", "Nhầm địa chỉ", "Nhầm phương thức thanh toán", "Khác",
 ]
 
 const STATUS_CFG: Record<Status, { label: string; c: string; bg: string; bd: string; dot: boolean }> = {
@@ -162,6 +161,8 @@ export default function OrdersPage() {
   const [reviewTxt,    setReviewTxt]    = useState("")
   const [toast,        setToast]        = useState("")
   const [userId,       setUserId]       = useState<string | null>(null)
+  const [cancelLocked, setCancelLocked] = useState(false)
+  const [cancelSecsLeft, setCancelSecsLeft] = useState(0)
 
   const fireToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2400) }
 
@@ -171,6 +172,11 @@ export default function OrdersPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
       setUserId(user.id)
+
+      // Kiểm tra cancel_locked
+      const { data: prof } = await supabase
+        .from("profiles").select("cancel_locked").eq("id", user.id).single()
+      if (prof?.cancel_locked) setCancelLocked(true)
 
       const { data: rows, error: ordersErr } = await supabase
         .from("orders")
@@ -255,6 +261,7 @@ export default function OrdersPage() {
           deliveryFee: (o as any).ship_fee ?? 0,
           discount:    0,
           createdAt: fmtDate(o.created_at),
+          createdAtRaw: o.created_at,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           address:   (o as any).drop_address ?? "",
           note: o.note ?? undefined,
@@ -301,6 +308,7 @@ export default function OrdersPage() {
         deliveryFee: 0,
         discount:    0,
         createdAt:   fmtDate(e.created_at),
+        createdAtRaw: e.created_at,
         address:     e.delivery_address ?? "",
         pickupAddress: e.pickup_address ?? undefined,
         note:          e.note ?? undefined,
@@ -341,6 +349,7 @@ export default function OrdersPage() {
           deliveryFee:  0,
           discount:     0,
           createdAt:    fmtDate(r.created_at),
+          createdAtRaw: r.created_at,
           address:      r.dropoff_address ?? "",
           pickupAddress:r.pickup_address ?? undefined,
           note:         r.note ?? undefined,
@@ -396,21 +405,72 @@ export default function OrdersPage() {
   }, [router])
 
   const cancelOrder    = orders.find(o => o.id === showCancel)
-  const canSelfCancel  = cancelOrder?.status === "pending"
   const willRefundWallet = cancelOrder?.payMethod === "Ví GiaoNhanh"
   const reviewOrder    = orders.find(o => o.id === showReview)
 
+  // 30s countdown khi mở cancel modal
+  useEffect(() => {
+    if (!showCancel || !cancelOrder) return
+    const raw = cancelOrder.createdAtRaw
+    const update = () => {
+      const elapsed = Math.floor((Date.now() - new Date(raw).getTime()) / 1000)
+      setCancelSecsLeft(Math.max(0, 30 - elapsed))
+    }
+    update()
+    const t = setInterval(update, 1000)
+    return () => clearInterval(t)
+  }, [showCancel, cancelOrder])
+
+  const canSelfCancel = cancelOrder?.status === "pending" && cancelSecsLeft > 0
+
   const handleConfirmCancel = async () => {
     if (!cancelRsn || !showCancel || !userId) return
-    await supabase.from("orders").update({
+    if (cancelLocked) {
+      fireToast("Tài khoản bị khóa hủy đơn · Liên hệ quản trị viên!")
+      setShowCancel(null); return
+    }
+    if (cancelSecsLeft <= 0) {
+      fireToast("Đã hết thời gian hủy đơn!")
+      setShowCancel(null); return
+    }
+    const { error } = await supabase.from("orders").update({
       status: "cancelled",
       cancel_reason: cancelRsn,
       cancelled_at: new Date().toISOString(),
-      cancelled_by: userId,
-    }).eq("id", showCancel)
-    setOrders(prev => prev.map(o => o.id === showCancel ? { ...o, status: "cancelled" as Status, cancelReason: cancelRsn } : o))
-    const msg = willRefundWallet ? "Đã hủy đơn · Hoàn tiền về ví GiaoNhanh!" : "Đã hủy đơn hàng!"
-    fireToast(msg)
+    }).eq("id", showCancel).eq("customer_id", userId)
+    if (error) {
+      console.error("[Cancel] update error:", error.message, error.code)
+      fireToast("Không thể hủy đơn, vui lòng thử lại!")
+      return
+    }
+
+    // Ghi cancel_log
+    await supabase.from("cancel_logs").insert({
+      order_id: showCancel, user_id: userId, role: "customer", reason: cancelRsn,
+    })
+
+    // Đếm số lần hủy trong 3 ngày
+    const since3d = new Date(Date.now() - 3 * 86400_000).toISOString()
+    const { count } = await supabase.from("cancel_logs")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId).eq("role", "customer")
+      .gte("cancelled_at", since3d)
+
+    const total = count ?? 0
+    if (total >= 4) {
+      await supabase.from("profiles").update({
+        cancel_locked: true,
+        cancel_locked_at: new Date().toISOString(),
+        cancel_locked_reason: "Hủy đơn quá nhiều lần",
+      }).eq("id", userId)
+      setCancelLocked(true)
+      fireToast("⚠️ Tài khoản bị khóa hủy đơn · Liên hệ admin để mở khóa")
+    } else {
+      setOrders(prev => prev.map(o => o.id === showCancel ? { ...o, status: "cancelled" as Status, cancelReason: cancelRsn } : o))
+      const msg = willRefundWallet ? "Đã hủy đơn · Hoàn tiền về ví GiaoNhanh!" : "Đã hủy đơn hàng!"
+      if (total === 3) fireToast(`${msg} · ⚠️ Đây là lần hủy thứ 3, lần tiếp theo sẽ khóa tài khoản!`)
+      else fireToast(msg)
+    }
     setShowCancel(null)
     setCancelRsn("")
   }
@@ -493,10 +553,28 @@ export default function OrdersPage() {
                 borderRadius: "20px 20px 0 0", padding: "20px 18px 36px" }}>
               <div style={{ width: 36, height: 4, background: "rgba(255,255,255,0.12)", borderRadius: 2, margin: "0 auto 18px" }} />
 
-              {canSelfCancel ? (
+              {cancelLocked ? (
                 <>
-                  <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
-                    Hủy đơn #{showCancel?.slice(0,8).toUpperCase()}
+                  <div style={{ color: "#ff4040", fontSize: 14, fontWeight: 700, marginBottom: 12 }}>🔒 Tài khoản bị khóa hủy đơn</div>
+                  <div style={{ background: "rgba(255,64,64,0.07)", border: "1px solid rgba(255,64,64,0.2)", borderRadius: 11, padding: "12px 13px", marginBottom: 16 }}>
+                    <div style={{ color: "#ff6060", fontSize: 10, lineHeight: 1.6 }}>
+                      Bạn đã hủy đơn quá nhiều lần. Vui lòng liên hệ quản trị viên để mở khóa tài khoản.
+                    </div>
+                  </div>
+                  <button onClick={() => { setShowCancel(null); setCancelRsn("") }}
+                    style={{ width: "100%", height: 44, borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "#6a5a40", fontSize: 11, fontFamily: "Lexend", cursor: "pointer" }}>
+                    Đóng
+                  </button>
+                </>
+              ) : canSelfCancel ? (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700 }}>
+                      Hủy đơn #{showCancel?.slice(0,8).toUpperCase()}
+                    </div>
+                    <div style={{ background: cancelSecsLeft <= 10 ? "rgba(255,64,64,0.15)" : "rgba(255,179,71,0.12)", border: `1px solid ${cancelSecsLeft <= 10 ? "rgba(255,64,64,0.3)" : "rgba(255,179,71,0.3)"}`, borderRadius: 8, padding: "3px 9px", color: cancelSecsLeft <= 10 ? "#ff4040" : "#FFB347", fontSize: 11, fontWeight: 700 }}>
+                      ⏱ {cancelSecsLeft}s
+                    </div>
                   </div>
                   <div style={{ background: willRefundWallet ? "rgba(62,207,110,0.07)" : "rgba(255,255,255,0.03)",
                     border: `1px solid ${willRefundWallet ? "rgba(62,207,110,0.2)" : "rgba(255,255,255,0.06)"}`,
@@ -544,10 +622,14 @@ export default function OrdersPage() {
                   <div style={{ background: "rgba(255,64,64,0.07)", border: "1px solid rgba(255,64,64,0.2)",
                     borderRadius: 11, padding: "12px 13px", marginBottom: 16 }}>
                     <div style={{ color: "#ff6060", fontSize: 11, fontWeight: 600, marginBottom: 4 }}>
-                      ⚠️ Quán đã xác nhận đơn #{showCancel?.slice(0,8).toUpperCase()}
+                      {cancelOrder?.status === "pending"
+                        ? "⏰ Đã quá 30 giây kể từ khi đặt đơn"
+                        : `⚠️ Quán đã xác nhận đơn #${showCancel?.slice(0,8).toUpperCase()}`}
                     </div>
                     <div style={{ color: "#6a5a40", fontSize: 9.5, lineHeight: 1.6 }}>
-                      Sau khi quán xác nhận, chỉ quản trị viên mới có quyền hủy đơn.
+                      {cancelOrder?.status === "pending"
+                        ? "Chỉ được hủy trong 30 giây đầu tiên. Liên hệ admin nếu cần hỗ trợ."
+                        : "Sau khi quán xác nhận, chỉ quản trị viên mới có quyền hủy đơn."}
                     </div>
                   </div>
                   <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",

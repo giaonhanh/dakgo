@@ -1,5 +1,12 @@
 ﻿import { create } from "zustand";
 
+export interface CartItemBreakdown {
+  basePrice: number;
+  sizeLabel?: string;
+  sizeDiff?: number;
+  toppings?: { name: string; price: number }[];
+}
+
 export interface CartItem {
   id: string;
   name: string;
@@ -9,6 +16,7 @@ export interface CartItem {
   shopId: string;
   imageUrl?: string;
   note?: string;
+  breakdown?: CartItemBreakdown;
 }
 
 interface CartStore {

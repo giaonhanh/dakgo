@@ -47,6 +47,17 @@ function maskPhone(phone: string): string {
   return "****" + digits.slice(-4)
 }
 
+function parseItemName(fullName: string) {
+  const match = fullName.match(/^(.+?)\s*\((.+)\)$/)
+  if (!match) return { base: fullName, size: null, toppings: [] as string[] }
+  const base = match[1].trim()
+  const parts = match[2].split(/\s*·\s*/).map(s => s.trim()).filter(Boolean)
+  const sizeIdx = parts.findIndex(p => /^size/i.test(p))
+  const size = sizeIdx >= 0 ? parts[sizeIdx] : null
+  const toppings = parts.filter((_, i) => i !== sizeIdx)
+  return { base, size, toppings }
+}
+
 function fmtTime(iso: string): string {
   const d = new Date(iso)
   return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`
@@ -133,16 +144,25 @@ export default function MerchantDashboard() {
     const orderIds = rows.map(o => o.id)
 
     // Fetch order_items riêng (tránh nested join RLS)
-    const { data: allItems, error: itemsErr } = await supabase
+    let { data: allItems, error: itemsErr } = await supabase
       .from("order_items")
       .select("order_id, name, price, qty, note")
       .in("order_id", orderIds)
-    if (itemsErr) console.error("[Merchant] order_items fetch error:", itemsErr.message, itemsErr.code)
+    if (itemsErr) {
+      console.error("[Merchant] order_items error:", itemsErr.message, itemsErr.code, itemsErr.details)
+      // Thử lại không có cột note (phòng khi schema cache lỗi)
+      const { data: fallback } = await supabase
+        .from("order_items")
+        .select("order_id, name, price, qty")
+        .in("order_id", orderIds)
+      allItems = fallback as typeof allItems
+      itemsErr = null
+    }
 
     const itemsByOrder: Record<string, { name: string; price: number; qty: number; note?: string }[]> = {}
     ;(allItems ?? []).forEach(item => {
       if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = []
-      itemsByOrder[item.order_id].push({ name: item.name, price: item.price, qty: item.qty, note: item.note ?? undefined })
+      itemsByOrder[item.order_id].push({ name: item.name, price: item.price, qty: item.qty, note: (item as {note?:string}).note ?? undefined })
     })
 
     // Get customer profiles
@@ -560,33 +580,66 @@ export default function MerchantDashboard() {
                             borderRadius: 10, overflow: "hidden", marginBottom: 12 }}>
                             {order.itemList.length === 0 ? (
                               <div style={{ padding: "10px 12px", color: "#6a5a40", fontSize: 10, textAlign: "center" }}>
-                                Đang tải món...
+                                Không có thông tin món
                               </div>
-                            ) : order.itemList.map((item, i) => (
-                              <div key={i} style={{ padding: "8px 12px",
-                                borderBottom: i < order.itemList.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ color: "#f8f0e0", fontSize: 10.5, fontWeight: 600 }}>
-                                      {item.name}
+                            ) : order.itemList.map((item, i) => {
+                              const { base, size, toppings } = parseItemName(item.name)
+                              return (
+                                <div key={i} style={{ padding: "10px 12px",
+                                  borderBottom: i < order.itemList.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+                                  {/* Số thứ tự + tên + số lượng + giá */}
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0 }}>
+                                      <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                                        background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.3)",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        color: "#FF8C00", fontSize: 9, fontWeight: 800 }}>{i + 1}</span>
+                                      <span style={{ color: "#f8f0e0", fontSize: 11.5, fontWeight: 700, lineHeight: 1.3 }}>{base}</span>
                                     </div>
-                                    <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 1 }}>
-                                      {fmt(item.price)} × {item.qty}
+                                    <div style={{ flexShrink: 0, marginLeft: 8, textAlign: "right" }}>
+                                      <div style={{ color: "#FF8C00", fontSize: 12, fontWeight: 800 }}>{fmt(item.price * item.qty)}</div>
+                                      <div style={{ color: "#6a5a40", fontSize: 8, marginTop: 1 }}>×{item.qty} · {fmt(item.price)}/món</div>
                                     </div>
                                   </div>
-                                  <div style={{ color: "#FF8C00", fontSize: 11, fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>
-                                    {fmt(item.price * item.qty)}
-                                  </div>
+
+                                  {/* Tùy chọn: size + toppings */}
+                                  {(size || toppings.length > 0) && (
+                                    <div style={{ marginLeft: 27, display: "flex", flexDirection: "column", gap: 4 }}>
+                                      {size && (
+                                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                          <span style={{ fontSize: 8.5, color: "#6a5a40", minWidth: 40 }}>📐 Size</span>
+                                          <span style={{ padding: "2px 8px", borderRadius: 5, fontSize: 9, fontWeight: 700,
+                                            background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.3)",
+                                            color: "#4a8ff5" }}>{size}</span>
+                                        </div>
+                                      )}
+                                      {toppings.length > 0 && (
+                                        <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+                                          <span style={{ fontSize: 8.5, color: "#6a5a40", minWidth: 40, paddingTop: 2 }}>🫙 Thêm</span>
+                                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                            {toppings.map((t, ti) => (
+                                              <span key={ti} style={{ padding: "2px 8px", borderRadius: 5, fontSize: 9, fontWeight: 600,
+                                                background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.25)",
+                                                color: "#3ecf6e" }}>{t}</span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Ghi chú của item */}
+                                  {item.note && (
+                                    <div style={{ marginTop: 6, marginLeft: 27, padding: "4px 9px", borderRadius: 6,
+                                      background: "rgba(245,197,66,0.08)", border: "1px solid rgba(245,197,66,0.2)",
+                                      color: "#f5c542", fontSize: 9, display: "flex", gap: 5, alignItems: "flex-start" }}>
+                                      <span style={{ flexShrink: 0, fontWeight: 700 }}>📝 Ghi chú:</span>
+                                      <span>{item.note}</span>
+                                    </div>
+                                  )}
                                 </div>
-                                {item.note && (
-                                  <div style={{ marginTop: 4, padding: "3px 7px", borderRadius: 5,
-                                    background: "rgba(245,197,66,0.07)", border: "1px solid rgba(245,197,66,0.15)",
-                                    color: "#f5c542", fontSize: 8.5 }}>
-                                    📝 {item.note}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                              )
+                            })}
                             {order.note && (
                               <div style={{ padding: "7px 12px", borderTop: "1px solid rgba(255,255,255,0.04)",
                                 background: "rgba(245,197,66,0.04)", display: "flex", gap: 6, alignItems: "flex-start" }}>

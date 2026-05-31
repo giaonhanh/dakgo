@@ -623,6 +623,15 @@ export default function ShopPage() {
       id: itemId, name: itemName, price: unitPrice,
       shop: shop?.name ?? "", shopId, imageUrl: optSheet.imageUrl ?? undefined,
       note: optNote.trim() || undefined,
+      breakdown: {
+        basePrice: optSheet.price,
+        sizeLabel: sizeLabel || undefined,
+        sizeDiff: sizeDiff > 0 ? sizeDiff : undefined,
+        toppings: selTops.map(tid => {
+          const t = optSheet.toppings.find(t => t.id === tid)
+          return { name: t?.name ?? "", price: t?.price ?? 0 }
+        }).filter(t => t.name),
+      },
     }
     if (storeShopId && storeShopId !== shopId) {
       setConflictItem(newItem)

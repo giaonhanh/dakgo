@@ -76,6 +76,9 @@ export default function TrackingPage() {
   const [loading,       setLoading]       = useState(true)
   const [showCancel,    setShowCancel]    = useState(false)
   const [showContact,   setShowContact]   = useState(false)
+  const [cancelLocked,  setCancelLocked]  = useState(false)
+  const [orderCreatedAt, setOrderCreatedAt] = useState<string | null>(null)
+  const [cancelSecsLeft, setCancelSecsLeft] = useState(0)
   const [showChat,      setShowChat]      = useState(false)
   const [currentUserId, setCurrentUserId] = useState("")
   const [toast,         setToast]         = useState("")
@@ -96,7 +99,7 @@ export default function TrackingPage() {
       const { data: order } = await supabase
         .from("orders")
         .select(`
-          id, status, delivery_address, delivery_lat, delivery_lng,
+          id, status, created_at, delivery_address, delivery_lat, delivery_lng,
           total_amount, pay_method, driver_id,
           shops(name, category),
           order_items(name, qty)
@@ -105,6 +108,11 @@ export default function TrackingPage() {
         .single()
 
       if (!order) { setLoading(false); return }
+      setOrderCreatedAt(order.created_at)
+
+      // Kiểm tra cancel_locked
+      const { data: prof } = await supabase.from("profiles").select("cancel_locked").eq("id", user.id).maybeSingle()
+      if (prof?.cancel_locked) setCancelLocked(true)
 
       const shop = Array.isArray(order.shops) ? order.shops[0] : order.shops
       const items = (order.order_items ?? []) as { name: string; qty: number }[]
@@ -203,20 +211,46 @@ export default function TrackingPage() {
   const { min, sec } = useCountdown(orderData?.etaMin ?? 20)
   const currentIdx   = STATUS_ORDER.indexOf(status)
   const isDelivered  = status === "delivered"
-  const canSelfCancel   = status === "accepted"
+
+  // 30s countdown
+  useEffect(() => {
+    if (!orderCreatedAt) return
+    const update = () => {
+      const elapsed = Math.floor((Date.now() - new Date(orderCreatedAt).getTime()) / 1000)
+      setCancelSecsLeft(Math.max(0, 30 - elapsed))
+    }
+    update()
+    const t = setInterval(update, 1000)
+    return () => clearInterval(t)
+  }, [orderCreatedAt])
+
+  const canSelfCancel   = status === "pending" && cancelSecsLeft > 0 && !cancelLocked
   const needAdminCancel = !isDelivered && !canSelfCancel
 
   const handleCancel = async () => {
     if (!orderId || !currentUserId) return
+    if (cancelLocked) { fireToast("Tài khoản bị khóa hủy đơn · Liên hệ admin!"); return }
+    if (cancelSecsLeft <= 0) { fireToast("Đã hết 30 giây cho phép hủy!"); return }
     const { error } = await supabase.from("orders").update({
       status: "cancelled",
       cancel_reason: "Khách hàng hủy",
       cancelled_at: new Date().toISOString(),
-      cancelled_by: currentUserId,
     }).eq("id", orderId)
     if (error) { fireToast("Không thể hủy đơn. Thử lại sau."); return }
-    setStatus("delivered") // visually close the tracking
-    fireToast("Đã hủy đơn hàng")
+
+    await supabase.from("cancel_logs").insert({ order_id: orderId, user_id: currentUserId, role: "customer", reason: "Khách hàng hủy" })
+
+    const since3d = new Date(Date.now() - 3 * 86400_000).toISOString()
+    const { count } = await supabase.from("cancel_logs").select("*", { count: "exact", head: true })
+      .eq("user_id", currentUserId).eq("role", "customer").gte("cancelled_at", since3d)
+    const total = count ?? 0
+    if (total >= 4) {
+      await supabase.from("profiles").update({ cancel_locked: true, cancel_locked_at: new Date().toISOString(), cancel_locked_reason: "Hủy đơn quá nhiều lần" }).eq("id", currentUserId)
+      setCancelLocked(true)
+    }
+
+    setStatus("delivered")
+    fireToast(total >= 4 ? "⚠️ Tài khoản bị khóa hủy đơn · Liên hệ admin" : "Đã hủy đơn hàng")
     setShowCancel(false)
     setTimeout(() => { window.location.href = "/orders" }, 1200)
   }

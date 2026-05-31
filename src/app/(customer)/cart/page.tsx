@@ -178,57 +178,108 @@ export default function CartPage() {
                         </div>
 
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ margin: "0 0 2px", fontSize: 13, fontWeight: 600, color: "#f8f0e0", lineHeight: 1.3 }}>
-                            {item.name}
+                          {/* Tên món */}
+                          <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 700, color: "#f8f0e0", lineHeight: 1.3 }}>
+                            {item.breakdown ? item.name.replace(/\s*\(.*\)$/, "") : item.name}
                           </p>
-                          <p style={{ margin: "0 0 6px", fontSize: 10.5, color: "#6a5a40" }}>
-                            {item.shop}
-                          </p>
-                          <span style={{
-                            fontSize: 13, fontWeight: 700,
-                            background: "linear-gradient(90deg,#FF6B00,#FFB347)",
-                            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                            backgroundClip: "text",
-                          } as React.CSSProperties}>
-                            {formatPrice(item.price * item.qty)}
-                          </span>
-                          {item.qty > 1 && (
-                            <span style={{ fontSize: 9, color: "#6a5a40", marginLeft: 5 }}>
-                              ({formatPrice(item.price)}/phần)
-                            </span>
-                          )}
-                        </div>
 
-                        {/* Qty controls */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                          <button
-                            type="button"
-                            onClick={() => updateQty(item.id, item.qty - 1)}
-                            style={{
-                              width: 36, height: 36, borderRadius: 9, border: "none",
-                              background: item.qty === 1 ? "rgba(255,64,64,0.12)" : "rgba(255,255,255,0.07)",
-                              color: item.qty === 1 ? "#ff6060" : "#f8f0e0",
-                              fontSize: item.qty === 1 ? 13 : 16, cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              fontFamily: "'Lexend', sans-serif",
-                            }}
-                          >
-                            {item.qty === 1 ? "🗑" : "−"}
-                          </button>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "#f8f0e0", minWidth: 16, textAlign: "center" }}>
-                            {item.qty}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => updateQty(item.id, item.qty + 1)}
-                            style={{
-                              width: 36, height: 36, borderRadius: 9, border: "none",
-                              background: "rgba(255,107,0,0.15)",
-                              color: "#FF8C00", fontSize: 18, cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              fontFamily: "'Lexend', sans-serif",
-                            }}
-                          >+</button>
+                          {/* Bảng tùy chọn */}
+                          {item.breakdown && (item.breakdown.sizeLabel || (item.breakdown.toppings?.length ?? 0) > 0) && (
+                            <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                              borderRadius: 8, overflow: "hidden", marginBottom: 6 }}>
+                              {/* Giá gốc */}
+                              <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
+                                borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Giá gốc</span>
+                                <span style={{ fontSize: 9.5, color: "#b0956a", fontWeight: 600 }}>
+                                  {formatPrice(item.breakdown.basePrice)}
+                                </span>
+                              </div>
+                              {/* Size */}
+                              {item.breakdown.sizeLabel && (
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                  padding: "5px 9px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                    <span style={{ fontSize: 9, color: "#6a5a40" }}>📐 Size</span>
+                                    <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700,
+                                      background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.25)",
+                                      color: "#4a8ff5" }}>{item.breakdown.sizeLabel}</span>
+                                  </div>
+                                  <span style={{ fontSize: 9.5, color: "#4a8ff5", fontWeight: 600 }}>
+                                    {item.breakdown.sizeDiff ? `+${formatPrice(item.breakdown.sizeDiff)}` : "Miễn phí"}
+                                  </span>
+                                </div>
+                              )}
+                              {/* Topping từng dòng */}
+                              {item.breakdown.toppings?.map((t, ti) => (
+                                <div key={ti} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                  padding: "5px 9px",
+                                  borderBottom: ti < (item.breakdown!.toppings!.length - 1) ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                    <span style={{ fontSize: 9, color: "#6a5a40" }}>🫙 Topping</span>
+                                    <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600,
+                                      background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.2)",
+                                      color: "#3ecf6e" }}>{t.name}</span>
+                                  </div>
+                                  <span style={{ fontSize: 9.5, color: "#3ecf6e", fontWeight: 600 }}>
+                                    {t.price > 0 ? `+${formatPrice(t.price)}` : "Miễn phí"}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Thành tiền / Số lượng / Tổng tiền */}
+                          <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                            {/* Thành tiền/món */}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                              <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Thành tiền / món</span>
+                              <span style={{ fontSize: 11, fontWeight: 600, color: "#b0956a" }}>
+                                {formatPrice(item.price)}
+                              </span>
+                            </div>
+
+                            {/* Số lượng + controls inline */}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                              <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Số lượng</span>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <button type="button" onClick={() => updateQty(item.id, item.qty - 1)}
+                                  style={{ width: 28, height: 28, borderRadius: 7, border: "none",
+                                    background: item.qty === 1 ? "rgba(255,64,64,0.12)" : "rgba(255,255,255,0.07)",
+                                    color: item.qty === 1 ? "#ff6060" : "#f8f0e0",
+                                    fontSize: item.qty === 1 ? 11 : 14, cursor: "pointer",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontFamily: "'Lexend', sans-serif" }}>
+                                  {item.qty === 1 ? "🗑" : "−"}
+                                </button>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: "#f8f0e0", minWidth: 18, textAlign: "center" }}>
+                                  {item.qty}
+                                </span>
+                                <button type="button" onClick={() => updateQty(item.id, item.qty + 1)}
+                                  style={{ width: 28, height: 28, borderRadius: 7, border: "none",
+                                    background: "rgba(255,107,0,0.15)", color: "#FF8C00",
+                                    fontSize: 16, cursor: "pointer",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontFamily: "'Lexend', sans-serif" }}>+</button>
+                              </div>
+                            </div>
+
+                            {/* Tổng tiền */}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                              paddingTop: 5, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                              <span style={{ fontSize: 10, fontWeight: 600, color: "#b0956a" }}>Tổng tiền</span>
+                              <span style={{
+                                fontSize: 14, fontWeight: 800,
+                                background: "linear-gradient(90deg,#FF6B00,#FFB347)",
+                                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                                backgroundClip: "text",
+                              } as React.CSSProperties}>
+                                {formatPrice(item.price * item.qty)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <p style={{ margin: "5px 0 0", fontSize: 9, color: "#6a5a40" }}>{item.shop}</p>
                         </div>
                       </div>
 

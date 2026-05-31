@@ -29,7 +29,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         status:        "cancelled",
         cancelled_at:  new Date().toISOString(),
         cancel_reason: reason ?? "Khách hủy",
-        cancelled_by:  user.id,
       })
       .eq("id", id)
 

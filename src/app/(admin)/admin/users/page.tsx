@@ -59,6 +59,7 @@ interface AppUser {
   loyaltyPoints: number; tier: TierLevel
   shopRevenue: number; shopCommission: number; driverEarnings: number
   walletBalance: number; blacklistReason?: string
+  cancelLocked?: boolean; cancelLockedAt?: string
 }
 
 interface DriverRow {
@@ -161,7 +162,7 @@ export default function AdminUsersPage() {
   async function loadUsers() {
     const supabase = createClient()
     const { data: profiles } = await supabase
-      .from("profiles").select("id, full_name, phone, role, is_active, created_at")
+      .from("profiles").select("id, full_name, phone, role, is_active, created_at, cancel_locked, cancel_locked_at")
       .order("created_at", { ascending: false }).limit(500)
     if (!profiles || profiles.length === 0) { setUsersLoading(false); return }
 
@@ -240,6 +241,8 @@ export default function AdminUsersPage() {
         driverEarnings: dOrd.earned,
         walletBalance: wBal["driver"] ?? wBal["customer"] ?? 0,
         blacklistReason: bl?.reason,
+        cancelLocked: (p as { cancel_locked?: boolean }).cancel_locked ?? false,
+        cancelLockedAt: (p as { cancel_locked_at?: string }).cancel_locked_at ?? undefined,
       }
     }))
     setUsersLoading(false)
@@ -340,6 +343,15 @@ export default function AdminUsersPage() {
     setUsers(p => p.map(u => u.id === id ? { ...u, status: "active" as UserStatus, blacklistReason: undefined } : u))
     if (selected?.id === id) setSelected(s => s ? { ...s, status: "active", blacklistReason: undefined } : s)
     setSaving(false)
+  }
+  const unlockCancelLock = async (id: string) => {
+    setSaving(true)
+    const supabase = createClient()
+    await supabase.from("profiles").update({ cancel_locked: false, cancel_locked_at: null, cancel_locked_reason: null }).eq("id", id)
+    setUsers(p => p.map(u => u.id === id ? { ...u, cancelLocked: false, cancelLockedAt: undefined } : u))
+    if (selected?.id === id) setSelected(s => s ? { ...s, cancelLocked: false, cancelLockedAt: undefined } : s)
+    setSaving(false)
+    fire("✅ Đã mở khóa hủy đơn cho người dùng")
   }
   const execConfirm = async () => {
     if (!confirmAction) return
@@ -909,6 +921,14 @@ export default function AdminUsersPage() {
                       <div style={{ color: "rgba(255,100,100,0.8)", fontSize: 10, lineHeight: 1.5 }}>{selected.blacklistReason}</div>
                     </div>
                   )}
+                  {selected.cancelLocked && (
+                    <div style={{ background: "rgba(255,179,71,0.08)", border: "1px solid rgba(255,179,71,0.25)", borderRadius: 10, padding: "10px 12px", marginBottom: 14 }}>
+                      <div style={{ color: "#FFB347", fontSize: 9, fontWeight: 700, marginBottom: 4 }}>🔒 Bị khóa hủy đơn</div>
+                      <div style={{ color: "rgba(255,179,71,0.75)", fontSize: 9.5, lineHeight: 1.5 }}>
+                        Hủy đơn quá nhiều lần{selected.cancelLockedAt ? ` · ${new Date(selected.cancelLockedAt).toLocaleDateString("vi-VN")}` : ""}
+                      </div>
+                    </div>
+                  )}
                   {([
                     ["Số điện thoại", selected.phone],
                     ["Ngày đăng ký", selected.registeredDate],
@@ -936,6 +956,11 @@ export default function AdminUsersPage() {
                     ? <button onClick={() => setConfirmAction({ type: "lock",   id: selected.id })} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,64,64,0.08)",  border: "1px solid rgba(255,64,64,0.2)",  color: "#ff4040", fontSize: 11, fontWeight: 700 }}>🔒 Khóa tài khoản</button>
                     : <button onClick={() => setConfirmAction({ type: "unlock", id: selected.id })} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.2)", color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>🔓 Mở khóa tài khoản</button>
                   }
+                  {selected.cancelLocked && (
+                    <button onClick={() => unlockCancelLock(selected.id)} disabled={saving} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,179,71,0.08)", border: "1px solid rgba(255,179,71,0.25)", color: "#FFB347", fontSize: 11, fontWeight: 700 }}>
+                      🔓 Mở khóa hủy đơn
+                    </button>
+                  )}
                 </div>
               </motion.div>
             </>
