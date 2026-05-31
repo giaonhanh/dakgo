@@ -201,14 +201,14 @@ export default function MerchantDashboard() {
 
   const handleAccept = async (order: MOrder) => {
     setOrderStatus(order.id, "accepted")
-    const { error } = await supabase.from("orders").update({ status: "accepted", accepted_at: new Date().toISOString() }).eq("id", order.id)
+    const { error } = await supabase.from("orders").update({ status: "accepted" }).eq("id", order.id)
     if (error) { setOrderStatus(order.id, "pending"); fireToast("❌ Không thể xác nhận, thử lại", false); return }
     fireToast(`✅ Đã xác nhận #${order.shortId} · Đang điều phối tài xế...`)
 
     // Move to preparing + dispatch drivers simultaneously
     setTimeout(async () => {
       setOrderStatus(order.id, "preparing")
-      await supabase.from("orders").update({ status: "preparing", preparing_at: new Date().toISOString() }).eq("id", order.id)
+      await supabase.from("orders").update({ status: "preparing" }).eq("id", order.id)
 
       // Dispatch to 3 nearest drivers (driver condition: < 3 incomplete orders)
       setDispatchStatus(prev => ({ ...prev, [order.id]: "dispatching" }))
@@ -246,7 +246,7 @@ export default function MerchantDashboard() {
 
   const handleReady = async (order: MOrder) => {
     setOrderStatus(order.id, "ready")
-    const { error } = await supabase.from("orders").update({ status: "ready", ready_at: new Date().toISOString() }).eq("id", order.id)
+    const { error } = await supabase.from("orders").update({ status: "ready" }).eq("id", order.id)
     if (error) { setOrderStatus(order.id, "preparing"); fireToast("❌ Lỗi kết nối, thử lại", false); return }
     fireToast(`📦 #${order.shortId} sẵn sàng · Đang tìm tài xế...`)
   }
