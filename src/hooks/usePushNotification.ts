@@ -32,7 +32,8 @@ export function usePushNotification() {
     try {
       const registration = await navigator.serviceWorker.ready
       const existing = await registration.pushManager.getSubscription()
-      const sub = existing ?? await registration.pushManager.subscribe({
+      if (existing) await existing.unsubscribe()
+      const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(
           process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
