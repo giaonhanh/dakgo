@@ -238,8 +238,8 @@ export default function AdminUsersPage() {
     const supabase = createClient()
     const { data: rows, error: driverErr } = await supabase
       .from("drivers")
-      .select("id, vehicle_type, license_plate, status, is_approved, rating_avg, total_trips, commission_rate, created_at, profiles(full_name, phone)")
-      .order("created_at", { ascending: false })
+      .select("id, vehicle_type, license_plate, status, is_approved, rating_avg, total_trips, commission_rate, updated_at, profiles(full_name, phone)")
+      .order("updated_at", { ascending: false })
     if (driverErr) console.error("[loadDrivers] error:", driverErr)
     if (!rows || rows.length === 0) { setDriversLoading(false); setDriversLoaded(true); return }
     setDrivers(rows.map(r => {
@@ -255,7 +255,7 @@ export default function AdminUsersPage() {
         ratingAvg: r.rating_avg ?? null,
         totalTrips: r.total_trips ?? 0,
         commissionRate: r.commission_rate ?? 20,
-        joinedDate: new Date(r.created_at).toLocaleDateString("vi-VN"),
+        joinedDate: r.updated_at ? new Date(r.updated_at).toLocaleDateString("vi-VN") : "—",
       }
     }))
     setDriversLoading(false)

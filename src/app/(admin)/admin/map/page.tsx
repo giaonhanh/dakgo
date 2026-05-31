@@ -246,6 +246,12 @@ export default function AdminMapPage() {
         @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         .driver-row:hover { background: rgba(255,255,255,0.05) !important; cursor:pointer; }
         .order-row:hover  { background: rgba(255,255,255,0.04) !important; }
+        .map-layout { display:flex; flex-direction:row; }
+        .map-right-panel { width:300px; flex-shrink:0; }
+        @media (max-width: 768px) {
+          .map-layout { flex-direction:column; }
+          .map-right-panel { width:100%; max-height:240px; border-left:none !important; border-top:1px solid rgba(255,255,255,0.06); }
+        }
       `}</style>
       <AdminShell
         pageTitle="🗺️ Bản đồ tài xế live"
@@ -264,7 +270,7 @@ export default function AdminMapPage() {
           </div>
         }
       >
-        <div style={{ flex:1, display:"flex", overflow:"hidden", height:"100%" }}>
+        <div className="map-layout" style={{ flex:1, overflow:"hidden", height:"100%" }}>
 
             {/* Map */}
             <div style={{ flex:1, position:"relative", overflow:"hidden" }}>
@@ -314,7 +320,7 @@ export default function AdminMapPage() {
             </div>
 
             {/* Right panel */}
-            <div style={{ width:300, borderLeft:"1px solid rgba(255,255,255,0.06)", display:"flex", flexDirection:"column", overflow:"hidden", background:"rgba(10,9,18,0.6)" }}>
+            <div className="map-right-panel" style={{ borderLeft:"1px solid rgba(255,255,255,0.06)", display:"flex", flexDirection:"column", overflow:"hidden", background:"rgba(10,9,18,0.6)" }}>
 
               {/* Driver list header */}
               <div style={{ padding:"12px 14px 8px", borderBottom:"1px solid rgba(255,255,255,0.06)", flexShrink:0 }}>
