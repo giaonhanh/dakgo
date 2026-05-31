@@ -28,6 +28,11 @@ interface MOrder {
   time: string
   note?: string
   scheduledAt?: string | null
+  driverId?: string
+  driverName?: string
+  driverPhone?: string
+  driverPlate?: string
+  driverRating?: number
 }
 
 const STATUS_CFG: Record<OrderStatus, { label: string; color: string; bg: string; bd: string }> = {
@@ -133,7 +138,7 @@ export default function MerchantDashboard() {
     // Fetch orders (không join order_items để tránh RLS join issue)
     const { data: rows } = await supabase
       .from("orders")
-      .select("id, status, total_amount, total, ship_fee, pay_method, note, created_at, scheduled_at, customer_id")
+      .select("id, status, total_amount, total, ship_fee, pay_method, note, created_at, scheduled_at, customer_id, driver_id")
       .eq("shop_id", sid)
       .gte("created_at", today.toISOString())
       .order("created_at", { ascending: false })
@@ -173,6 +178,19 @@ export default function MerchantDashboard() {
       .in("id", customerIds)
     const profileMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p]))
 
+    // Get driver profiles (cho các đơn đã có tài xế)
+    const driverIds = [...new Set(rows.map(o => o.driver_id).filter(Boolean))]
+    const driverProfileMap: Record<string, { full_name: string; phone: string }> = {}
+    const driverInfoMap: Record<string, { license_plate: string; rating_avg: number }> = {}
+    if (driverIds.length > 0) {
+      const [{ data: dProfiles }, { data: dInfos }] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, phone").in("id", driverIds),
+        supabase.from("drivers").select("id, license_plate, rating_avg").in("id", driverIds),
+      ])
+      ;(dProfiles ?? []).forEach(p => { driverProfileMap[p.id] = p })
+      ;(dInfos ?? []).forEach(d => { driverInfoMap[d.id] = d })
+    }
+
     const revenue = rows
       .filter(o => o.status !== "cancelled" && o.status !== "rejected")
       .reduce((sum, o) => sum + (o.total_amount ?? 0), 0)
@@ -183,6 +201,8 @@ export default function MerchantDashboard() {
       const items = itemsByOrder[o.id] ?? []
       const itemStr = items.map(i => `${i.name} x${i.qty}`).join(", ")
       const pm = o.pay_method as PayMethod
+      const dp = o.driver_id ? driverProfileMap[o.driver_id] : null
+      const di = o.driver_id ? driverInfoMap[o.driver_id] : null
       return {
         id: o.id,
         shortId: o.id.slice(0,8).toUpperCase(),
@@ -194,6 +214,11 @@ export default function MerchantDashboard() {
         subtotal: o.total ?? o.total_amount,
         shipFee: o.ship_fee ?? 0,
         discountAmount: 0,
+        driverId: o.driver_id ?? undefined,
+        driverName: dp?.full_name ?? undefined,
+        driverPhone: dp?.phone ?? undefined,
+        driverPlate: di?.license_plate ?? undefined,
+        driverRating: di?.rating_avg ?? undefined,
         payMethod: pm === "wallet" ? "wallet" : pm === "vietqr" ? "vietqr" : "cash",
         status: (o.status === "delivered" ? "ready" : o.status === "cancelled" ? "rejected" : o.status) as OrderStatus,
         time: fmtTime(o.created_at),
@@ -570,6 +595,56 @@ export default function MerchantDashboard() {
                               </div>
                             </div>
                           </div>
+
+                          {/* ── Thông tin tài xế (khi đã có tài xế nhận) ── */}
+                          {order.driverId && (
+                            <>
+                              <div style={{ fontSize: 8, fontWeight: 700, color: "#6a5a40",
+                                textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 5 }}>
+                                Tài xế nhận đơn
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8,
+                                padding: "8px 10px", borderRadius: 9, marginBottom: 12,
+                                background: "rgba(62,207,110,0.04)", border: "1px solid rgba(62,207,110,0.15)" }}>
+                                <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                                  background: "rgba(62,207,110,0.12)", border: "1px solid rgba(62,207,110,0.25)",
+                                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>🛵</div>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 700 }}>
+                                    {order.driverName ?? "Đang cập nhật..."}
+                                  </div>
+                                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 2 }}>
+                                    {order.driverPlate && (
+                                      <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 700,
+                                        background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.2)",
+                                        padding: "1px 6px", borderRadius: 4 }}>{order.driverPlate}</span>
+                                    )}
+                                    {order.driverRating && (
+                                      <span style={{ color: "#FFB347", fontSize: 9 }}>⭐ {order.driverRating}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                {order.driverPhone && (
+                                  <a href={`tel:${order.driverPhone}`}
+                                    style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+                                      background: "rgba(62,207,110,0.12)", border: "1px solid rgba(62,207,110,0.3)",
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      fontSize: 16, textDecoration: "none" }}>📞</a>
+                                )}
+                              </div>
+                            </>
+                          )}
+
+                          {/* Không có tài xế còn chờ */}
+                          {!order.driverId && ["preparing","ready"].includes(order.status) && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 7,
+                              padding: "7px 10px", borderRadius: 9, marginBottom: 12,
+                              background: "rgba(245,197,66,0.05)", border: "1px solid rgba(245,197,66,0.15)" }}>
+                              <div style={{ width: 6, height: 6, borderRadius: "50%",
+                                background: "#f5c542", animation: "mPulse 1.2s infinite", flexShrink: 0 }} />
+                              <span style={{ color: "#f5c542", fontSize: 9 }}>Đang tìm tài xế gần nhất...</span>
+                            </div>
+                          )}
 
                           {/* ── Chi tiết đơn hàng ── */}
                           <div style={{ fontSize: 8, fontWeight: 700, color: "#6a5a40",

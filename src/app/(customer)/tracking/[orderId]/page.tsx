@@ -495,36 +495,44 @@ export default function TrackingPage() {
                 <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}}
                   style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
                     borderRadius:14,padding:"12px 14px",marginBottom:10 }}>
-                  <div style={{ display:"flex",alignItems:"center",gap:11 }}>
-                    <div style={{ width:48,height:48,borderRadius:13,flexShrink:0,
-                      background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.2)",
-                      display:"flex",alignItems:"center",justifyContent:"center",fontSize:24 }}>🛵</div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:2 }}>Tài xế của bạn</div>
-                      <div style={{ color:"#f8f0e0",fontSize:13,fontWeight:700,marginBottom:2 }}>
+                  <div style={{ display:"flex",alignItems:"flex-start",gap:11 }}>
+                    <div style={{ width:44,height:44,borderRadius:12,flexShrink:0,
+                      background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.25)",
+                      display:"flex",alignItems:"center",justifyContent:"center",fontSize:22 }}>🛵</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:3 }}>Tài xế của bạn</div>
+                      <div style={{ color:"#f8f0e0",fontSize:13,fontWeight:700,marginBottom:4 }}>
                         {driverData.name}
                       </div>
-                      <div style={{ display:"flex",gap:8,alignItems:"center" }}>
+                      {/* Biển số + rating + số chuyến */}
+                      <div style={{ display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:6 }}>
+                        {driverData.plate && (
+                          <span style={{ color:"#3ecf6e",fontSize:9,fontWeight:700,
+                            background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.2)",
+                            padding:"1px 7px",borderRadius:5 }}>{driverData.plate}</span>
+                        )}
                         <span style={{ color:"#FFB347",fontSize:9 }}>⭐ {driverData.rating}</span>
-                        <span style={{ color:"rgba(255,255,255,0.1)",fontSize:8 }}>|</span>
                         <span style={{ color:"#6a5a40",fontSize:9 }}>{driverData.trips} chuyến</span>
-                        <span style={{ color:"rgba(255,255,255,0.1)",fontSize:8 }}>|</span>
-                        <span style={{ color:"#6a5a40",fontSize:9 }}>{driverData.plate}</span>
                       </div>
-                    </div>
-                    <div style={{ display:"flex",gap:7 }}>
+                      {/* Số điện thoại hiển thị rõ */}
                       {driverData.phone && (
-                        <a href={`tel:${driverData.phone}`}
-                          style={{ width:40,height:40,borderRadius:11,
-                            background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.25)",
-                            display:"flex",alignItems:"center",justifyContent:"center",
-                            textDecoration:"none",fontSize:18 }}>📞</a>
+                        <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                          <span style={{ color:"#b0956a",fontSize:10,fontWeight:600 }}>
+                            📱 {driverData.phone}
+                          </span>
+                          <a href={`tel:${driverData.phone}`}
+                            style={{ padding:"3px 10px",borderRadius:7,
+                              background:"rgba(62,207,110,0.12)",border:"1px solid rgba(62,207,110,0.3)",
+                              color:"#3ecf6e",fontSize:9,fontWeight:700,textDecoration:"none" }}>
+                            Gọi ngay
+                          </a>
+                        </div>
                       )}
-                      <button onClick={() => setShowChat(true)}
-                        style={{ width:40,height:40,borderRadius:11,background:"rgba(255,107,0,0.08)",
-                          border:"1px solid rgba(255,107,0,0.25)",display:"flex",alignItems:"center",
-                          justifyContent:"center",fontSize:18,cursor:"pointer" }}>💬</button>
                     </div>
+                    <button onClick={() => setShowChat(true)}
+                      style={{ width:36,height:36,borderRadius:10,background:"rgba(255,107,0,0.08)",
+                        border:"1px solid rgba(255,107,0,0.25)",display:"flex",alignItems:"center",
+                        justifyContent:"center",fontSize:16,cursor:"pointer",flexShrink:0 }}>💬</button>
                   </div>
                 </motion.div>
               )}
