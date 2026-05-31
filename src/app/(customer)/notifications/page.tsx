@@ -217,31 +217,20 @@ export default function NotificationsPage() {
                   initial={{ opacity:0,y:8 }} animate={{ opacity:1,y:0 }}
                   exit={{ opacity:0,x:-40,transition:{duration:.2} }}
                   transition={{ delay:idx*0.03 }}
-                  style={{ marginBottom:7, position:"relative", overflow:"hidden", borderRadius:14 }}
-                  onTouchStart={e => { touchX.current = e.touches[0].clientX }}
-                  onTouchEnd={e => {
-                    const dx = touchX.current - e.changedTouches[0].clientX
-                    if (dx > 60) setSwipedId(n.id)
-                    else if (dx < -20) setSwipedId(null)
-                  }}>
-                  <a href={n.href} onClick={() => { if (swipedId===n.id) { setSwipedId(null); return } markRead(n.id) }}
-                    style={{ textDecoration:"none", display:"block",
-                      transform: swipedId===n.id ? "translateX(-72px)" : "translateX(0)",
-                      transition:"transform .2s ease" }}>
+                  style={{ marginBottom:7, position:"relative", borderRadius:14 }}>
+                  <a href={n.href} onClick={() => markRead(n.id)}
+                    style={{ textDecoration:"none", display:"block" }}>
                     <div style={{
                       background: !n.isRead ? "rgba(255,107,0,0.06)" : "rgba(255,255,255,0.03)",
                       backdropFilter:"blur(10px)",
                       border:`1px solid ${!n.isRead ? "rgba(255,107,0,0.2)" : "rgba(255,255,255,0.07)"}`,
-                      borderRadius:14, padding:"11px 13px",
+                      borderRadius:14, padding:"11px 13px 11px 13px",
                       display:"flex", gap:10, alignItems:"flex-start",
                     }}>
-                      {!n.isRead && (
-                        <div style={{ position:"absolute", top:10, right:10, width:7, height:7, borderRadius:"50%", background:"#FF6B00", boxShadow:"0 0 5px rgba(255,107,0,0.6)", animation:"pulse 1.5s infinite" }} />
-                      )}
                       <div style={{ width:38, height:38, borderRadius:11, background:n.iconBg, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, marginTop:1 }}>
                         {n.icon}
                       </div>
-                      <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ flex:1, minWidth:0, paddingRight:16 }}>
                         <div style={{ color: !n.isRead?"#f8f0e0":"#b0956a", fontSize:11.5, fontWeight: !n.isRead?600:500, marginBottom:3, lineHeight:1.3 }}>
                           {n.title}
                         </div>
@@ -255,17 +244,21 @@ export default function NotificationsPage() {
                             background: n.type==="order"?"rgba(255,107,0,0.1)":n.type==="promo"?"rgba(255,179,71,0.1)":n.type==="driver"?"rgba(62,207,110,0.1)":"rgba(74,143,245,0.1)",
                             color: n.type==="order"?"#FF8C00":n.type==="promo"?"#FFB347":n.type==="driver"?"#3ecf6e":"#4a8ff5",
                           }}>
-                            {n.type==="order"?"�on h�ng":n.type==="promo"?"Khuy?n m�i":n.type==="driver"?"T�i x?":"H? th?ng"}
+                            {n.type==="order"?"Đơn hàng":n.type==="promo"?"Khuyến mãi":n.type==="driver"?"Tài xế":"Hệ thống"}
                           </span>
                         </div>
                       </div>
                     </div>
                   </a>
-                  {/* Delete reveal */}
-                  <div onClick={() => deleteNotif(n.id)}
-                    style={{ position:"absolute", right:0, top:0, bottom:0, width:72, background:"rgba(255,64,64,0.88)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:22, borderRadius:"0 14px 14px 0" }}>
-                    ??
-                  </div>
+                  {/* Unread dot */}
+                  {!n.isRead && (
+                    <div style={{ position:"absolute", top:9, right:22, width:7, height:7, borderRadius:"50%", background:"#FF6B00", boxShadow:"0 0 5px rgba(255,107,0,0.6)", animation:"pulse 1.5s infinite", pointerEvents:"none" }} />
+                  )}
+                  {/* Delete × */}
+                  <button onClick={e => { e.preventDefault(); deleteNotif(n.id) }}
+                    style={{ position:"absolute", top:7, right:7, width:18, height:18, borderRadius:"50%", background:"rgba(255,255,255,0.08)", border:"none", color:"rgba(255,255,255,0.35)", fontSize:11, lineHeight:1, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", padding:0 }}>
+                    ×
+                  </button>
                 </motion.div>
               ))}
             </AnimatePresence>
