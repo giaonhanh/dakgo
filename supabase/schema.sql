@@ -162,6 +162,18 @@ CREATE TABLE drivers (
   license_plate        TEXT,
   vehicle_model        TEXT,
 
+  -- Trạng thái & phê duyệt
+  status               TEXT        NOT NULL DEFAULT 'offline',
+  is_approved          BOOLEAN     NOT NULL DEFAULT false,
+  approved_at          TIMESTAMPTZ,
+
+  -- Hoa hồng
+  commission_rate      NUMERIC(5,2) NOT NULL DEFAULT 20,
+
+  -- Giấy tờ
+  id_card_number       TEXT,
+  license_number       TEXT,
+
   -- Stats
   rating_avg           NUMERIC(3,2) DEFAULT 5.0,
   total_trips          INT          DEFAULT 0,

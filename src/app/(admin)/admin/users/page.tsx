@@ -236,10 +236,11 @@ export default function AdminUsersPage() {
     if (driversLoaded) return
     setDriversLoading(true)
     const supabase = createClient()
-    const { data: rows } = await supabase
+    const { data: rows, error: driverErr } = await supabase
       .from("drivers")
       .select("id, vehicle_type, license_plate, status, is_approved, rating_avg, total_trips, commission_rate, created_at, profiles(full_name, phone)")
       .order("created_at", { ascending: false })
+    if (driverErr) console.error("[loadDrivers] error:", driverErr)
     if (!rows || rows.length === 0) { setDriversLoading(false); setDriversLoaded(true); return }
     setDrivers(rows.map(r => {
       const p = (Array.isArray(r.profiles) ? r.profiles[0] : r.profiles) as { full_name?: string; phone?: string } | null

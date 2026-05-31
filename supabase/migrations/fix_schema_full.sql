@@ -34,6 +34,22 @@ ALTER TABLE shops ADD CONSTRAINT shops_owner_unique UNIQUE (owner_id);
 
 
 -- ════════════════════════════════════════════════
+-- 1b. BẢNG DRIVERS — thêm các cột còn thiếu
+-- ════════════════════════════════════════════════
+
+ALTER TABLE drivers
+  ADD COLUMN IF NOT EXISTS status          TEXT         DEFAULT 'offline',
+  ADD COLUMN IF NOT EXISTS is_approved     BOOLEAN      DEFAULT false,
+  ADD COLUMN IF NOT EXISTS approved_at     TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS commission_rate NUMERIC(5,2) DEFAULT 20,
+  ADD COLUMN IF NOT EXISTS id_card_number  TEXT,
+  ADD COLUMN IF NOT EXISTS license_number  TEXT;
+
+-- Đồng bộ is_online → status cho tài xế cũ
+UPDATE drivers SET status = 'online' WHERE is_online = true AND status = 'offline';
+
+
+-- ════════════════════════════════════════════════
 -- 2. BẢNG PRODUCTS — thêm các cột còn thiếu
 -- ════════════════════════════════════════════════
 
