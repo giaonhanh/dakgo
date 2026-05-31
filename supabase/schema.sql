@@ -183,6 +183,7 @@ CREATE TABLE drivers (
   bank_account_number  TEXT,
   bank_account_name    TEXT,
 
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE drivers ENABLE ROW LEVEL SECURITY;

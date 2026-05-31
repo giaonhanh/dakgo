@@ -43,7 +43,8 @@ ALTER TABLE drivers
   ADD COLUMN IF NOT EXISTS approved_at     TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS commission_rate NUMERIC(5,2) DEFAULT 20,
   ADD COLUMN IF NOT EXISTS id_card_number  TEXT,
-  ADD COLUMN IF NOT EXISTS license_number  TEXT;
+  ADD COLUMN IF NOT EXISTS license_number  TEXT,
+  ADD COLUMN IF NOT EXISTS created_at      TIMESTAMPTZ  DEFAULT now();
 
 -- Đồng bộ is_online → status cho tài xế cũ
 UPDATE drivers SET status = 'online' WHERE is_online = true AND status = 'offline';
