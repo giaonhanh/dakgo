@@ -125,10 +125,11 @@ export default function MerchantDashboard() {
     const orderIds = rows.map(o => o.id)
 
     // Fetch order_items riêng (tránh nested join RLS)
-    const { data: allItems } = await supabase
+    const { data: allItems, error: itemsErr } = await supabase
       .from("order_items")
       .select("order_id, name, price, qty, note")
       .in("order_id", orderIds)
+    if (itemsErr) console.error("[Merchant] order_items fetch error:", itemsErr.message, itemsErr.code)
 
     const itemsByOrder: Record<string, { name: string; price: number; qty: number; note?: string }[]> = {}
     ;(allItems ?? []).forEach(item => {
