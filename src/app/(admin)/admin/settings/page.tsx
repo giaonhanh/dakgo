@@ -589,8 +589,8 @@ export default function AdminSettingsPage() {
               <div style={{ color:"#f0eaff", fontSize:15, fontWeight:700, marginBottom:4 }}>🗺️ Khu vực hoạt động</div>
               <div style={{ color:"#6a5a40", fontSize:11, marginBottom:20 }}>Tọa độ trung tâm, bán kính phủ sóng, múi giờ</div>
               <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px" }}>
-                {renderInput("Vĩ độ trung tâm (Lat)",   "Tọa độ vĩ độ trung tâm khu vực phục vụ",              areaSettings.centerLat,      v => setAreaSettings(p=>({...p,centerLat:v})),      "°N","text")}
-                {renderInput("Kinh độ trung tâm (Lng)", "Tọa độ kinh độ trung tâm khu vực phục vụ",             areaSettings.centerLng,      v => setAreaSettings(p=>({...p,centerLng:v})),      "°E","text")}
+                {renderInput("Vĩ độ trung tâm (Lat)",   "Tọa độ vĩ độ trung tâm khu vực phục vụ",              areaSettings.centerLat,      v => setAreaSettings(p=>({...p,centerLat:v})),      "°N",false)}
+                {renderInput("Kinh độ trung tâm (Lng)", "Tọa độ kinh độ trung tâm khu vực phục vụ",             areaSettings.centerLng,      v => setAreaSettings(p=>({...p,centerLng:v})),      "°E",false)}
                 {renderInput("Bán kính phủ sóng",       "Bán kính tính từ trung tâm để tìm quán gần nhất",      areaSettings.coverageRadius, v => setAreaSettings(p=>({...p,coverageRadius:v})), "km")}
               </div>
               <div style={{ marginTop:14, background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"16px 20px" }}>

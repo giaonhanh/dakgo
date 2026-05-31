@@ -42,7 +42,8 @@ DROP TABLE IF EXISTS voucher_usages     CASCADE;
 DROP TABLE IF EXISTS combo_items        CASCADE;
 DROP TABLE IF EXISTS vouchers           CASCADE;
 DROP TABLE IF EXISTS app_settings       CASCADE;
-DROP TABLE IF EXISTS notifications      CASCADE;
+DROP TABLE IF EXISTS notifications           CASCADE;
+DROP TABLE IF EXISTS notification_schedules  CASCADE;
 DROP TABLE IF EXISTS reviews            CASCADE;
 DROP TABLE IF EXISTS blacklist          CASCADE;
 DROP TABLE IF EXISTS order_items        CASCADE;
@@ -449,6 +450,34 @@ CREATE POLICY "notif_admin_all"   ON notifications FOR ALL
 
 CREATE INDEX IF NOT EXISTS idx_notif_user_unread
   ON notifications(user_id, is_read, created_at DESC);
+
+
+-- ════════════════════════════════════════════════
+-- NOTIFICATION SCHEDULES (hẹn giờ gửi thông báo)
+-- ════════════════════════════════════════════════
+CREATE TABLE notification_schedules (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  title        TEXT        NOT NULL,
+  body         TEXT        NOT NULL,
+  type         TEXT        NOT NULL DEFAULT 'system'
+               CHECK (type IN ('promo','system','order','ride')),
+  audience     TEXT        NOT NULL DEFAULT 'all'
+               CHECK (audience IN ('all','customers','drivers','merchants')),
+  image_url    TEXT,
+  scheduled_at TIMESTAMPTZ NOT NULL,
+  sent_at      TIMESTAMPTZ,
+  sent_count   INT         NOT NULL DEFAULT 0,
+  created_by   UUID        REFERENCES profiles(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE notification_schedules ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "ns_admin_all" ON notification_schedules
+  FOR ALL TO authenticated
+  USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin')
+  WITH CHECK ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
+
+CREATE INDEX IF NOT EXISTS idx_ns_scheduled
+  ON notification_schedules(scheduled_at) WHERE sent_at IS NULL;
 
 
 -- ════════════════════════════════════════════════

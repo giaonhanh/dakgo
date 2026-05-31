@@ -912,7 +912,39 @@ CREATE TRIGGER trg_award_loyalty_points
 
 
 -- ════════════════════════════════════════════════
--- 27. KIỂM TRA SAU KHI CHẠY
+-- 27. NOTIFICATION SCHEDULES (bảng hẹn giờ thông báo)
+-- ════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS notification_schedules (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  title        TEXT        NOT NULL,
+  body         TEXT        NOT NULL,
+  type         TEXT        NOT NULL DEFAULT 'system'
+               CHECK (type IN ('promo','system','order','ride')),
+  audience     TEXT        NOT NULL DEFAULT 'all'
+               CHECK (audience IN ('all','customers','drivers','merchants')),
+  image_url    TEXT,
+  scheduled_at TIMESTAMPTZ NOT NULL,
+  sent_at      TIMESTAMPTZ,
+  sent_count   INT         NOT NULL DEFAULT 0,
+  created_by   UUID        REFERENCES profiles(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE notification_schedules ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "ns_admin_all" ON notification_schedules;
+CREATE POLICY "ns_admin_all" ON notification_schedules
+  FOR ALL TO authenticated
+  USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin')
+  WITH CHECK ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
+
+CREATE INDEX IF NOT EXISTS idx_ns_scheduled
+  ON notification_schedules(scheduled_at) WHERE sent_at IS NULL;
+
+
+-- ════════════════════════════════════════════════
+-- 28. KIỂM TRA SAU KHI CHẠY
 -- ════════════════════════════════════════════════
 
 -- Chạy từng câu để xác nhận:
