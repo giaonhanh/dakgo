@@ -34,13 +34,14 @@ interface StatusStep {
 }
 
 const STEPS: StatusStep[] = [
-  { key:"accepted",   label:"Đã xác nhận",   icon:"✅", desc:"Đơn được quán nhận" },
-  { key:"preparing",  label:"Đang chuẩn bị", icon:"👨‍🍳", desc:"Quán đang làm đồ ăn" },
-  { key:"delivering", label:"Đang giao",      icon:"🛵", desc:"Tài xế đang trên đường" },
-  { key:"delivered",  label:"Đã giao",        icon:"🎉", desc:"Giao thành công!" },
+  { key:"accepted",   label:"Đã xác nhận · Đang làm",  icon:"👨‍🍳", desc:"Quán đã nhận và đang chuẩn bị" },
+  { key:"ready",      label:"Đang tìm tài xế",          icon:"🔍", desc:"Món xong, đang điều phối tài xế" },
+  { key:"delivering", label:"Đang giao",                 icon:"🛵", desc:"Tài xế đang trên đường" },
+  { key:"delivered",  label:"Đã giao",                  icon:"🎉", desc:"Giao thành công!" },
 ]
 
-const STATUS_ORDER: OrderStatus[] = ["accepted","preparing","delivering","delivered"]
+// preparing hiển thị cùng bước với accepted
+const STATUS_ORDER: OrderStatus[] = ["accepted","ready","delivering","delivered"]
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
 function useCountdown(initMin: number) {
@@ -120,7 +121,8 @@ export default function TrackingPage() {
         items: items.map(i => ({ name: `${i.name} ×${i.qty}`, emoji: "🍽️" })),
         paymentMethod: order.pay_method,
       })
-      const st = (order.status === "delivered" ? "delivered" : order.status) as OrderStatus
+      const rawSt = order.status === "preparing" ? "accepted" : order.status
+      const st = rawSt as OrderStatus
       setStatus(st)
       if (order.pay_method !== "cash" && st === "delivered") setPaymentStatus("paid")
 
@@ -173,8 +175,8 @@ export default function TrackingPage() {
         event: "UPDATE", schema: "public", table: "orders",
         filter: `id=eq.${orderId}`
       }, (payload) => {
-        const newStatus = payload.new.status as OrderStatus
-        setStatus(newStatus === "delivered" ? "delivered" : newStatus)
+        const raw = payload.new.status === "preparing" ? "accepted" : payload.new.status
+        setStatus(raw as OrderStatus)
         if ((payload.new as { pay_method?: string; status?: string }).pay_method !== "cash"
             && (payload.new as { status?: string }).status === "delivered") {
           setPaymentStatus("paid")

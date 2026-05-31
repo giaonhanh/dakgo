@@ -48,13 +48,13 @@ const CANCEL_REASONS = [
 ]
 
 const STATUS_CFG: Record<Status, { label: string; c: string; bg: string; bd: string; dot: boolean }> = {
-  delivering: { label: "Đang giao",     c: "#FF8C00", bg: "rgba(255,140,0,0.12)",   bd: "rgba(255,107,0,0.3)",   dot: true  },
-  preparing:  { label: "Đang chuẩn bị", c: "#4a8ff5", bg: "rgba(74,143,245,0.12)",  bd: "rgba(74,143,245,0.3)",  dot: true  },
-  accepted:   { label: "Đã xác nhận",   c: "#3ecf6e", bg: "rgba(62,207,110,0.10)",  bd: "rgba(62,207,110,0.28)", dot: true  },
-  pending:    { label: "Chờ xác nhận",  c: "#b464ff", bg: "rgba(180,100,255,0.12)", bd: "rgba(180,100,255,0.3)", dot: false },
-  ready:      { label: "Sẵn sàng giao", c: "#FFB347", bg: "rgba(255,179,71,0.12)",  bd: "rgba(255,179,71,0.3)",  dot: true  },
-  completed:  { label: "Hoàn thành",    c: "#3ecf6e", bg: "rgba(62,207,110,0.08)",  bd: "rgba(62,207,110,0.25)", dot: false },
-  cancelled:  { label: "Đã hủy",        c: "#ff4040", bg: "rgba(255,64,64,0.08)",   bd: "rgba(255,64,64,0.22)",  dot: false },
+  pending:    { label: "Chờ xác nhận",          c: "#b464ff", bg: "rgba(180,100,255,0.12)", bd: "rgba(180,100,255,0.3)", dot: false },
+  accepted:   { label: "Đã xác nhận · Đang làm", c: "#4a8ff5", bg: "rgba(74,143,245,0.12)",  bd: "rgba(74,143,245,0.3)",  dot: true  },
+  preparing:  { label: "Đã xác nhận · Đang làm", c: "#4a8ff5", bg: "rgba(74,143,245,0.12)",  bd: "rgba(74,143,245,0.3)",  dot: true  },
+  ready:      { label: "Đang tìm tài xế",         c: "#FFB347", bg: "rgba(255,179,71,0.12)",  bd: "rgba(255,179,71,0.3)",  dot: true  },
+  delivering: { label: "Đang giao",               c: "#FF8C00", bg: "rgba(255,140,0,0.12)",   bd: "rgba(255,107,0,0.3)",   dot: true  },
+  completed:  { label: "Đã giao",                 c: "#3ecf6e", bg: "rgba(62,207,110,0.08)",  bd: "rgba(62,207,110,0.25)", dot: false },
+  cancelled:  { label: "Đã hủy",                  c: "#ff4040", bg: "rgba(255,64,64,0.08)",   bd: "rgba(255,64,64,0.22)",  dot: false },
 }
 
 // ─── Helpers ─────────────────────────────────────────────

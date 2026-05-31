@@ -565,9 +565,8 @@ export default function HomePage() {
                         background:"#3ecf6e", boxShadow:"0 0 5px #3ecf6e",
                         animation:"pulse 1.5s infinite" }} />
                       <span style={{ color:"#3ecf6e", fontSize:9, fontWeight:600 }}>
-                        {liveOrder.status === "accepted"   ? "Đã xác nhận · Đang chuẩn bị" :
-                         liveOrder.status === "preparing"  ? "Đang chuẩn bị" :
-                         liveOrder.status === "ready"      ? "Sẵn sàng giao" :
+                        {(liveOrder.status === "accepted" || liveOrder.status === "preparing") ? "Đã xác nhận · Đang làm" :
+                         liveOrder.status === "ready"      ? "Đang tìm tài xế" :
                          liveOrder.status === "delivering" ? "Đang giao hàng" : "Đang xử lý"}
                       </span>
                     </div>
