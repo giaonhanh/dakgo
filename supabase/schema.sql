@@ -131,7 +131,9 @@ CREATE TABLE shops (
   is_negotiated_commission BOOLEAN      NOT NULL DEFAULT false,
 
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT shops_owner_unique UNIQUE (owner_id)
 );
 ALTER TABLE shops ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "shops_select_open"    ON shops FOR SELECT USING (true);

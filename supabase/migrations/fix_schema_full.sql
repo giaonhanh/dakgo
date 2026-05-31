@@ -28,6 +28,10 @@ UPDATE shops SET rating_avg  = rating       WHERE rating_avg IS NULL AND rating 
 UPDATE shops SET total_reviews = rating_count WHERE total_reviews = 0  AND rating_count > 0;
 UPDATE shops SET logo_url    = avatar_url   WHERE logo_url IS NULL    AND avatar_url IS NOT NULL;
 
+-- 1 chủ tài khoản chỉ được có 1 cửa hàng
+ALTER TABLE shops DROP CONSTRAINT IF EXISTS shops_owner_unique;
+ALTER TABLE shops ADD CONSTRAINT shops_owner_unique UNIQUE (owner_id);
+
 
 -- ════════════════════════════════════════════════
 -- 2. BẢNG PRODUCTS — thêm các cột còn thiếu
