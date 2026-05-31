@@ -55,10 +55,28 @@ export default function ApprovalsPage() {
   const [shopLoading, setShopLoading]     = useState(true)
 
   const [saving, setSaving] = useState(false)
+
+  // Commission config từ app_settings
+  const [commCfg, setCommCfg] = useState({ minRate: 5, maxRate: 35, defaultRate: 15 })
   const [rejectModal, setRejectModal] = useState<{ id: string; type: "driver" | "shop"; name: string } | null>(null)
   const [rejectReason, setRejectReason] = useState("")
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
+
+  // ── Load commission config ──
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from("app_settings").select("value").eq("key", "commission").maybeSingle()
+      .then(({ data }) => {
+        if (!data) return
+        const v = data.value as { defaultRate?: string; minRate?: string; maxRate?: string }
+        setCommCfg({
+          defaultRate: parseInt(v.defaultRate ?? "15") || 15,
+          minRate:     parseInt(v.minRate     ?? "5")  || 5,
+          maxRate:     parseInt(v.maxRate     ?? "35") || 35,
+        })
+      })
+  }, [])
 
   // ── Load drivers ──
   useEffect(() => {
@@ -167,6 +185,10 @@ export default function ApprovalsPage() {
 
   // ── Actions: Shop ──
   async function updateShopStatus(id: string, status: ShopStatus, reason?: string, commissionRate?: number) {
+    if (commissionRate !== undefined) {
+      if (commissionRate < commCfg.minRate) { fireToast(`❌ Hoa hồng tối thiểu là ${commCfg.minRate}%`); return }
+      if (commissionRate > commCfg.maxRate) { fireToast(`❌ Hoa hồng tối đa là ${commCfg.maxRate}%`); return }
+    }
     setSaving(true)
     const supabase = createClient()
     const updatePayload: Record<string, unknown> = { status }

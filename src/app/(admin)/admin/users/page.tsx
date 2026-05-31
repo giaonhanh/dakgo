@@ -89,6 +89,9 @@ const fmtShort = (n: number) =>
 export default function AdminUsersPage() {
   const [activeTab, setActiveTab] = useState<MainTab>("customers")
 
+  // ── Commission config từ app_settings ──
+  const [commCfg, setCommCfg] = useState({ minRate: 5, maxRate: 35, driverShare: 80 })
+
   // ── Customers ──
   const [users,         setUsers]         = useState<AppUser[]>([])
   const [filterStatus,  setFilterStatus]  = useState<"all" | UserStatus>("all")
@@ -140,7 +143,20 @@ export default function AdminUsersPage() {
 
   // ── Load: Customers ──────────────────────────────────────────────────────────
 
-  useEffect(() => { loadUsers() }, [])
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from("app_settings").select("value").eq("key", "commission").maybeSingle()
+      .then(({ data }) => {
+        if (!data) return
+        const v = data.value as { minRate?: string; maxRate?: string; driverSharePercent?: string }
+        setCommCfg({
+          minRate:     parseFloat(v.minRate     ?? "5")  || 5,
+          maxRate:     parseFloat(v.maxRate     ?? "35") || 35,
+          driverShare: parseFloat(v.driverSharePercent ?? "80") || 80,
+        })
+      })
+    loadUsers()
+  }, [])
 
   async function loadUsers() {
     const supabase = createClient()
@@ -184,8 +200,7 @@ export default function AdminUsersPage() {
       if (o.driver_id && o.status === "delivered") {
         if (!dOrdMap[o.driver_id]) dOrdMap[o.driver_id] = { count: 0, earned: 0 }
         dOrdMap[o.driver_id].count++
-        const shop = shopById[o.shop_id]
-        dOrdMap[o.driver_id].earned += Math.round((o.ship_fee ?? 0) * (1 - (shop?.commission_rate ?? 15) / 100))
+        dOrdMap[o.driver_id].earned += Math.round((o.ship_fee ?? 0) * commCfg.driverShare / 100)
       }
       if (o.shop_id && o.status !== "cancelled") {
         const shop = shopById[o.shop_id]
@@ -428,6 +443,8 @@ export default function AdminUsersPage() {
   // ── Actions: Merchant commission ─────────────────────────────────────────────
 
   const saveMerchantCommission = async (id: string, rate: number) => {
+    if (rate < commCfg.minRate) { fire(`❌ Hoa hồng tối thiểu là ${commCfg.minRate}%`, false); return }
+    if (rate > commCfg.maxRate) { fire(`❌ Hoa hồng tối đa là ${commCfg.maxRate}%`, false); return }
     setMerchantSaving(true)
     const supabase = createClient()
     const { error } = await supabase.from("shops").update({ commission_rate: rate, is_negotiated_commission: true }).eq("id", id)

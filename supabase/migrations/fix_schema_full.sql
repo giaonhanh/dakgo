@@ -860,7 +860,59 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
 -- ════════════════════════════════════════════════
--- 25. KIỂM TRA SAU KHI CHẠY
+-- 26. AUTO LOYALTY POINTS khi đơn giao thành công
+-- ════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION award_loyalty_points_on_delivery()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_rate      NUMERIC := 1;   -- điểm per 10.000đ (default)
+  v_points    INT;
+  v_cfg       JSONB;
+BEGIN
+  -- Chỉ chạy khi status chuyển sang 'delivered'
+  IF NEW.status <> 'delivered' OR OLD.status = 'delivered' THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.customer_id IS NULL OR NEW.total_amount IS NULL OR NEW.total_amount <= 0 THEN
+    RETURN NEW;
+  END IF;
+
+  -- Lấy loyaltyPointsRate từ app_settings
+  SELECT (value->>'loyaltyPointsRate')::NUMERIC INTO v_rate
+  FROM app_settings WHERE key = 'commission'
+  LIMIT 1;
+  IF v_rate IS NULL OR v_rate <= 0 THEN v_rate := 1; END IF;
+
+  -- Tính điểm: mỗi 10.000đ được v_rate điểm
+  v_points := FLOOR(NEW.total_amount / 10000 * v_rate);
+  IF v_points <= 0 THEN RETURN NEW; END IF;
+
+  -- Cộng điểm vào loyalty_points
+  INSERT INTO loyalty_points (user_id, total_points, tier)
+  VALUES (NEW.customer_id, v_points, 'bronze')
+  ON CONFLICT (user_id) DO UPDATE
+    SET total_points = loyalty_points.total_points + v_points,
+        tier = CASE
+          WHEN loyalty_points.total_points + v_points >= 2000 THEN 'platinum'
+          WHEN loyalty_points.total_points + v_points >= 1000 THEN 'gold'
+          WHEN loyalty_points.total_points + v_points >= 500  THEN 'silver'
+          ELSE 'bronze'
+        END,
+        updated_at = now();
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_award_loyalty_points ON orders;
+CREATE TRIGGER trg_award_loyalty_points
+  AFTER UPDATE OF status ON orders
+  FOR EACH ROW EXECUTE FUNCTION award_loyalty_points_on_delivery();
+
+
+-- ════════════════════════════════════════════════
+-- 27. KIỂM TRA SAU KHI CHẠY
 -- ════════════════════════════════════════════════
 
 -- Chạy từng câu để xác nhận:
