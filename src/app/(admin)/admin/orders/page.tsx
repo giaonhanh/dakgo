@@ -587,7 +587,7 @@ export default function AdminOrdersPage() {
                 </div>
                 <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginBottom:3 }}>{order.customerName}</div>
                 <div style={{ color:"#6a5a40", fontSize:9, marginBottom:3 }}>🏪 {order.shopName} · {order.itemCount} món</div>
-                <div style={{ color:"#6a5a40", fontSize:9, marginBottom:6 }}>📍 {order.delivery_address}</div>
+                <div style={{ color:"#6a5a40", fontSize:9, marginBottom:6 }}>📍 {order.drop_address}</div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <div style={{ color:"#6a5a40", fontSize:9 }}>{order.driverName?`🛵 ${order.driverName}`:"⏳ Chưa có tài xế"}</div>
                   <span style={{ background:"linear-gradient(90deg,#FF6B00,#FFB347)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text", fontSize:13, fontWeight:800 }}>{fmt(order.total_amount)}</span>
