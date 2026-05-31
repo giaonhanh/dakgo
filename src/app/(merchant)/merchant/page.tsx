@@ -39,6 +39,13 @@ const STATUS_CFG: Record<OrderStatus, { label: string; color: string; bg: string
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
+function maskPhone(phone: string): string {
+  if (!phone) return "—"
+  const digits = phone.replace(/\D/g, "")
+  if (digits.length < 4) return phone
+  return "****" + digits.slice(-4)
+}
+
 function fmtTime(iso: string): string {
   const d = new Date(iso)
   return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`
@@ -521,73 +528,107 @@ export default function MerchantDashboard() {
                         transition={{ duration: 0.22 }} style={{ overflow: "hidden" }}>
                         <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "11px 13px" }}>
 
-                          <div style={{ marginBottom: 10 }}>
-                            {order.itemList.map((item, i) => (
-                              <div key={i} style={{ display: "flex", justifyContent: "space-between",
-                                padding: "4px 0",
-                                borderBottom: i < order.itemList.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                <span style={{ color: "#b0956a", fontSize: 10 }}>
-                                  {item.name} <span style={{ color: "#6a5a40" }}>×{item.qty}</span>
-                                </span>
-                                <span style={{ color: "#f8f0e0", fontSize: 10, fontWeight: 600 }}>
-                                  {fmt(item.price * item.qty)}
-                                </span>
-                              </div>
-                            ))}
-                            {order.note && (
-                              <div style={{ marginTop: 7, padding: "5px 8px", borderRadius: 7,
-                                background: "rgba(255,255,255,0.03)", color: "#6a5a40", fontSize: 8.5 }}>
-                                📝 {order.note}
-                              </div>
-                            )}
+                          {/* ── Thông tin khách hàng ── */}
+                          <div style={{ fontSize: 8, fontWeight: 700, color: "#6a5a40",
+                            textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 5 }}>
+                            Khách hàng
                           </div>
-
                           <div style={{ display: "flex", alignItems: "center", gap: 8,
-                            padding: "7px 10px", borderRadius: 9, marginBottom: 10,
-                            background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                            <span style={{ fontSize: 14 }}>👤</span>
+                            padding: "8px 10px", borderRadius: 9, marginBottom: 12,
+                            background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                            <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                              background: "rgba(255,107,0,0.1)", border: "1px solid rgba(255,107,0,0.2)",
+                              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>👤</div>
                             <div style={{ flex: 1 }}>
-                              <div style={{ color: "#b0956a", fontSize: 10, fontWeight: 600 }}>{order.customerName}</div>
-                              <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 1 }}>{order.customerPhone}</div>
+                              <div style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 700 }}>
+                                {order.customerName}
+                              </div>
+                              <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 2 }}>
+                                📱 {maskPhone(order.customerPhone)}
+                              </div>
                             </div>
                             {order.customerPhone && (
                               <a href={`tel:${order.customerPhone}`}
-                                style={{ width: 30, height: 30, borderRadius: 8, textDecoration: "none",
-                                  background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.2)",
-                                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>📞</a>
+                                style={{ width: 34, height: 34, borderRadius: 9, textDecoration: "none",
+                                  background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.25)",
+                                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>📞</a>
                             )}
                           </div>
 
-                          {/* ── Money breakdown ── */}
+                          {/* ── Chi tiết đơn hàng ── */}
+                          <div style={{ fontSize: 8, fontWeight: 700, color: "#6a5a40",
+                            textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 5 }}>
+                            Chi tiết đơn hàng
+                          </div>
+                          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+                            borderRadius: 10, overflow: "hidden", marginBottom: 12 }}>
+                            {order.itemList.length === 0 ? (
+                              <div style={{ padding: "10px 12px", color: "#6a5a40", fontSize: 10, textAlign: "center" }}>
+                                Đang tải món...
+                              </div>
+                            ) : order.itemList.map((item, i) => (
+                              <div key={i} style={{ display: "flex", justifyContent: "space-between",
+                                alignItems: "center", padding: "8px 12px",
+                                borderBottom: i < order.itemList.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ color: "#f8f0e0", fontSize: 10.5, fontWeight: 600,
+                                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {item.name}
+                                  </div>
+                                  <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 1 }}>
+                                    {fmt(item.price)} × {item.qty}
+                                  </div>
+                                </div>
+                                <div style={{ color: "#FF8C00", fontSize: 11, fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>
+                                  {fmt(item.price * item.qty)}
+                                </div>
+                              </div>
+                            ))}
+                            {order.note && (
+                              <div style={{ padding: "7px 12px", borderTop: "1px solid rgba(255,255,255,0.04)",
+                                background: "rgba(245,197,66,0.04)", display: "flex", gap: 6, alignItems: "flex-start" }}>
+                                <span style={{ fontSize: 11, flexShrink: 0 }}>📝</span>
+                                <span style={{ color: "#b0956a", fontSize: 9 }}>{order.note}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ── Thông tin thanh toán ── */}
+                          <div style={{ fontSize: 8, fontWeight: 700, color: "#6a5a40",
+                            textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 5 }}>
+                            Thông tin thanh toán
+                          </div>
                           {(() => {
-                            const commission    = Math.round(order.subtotal * 0.15)
-                            const netReceive    = order.subtotal - commission - order.discountAmount
+                            const commission = Math.round(order.subtotal * 0.15)
+                            const netReceive = order.subtotal - commission - order.discountAmount
                             return (
-                              <div style={{ background:"rgba(0,0,0,0.25)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, padding:"10px 12px", marginBottom:10 }}>
-                                {/* rows */}
+                              <div style={{ background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.07)",
+                                borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
                                 {[
-                                  { label:"Tiền hàng",       value: order.subtotal,          color:"#f8f0e0", prefix:"" },
-                                  { label:"Hoa hồng app 15%", value: commission,              color:"#ff4040", prefix:"−" },
+                                  { label: "Tiền hàng",        value: order.subtotal,       color: "#f8f0e0", prefix: "" },
+                                  { label: "Hoa hồng app 15%", value: commission,            color: "#ff6060", prefix: "−" },
                                   ...(order.discountAmount > 0
-                                    ? [{ label:"Voucher giảm giá", value: order.discountAmount, color:"#FFB347", prefix:"−" }]
+                                    ? [{ label: "Voucher giảm giá", value: order.discountAmount, color: "#FFB347", prefix: "−" }]
                                     : []),
                                 ].map(r => (
-                                  <div key={r.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"3px 0", borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
-                                    <span style={{ color:"#6a5a40", fontSize:10 }}>{r.label}</span>
-                                    <span style={{ color:r.color, fontSize:10, fontWeight:600 }}>{r.prefix}{fmt(r.value)}</span>
+                                  <div key={r.label} style={{ display: "flex", justifyContent: "space-between",
+                                    alignItems: "center", padding: "4px 0",
+                                    borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                                    <span style={{ color: "#6a5a40", fontSize: 9.5 }}>{r.label}</span>
+                                    <span style={{ color: r.color, fontSize: 9.5, fontWeight: 600 }}>
+                                      {r.prefix}{fmt(r.value)}
+                                    </span>
                                   </div>
                                 ))}
-                                {/* net receive */}
-                                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:8, paddingTop:6, borderTop:"1px solid rgba(62,207,110,0.25)" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                  marginTop: 8, paddingTop: 7, borderTop: "1px solid rgba(62,207,110,0.3)" }}>
                                   <div>
-                                    <div style={{ color:"#3ecf6e", fontSize:11, fontWeight:800 }}>✓ Thực nhận từ tài xế</div>
-                                    <div style={{ color:"#6a5a40", fontSize:8, marginTop:1 }}>
-                                      Tài xế trả bạn khi lấy hàng · {order.payMethod === "wallet" ? "💙 Đã thu qua ví" : "💵 Tiền mặt"}
+                                    <div style={{ color: "#3ecf6e", fontSize: 10.5, fontWeight: 800 }}>✓ Thực nhận từ tài xế</div>
+                                    <div style={{ color: "#6a5a40", fontSize: 8, marginTop: 1 }}>
+                                      {order.payMethod === "wallet" ? "💙 Khách đã trả qua ví" : "💵 Tài xế trả khi lấy hàng"}
                                     </div>
                                   </div>
-                                  <div style={{ textAlign:"right" }}>
-                                    <div style={{ color:"#3ecf6e", fontSize:16, fontWeight:800 }}>{fmt(netReceive)}</div>
-                                  </div>
+                                  <div style={{ color: "#3ecf6e", fontSize: 16, fontWeight: 800 }}>{fmt(netReceive)}</div>
                                 </div>
                               </div>
                             )
