@@ -515,8 +515,6 @@ export default function TrackingPage() {
                               background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.2)",
                               padding:"1px 7px",borderRadius:5 }}>{driverData.plate}</span>
                           )}
-                          <span style={{ color:"#FFB347",fontSize:9 }}>⭐ {driverData.rating}</span>
-                          <span style={{ color:"#6a5a40",fontSize:9 }}>{driverData.trips} chuyến</span>
                         </div>
                       </div>
                       <div style={{ display:"flex",gap:6,flexShrink:0 }}>

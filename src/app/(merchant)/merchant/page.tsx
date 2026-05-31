@@ -616,9 +616,6 @@ export default function MerchantDashboard() {
                                           background: "rgba(62,207,110,0.12)", border: "1px solid rgba(62,207,110,0.25)",
                                           padding: "2px 8px", borderRadius: 5 }}>{order.driverPlate}</span>
                                       )}
-                                      {order.driverRating && (
-                                        <span style={{ color: "#FFB347", fontSize: 9, fontWeight: 600 }}>⭐ {order.driverRating}</span>
-                                      )}
                                     </div>
                                   </div>
                                   {order.driverPhone && (
