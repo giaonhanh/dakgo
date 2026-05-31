@@ -71,18 +71,6 @@ export default function DriverNotificationsPage() {
     setNotifs(ns => ns.map(n => ({ ...n, is_read: true })))
   }
 
-  async function deleteNotif(id: string) {
-    setNotifs(ns => ns.filter(n => n.id !== id))
-    setSwipedId(null)
-    await supabase.from("notifications").update({ deleted_at: new Date().toISOString() }).eq("id", id)
-  }
-
-  async function deleteAll() {
-    const ids = (filter === "all" ? notifs : notifs.filter(n => n.type === filter)).map(n => n.id)
-    if (!ids.length) return
-    setNotifs(ns => filter === "all" ? [] : ns.filter(n => n.type !== filter))
-    await supabase.from("notifications").update({ deleted_at: new Date().toISOString() }).in("id", ids)
-  }
 
   const filtered  = filter === "all" ? notifs : notifs.filter(n => n.type === filter)
   const unreadCnt = notifs.filter(n => !n.is_read).length
@@ -111,12 +99,6 @@ export default function DriverNotificationsPage() {
               <button onClick={markAllRead}
                 style={{ padding:"6px 10px", borderRadius:8, background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.25)", color:"#FF8C00", fontSize:9, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
                 ✓ Đọc hết
-              </button>
-            )}
-            {filtered.length > 0 && (
-              <button onClick={deleteAll}
-                style={{ padding:"6px 10px", borderRadius:8, background:"rgba(255,64,64,0.1)", border:"1px solid rgba(255,64,64,0.25)", color:"#ff4040", fontSize:9, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
-                🗑 Xoá tất cả
               </button>
             )}
           </div>
@@ -181,19 +163,9 @@ export default function DriverNotificationsPage() {
                   <div style={{ color:"#6a5a40", fontSize:9, marginTop:5 }}>{fmtTime(n.created_at)}</div>
                 </div>
               </div>
-              {/* Delete reveal */}
-              <div onClick={() => deleteNotif(n.id)}
-                style={{ position:"absolute", right:0, top:0, bottom:0, width:72, background:"rgba(255,64,64,0.88)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:22, borderRadius:"0 14px 14px 0" }}>
-                🗑
-              </div>
             </div>
           )
         })}
-        {!loading && filtered.length > 0 && (
-          <div style={{ textAlign:"center", padding:"8px 0", color:"#6a5a40", fontSize:9 }}>
-            Vuốt trái để xoá từng thông báo
-          </div>
-        )}
       </div>
 
       <style>{`@keyframes pulse { 0%,100%{opacity:.6} 50%{opacity:.3} }`}</style>

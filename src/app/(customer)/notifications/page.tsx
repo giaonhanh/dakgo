@@ -4,7 +4,7 @@
 // Trung t�m th�ng b�o � d?y d? t�nh nang
 // Tab l?c � Mark read � Tap ? d�ng route � Badge unread � Real-time
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 
@@ -57,8 +57,6 @@ export default function NotificationsPage() {
   const [notifs,    setNotifs]    = useState<Notif[]>([])
   const [activeTab, setActiveTab] = useState("all")
   const [loading,   setLoading]   = useState(true)
-  const [swipedId,  setSwipedId]  = useState<string | null>(null)
-  const touchX = useRef(0)
 
   useEffect(() => {
     async function load() {
@@ -110,18 +108,6 @@ export default function NotificationsPage() {
     }
   }
 
-  const deleteNotif = async (id: string) => {
-    setNotifs(prev => prev.filter(n => n.id !== id))
-    setSwipedId(null)
-    await supabase.from("notifications").update({ deleted_at: new Date().toISOString() }).eq("id", id)
-  }
-
-  const deleteAll = async () => {
-    const ids = (activeTab === "all" ? notifs : notifs.filter(n => n.type === activeTab)).map(n => n.id)
-    if (!ids.length) return
-    setNotifs(prev => activeTab === "all" ? [] : prev.filter(n => n.type !== activeTab))
-    await supabase.from("notifications").update({ deleted_at: new Date().toISOString() }).in("id", ids)
-  }
 
   return (
     <>
@@ -157,12 +143,6 @@ export default function NotificationsPage() {
                 <button onClick={markAllRead}
                   style={{ cursor:"pointer", color:"#FF8C00", fontSize:9, fontWeight:700, fontFamily:"Lexend", padding:"6px 10px", borderRadius:8, background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.2)", whiteSpace:"nowrap" }}>
                   ? �?c h?t
-                </button>
-              )}
-              {filtered.length > 0 && (
-                <button onClick={deleteAll}
-                  style={{ cursor:"pointer", color:"#ff4040", fontSize:9, fontWeight:700, fontFamily:"Lexend", padding:"6px 10px", borderRadius:8, background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)", whiteSpace:"nowrap" }}>
-                  ?? Xo� t?t c?
                 </button>
               )}
             </div>
@@ -254,11 +234,6 @@ export default function NotificationsPage() {
                   {!n.isRead && (
                     <div style={{ position:"absolute", top:9, right:22, width:7, height:7, borderRadius:"50%", background:"#FF6B00", boxShadow:"0 0 5px rgba(255,107,0,0.6)", animation:"pulse 1.5s infinite", pointerEvents:"none" }} />
                   )}
-                  {/* Delete × */}
-                  <button onClick={e => { e.preventDefault(); deleteNotif(n.id) }}
-                    style={{ position:"absolute", top:7, right:7, width:18, height:18, borderRadius:"50%", background:"rgba(255,255,255,0.08)", border:"none", color:"rgba(255,255,255,0.35)", fontSize:11, lineHeight:1, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", padding:0 }}>
-                    ×
-                  </button>
                 </motion.div>
               ))}
             </AnimatePresence>
