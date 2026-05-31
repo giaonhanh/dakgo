@@ -160,12 +160,12 @@ export default function HomePage() {
         .eq("user_id", user.id).eq("is_read", false)
       setNotifCount(count ?? 0)
 
-      // Live order (đơn đang giao)
+      // Live order (đơn đang xử lý / giao)
       const { data: live } = await supabase
         .from("orders")
         .select("id, status, shops(name)")
         .eq("customer_id", user.id)
-        .in("status", ["accepted","preparing","ready","delivering"])
+        .in("status", ["pending","accepted","preparing","ready","delivering"])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -565,7 +565,8 @@ export default function HomePage() {
                         background:"#3ecf6e", boxShadow:"0 0 5px #3ecf6e",
                         animation:"pulse 1.5s infinite" }} />
                       <span style={{ color:"#3ecf6e", fontSize:9, fontWeight:600 }}>
-                        {(liveOrder.status === "accepted" || liveOrder.status === "preparing") ? "Đã xác nhận · Đang làm" :
+                        {liveOrder.status === "pending"    ? "Chờ quán xác nhận" :
+                         (liveOrder.status === "accepted" || liveOrder.status === "preparing") ? "Đã xác nhận · Đang làm" :
                          liveOrder.status === "ready"      ? "Đang tìm tài xế" :
                          liveOrder.status === "delivering" ? "Đang giao hàng" : "Đang xử lý"}
                       </span>

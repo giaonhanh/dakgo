@@ -177,9 +177,7 @@ export default function OrdersPage() {
         .select(`
           id, status, drop_address, note, total, ship_fee,
           pay_method, cancel_reason, created_at, driver_id, shop_id,
-          shops(id, name, category),
-          order_items(id, product_id, name, price, qty),
-          drivers(id, license_plate, rating_avg)
+          shops(id, name, category)
         `)
         .eq("customer_id", user.id)
         .order("created_at", { ascending: false })
@@ -187,7 +185,20 @@ export default function OrdersPage() {
 
       if (ordersErr) console.error("[Orders] fetch error:", ordersErr.message)
 
-      if (!rows) { setLoading(false); return }
+      if (!rows || rows.length === 0) { setLoading(false); return }
+
+      const orderIds = rows.map(o => o.id)
+
+      // Fetch order_items riêng (tránh nested join RLS)
+      const { data: allItems } = await supabase
+        .from("order_items")
+        .select("order_id, id, product_id, name, price, qty")
+        .in("order_id", orderIds)
+      const itemsByOrder: Record<string, { id: string; product_id: string | null; name: string; price: number; qty: number }[]> = {}
+      ;(allItems ?? []).forEach(item => {
+        if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = []
+        itemsByOrder[item.order_id].push({ id: item.id, product_id: item.product_id, name: item.name, price: item.price, qty: item.qty })
+      })
 
       // Fetch driver profiles for orders that have a driver
       const driverIds = rows
@@ -219,10 +230,8 @@ export default function OrdersPage() {
 
       const mapped: Order[] = rows.map((o, idx) => {
         const shop = Array.isArray(o.shops) ? o.shops[0] : o.shops
-        const driverRow = Array.isArray(o.drivers) ? o.drivers[0] : o.drivers
         const driverProfile = driverProfiles.find(p => p.id === o.driver_id)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const items = (o.order_items ?? []) as { id: string; product_id: string | null; name: string; price: number; qty: number }[]
+        const items = itemsByOrder[o.id] ?? []
 
         return {
           id: o.id,
@@ -249,11 +258,11 @@ export default function OrdersPage() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           address:   (o as any).drop_address ?? "",
           note: o.note ?? undefined,
-          driver: driverRow ? {
-            name: driverProfile?.full_name ?? "Tài xế",
-            plate: driverRow.license_plate ?? "",
-            phone: driverProfile?.phone ?? "",
-            rating: Number(driverRow.rating_avg ?? 5),
+          driver: driverProfile ? {
+            name: driverProfile.full_name ?? "Tài xế",
+            plate: "",
+            phone: driverProfile.phone ?? "",
+            rating: 5,
             eta: 0,
           } : undefined,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

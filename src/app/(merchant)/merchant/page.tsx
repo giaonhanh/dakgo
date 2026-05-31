@@ -193,7 +193,14 @@ export default function MerchantDashboard() {
         fetchOrders(shopId)
       })
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+
+    // Fallback: poll every 30s in case realtime misses an event
+    const interval = setInterval(() => fetchOrders(shopId), 30_000)
+
+    return () => {
+      supabase.removeChannel(ch)
+      clearInterval(interval)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shopId])
 
@@ -624,7 +631,7 @@ export default function MerchantDashboard() {
                                   <div style={{ position: "absolute", top: 0, left: "-60%", width: "35%", height: "100%",
                                     background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)",
                                     animation: "mShim 2.5s infinite" }} />
-                                  <span style={{ position: "relative", zIndex: 1 }}>✓ Xác nhận &amp; Điều phối tài xế</span>
+                                  <span style={{ position: "relative", zIndex: 1 }}>✓ Xác nhận &amp; Chuẩn bị</span>
                                 </button>
                               </>
                             )}
