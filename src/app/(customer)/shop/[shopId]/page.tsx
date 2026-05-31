@@ -20,6 +20,7 @@ interface Product {
   imageUrl:  string | null
   sold:      number
   hot?:      boolean
+  badge?:    "hot" | "bigsale" | "bestseller" | null
   toppings:  Topping[]
   sizes:     SizeOpt[]
 }
@@ -361,7 +362,20 @@ function ProductCard({
             -{discount}%
           </div>
         )}
-        {product.hot && (
+        {product.badge && (
+          <div style={{ position:"absolute", bottom:-4, right:-4,
+            borderRadius:6, padding:"2px 7px", fontSize:7.5, fontWeight:800,
+            ...(product.badge === "hot"
+              ? { background:"linear-gradient(90deg,#ff4040,#ff6b00)", color:"#fff" }
+              : product.badge === "bigsale"
+              ? { background:"linear-gradient(90deg,#FFD700,#FF8C00)", color:"#fff" }
+              : { background:"linear-gradient(90deg,#3ecf6e,#2ea855)", color:"#fff" }) }}>
+            {product.badge === "hot" ? "🔥 HOT"
+              : product.badge === "bigsale" ? "💸 SALE"
+              : "📈 BÁN CHẠY"}
+          </div>
+        )}
+        {!product.badge && product.hot && (
           <div style={{ position:"absolute", bottom:-4, right:-4,
             background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
             color:"#fff", borderRadius:6, padding:"1px 6px",
@@ -497,21 +511,25 @@ export default function ShopPage() {
       // Products
       const { data: prodData } = await supabase
         .from("products")
-        .select("id,name,description,price,original_price,category,is_available,sold_count,image_url,toppings,sizes")
+        .select("id,name,description,price,original_price,category,is_available,sold_count,image_url,toppings,sizes,badge,sort_order")
         .eq("shop_id", shopId)
         .eq("is_available", true)
         .order("sort_order", { ascending: true })
 
-      type ProdRow = { id:string; name:string; description:string|null; price:number; original_price:number|null; category:string|null; sold_count:number; image_url:string|null; toppings:unknown; sizes:unknown }
-      const mapped: Product[] = (prodData ?? [] as ProdRow[]).map((p: ProdRow) => ({
-        id: p.id, name: p.name, desc: p.description ?? "",
-        price: p.price, origPrice: p.original_price ?? null,
-        category: p.category ?? "Thực đơn",
-        imageUrl: p.image_url,
-        sold: p.sold_count, hot: p.sold_count > 50,
-        toppings: (p.toppings as Topping[] | null) ?? [],
-        sizes: (p.sizes as SizeOpt[] | null) ?? [],
-      }))
+      type ProdRow = { id:string; name:string; description:string|null; price:number; original_price:number|null; category:string|null; sold_count:number; image_url:string|null; toppings:unknown; sizes:unknown; badge:string|null; sort_order:number }
+      const mapped: Product[] = (prodData ?? [] as ProdRow[])
+        .map((p: ProdRow) => ({
+          id: p.id, name: p.name, desc: p.description ?? "",
+          price: p.price, origPrice: p.original_price ?? null,
+          category: p.category ?? "Thực đơn",
+          imageUrl: p.image_url,
+          sold: p.sold_count, hot: p.sold_count > 50,
+          badge: (p.badge as Product["badge"]) ?? null,
+          toppings: (p.toppings as Topping[] | null) ?? [],
+          sizes: (p.sizes as SizeOpt[] | null) ?? [],
+        }))
+        // Badge products float to top within their category
+        .sort((a, b) => (b.badge ? 1 : 0) - (a.badge ? 1 : 0))
       setProducts(mapped)
 
       // Derive category tabs — prefer menu_groups_data names (merchant-defined order & labels)

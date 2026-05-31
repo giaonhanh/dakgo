@@ -596,40 +596,46 @@ export default function MerchantDashboard() {
                             </div>
                           </div>
 
-                          {/* ── Thông tin tài xế (khi đã có tài xế nhận) ── */}
+                          {/* ── Tài xế nhận đơn ── */}
                           {order.driverId && (
                             <>
                               <div style={{ fontSize: 8, fontWeight: 700, color: "#6a5a40",
                                 textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 5 }}>
-                                Tài xế nhận đơn
+                                🛵 Tài xế nhận đơn
                               </div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8,
-                                padding: "8px 10px", borderRadius: 9, marginBottom: 12,
-                                background: "rgba(62,207,110,0.04)", border: "1px solid rgba(62,207,110,0.15)" }}>
-                                <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-                                  background: "rgba(62,207,110,0.12)", border: "1px solid rgba(62,207,110,0.25)",
-                                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>🛵</div>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 700 }}>
-                                    {order.driverName ?? "Đang cập nhật..."}
+                              <div style={{ borderRadius: 10, marginBottom: 12, overflow: "hidden",
+                                background: "rgba(62,207,110,0.04)", border: "1px solid rgba(62,207,110,0.18)" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px" }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                                      {order.driverName ?? "Đang cập nhật..."}
+                                    </div>
+                                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                      {order.driverPlate && (
+                                        <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 700,
+                                          background: "rgba(62,207,110,0.12)", border: "1px solid rgba(62,207,110,0.25)",
+                                          padding: "2px 8px", borderRadius: 5 }}>{order.driverPlate}</span>
+                                      )}
+                                      {order.driverRating && (
+                                        <span style={{ color: "#FFB347", fontSize: 9, fontWeight: 600 }}>⭐ {order.driverRating}</span>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 2 }}>
-                                    {order.driverPlate && (
-                                      <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 700,
-                                        background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.2)",
-                                        padding: "1px 6px", borderRadius: 4 }}>{order.driverPlate}</span>
-                                    )}
-                                    {order.driverRating && (
-                                      <span style={{ color: "#FFB347", fontSize: 9 }}>⭐ {order.driverRating}</span>
-                                    )}
-                                  </div>
+                                  {order.driverPhone && (
+                                    <a href={`tel:${order.driverPhone}`}
+                                      style={{ display: "flex", alignItems: "center", gap: 5,
+                                        padding: "7px 14px", borderRadius: 8, textDecoration: "none",
+                                        background: "rgba(62,207,110,0.12)", border: "1px solid rgba(62,207,110,0.3)",
+                                        color: "#3ecf6e", fontSize: 10, fontWeight: 700 }}>
+                                      📞 Gọi
+                                    </a>
+                                  )}
                                 </div>
                                 {order.driverPhone && (
-                                  <a href={`tel:${order.driverPhone}`}
-                                    style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-                                      background: "rgba(62,207,110,0.12)", border: "1px solid rgba(62,207,110,0.3)",
-                                      display: "flex", alignItems: "center", justifyContent: "center",
-                                      fontSize: 16, textDecoration: "none" }}>📞</a>
+                                  <div style={{ padding: "6px 12px", borderTop: "1px solid rgba(62,207,110,0.1)",
+                                    color: "#6a5a40", fontSize: 9 }}>
+                                    📱 {order.driverPhone}
+                                  </div>
                                 )}
                               </div>
                             </>
