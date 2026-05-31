@@ -11,7 +11,7 @@ type ServiceType  = "food" | "motorbike" | "taxi" | "buy_for_me" | "deliver_for_
 
 interface Order {
   id: string; status: OrderStatus; total_amount: number
-  delivery_address: string; created_at: string
+  drop_address: string; created_at: string
   customer_id: string; driver_id: string | null
   shopName: string; itemCount: number; customerName: string; driverName: string | null
 }
@@ -234,7 +234,7 @@ export default function AdminOrdersPage() {
     const supabase = createClient()
     const { data: rows, error } = await supabase
       .from("orders")
-      .select("id,status,total_amount,delivery_address,created_at,customer_id,driver_id,shops!shop_id(name),order_items(id)")
+      .select("id,status,total_amount,drop_address,created_at,customer_id,driver_id,shops!shop_id(name),order_items(id)")
       .order("created_at", { ascending: false })
       .limit(100)
     if (error || !rows) { setLoading(false); return }
@@ -253,7 +253,7 @@ export default function AdminOrdersPage() {
       const shopName = Array.isArray(s) ? (s[0] as {name:string})?.name ?? "—" : (s as {name:string}|null)?.name ?? "—"
       return {
         id: r.id, status: r.status as OrderStatus, total_amount: r.total_amount,
-        delivery_address: r.delivery_address, created_at: r.created_at,
+        drop_address: r.drop_address, created_at: r.created_at,
         customer_id: r.customer_id, driver_id: r.driver_id, shopName,
         itemCount: (r.order_items as unknown[])?.length ?? 0,
         customerName: pMap[r.customer_id] ?? "Khách hàng",
