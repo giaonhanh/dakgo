@@ -208,11 +208,9 @@ function ProductSheet({
                         <div style={{ color: active ? "#4a8ff5" : "#b0956a",
                           fontSize:11, fontWeight: active ? 700 : 400 }}>{s.label}</div>
                         <div style={{ color: active ? "#4a8ff5" : "#6a5a40", fontSize:9, marginTop:2 }}>
-                          {s.priceDiff > 0
-                            ? `+${s.priceDiff.toLocaleString("vi-VN")}đ`
-                            : s.priceDiff < 0
-                            ? `${s.priceDiff.toLocaleString("vi-VN")}đ`
-                            : "Miễn phí"}
+                          {(s.priceDiff ?? 0) === 0
+                            ? "Miễn phí"
+                            : `${(s.priceDiff ?? 0) > 0 ? "+" : ""}${(s.priceDiff ?? 0).toLocaleString("vi-VN")}đ`}
                         </div>
                       </div>
                     )
@@ -250,8 +248,8 @@ function ProductSheet({
                         </div>
                         <span style={{ flex:1, color: checked ? "#f8f0e0" : "#b0956a",
                           fontSize:12, fontWeight: checked ? 600 : 400 }}>{t.name}</span>
-                        <span style={{ color: t.price > 0 ? "#FF8C00" : "#3ecf6e", fontSize:10, fontWeight:600, flexShrink:0 }}>
-                          {t.price > 0 ? `+${t.price.toLocaleString("vi-VN")}đ` : "Miễn phí"}
+                        <span style={{ color: (t.price ?? 0) > 0 ? "#FF8C00" : "#3ecf6e", fontSize:10, fontWeight:600, flexShrink:0 }}>
+                          {(t.price ?? 0) === 0 ? "Miễn phí" : `+${t.price.toLocaleString("vi-VN")}đ`}
                         </span>
                       </div>
                     )
