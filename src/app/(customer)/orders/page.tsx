@@ -864,49 +864,54 @@ export default function OrdersPage() {
                           transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .2s" }}>⌾</span>
                       </div>
 
-                      {/* Danh sách món preview */}
-                      <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
-                        borderRadius: 9, overflow: "hidden", marginBottom: 8 }}>
-                        {order.items.slice(0, 3).map((item, ii) => {
-                          const parsed2 = parseItemName(item.name)
-                          const sLbl = item.breakdown?.sizeLabel
-                            ? (/^size/i.test(item.breakdown.sizeLabel) ? item.breakdown.sizeLabel : `Size ${item.breakdown.sizeLabel}`)
-                            : parsed2.size ? (/^size/i.test(parsed2.size) ? parsed2.size : `Size ${parsed2.size}`) : null
-                          const tNames = item.breakdown?.toppings?.map(t => t.name) ?? parsed2.toppings
-                          return (
-                            <div key={ii} style={{ padding: "5px 9px",
-                              borderBottom: ii < Math.min(order.items.length, 3) - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-                              display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <span style={{ color: "#b0956a", fontSize: 9.5, fontWeight: 600 }}>{parsed2.base}</span>
-                                {(sLbl || tNames.length > 0) && (
-                                  <div style={{ fontSize: 8, marginTop: 1, display: "flex", flexWrap: "wrap", gap: 3 }}>
-                                    {sLbl && <span style={{ color: "#4a8ff5" }}>{sLbl}</span>}
-                                    {tNames.map((t, ti) => (
-                                      <span key={ti} style={{ color: "#3ecf6e" }}>{(sLbl || ti > 0) ? "· " : ""}{t}</span>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              <div style={{ flexShrink: 0, textAlign: "right" }}>
-                                <span style={{ color: "#6a5a40", fontSize: 8.5 }}>×{item.qty}</span>
-                                <span style={{ color: "#f8f0e0", fontSize: 9.5, fontWeight: 600, marginLeft: 4 }}>
-                                  {formatPrice(item.price * item.qty)}
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        })}
-                        {order.items.length > 3 && (
-                          <div style={{ padding: "3px 9px", color: "#6a5a40", fontSize: 8 }}>
-                            +{order.items.length - 3} món khác
-                          </div>
-                        )}
+                    </div>
+
+                    {/* ── Thông tin giao hàng (luôn hiển thị) ── */}
+                    <div style={{ padding: "9px 13px 10px",
+                      borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+
+                      {/* Địa chỉ */}
+                      <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginBottom: 7 }}>
+                        <span style={{ fontSize: 12, flexShrink: 0, marginTop: 1 }}>📍</span>
+                        <span style={{ color: "#b0956a", fontSize: 9.5, lineHeight: 1.45, flex: 1 }}>
+                          {order.address || "Chưa có địa chỉ"}
+                        </span>
                       </div>
+
+                      {/* Tài xế + call + tracking */}
+                      {order.driver ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          <span style={{ fontSize: 12, flexShrink: 0 }}>🛵</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ color: "#f8f0e0", fontSize: 10, fontWeight: 600 }}>{order.driver.name}</span>
+                            {order.driver.plate && (
+                              <span style={{ color: "#6a5a40", fontSize: 9, marginLeft: 5 }}>{order.driver.plate}</span>
+                            )}
+                          </div>
+                          {order.driver.phone && (
+                            <a href={`tel:${order.driver.phone}`}
+                              onClick={e => e.stopPropagation()}
+                              style={{ textDecoration: "none", width: 30, height: 30, borderRadius: 9, flexShrink: 0,
+                                background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.28)",
+                                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>📞</a>
+                          )}
+                          {order.status === "delivering" && (
+                            <button onClick={e => { e.stopPropagation(); router.push(`/tracking/${order.id}`) }}
+                              style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, cursor: "pointer",
+                                background: "rgba(255,107,0,0.1)", outline: "1px solid rgba(255,107,0,0.28)",
+                                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>🗺️</button>
+                          )}
+                        </div>
+                      ) : !isCancelled && !isCompleted ? (
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <span style={{ fontSize: 11 }}>⏳</span>
+                          <span style={{ color: "#6a5a40", fontSize: 9 }}>Đang tìm tài xế...</span>
+                        </div>
+                      ) : null}
 
                       {/* Lý do hủy */}
                       {isCancelled && order.cancelReason && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 7,
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 7,
                           padding: "5px 9px", background: "rgba(255,64,64,0.05)",
                           border: "1px solid rgba(255,64,64,0.15)", borderRadius: 7 }}>
                           <span style={{ fontSize: 11 }}>⚠️</span>
@@ -922,31 +927,6 @@ export default function OrdersPage() {
                           animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.25 }} style={{ overflow: "hidden" }}>
                           <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "12px 13px" }}>
-
-                            {/* Tracking card */}
-                            {order.status === "delivering" && order.driver && (
-                              <button onClick={() => router.push(`/tracking/${order.id}`)}
-                                style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", marginBottom: 10 }}>
-                                <div style={{ background: "#0f1a08", border: "1px solid rgba(62,207,110,0.28)",
-                                  borderRadius: 11, padding: "9px 12px", display: "flex", alignItems: "center", gap: 9,
-                                  position: "relative", overflow: "hidden" }}>
-                                  <div style={{ position: "absolute", right: -8, top: -8, width: 60, height: 60,
-                                    background: "radial-gradient(circle,rgba(62,207,110,0.18) 0%,transparent 65%)" }} />
-                                  <span style={{ fontSize: 20, position: "relative", zIndex: 1 }}>🗺️</span>
-                                  <div style={{ flex: 1, position: "relative", zIndex: 1 }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#3ecf6e", animation: "oPulse 1.5s infinite" }} />
-                                      <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>Tài xế đang đến</span>
-                                    </div>
-                                    <div style={{ color: "#f8f0e0", fontSize: 10, fontWeight: 600, marginTop: 2 }}>
-                                      {order.driver.name}{order.driver.plate ? ` · ${order.driver.plate}` : ""}
-                                    </div>
-                                    <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 8, marginTop: 1 }}>Nhấn để mở bản đồ</div>
-                                  </div>
-                                  <span style={{ color: "#3ecf6e", fontSize: 16, position: "relative", zIndex: 1 }}>›</span>
-                                </div>
-                              </button>
-                            )}
 
                             {order.status === "preparing" && (
                               <div style={{ background: "rgba(74,143,245,0.07)", border: "1px solid rgba(74,143,245,0.2)",
