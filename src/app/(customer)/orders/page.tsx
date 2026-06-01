@@ -830,89 +830,44 @@ export default function OrdersPage() {
                     <div onClick={() => setExpanded(p => p === order.id ? null : order.id)}
                       style={{ padding: "12px 13px", cursor: "pointer" }}>
 
-                      {/* Row 1: chip dịch vụ + tên quán + status badge */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+                      {/* Row 1: Dịch vụ · Tên quán · Trạng thái (realtime) */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
-                          background: svc.chipBg, border: `1px solid ${svc.chipBd}`, borderRadius: 6,
-                          padding: "2px 7px" }}>
+                          background: svc.chipBg, border: `1px solid ${svc.chipBd}`, borderRadius: 6, padding: "2px 7px" }}>
                           <span style={{ fontSize: 11 }}>{svc.emoji}</span>
                           <span style={{ color: svc.color, fontSize: 8.5, fontWeight: 700 }}>{svc.label}</span>
                         </div>
-                        <div style={{ flex: 1, color: "#f8f0e0", fontSize: 11.5, fontWeight: 600,
+                        <div style={{ flex: 1, color: "#f8f0e0", fontSize: 11.5, fontWeight: 700,
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {order.shopName}
                         </div>
                         <StatusBadge status={order.status} />
                       </div>
 
-                      {/* Row 2: mã đơn + ngày giờ */}
-                      <div style={{ color: "#6a5a40", fontSize: 8.5, marginBottom: 8 }}>
-                        #{order.id.slice(0,8).toUpperCase()} · {order.createdAt}
-                      </div>
-
-                      {/* Danh sách món preview */}
-                      <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
-                        borderRadius: 9, overflow: "hidden", marginBottom: 8 }}>
-                        {order.items.slice(0, 3).map((item, ii) => {
-                          const parsed2 = parseItemName(item.name)
-                          const sLbl = item.breakdown?.sizeLabel
-                            ? (/^size/i.test(item.breakdown.sizeLabel) ? item.breakdown.sizeLabel : `Size ${item.breakdown.sizeLabel}`)
-                            : parsed2.size ? (/^size/i.test(parsed2.size) ? parsed2.size : `Size ${parsed2.size}`) : null
-                          const tNames = item.breakdown?.toppings?.map(t => t.name) ?? parsed2.toppings
-                          return (
-                            <div key={ii} style={{ padding: "5px 9px",
-                              borderBottom: ii < Math.min(order.items.length, 3) - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-                              display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <span style={{ color: "#b0956a", fontSize: 9.5, fontWeight: 600 }}>{parsed2.base}</span>
-                                {(sLbl || tNames.length > 0) && (
-                                  <div style={{ fontSize: 8, marginTop: 1, display: "flex", flexWrap: "wrap", gap: 3 }}>
-                                    {sLbl && <span style={{ color: "#4a8ff5" }}>{sLbl}</span>}
-                                    {tNames.map((t, ti) => (
-                                      <span key={ti} style={{ color: "#3ecf6e" }}>{(sLbl || ti > 0) ? "· " : ""}{t}</span>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              <div style={{ flexShrink: 0, textAlign: "right" }}>
-                                <span style={{ color: "#6a5a40", fontSize: 8.5 }}>×{item.qty}</span>
-                                <span style={{ color: "#f8f0e0", fontSize: 9.5, fontWeight: 600, marginLeft: 4 }}>
-                                  {formatPrice(item.price * item.qty)}
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        })}
-                        {order.items.length > 3 && (
-                          <div style={{ padding: "3px 9px", color: "#6a5a40", fontSize: 8 }}>
-                            +{order.items.length - 3} món khác
-                          </div>
+                      {/* Row 2: Mã đơn · Ngày giờ · Số món  Tổng › */}
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        <span style={{ color: "#6a5a40", fontSize: 8.5, fontWeight: 600 }}>
+                          #{order.id.slice(0,8).toUpperCase()}
+                        </span>
+                        <span style={{ color: "rgba(255,255,255,0.12)", margin: "0 5px", fontSize: 8 }}>·</span>
+                        <span style={{ color: "#6a5a40", fontSize: 8.5 }}>{order.createdAt}</span>
+                        <span style={{ color: "rgba(255,255,255,0.12)", margin: "0 5px", fontSize: 8 }}>·</span>
+                        <span style={{ color: "#6a5a40", fontSize: 8.5 }}>{order.items.length} món</span>
+                        {isCancelled && order.cancelReason && (
+                          <>
+                            <span style={{ color: "rgba(255,255,255,0.12)", margin: "0 5px", fontSize: 8 }}>·</span>
+                            <span style={{ color: "#ff6060", fontSize: 8 }}>⚠️ {order.cancelReason}</span>
+                          </>
                         )}
-                      </div>
-
-                      {/* Lý do hủy */}
-                      {isCancelled && order.cancelReason && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 7,
-                          padding: "5px 9px", background: "rgba(255,64,64,0.05)",
-                          border: "1px solid rgba(255,64,64,0.15)", borderRadius: 7 }}>
-                          <span style={{ fontSize: 11 }}>⚠️</span>
-                          <span style={{ color: "#ff6060", fontSize: 8.5 }}>Lý do: {order.cancelReason}</span>
-                        </div>
-                      )}
-
-                      {/* Tổng + expand arrow */}
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
-                        <div>
-                          <span style={{ color: "#6a5a40", fontSize: 9 }}>Tổng thanh toán: </span>
-                          <span style={{ background: "linear-gradient(135deg,#FF6B00,#FFB347)",
-                            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-                            fontSize: isCancelled ? 12 : 13, fontWeight: 700,
-                            textDecoration: isCancelled ? "line-through" : "none" }}>
-                            {formatPrice(total)}
-                          </span>
-                        </div>
-                        <span style={{ color: "#6a5a40", fontSize: 12,
-                          transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .2s", display: "inline-block" }}>⌾</span>
+                        <div style={{ flex: 1 }} />
+                        <span style={{ background: "linear-gradient(135deg,#FF6B00,#FFB347)",
+                          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+                          fontSize: 13, fontWeight: 700, marginRight: 7,
+                          textDecoration: isCancelled ? "line-through" : "none" }}>
+                          {formatPrice(total)}
+                        </span>
+                        <span style={{ color: "#6a5a40", fontSize: 11, display: "inline-block",
+                          transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .2s" }}>⌾</span>
                       </div>
                     </div>
 
@@ -961,91 +916,59 @@ export default function OrdersPage() {
                             )}
 
                             {/* ── 1. Chi tiết món ── */}
-                            <SLabel>Chi tiết món</SLabel>
+                            <SLabel>Chi tiết đơn</SLabel>
                             <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
                               borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
                               {order.items.map((item, i) => {
-                                const parsed = parseItemName(item.name)
-                                const bd = item.breakdown
-                                const displaySize = bd?.sizeLabel
+                                const bd       = item.breakdown
+                                const base     = bd?.basePrice ?? item.price
+                                const sizeDiff = bd?.sizeDiff  ?? 0
+                                const tops     = bd?.toppings  ?? []
+                                const perUnit  = base + sizeDiff + tops.reduce((s,t) => s + t.price, 0)
+                                const parsed   = parseItemName(item.name)
+                                const displaySz = bd?.sizeLabel
                                   ? (/^size/i.test(bd.sizeLabel) ? bd.sizeLabel : `Size ${bd.sizeLabel}`)
                                   : parsed.size ? (/^size/i.test(parsed.size) ? parsed.size : `Size ${parsed.size}`) : null
-                                const hasBd = !!(bd && (bd.basePrice > 0 || (bd.sizeDiff ?? 0) > 0 || (bd.toppings?.length ?? 0) > 0))
-                                const hasOpts = !!(displaySize || parsed.toppings.length > 0 || hasBd)
                                 return (
-                                  <div key={i} style={{ padding: "10px 12px",
+                                  <div key={i} style={{ padding: "9px 12px",
                                     borderBottom: i < order.items.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                    {/* Số thứ tự + Tên + Số lượng */}
-                                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
-                                      <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-                                        background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.3)",
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        color: "#FF8C00", fontSize: 9, fontWeight: 800 }}>{i + 1}</span>
-                                      <span style={{ color: "#f8f0e0", fontSize: 11.5, fontWeight: 700, flex: 1 }}>{parsed.base}</span>
-                                      <span style={{ color: "#6a5a40", fontSize: 9 }}>×{item.qty}</span>
+                                    {/* Tên món + Giá gốc */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+                                      marginBottom: (displaySz || tops.length > 0) ? 4 : 0 }}>
+                                      <span style={{ color: "#f8f0e0", fontSize: 10.5, fontWeight: 700, flex: 1, marginRight: 8 }}>{parsed.base}</span>
+                                      <span style={{ color: "#b0956a", fontSize: 9.5, flexShrink: 0 }}>{formatPrice(base)}</span>
                                     </div>
-                                    {/* Bảng giá */}
-                                    {hasOpts && (
-                                      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
-                                        borderRadius: 8, overflow: "hidden", marginBottom: 6 }}>
-                                        {hasBd ? (
-                                          <>
-                                            <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
-                                              borderBottom: (displaySize || (bd?.toppings?.length ?? 0) > 0) ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                              <span style={{ color: "#6a5a40", fontSize: 9 }}>Giá gốc</span>
-                                              <span style={{ color: "#b0956a", fontSize: 9, fontWeight: 600 }}>{formatPrice(bd!.basePrice)}</span>
-                                            </div>
-                                            {displaySize && (bd?.sizeDiff ?? 0) > 0 && (
-                                              <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
-                                                borderBottom: (bd?.toppings?.length ?? 0) > 0 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                                <span style={{ color: "#4a8ff5", fontSize: 9 }}>▸ {displaySize}</span>
-                                                <span style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 600 }}>+{formatPrice(bd!.sizeDiff!)}</span>
-                                              </div>
-                                            )}
-                                            {bd?.toppings?.map((tp, ti) => (
-                                              <div key={ti} style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
-                                                borderBottom: ti < (bd?.toppings?.length ?? 0) - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                                <span style={{ color: "#3ecf6e", fontSize: 9 }}>+ {tp.name}</span>
-                                                <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>+{formatPrice(tp.price)}</span>
-                                              </div>
-                                            ))}
-                                          </>
-                                        ) : (
-                                          <>
-                                            {displaySize && (
-                                              <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
-                                                borderBottom: parsed.toppings.length > 0 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                                <span style={{ color: "#4a8ff5", fontSize: 9 }}>▸ {displaySize}</span>
-                                                <span style={{ color: "#6a5a40", fontSize: 8 }}>đã tính</span>
-                                              </div>
-                                            )}
-                                            {parsed.toppings.map((t, ti) => (
-                                              <div key={ti} style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
-                                                borderBottom: ti < parsed.toppings.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                                <span style={{ color: "#3ecf6e", fontSize: 9 }}>+ {t}</span>
-                                                <span style={{ color: "#6a5a40", fontSize: 8 }}>đã tính</span>
-                                              </div>
-                                            ))}
-                                          </>
-                                        )}
+                                    {/* Size */}
+                                    {displaySz && sizeDiff > 0 && (
+                                      <div style={{ display: "flex", justifyContent: "space-between", paddingLeft: 8, marginBottom: 2 }}>
+                                        <span style={{ color: "#4a8ff5", fontSize: 9 }}>▸ {displaySz}</span>
+                                        <span style={{ color: "#4a8ff5", fontSize: 9 }}>+{formatPrice(sizeDiff)}</span>
                                       </div>
                                     )}
-                                    {/* Thành tiền */}
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                      <span style={{ color: "#b0956a", fontSize: 9.5 }}>
-                                        Thành tiền{item.qty > 1 ? ` (×${item.qty})` : ""}
-                                      </span>
-                                      <span style={{ color: "#FF8C00", fontSize: 12, fontWeight: 800 }}>
-                                        {formatPrice(item.price * item.qty)}
+                                    {/* Toppings */}
+                                    {tops.map((tp, ti) => (
+                                      <div key={ti} style={{ display: "flex", justifyContent: "space-between", paddingLeft: 8, marginBottom: 2 }}>
+                                        <span style={{ color: "#3ecf6e", fontSize: 9 }}>+ {tp.name}</span>
+                                        <span style={{ color: "#3ecf6e", fontSize: 9 }}>+{formatPrice(tp.price)}</span>
+                                      </div>
+                                    ))}
+                                    {/* Thành tiền · Số lượng · Tổng tiền */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                      marginTop: 5, paddingTop: 5, borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                        <span style={{ color: "#6a5a40", fontSize: 8.5 }}>Thành tiền</span>
+                                        <span style={{ color: "rgba(255,255,255,0.15)", fontSize: 8 }}>×</span>
+                                        <span style={{ color: "#6a5a40", fontSize: 8.5, fontWeight: 600 }}>{item.qty}</span>
+                                      </div>
+                                      <span style={{ color: "#FF8C00", fontSize: 11, fontWeight: 800 }}>
+                                        {formatPrice(perUnit * item.qty)}
                                       </span>
                                     </div>
-                                    {/* Ghi chú món */}
                                     {item.note && (
-                                      <div style={{ marginTop: 6, padding: "5px 9px", borderRadius: 7,
-                                        background: "rgba(245,197,66,0.08)", border: "1px solid rgba(245,197,66,0.2)",
-                                        color: "#f5c542", fontSize: 9, display: "flex", gap: 5, alignItems: "flex-start" }}>
-                                        <span style={{ flexShrink: 0, fontWeight: 700 }}>📝</span>
-                                        <span>{item.note}</span>
+                                      <div style={{ marginTop: 5, padding: "4px 8px", borderRadius: 6,
+                                        background: "rgba(245,197,66,0.08)", border: "1px solid rgba(245,197,66,0.15)",
+                                        color: "#f5c542", fontSize: 8.5, display: "flex", gap: 4 }}>
+                                        <span>📝</span><span>{item.note}</span>
                                       </div>
                                     )}
                                   </div>
@@ -1060,48 +983,49 @@ export default function OrdersPage() {
                               )}
                             </div>
 
-                            {/* ── 2. Thông tin thanh toán ── */}
+                            {/* ── 2. Tổng thanh toán ── */}
                             {(() => {
-                              const xuUsed = order.xuUsed ?? 0
-                              const payable = total - xuUsed
-                              const raw = order.payMethodRaw ?? "cash"
-                              const pStat = order.paymentStatus ?? "pending"
-                              let statusText = ""
-                              let statusColor = "#6a5a40"
-                              if (pStat === "paid") { statusText = "✅ Đã thanh toán"; statusColor = "#3ecf6e" }
-                              else if (raw === "cash") { statusText = `💵 Chưa thanh toán · ${formatPrice(payable)}`; statusColor = "#ff6060" }
-                              else { statusText = `⏳ Chờ chuyển khoản · ${formatPrice(payable)}`; statusColor = "#FFB347" }
+                              const xuUsed  = order.xuUsed ?? 0
+                              const raw     = order.payMethodRaw ?? "cash"
+                              const pStat   = order.paymentStatus ?? "pending"
+                              let statusColor = "#ff6060", statusText = "Chưa TT"
+                              if (pStat === "paid")       { statusText = "✅ Đã TT";  statusColor = "#3ecf6e" }
+                              else if (raw !== "cash")    { statusText = "⏳ Chờ CK"; statusColor = "#FFB347" }
                               return (
-                                <>
-                                  <SLabel>Thông tin thanh toán</SLabel>
-                                  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
-                                    borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
-                                    {[
-                                      { label: "Tiền món",       val: order.subtotal,   c: "#b0956a" },
-                                      order.deliveryFee > 0 ? { label: "Phí giao hàng", val: order.deliveryFee, c: "#b0956a" } : null,
-                                      order.discount > 0    ? { label: "Voucher giảm",  val: -order.discount,   c: "#3ecf6e" } : null,
-                                      xuUsed > 0            ? { label: "🪙 Xu đã dùng", val: -xuUsed,           c: "#FFB347" } : null,
-                                    ].filter((r): r is { label: string; val: number; c: string } => r !== null)
-                                     .map((r, ri) => (
-                                      <div key={ri} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
-                                        <span style={{ color: "#6a5a40", fontSize: 9 }}>{r.label}</span>
-                                        <span style={{ color: r.c, fontSize: 9 }}>{r.val < 0 ? "−" : ""}{formatPrice(Math.abs(r.val))}</span>
-                                      </div>
-                                    ))}
-                                    <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "6px 0" }} />
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                                      <span style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600 }}>Tổng cộng</span>
+                                <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
+                                  borderRadius: 10, padding: "8px 12px", marginBottom: 10 }}>
+                                  {order.deliveryFee > 0 && (
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                                      <span style={{ color: "#6a5a40", fontSize: 9 }}>Phí giao</span>
+                                      <span style={{ color: "#b0956a", fontSize: 9 }}>{formatPrice(order.deliveryFee)}</span>
+                                    </div>
+                                  )}
+                                  {order.discount > 0 && (
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                                      <span style={{ color: "#6a5a40", fontSize: 9 }}>Voucher</span>
+                                      <span style={{ color: "#3ecf6e", fontSize: 9 }}>−{formatPrice(order.discount)}</span>
+                                    </div>
+                                  )}
+                                  {xuUsed > 0 && (
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                                      <span style={{ color: "#6a5a40", fontSize: 9 }}>🪙 Xu</span>
+                                      <span style={{ color: "#FFB347", fontSize: 9 }}>−{formatPrice(xuUsed)}</span>
+                                    </div>
+                                  )}
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                    paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+                                    <div>
+                                      <span style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 700 }}>Tổng cộng  </span>
+                                      <span style={{ color: "#6a5a40", fontSize: 8.5 }}>{order.payMethod}</span>
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <span style={{ color: statusColor, fontSize: 8.5, fontWeight: 600 }}>{statusText}</span>
                                       <span style={{ background: "linear-gradient(135deg,#FF6B00,#FFB347)",
                                         WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                                        backgroundClip: "text", fontSize: 14, fontWeight: 700 }}>{formatPrice(total)}</span>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                                      padding: "6px 0", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                                      <span style={{ color: "#6a5a40", fontSize: 9 }}>{order.payMethod}</span>
-                                      <span style={{ color: statusColor, fontSize: 9.5, fontWeight: 600 }}>{statusText}</span>
+                                        backgroundClip: "text", fontSize: 14, fontWeight: 800 }}>{formatPrice(total)}</span>
                                     </div>
                                   </div>
-                                </>
+                                </div>
                               )
                             })()}
 
