@@ -27,10 +27,16 @@ import { useLocationStore } from "@/store/locationStore"
 import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ─────────────────────────────────────────────────
-type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; avatar_url: string | null }
+type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; avatar_url: string | null; lat: number | null; lng: number | null; open_hour: number | null; close_hour: number | null }
 type ProductRow = { id: string; name: string; price: number; sold_count: number; shop_id: string; shops: { name: string } | { name: string }[] | null }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
-type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null }
+type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_spend: number | null }
+
+function distKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
 type LiveOrderRow = { id: string; status: string; shops: { name: string } | { name: string }[] | null }
 type RecoRow = { id: string; name: string; price: number; original_price: number | null; image_url: string | null; sold_count: number; shop_id: string; shop_name: string; order_count: number }
 
@@ -174,7 +180,7 @@ export default function HomePage() {
       // Vouchers
       const { data: voucherData } = await supabase
         .from("vouchers")
-        .select("id,code,title,discount_type,discount_value,valid_to,shop_id")
+        .select("id,code,title,discount_type,discount_value,valid_to,shop_id,min_spend")
         .eq("is_active", true)
         .gt("valid_to", new Date().toISOString())
         .order("valid_to", { ascending: true })
@@ -184,7 +190,7 @@ export default function HomePage() {
       // Nearby shops (all approved shops)
       const { data: shopData } = await supabase
         .from("shops")
-        .select("id,name,is_open,rating_avg,address,avatar_url")
+        .select("id,name,is_open,rating_avg,address,avatar_url,lat,lng,open_hour,close_hour")
         .order("rating_avg", { ascending: false })
         .limit(10)
       setNearbyShops((shopData ?? []) as ShopRow[])
@@ -459,8 +465,13 @@ export default function HomePage() {
               </div>
               <div>
                 <div style={{ color:"#6a5a40", fontSize:9 }}>Vị trí của bạn</div>
-                <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:600 }}>
-                  {location} ▾
+                <div onClick={() => router.push("/addresses")}
+                  style={{ color:"#f8f0e0", fontSize:12, fontWeight:600, cursor:"pointer",
+                    display:"flex", alignItems:"center", gap:4 }}>
+                  <span style={{ maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                    {location}
+                  </span>
+                  <span style={{ color:"#FF8C00", fontSize:10 }}>▾</span>
                 </div>
               </div>
             </div>
@@ -856,6 +867,21 @@ export default function HomePage() {
                         <div style={{ color:"#b0956a", fontSize:8, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.title}</div>
                       </div>
                     </div>
+                    {/* Min spend progress bar */}
+                    {v.min_spend && v.min_spend > 0 && (
+                      <div style={{ marginBottom:6 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+                          <span style={{ fontSize:7.5, color:"#6a5a40" }}>Đặt từ</span>
+                          <span style={{ fontSize:7.5, color: isShop ? "#4a8ff5" : "#FF8C00", fontWeight:700 }}>
+                            {v.min_spend.toLocaleString("vi-VN")}đ
+                          </span>
+                        </div>
+                        <div style={{ height:3, borderRadius:2, background:"rgba(255,255,255,0.06)", overflow:"hidden" }}>
+                          <div style={{ height:"100%", width:"0%", borderRadius:2,
+                            background: isShop ? "#4a8ff5" : "#FF8C00" }} />
+                        </div>
+                      </div>
+                    )}
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                       <div style={{ fontSize:7.5, color: urgent ? "#ff4040" : "rgba(255,107,0,0.45)", fontWeight: urgent ? 700 : 400 }}>
                         {urgent ? "⏰ " : ""}{expiryLabel}
@@ -1076,6 +1102,16 @@ export default function HomePage() {
               </div>
             ) : nearbyShops.map(s => {
               const isFav = favoriteIds.includes(s.id)
+              const uLat = locationData.lat, uLng = locationData.lng
+              const dist = (uLat && uLng && s.lat && s.lng)
+                ? distKm(uLat, uLng, s.lat, s.lng)
+                : null
+              const distLabel = dist != null
+                ? dist < 1 ? `${Math.round(dist*1000)}m` : `${dist.toFixed(1)}km`
+                : null
+              const reopenLabel = !s.is_open && s.open_hour != null
+                ? `Mở lại ${String(s.open_hour).padStart(2,"0")}:00`
+                : null
               return (
               <div key={s.id} style={{ position:"relative" }}>
                 <a href={`/shop/${s.id}`} style={{ textDecoration:"none" }}>
@@ -1085,36 +1121,47 @@ export default function HomePage() {
                     borderRadius:14, padding:"10px 11px",
                     display:"flex", alignItems:"center", gap:10, cursor:"pointer",
                   }}>
-                    <div style={{ width:54, height:54, borderRadius:12, flexShrink:0,
+                    <div style={{ width:54, height:54, borderRadius:12, flexShrink:0, position:"relative",
                       background:"rgba(255,107,0,0.07)", border:"1px solid rgba(255,255,255,0.08)",
                       display:"flex", alignItems:"center", justifyContent:"center", fontSize:27, overflow:"hidden" }}>
                       {s.avatar_url ? (
                         <img src={s.avatar_url} alt={s.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
                       ) : "🏪"}
+                      {!s.is_open && (
+                        <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.55)",
+                          display:"flex", alignItems:"center", justifyContent:"center",
+                          borderRadius:12, fontSize:18 }}>🔒</div>
+                      )}
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ color:"#f8f0e0", fontSize:11.5, fontWeight:600,
-                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                        {s.name}
-                      </div>
-                      <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
-                        <span style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.06)",
-                          color:"#6a5a40", fontSize:7.5, borderRadius:5, padding:"2px 6px" }}>
-                          {s.address.split(",")[0]}
-                        </span>
-                        {s.is_open ? (
-                          <span style={{ background:"rgba(62,207,110,0.08)", border:"1px solid rgba(62,207,110,0.2)",
-                            color:"#3ecf6e", fontSize:7.5, borderRadius:5, padding:"2px 6px" }}>🟢 Đang mở</span>
-                        ) : (
-                          <span style={{ background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)",
-                            color:"#ff6060", fontSize:7.5, borderRadius:5, padding:"2px 6px" }}>🔴 Đóng cửa</span>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:6 }}>
+                        <div style={{ color:"#f8f0e0", fontSize:11.5, fontWeight:600,
+                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>
+                          {s.name}
+                        </div>
+                        {distLabel && (
+                          <span style={{ color:"#6a5a40", fontSize:9, fontWeight:600, flexShrink:0 }}>
+                            📍 {distLabel}
+                          </span>
                         )}
                       </div>
-                      <div style={{ display:"flex", alignItems:"center", gap:7, marginTop:5 }}>
+                      <div style={{ display:"flex", gap:5, marginTop:4, alignItems:"center" }}>
+                        {s.is_open ? (
+                          <span style={{ background:"rgba(62,207,110,0.08)", border:"1px solid rgba(62,207,110,0.2)",
+                            color:"#3ecf6e", fontSize:7.5, borderRadius:5, padding:"2px 7px", fontWeight:600 }}>🟢 Đang mở</span>
+                        ) : (
+                          <>
+                            <span style={{ background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)",
+                              color:"#ff6060", fontSize:7.5, borderRadius:5, padding:"2px 7px" }}>🔴 Đóng cửa</span>
+                            {reopenLabel && (
+                              <span style={{ color:"#FFB347", fontSize:7.5, fontWeight:600 }}>· {reopenLabel}</span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:4 }}>
                         <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
                         <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.rating_avg?.toFixed(1) ?? "Mới"}</span>
-                        <span style={{ color:"#4a5040", fontSize:9 }}>·</span>
-                        <span style={{ color:"#b0956a", fontSize:8.5 }}>Ship 15k</span>
                       </div>
                     </div>
                   </div>

@@ -190,9 +190,11 @@ function ProductSheet({
             {/* Size */}
             {product.sizes.length > 0 && (
               <div style={{ marginBottom:18 }}>
-                <div style={{ color:"rgba(176,149,106,0.7)", fontSize:9.5, fontWeight:700,
-                  letterSpacing:".4px", textTransform:"uppercase", marginBottom:8 }}>
-                  Chọn size <span style={{ color:"#ff4040", marginLeft:2 }}>*</span>
+                <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
+                  <span style={{ background:"rgba(74,143,245,0.12)", border:"1px solid rgba(74,143,245,0.3)",
+                    color:"#4a8ff5", fontSize:8.5, fontWeight:700, padding:"2px 8px", borderRadius:5,
+                    letterSpacing:".4px", textTransform:"uppercase" }}>📐 Size</span>
+                  <span style={{ color:"#ff4040", fontSize:9 }}>* Bắt buộc</span>
                 </div>
                 <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
                   {product.sizes.map(s => {
@@ -200,13 +202,13 @@ function ProductSheet({
                     return (
                       <div key={s.id} onClick={() => onSizeChange(s.id)}
                         style={{ padding:"8px 16px", borderRadius:10, cursor:"pointer",
-                          background: active ? "rgba(255,107,0,0.14)" : "rgba(255,255,255,0.04)",
-                          border:`1.5px solid ${active ? "#FF6B00" : "rgba(255,255,255,0.1)"}`,
+                          background: active ? "rgba(74,143,245,0.15)" : "rgba(255,255,255,0.04)",
+                          border:`1.5px solid ${active ? "#4a8ff5" : "rgba(255,255,255,0.1)"}`,
                           transition:"all .15s" }}>
-                        <div style={{ color: active ? "#FF8C00" : "#b0956a",
+                        <div style={{ color: active ? "#4a8ff5" : "#b0956a",
                           fontSize:11, fontWeight: active ? 700 : 400 }}>{s.label}</div>
                         {s.priceDiff !== 0 && (
-                          <div style={{ color: active ? "#FF8C00" : "#6a5a40", fontSize:9, marginTop:1 }}>
+                          <div style={{ color: active ? "#4a8ff5" : "#6a5a40", fontSize:9, marginTop:1 }}>
                             {s.priceDiff > 0 ? "+" : ""}{s.priceDiff.toLocaleString("vi-VN")}đ
                           </div>
                         )}
@@ -220,11 +222,11 @@ function ProductSheet({
             {/* Toppings */}
             {product.toppings.length > 0 && (
               <div style={{ marginBottom:18 }}>
-                <div style={{ color:"rgba(176,149,106,0.7)", fontSize:9.5, fontWeight:700,
-                  letterSpacing:".4px", textTransform:"uppercase", marginBottom:8 }}>
-                  Chọn topping
-                  <span style={{ color:"#6a5a40", fontSize:8.5, textTransform:"none",
-                    fontWeight:400, marginLeft:4 }}>(tuỳ chọn)</span>
+                <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
+                  <span style={{ background:"rgba(62,207,110,0.1)", border:"1px solid rgba(62,207,110,0.25)",
+                    color:"#3ecf6e", fontSize:8.5, fontWeight:700, padding:"2px 8px", borderRadius:5,
+                    letterSpacing:".4px", textTransform:"uppercase" }}>🫙 Topping</span>
+                  <span style={{ color:"#6a5a40", fontSize:8.5 }}>(tuỳ chọn)</span>
                 </div>
                 <div style={{ background:"rgba(255,255,255,0.02)",
                   border:"1px solid rgba(255,255,255,0.07)", borderRadius:12, overflow:"hidden" }}>
@@ -630,7 +632,10 @@ export default function ShopPage() {
     const sizeDiff  = optSheet.sizes.find(s => s.id === selSize)?.priceDiff ?? 0
     const topTotal  = selTops.reduce((s, tid) => s + (optSheet.toppings.find(t => t.id === tid)?.price ?? 0), 0)
     const unitPrice = optSheet.price + sizeDiff + topTotal
-    const sizeLabel = optSheet.sizes.find(s => s.id === selSize)?.label
+    const rawSizeLabel = optSheet.sizes.find(s => s.id === selSize)?.label
+    const sizeLabel = rawSizeLabel
+      ? (/^size/i.test(rawSizeLabel) ? rawSizeLabel : `Size ${rawSizeLabel}`)
+      : undefined
     const topLabels = selTops.map(tid => optSheet.toppings.find(t => t.id === tid)?.name).filter(Boolean)
     const optSuffix = [...(sizeLabel ? [sizeLabel] : []), ...topLabels].join(" · ")
     const itemName  = optSuffix ? `${optSheet.name} (${optSuffix})` : optSheet.name
