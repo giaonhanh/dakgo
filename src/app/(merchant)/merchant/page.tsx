@@ -520,20 +520,33 @@ export default function MerchantDashboard() {
                   <div onClick={() => setExpand(p => p === order.id ? null : order.id)}
                     style={{ padding: "11px 13px", cursor: "pointer" }}>
 
-                    {/* ── Hàng 1: ID · giờ · trạng thái ── */}
+                    {/* ── Hàng 1: giờ · tổng món · ghi chú · trạng thái ── */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         {order.status === "pending" && (
                           <div style={{ width: 7, height: 7, borderRadius: "50%",
                             background: "#f5c542", animation: "mPulse 1.2s infinite",
                             boxShadow: "0 0 6px rgba(245,197,66,0.6)", flexShrink: 0 }} />
                         )}
-                        <span style={{ color: "#FF8C00", fontSize: 11, fontWeight: 800 }}>#{order.shortId}</span>
-                        <span style={{ color: "#6a5a40", fontSize: 9 }}>{order.time}</span>
+                        {/* Giờ đặt */}
+                        <span style={{ color: "#b0956a", fontSize: 11, fontWeight: 700 }}>{order.time}</span>
+                        {/* Tổng số món */}
+                        <span style={{ fontSize: 8, padding: "2px 7px", borderRadius: 5, fontWeight: 700,
+                          background: "rgba(255,107,0,0.1)", border: "1px solid rgba(255,107,0,0.25)",
+                          color: "#FF8C00" }}>
+                          {order.itemList.reduce((s, i) => s + i.qty, 0)} món
+                        </span>
+                        {/* Đặt trước */}
                         {order.scheduledAt && (
-                          <span style={{ fontSize: 8, padding: "1px 6px", borderRadius: 5, fontWeight: 600,
+                          <span style={{ fontSize: 8, padding: "2px 6px", borderRadius: 5, fontWeight: 600,
                             background: "rgba(245,197,66,0.12)", border: "1px solid rgba(245,197,66,0.3)",
                             color: "#f5c542" }}>🕐 {fmtTime(order.scheduledAt)}</span>
+                        )}
+                        {/* Có ghi chú */}
+                        {order.note && (
+                          <span style={{ fontSize: 8, padding: "2px 6px", borderRadius: 5,
+                            background: "rgba(245,197,66,0.08)", border: "1px solid rgba(245,197,66,0.2)",
+                            color: "#f5c542" }}>📝</span>
                         )}
                       </div>
                       <div style={{ background: cfg.bg, border: `1px solid ${cfg.bd}`,
