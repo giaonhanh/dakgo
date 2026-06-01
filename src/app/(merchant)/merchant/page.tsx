@@ -519,51 +519,87 @@ export default function MerchantDashboard() {
 
                   <div onClick={() => setExpand(p => p === order.id ? null : order.id)}
                     style={{ padding: "11px 13px", cursor: "pointer" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+
+                    {/* ── Hàng 1: ID · giờ · trạng thái ── */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                         {order.status === "pending" && (
                           <div style={{ width: 7, height: 7, borderRadius: "50%",
                             background: "#f5c542", animation: "mPulse 1.2s infinite",
-                            boxShadow: "0 0 6px rgba(245,197,66,0.6)" }} />
+                            boxShadow: "0 0 6px rgba(245,197,66,0.6)", flexShrink: 0 }} />
                         )}
-                        <div style={{ color: "#FF8C00", fontSize: 12, fontWeight: 800 }}>#{order.shortId}</div>
-                        <div style={{ color: "#6a5a40", fontSize: 9 }}>{order.time}</div>
+                        <span style={{ color: "#FF8C00", fontSize: 11, fontWeight: 800 }}>#{order.shortId}</span>
+                        <span style={{ color: "#6a5a40", fontSize: 9 }}>{order.time}</span>
                         {order.scheduledAt && (
-                          <div style={{ fontSize: 8, padding: "1px 6px", borderRadius: 5, fontWeight: 600,
+                          <span style={{ fontSize: 8, padding: "1px 6px", borderRadius: 5, fontWeight: 600,
                             background: "rgba(245,197,66,0.12)", border: "1px solid rgba(245,197,66,0.3)",
-                            color: "#f5c542", display: "flex", alignItems: "center", gap: 2 }}>
-                            🕐 {fmtTime(order.scheduledAt)}
-                          </div>
+                            color: "#f5c542" }}>🕐 {fmtTime(order.scheduledAt)}</span>
                         )}
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0,
-                        background: cfg.bg, border: `1px solid ${cfg.bd}`, borderRadius: 7, padding: "2px 8px" }}>
+                      <div style={{ background: cfg.bg, border: `1px solid ${cfg.bd}`,
+                        borderRadius: 7, padding: "2px 8px", flexShrink: 0 }}>
                         <span style={{ color: cfg.color, fontSize: 9, fontWeight: 600 }}>{cfg.label}</span>
                       </div>
                     </div>
 
-                    <div style={{ color: "#b0956a", fontSize: 9.5,
-                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 5 }}>
-                      {order.items}
+                    {/* ── Hàng 2: Khách hàng ── */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7,
+                      padding: "6px 9px", borderRadius: 9,
+                      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                      <span style={{ fontSize: 15, flexShrink: 0 }}>👤</span>
+                      <span style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 700, flex: 1,
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {order.customerName}
+                      </span>
+                      <span style={{ color: "#6a5a40", fontSize: 9, flexShrink: 0 }}>
+                        📱 {maskPhone(order.customerPhone)}
+                      </span>
                     </div>
 
+                    {/* ── Hàng 3: Danh sách món ── */}
+                    <div style={{ marginBottom: 8, padding: "6px 9px", borderRadius: 9,
+                      background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                      {order.itemList.slice(0, 3).map((item, i) => {
+                        const { base } = parseItemName(item.name)
+                        return (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between",
+                            alignItems: "center", padding: "2px 0",
+                            borderBottom: i < Math.min(order.itemList.length, 3) - 1
+                              ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                            <span style={{ color: "#b0956a", fontSize: 10, flex: 1,
+                              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {base}
+                            </span>
+                            <span style={{ color: "#f8f0e0", fontSize: 10, fontWeight: 700,
+                              marginLeft: 8, flexShrink: 0 }}>×{item.qty}</span>
+                          </div>
+                        )
+                      })}
+                      {order.itemList.length > 3 && (
+                        <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 3 }}>
+                          +{order.itemList.length - 3} món khác...
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── Hàng 4: Tổng tiền + phương thức + mũi tên ── */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ background: "linear-gradient(90deg,#FF6B00,#FFB347)",
                           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                          backgroundClip: "text", fontSize: 13, fontWeight: 800 }}>
+                          backgroundClip: "text", fontSize: 14, fontWeight: 800 }}>
                           {fmt(order.total)}
                         </span>
-                        <span style={{ fontSize: 8, padding: "1px 6px", borderRadius: 5, fontWeight: 600,
+                        <span style={{ fontSize: 8, padding: "2px 7px", borderRadius: 5, fontWeight: 600,
                           background: order.payMethod === "wallet" ? "rgba(74,143,245,0.1)" : "rgba(255,255,255,0.05)",
                           color: order.payMethod === "wallet" ? "#4a8ff5" : "#6a5a40",
                           border: order.payMethod === "wallet" ? "1px solid rgba(74,143,245,0.25)" : "1px solid rgba(255,255,255,0.08)" }}>
                           {order.payMethod === "wallet" ? "💙 Ví GN" : "💵 Tiền mặt"}
                         </span>
                       </div>
-                      <span style={{ color: "#6a5a40", fontSize: 12,
+                      <span style={{ color: "#6a5a40", fontSize: 11,
                         transform: isOpen ? "rotate(180deg)" : "none",
-                        transition: "transform .2s", display: "inline-block" }}>⌾</span>
+                        transition: "transform .2s", display: "inline-block" }}>▾</span>
                     </div>
                   </div>
 
