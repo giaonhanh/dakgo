@@ -1151,7 +1151,9 @@ export default function CheckoutPage() {
   const [refApplied, setRefApplied]             = useState(false)
   const [refLoading, setRefLoading]             = useState(false)
   const [refMsg,     setRefMsg]                 = useState<{ ok: boolean; text: string } | null>(null)
-  const [refAlready, setRefAlready]             = useState(false)  // đã dùng từ session trước
+  const [refAlready, setRefAlready]             = useState(false)
+  const [surcharge,      setSurcharge]      = useState(0)
+  const [surchargeLabel, setSurchargeLabel] = useState<string | null>(null)
 
   // ── Load user, saved addresses, xu balance ──
   useEffect(() => {
@@ -1160,12 +1162,33 @@ export default function CheckoutPage() {
       if (!user) return
       setUserId(user.id)
 
-      const [{ data: addrs }, { data: wallet }, { data: voucherData }, { data: refUsage }] = await Promise.all([
+      const [{ data: addrs }, { data: wallet }, { data: voucherData }, { data: refUsage }, { data: settingsData }] = await Promise.all([
         supabase.from("saved_addresses").select("id, label, address, lat, lng, is_default").eq("user_id", user.id).order("is_default", { ascending: false }),
         supabase.from("wallets").select("id, balance, bonus_balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
         supabase.from("vouchers").select("id,code,title,discount_type,discount_value,min_order,max_discount,valid_to,shop_id,is_active,per_person_limit").eq("is_active", true).gte("valid_to", new Date().toISOString()).limit(30),
         supabase.from("referral_usages").select("id").eq("referee_id", user.id).maybeSingle(),
+        supabase.from("app_settings").select("key,value").in("key", ["weather_surcharge","night_surcharge"]),
       ])
+
+      // Tính phụ phí có điều kiện
+      const settingsMap = Object.fromEntries((settingsData ?? []).map((r: {key:string;value:unknown}) => [r.key, r.value]))
+      const weatherCfg = settingsMap.weather_surcharge as { enabled: boolean; type: "percent"|"fixed"; value: string } | undefined
+      const nightCfg   = settingsMap.night_surcharge   as { enabled: boolean; start: string; end: string; fee: string } | undefined
+      const nowH = new Date().getHours()
+      const nightStart = nightCfg?.start ? parseInt(nightCfg.start) : 22
+      const nightEnd   = nightCfg?.end   ? parseInt(nightCfg.end)   : 5
+      const isNight    = nightCfg?.enabled && (nowH >= nightStart || nowH < nightEnd)
+      if (weatherCfg?.enabled) {
+        const base = 15000
+        const amt  = weatherCfg.type === "percent"
+          ? Math.round(base * Number(weatherCfg.value) / 100)
+          : Number(weatherCfg.value)
+        setSurcharge(amt)
+        setSurchargeLabel("⛈️ Thời tiết xấu")
+      } else if (isNight) {
+        setSurcharge(Number(nightCfg?.fee ?? 5000))
+        setSurchargeLabel("🌙 Đêm khuya")
+      }
       if (refUsage) setRefAlready(true)
       if (voucherData) {
         setDbVouchers(voucherData as DbVoucher[])
@@ -1254,7 +1277,7 @@ export default function CheckoutPage() {
   const subtotal    = cartItems.reduce((s, i) => s + i.price * i.qty, 0)
   const deliveryFee = 15000
   const discount    = appliedVouchers.reduce((s, v) => s + v.discount, 0)
-  const total       = subtotal + deliveryFee - discount
+  const total       = subtotal + deliveryFee + surcharge - discount
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2000) }
 
@@ -1337,7 +1360,7 @@ export default function CheckoutPage() {
           drop_address: currentAddr.address,
           note:         driverNote || null,
           total:        subtotal,
-          ship_fee:     deliveryFee,
+          ship_fee:     deliveryFee + surcharge,
           total_amount: total,
           pay_method:   payment,
           payment_code: payment === "vietqr" ? orderCode : null,
@@ -2054,6 +2077,9 @@ export default function CheckoutPage() {
               {[
                 { label: "Tạm tính",  val: fmt(subtotal),    color: "#b0956a" },
                 { label: "Phí giao",  val: fmt(deliveryFee), color: "#b0956a" },
+                ...(surcharge > 0 && surchargeLabel ? [{
+                  label: `Phụ phí ${surchargeLabel}`, val: `+${fmt(surcharge)}`, color: "#FFB347",
+                }] : []),
                 ...(appliedVouchers.reduce((s, v) => s + v.discount, 0) > 0 ? [{
                   label: appliedVouchers.length > 1 ? `Giảm giá (${appliedVouchers.length} voucher)` : "Giảm giá",
                   val: `-${fmt(appliedVouchers.reduce((s, v) => s + v.discount, 0))}`, color: "#3ecf6e",
