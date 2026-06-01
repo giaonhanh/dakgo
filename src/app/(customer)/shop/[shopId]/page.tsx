@@ -201,17 +201,19 @@ function ProductSheet({
                     const active = selSize === s.id
                     return (
                       <div key={s.id} onClick={() => onSizeChange(s.id)}
-                        style={{ padding:"8px 16px", borderRadius:10, cursor:"pointer",
+                        style={{ padding:"8px 14px", borderRadius:10, cursor:"pointer",
                           background: active ? "rgba(74,143,245,0.15)" : "rgba(255,255,255,0.04)",
                           border:`1.5px solid ${active ? "#4a8ff5" : "rgba(255,255,255,0.1)"}`,
-                          transition:"all .15s" }}>
+                          transition:"all .15s", textAlign:"center" }}>
                         <div style={{ color: active ? "#4a8ff5" : "#b0956a",
                           fontSize:11, fontWeight: active ? 700 : 400 }}>{s.label}</div>
-                        {s.priceDiff !== 0 && (
-                          <div style={{ color: active ? "#4a8ff5" : "#6a5a40", fontSize:9, marginTop:1 }}>
-                            {s.priceDiff > 0 ? "+" : ""}{s.priceDiff.toLocaleString("vi-VN")}đ
-                          </div>
-                        )}
+                        <div style={{ color: active ? "#4a8ff5" : "#6a5a40", fontSize:9, marginTop:2 }}>
+                          {s.priceDiff > 0
+                            ? `+${s.priceDiff.toLocaleString("vi-VN")}đ`
+                            : s.priceDiff < 0
+                            ? `${s.priceDiff.toLocaleString("vi-VN")}đ`
+                            : "Miễn phí"}
+                        </div>
                       </div>
                     )
                   })}
@@ -248,8 +250,8 @@ function ProductSheet({
                         </div>
                         <span style={{ flex:1, color: checked ? "#f8f0e0" : "#b0956a",
                           fontSize:12, fontWeight: checked ? 600 : 400 }}>{t.name}</span>
-                        <span style={{ color:"#FF8C00", fontSize:10, fontWeight:600, flexShrink:0 }}>
-                          +{t.price.toLocaleString("vi-VN")}đ
+                        <span style={{ color: t.price > 0 ? "#FF8C00" : "#3ecf6e", fontSize:10, fontWeight:600, flexShrink:0 }}>
+                          {t.price > 0 ? `+${t.price.toLocaleString("vi-VN")}đ` : "Miễn phí"}
                         </span>
                       </div>
                     )
