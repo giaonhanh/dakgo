@@ -673,13 +673,11 @@ export default function ShopPage() {
     setConflictItem(null)
   }
 
-  // Scroll to category section
+  // Switch tab — scroll to just below tabs bar so products fill screen
   const scrollToSection = (id: string) => {
     setActiveTab(id)
-    const el = sectionRefs.current[id]
-    if (el && containerRef.current) {
-      const top = el.offsetTop - 120
-      containerRef.current.scrollTo({ top, behavior:"smooth" })
+    if (containerRef.current && tabsRef.current) {
+      containerRef.current.scrollTo({ top: tabsRef.current.offsetTop, behavior: "smooth" })
     }
   }
 
@@ -1031,28 +1029,45 @@ export default function ShopPage() {
                 Quán chưa có sản phẩm nào
               </div>
             )}
-            {categories.map(cat => {
-              const items = productsByCategory(cat.id)
-              if (!items.length) return null
-              return (
-                <div key={cat.id}
-                  ref={el => { sectionRefs.current[cat.id] = el }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:8, padding:"16px 0 4px" }}>
-                    <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700 }}>{cat.label}</div>
-                    <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.06)" }} />
-                    <span style={{ color:"#6a5a40", fontSize:9 }}>{items.length} món</span>
-                  </div>
-                  {items.map(product => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      onAdd={handleAdd}
-                      badgeRef={cartBadgeRef}
-                    />
-                  ))}
-                </div>
-              )
-            })}
+            {activeTab === "__all__"
+              ? categories.filter(c => c.id !== "__all__").map(cat => {
+                  const items = productsByCategory(cat.id)
+                  if (!items.length) return null
+                  return (
+                    <div key={cat.id} ref={el => { sectionRefs.current[cat.id] = el }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, padding:"16px 0 4px" }}>
+                        <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700 }}>{cat.label}</div>
+                        <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.06)" }} />
+                        <span style={{ color:"#6a5a40", fontSize:9 }}>{items.length} món</span>
+                      </div>
+                      {items.map(product => (
+                        <ProductCard key={product.id} product={product} onAdd={handleAdd} badgeRef={cartBadgeRef} />
+                      ))}
+                    </div>
+                  )
+                })
+              : (() => {
+                  const items = productsByCategory(activeTab)
+                  const cat   = categories.find(c => c.id === activeTab)
+                  if (!items.length) return (
+                    <div style={{ textAlign:"center", padding:"40px 0", color:"#6a5a40", fontSize:12 }}>
+                      Không có món nào trong mục này
+                    </div>
+                  )
+                  return (
+                    <div ref={el => { sectionRefs.current[activeTab] = el }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, padding:"16px 0 4px" }}>
+                        <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700 }}>{cat?.label ?? ""}</div>
+                        <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.06)" }} />
+                        <span style={{ color:"#6a5a40", fontSize:9 }}>{items.length} món</span>
+                      </div>
+                      {items.map(product => (
+                        <ProductCard key={product.id} product={product} onAdd={handleAdd} badgeRef={cartBadgeRef} />
+                      ))}
+                    </div>
+                  )
+                })()
+            }
 
             {/* Bottom breathing room */}
             <div style={{ height:12 }} />
