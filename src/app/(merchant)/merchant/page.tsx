@@ -623,27 +623,6 @@ export default function MerchantDashboard() {
                         transition={{ duration: 0.22 }} style={{ overflow: "hidden" }}>
                         <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "11px 13px" }}>
 
-                          {/* ── Thông tin khách hàng ── */}
-                          <div style={{ fontSize: 8, fontWeight: 700, color: "#6a5a40",
-                            textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 5 }}>
-                            Khách hàng
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8,
-                            padding: "8px 10px", borderRadius: 9, marginBottom: 12,
-                            background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                            <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-                              background: "rgba(255,107,0,0.1)", border: "1px solid rgba(255,107,0,0.2)",
-                              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>👤</div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 700 }}>
-                                {order.customerName}
-                              </div>
-                              <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 2 }}>
-                                📱 {maskPhone(order.customerPhone)}
-                              </div>
-                            </div>
-                          </div>
-
                           {/* ── Tài xế nhận đơn ── */}
                           {order.driverId && (
                             <>
