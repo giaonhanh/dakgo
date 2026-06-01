@@ -27,10 +27,10 @@ import { useLocationStore } from "@/store/locationStore"
 import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ─────────────────────────────────────────────────
-type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; avatar_url: string | null; lat: number | null; lng: number | null; open_hour: number | null; close_hour: number | null }
+type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; lat: number | null; lng: number | null; open_hour: number | null; close_hour: number | null }
 type ProductRow = { id: string; name: string; price: number; sold_count: number; shop_id: string; shops: { name: string } | { name: string }[] | null }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
-type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_spend: number | null }
+type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null }
 
 function distKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180
@@ -180,17 +180,18 @@ export default function HomePage() {
       // Vouchers
       const { data: voucherData } = await supabase
         .from("vouchers")
-        .select("id,code,title,discount_type,discount_value,valid_to,shop_id,min_spend")
+        .select("id,code,title,discount_type,discount_value,valid_to,shop_id,min_order")
         .eq("is_active", true)
         .gt("valid_to", new Date().toISOString())
         .order("valid_to", { ascending: true })
         .limit(6)
       setVouchers((voucherData ?? []) as VoucherRow[])
 
-      // Nearby shops (all approved shops)
+      // Nearby shops (approved only)
       const { data: shopData } = await supabase
         .from("shops")
-        .select("id,name,is_open,rating_avg,address,avatar_url,lat,lng,open_hour,close_hour")
+        .select("id,name,is_open,rating_avg,address,logo_url,lat,lng")
+        .eq("status", "approved")
         .order("rating_avg", { ascending: false })
         .limit(10)
       setNearbyShops((shopData ?? []) as ShopRow[])
@@ -268,7 +269,7 @@ export default function HomePage() {
       setFavoriteIds(ids)
       if (ids.length === 0) return
       supabase.from("shops")
-        .select("id,name,is_open,rating_avg,address,avatar_url")
+        .select("id,name,is_open,rating_avg,address,logo_url")
         .in("id", ids)
         .then(({ data }) => { if (data) setFavoriteShops(data as ShopRow[]) })
     } catch { /* ignore */ }
@@ -868,12 +869,12 @@ export default function HomePage() {
                       </div>
                     </div>
                     {/* Min spend progress bar */}
-                    {v.min_spend && v.min_spend > 0 && (
+                    {v.min_order && v.min_order > 0 && (
                       <div style={{ marginBottom:6 }}>
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
                           <span style={{ fontSize:7.5, color:"#6a5a40" }}>Đặt từ</span>
                           <span style={{ fontSize:7.5, color: isShop ? "#4a8ff5" : "#FF8C00", fontWeight:700 }}>
-                            {v.min_spend.toLocaleString("vi-VN")}đ
+                            {v.min_order.toLocaleString("vi-VN")}đ
                           </span>
                         </div>
                         <div style={{ height:3, borderRadius:2, background:"rgba(255,255,255,0.06)", overflow:"hidden" }}>
@@ -1064,8 +1065,8 @@ export default function HomePage() {
                       <div style={{ height:64, background:"rgba(255,107,0,0.06)",
                         display:"flex", alignItems:"center", justifyContent:"center",
                         fontSize:36, position:"relative" }}>
-                        {s.avatar_url
-                          ? <img src={s.avatar_url} alt={s.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                        {s.logo_url
+                          ? <img src={s.logo_url} alt={s.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
                           : "🏪"}
                         <button onClick={e => { e.preventDefault(); e.stopPropagation(); toggleFavorite(s.id) }}
                           style={{ position:"absolute", top:5, right:5, width:24, height:24, borderRadius:7,
@@ -1124,8 +1125,8 @@ export default function HomePage() {
                     <div style={{ width:54, height:54, borderRadius:12, flexShrink:0, position:"relative",
                       background:"rgba(255,107,0,0.07)", border:"1px solid rgba(255,255,255,0.08)",
                       display:"flex", alignItems:"center", justifyContent:"center", fontSize:27, overflow:"hidden" }}>
-                      {s.avatar_url ? (
-                        <img src={s.avatar_url} alt={s.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                      {s.logo_url ? (
+                        <img src={s.logo_url} alt={s.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
                       ) : "🏪"}
                       {!s.is_open && (
                         <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.55)",
