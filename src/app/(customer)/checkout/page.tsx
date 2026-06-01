@@ -1141,7 +1141,8 @@ export default function CheckoutPage() {
   const [showMapPicker,    setShowMapPicker]    = useState(false)
   const [showVietQR,       setShowVietQR]       = useState(false)
   const [payosData,        setPayosData]        = useState<PayOSData | null>(null)
-  const [useXu,            setUseXu]            = useState(false)
+  const [useXuGN,          setUseXuGN]          = useState(false)
+  const [useXuGNRef,         setUseXuRef]         = useState(false)
   const [payosLoading,     setPayosLoading]     = useState(false)
   const [mapAddress,       setMapAddress]       = useState<{ address: string; lat: number; lng: number } | null>(null)
   const [showAddressSheet, setShowAddressSheet] = useState(false)
@@ -1383,8 +1384,8 @@ export default function CheckoutPage() {
         }))
       )
 
-      // Trừ xu nếu dùng — bonus trước, balance sau
-      if (useXu && xuWalletId && (xuBonusUsed > 0 || xuUsed > 0)) {
+      // Trừ xu nếu dùng — referral trước, GiaoNhanh sau
+      if (xuWalletId && (xuBonusUsed > 0 || xuUsed > 0)) {
         const newBonus = Math.max(0, xuBonus - xuBonusUsed)
         const newBal   = Math.max(0, xuBalance - xuUsed)
         await supabase.from("wallets").update({
@@ -1451,9 +1452,10 @@ export default function CheckoutPage() {
     }
   }
 
-  const xuBonusUsed = useXu ? Math.min(xuBonus, total) : 0
-  const xuUsed      = useXu ? Math.min(xuBalance, Math.max(0, total - xuBonusUsed)) : 0
-  const remaining   = total - xuBonusUsed - xuUsed
+  const xuRefUsed   = (useXuGNRef && total >= 50000) ? Math.min(xuBonus, total) : 0
+  const xuBonusUsed = xuRefUsed   // alias cho submit code cũ
+  const xuUsed      = useXuGN ? Math.min(xuBalance, Math.max(0, total - xuRefUsed)) : 0
+  const remaining   = total - xuRefUsed - xuUsed
   const ctaBlocked  = loading || (!deliveryNow && !scheduledTime)
 
   // Spinner chỉ hiện trong lúc đang load dữ liệu từ Supabase
@@ -1783,80 +1785,92 @@ export default function CheckoutPage() {
             </AnimatePresence>
           </SectionCard>
 
-          {/* 3. Xu Giao Nhanh — quyết định trước, rồi mới chọn hình thức trả phần còn lại */}
-          <SectionCard title="Xu Giao Nhanh" icon="🪙">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                <div style={{
-                  width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-                  background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)",
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
-                }}>🪙</div>
+          {/* 3a. XU Giao Nhanh */}
+          {xuBalance > 0 && (
+          <SectionCard title="XU Giao Nhanh" icon="🪙">
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+                <div style={{ width:38, height:38, borderRadius:10, flexShrink:0,
+                  background:"rgba(255,215,0,0.08)", border:"1px solid rgba(255,215,0,0.2)",
+                  display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🪙</div>
                 <div>
-                  <div style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600 }}>Dùng xu để giảm tiền</div>
-                  <div style={{ color: "#6a5a40", fontSize: 10, marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <span>Ví: <span style={{ color: "#FFD700", fontWeight: 700 }}>{xuBalance.toLocaleString("vi-VN")}xu</span></span>
-                    {xuBonus > 0 && (
-                      <span>Thưởng: <span style={{ color: "#3ecf6e", fontWeight: 700 }}>{xuBonus.toLocaleString("vi-VN")}xu</span></span>
+                  <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600 }}>Dùng XU Giao Nhanh</div>
+                  <div style={{ color:"#6a5a40", fontSize:10, marginTop:3 }}>
+                    Số dư: <span style={{ color:"#FFD700", fontWeight:700 }}>{xuBalance.toLocaleString("vi-VN")} xu</span>
+                  </div>
+                </div>
+              </div>
+              <button type="button" onClick={() => setUseXuGN(v => !v)}
+                style={{ width:46, height:26, borderRadius:13, border:"none", cursor:"pointer",
+                  background: useXuGN ? "linear-gradient(90deg,#FF6B00,#FF8C00)" : "rgba(255,255,255,0.1)",
+                  position:"relative", flexShrink:0, transition:"background 0.2s" }}>
+                <div style={{ position:"absolute", top:3, width:20, height:20, borderRadius:10,
+                  background:"#fff", transition:"left 0.2s", left: useXuGN ? 23 : 3,
+                  boxShadow:"0 1px 4px rgba(0,0,0,0.35)" }} />
+              </button>
+            </div>
+            {useXuGN && xuUsed > 0 && (
+              <div style={{ marginTop:10, padding:"9px 12px", borderRadius:10,
+                background:"rgba(255,215,0,0.05)", border:"1px solid rgba(255,215,0,0.18)" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                  <span style={{ color:"#6a5a40", fontSize:10 }}>Xu sử dụng</span>
+                  <span style={{ color:"#FFD700", fontSize:10, fontWeight:700 }}>−{xuUsed.toLocaleString("vi-VN")} xu</span>
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-between" }}>
+                  <span style={{ color:"#6a5a40", fontSize:10 }}>Còn lại trong ví</span>
+                  <span style={{ color:"#b0956a", fontSize:10 }}>{(xuBalance - xuUsed).toLocaleString("vi-VN")} xu</span>
+                </div>
+              </div>
+            )}
+          </SectionCard>
+          )}
+
+          {/* 3b. XU Giới Thiệu */}
+          {xuBonus > 0 && (
+          <SectionCard title="XU Giới Thiệu" icon="🎁">
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+                <div style={{ width:38, height:38, borderRadius:10, flexShrink:0,
+                  background:"rgba(62,207,110,0.08)", border:"1px solid rgba(62,207,110,0.25)",
+                  display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🎁</div>
+                <div>
+                  <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600 }}>Dùng XU Giới Thiệu</div>
+                  <div style={{ color:"#6a5a40", fontSize:10, marginTop:3 }}>
+                    Số dư: <span style={{ color:"#3ecf6e", fontWeight:700 }}>{xuBonus.toLocaleString("vi-VN")} xu</span>
+                    {total < 50000 && (
+                      <span style={{ color:"#ff6060", marginLeft:6 }}>· Đơn tối thiểu 50,000đ</span>
                     )}
                   </div>
                 </div>
               </div>
-              <button type="button" onClick={() => setUseXu(v => !v)} style={{
-                width: 46, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-                background: useXu ? "linear-gradient(90deg,#FF6B00,#FF8C00)" : "rgba(255,255,255,0.1)",
-                position: "relative", flexShrink: 0, transition: "background 0.2s",
-              }}>
-                <div style={{
-                  position: "absolute", top: 3, width: 20, height: 20, borderRadius: 10,
-                  background: "#fff", transition: "left 0.2s",
-                  left: useXu ? 23 : 3,
-                  boxShadow: "0 1px 4px rgba(0,0,0,0.35)",
-                }} />
+              <button type="button"
+                disabled={total < 50000}
+                onClick={() => total >= 50000 && setUseXuRef(v => !v)}
+                style={{ width:46, height:26, borderRadius:13, border:"none",
+                  cursor: total >= 50000 ? "pointer" : "not-allowed",
+                  background: useXuGNRef ? "linear-gradient(90deg,#3ecf6e,#27ae60)" : "rgba(255,255,255,0.1)",
+                  position:"relative", flexShrink:0, transition:"background 0.2s",
+                  opacity: total < 50000 ? 0.4 : 1 }}>
+                <div style={{ position:"absolute", top:3, width:20, height:20, borderRadius:10,
+                  background:"#fff", transition:"left 0.2s", left: useXuGNRef ? 23 : 3,
+                  boxShadow:"0 1px 4px rgba(0,0,0,0.35)" }} />
               </button>
             </div>
-
-            <AnimatePresence>
-              {useXu && (
-                <motion.div key="xu-detail"
-                  initial={{ opacity: 0, maxHeight: 0 }} animate={{ opacity: 1, maxHeight: 260 }}
-                  exit={{ opacity: 0, maxHeight: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}
-                  style={{ overflow: "hidden", marginTop: 10 }}>
-                  <div style={{
-                    background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.18)",
-                    borderRadius: 11, padding: "11px 13px",
-                  }}>
-                    {[
-                      { label: "Xu sử dụng",         val: `${xuUsed.toLocaleString("vi-VN")} xu`,                      color: "#FFD700" },
-                      { label: "Còn phải trả",        val: remaining > 0 ? fmt(remaining) : "Miễn phí 🎉",             color: remaining > 0 ? "#f8f0e0" : "#3ecf6e" },
-                      { label: "Xu còn lại trong ví", val: `${(xuBalance - xuUsed).toLocaleString("vi-VN")} xu`, color: "#b0956a" },
-                    ].map(r => (
-                      <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
-                        <span style={{ color: "#6a5a40", fontSize: 11 }}>{r.label}</span>
-                        <span style={{ color: r.color, fontSize: 11, fontWeight: 700 }}>{r.val}</span>
-                      </div>
-                    ))}
-                    {xuBalance < total && (
-                      <div style={{ marginTop: 8, padding: "6px 9px", borderRadius: 8,
-                        background: "rgba(245,197,66,0.07)", border: "1px solid rgba(245,197,66,0.2)" }}>
-                        <span style={{ color: "#f5c542", fontSize: 11 }}>
-                          ⚠️ Dùng hết {xuUsed.toLocaleString("vi-VN")} xu, còn {fmt(remaining)} trả bằng {payment === "vietqr" ? "QR" : "tiền mặt"}
-                        </span>
-                      </div>
-                    )}
-                    {remaining === 0 && (
-                      <div style={{ marginTop: 8, padding: "6px 9px", borderRadius: 8,
-                        background: "rgba(62,207,110,0.07)", border: "1px solid rgba(62,207,110,0.18)",
-                        display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ fontSize: 11 }}>⚡</span>
-                        <span style={{ color: "#3ecf6e", fontSize: 11 }}>Đủ xu — đặt hàng không cần trả thêm</span>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {useXuGNRef && xuRefUsed > 0 && (
+              <div style={{ marginTop:10, padding:"9px 12px", borderRadius:10,
+                background:"rgba(62,207,110,0.05)", border:"1px solid rgba(62,207,110,0.18)" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                  <span style={{ color:"#6a5a40", fontSize:10 }}>Xu sử dụng</span>
+                  <span style={{ color:"#3ecf6e", fontSize:10, fontWeight:700 }}>−{xuRefUsed.toLocaleString("vi-VN")} xu</span>
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-between" }}>
+                  <span style={{ color:"#6a5a40", fontSize:10 }}>Còn lại</span>
+                  <span style={{ color:"#b0956a", fontSize:10 }}>{(xuBonus - xuRefUsed).toLocaleString("vi-VN")} xu</span>
+                </div>
+              </div>
+            )}
           </SectionCard>
+          )}
 
           {/* 3.5 Phương thức thanh toán phần còn lại */}
           {remaining > 0 && (
@@ -2085,7 +2099,7 @@ export default function CheckoutPage() {
                   label: appliedVouchers.length > 1 ? `Giảm giá (${appliedVouchers.length} voucher)` : "Giảm giá",
                   val: `-${fmt(appliedVouchers.reduce((s, v) => s + v.discount, 0))}`, color: "#3ecf6e",
                 }] : []),
-                ...(useXu && xuUsed > 0 ? [{
+                ...(useXuGN && xuUsed > 0 ? [{
                   label: "🪙 Xu Giao Nhanh",
                   val: `-${xuUsed.toLocaleString("vi-VN")} xu`, color: "#FFD700",
                 }] : []),
@@ -2100,7 +2114,7 @@ export default function CheckoutPage() {
                 marginTop: 6, borderTop: "1px solid rgba(255,255,255,0.08)",
               }}>
                 <span style={{ color: "#f8f0e0", fontSize: 13, fontWeight: 700 }}>
-                  {useXu && remaining < total ? "Còn phải trả" : "Tổng cộng"}
+                  {useXuGN && remaining < total ? "Còn phải trả" : "Tổng cộng"}
                 </span>
                 <span style={{
                   background: remaining === 0
@@ -2169,7 +2183,7 @@ export default function CheckoutPage() {
                     ? `Đặt hàng bằng xu · Miễn phí`
                     : payment === "vietqr"
                     ? `Thanh toán QR · ${fmt(remaining)}`
-                    : useXu
+                    : useXuGN
                     ? `Đặt hàng · ${fmt(remaining)} + ${xuUsed.toLocaleString("vi-VN")} xu`
                     : `Đặt hàng ngay · ${fmt(total)}`}
                 </span>
