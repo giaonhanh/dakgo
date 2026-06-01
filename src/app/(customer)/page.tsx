@@ -27,7 +27,7 @@ import { useLocationStore } from "@/store/locationStore"
 import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ─────────────────────────────────────────────────
-type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; lat: number | null; lng: number | null; open_hour: number | null; close_hour: number | null }
+type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null }
 type ProductRow = { id: string; name: string; price: number; sold_count: number; shop_id: string; shops: { name: string } | { name: string }[] | null }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null }
@@ -190,7 +190,7 @@ export default function HomePage() {
       // Nearby shops (approved only)
       const { data: shopData } = await supabase
         .from("shops")
-        .select("id,name,is_open,rating_avg,address,logo_url,lat,lng")
+        .select("id,name,is_open,rating_avg,address,logo_url,location")
         .eq("status", "approved")
         .order("rating_avg", { ascending: false })
         .limit(10)
@@ -949,56 +949,8 @@ export default function HomePage() {
           {/* ──────────────────────────────────────
               S8 — PromoSection
           ────────────────────────────────────── */}
+          {promos.length > 0 && (<>
           <SectionHeader title="🔥 Khuyến mãi hôm nay" more="Xem tất cả →" href="/promo-items" />
-          {promos.length === 0 ? (
-            <div style={{ margin:"0 16px 14px",
-              background:"linear-gradient(135deg,rgba(255,107,0,0.05),rgba(255,64,64,0.04))",
-              border:"1.5px dashed rgba(255,107,0,0.18)",
-              borderRadius:16, padding:"18px 16px",
-              display:"flex", alignItems:"center", gap:16, position:"relative", overflow:"hidden",
-            }}>
-              {/* Glow background */}
-              <div style={{ position:"absolute", right:-20, top:-20, width:100, height:100,
-                background:"radial-gradient(circle,rgba(255,107,0,0.08) 0%,transparent 70%)",
-                pointerEvents:"none" }} />
-              {/* Illustration */}
-              <div style={{ flexShrink:0, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
-                <motion.div
-                  animate={{ y:[0,-4,0] }}
-                  transition={{ duration:3, repeat:Infinity, ease:"easeInOut" }}
-                  style={{ fontSize:46, lineHeight:1,
-                    filter:"drop-shadow(0 4px 10px rgba(255,107,0,0.25))" }}>
-                  🍽️
-                </motion.div>
-                <div style={{ display:"flex", gap:3 }}>
-                  {[0,1,2].map(i=>(
-                    <motion.div key={i}
-                      animate={{ opacity:[0.3,1,0.3] }}
-                      transition={{ duration:1.5, repeat:Infinity, delay: i*0.4 }}
-                      style={{ width:4, height:4, borderRadius:"50%", background:"rgba(255,107,0,0.4)" }} />
-                  ))}
-                </div>
-              </div>
-              {/* Text */}
-              <div style={{ flex:1 }}>
-                <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700, marginBottom:5, lineHeight:1.4 }}>
-                  Hôm nay chưa có<br/>khuyến mãi
-                </div>
-                <div style={{ color:"#6a5a40", fontSize:9, lineHeight:1.7, marginBottom:8 }}>
-                  Các quán đang chuẩn bị deal xịn —
-                  <span style={{ color:"#FFB347", fontWeight:600 }}> ghé lại sau nhé!</span>
-                </div>
-                <a href="/nearby-shops" style={{ textDecoration:"none" }}>
-                  <div style={{ display:"inline-block",
-                    background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.25)",
-                    borderRadius:8, padding:"5px 13px",
-                    color:"#FF8C00", fontSize:9, fontWeight:700 }}>
-                    Xem menu các quán →
-                  </div>
-                </a>
-              </div>
-            </div>
-          ) : (
             <HScroll>
             {promos.map(p => {
               const shopName = (p.shops as {name:string}|null)?.name ?? ""
@@ -1047,7 +999,7 @@ export default function HomePage() {
               )
             })}
             </HScroll>
-          )}
+          </>)}
 
           {/* ──────────────────────────────────────
               S8.5 — Cửa hàng yêu thích
@@ -1102,75 +1054,96 @@ export default function HomePage() {
                 Chưa có quán nào trong khu vực
               </div>
             ) : nearbyShops.map(s => {
-              const isFav = favoriteIds.includes(s.id)
-              const uLat = locationData.lat, uLng = locationData.lng
-              const dist = (uLat && uLng && s.lat && s.lng)
-                ? distKm(uLat, uLng, s.lat, s.lng)
+              const isFav  = favoriteIds.includes(s.id)
+              const uLat   = locationData.lat, uLng = locationData.lng
+              const coords = s.location?.coordinates  // GeoJSON: [lng, lat]
+              const dist   = (uLat && uLng && coords)
+                ? distKm(uLat, uLng, coords[1], coords[0])
                 : null
               const distLabel = dist != null
-                ? dist < 1 ? `${Math.round(dist*1000)}m` : `${dist.toFixed(1)}km`
+                ? dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`
                 : null
-              const reopenLabel = !s.is_open && s.open_hour != null
-                ? `Mở lại ${String(s.open_hour).padStart(2,"0")}:00`
-                : null
+              const rating = s.rating_avg?.toFixed(1) ?? null
               return (
               <div key={s.id} style={{ position:"relative" }}>
                 <a href={`/shop/${s.id}`} style={{ textDecoration:"none" }}>
                   <div className="shop-card" style={{
                     background:"rgba(255,255,255,0.06)", backdropFilter:"blur(10px)",
                     border:`1px solid ${isFav ? "rgba(255,64,64,0.25)" : "rgba(255,255,255,0.08)"}`,
-                    borderRadius:14, padding:"10px 11px",
-                    display:"flex", alignItems:"center", gap:10, cursor:"pointer",
+                    borderRadius:14, padding:"11px 12px",
+                    display:"flex", alignItems:"center", gap:11, cursor:"pointer",
                   }}>
-                    <div style={{ width:54, height:54, borderRadius:12, flexShrink:0, position:"relative",
+                    {/* Logo */}
+                    <div style={{ width:56, height:56, borderRadius:13, flexShrink:0, position:"relative",
                       background:"rgba(255,107,0,0.07)", border:"1px solid rgba(255,255,255,0.08)",
-                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:27, overflow:"hidden" }}>
-                      {s.logo_url ? (
-                        <img src={s.logo_url} alt={s.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                      ) : "🏪"}
+                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, overflow:"hidden" }}>
+                      {s.logo_url
+                        ? <img src={s.logo_url} alt={s.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                        : "🏪"}
+                      {/* Closed overlay */}
                       {!s.is_open && (
-                        <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.55)",
-                          display:"flex", alignItems:"center", justifyContent:"center",
-                          borderRadius:12, fontSize:18 }}>🔒</div>
+                        <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.52)",
+                          display:"flex", alignItems:"center", justifyContent:"center", borderRadius:13 }}>
+                          <span style={{ fontSize:16 }}>🔒</span>
+                        </div>
                       )}
                     </div>
+
+                    {/* Info */}
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:6 }}>
-                        <div style={{ color:"#f8f0e0", fontSize:11.5, fontWeight:600,
-                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>
-                          {s.name}
-                        </div>
+                      {/* Tên quán */}
+                      <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700,
+                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
+                        marginBottom:5 }}>
+                        {s.name}
+                      </div>
+
+                      {/* ⭐ rating + 📍 km + trạng thái — cùng 1 hàng */}
+                      <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+                        {/* Stars */}
+                        {rating && (
+                          <div style={{ display:"flex", alignItems:"center", gap:3,
+                            background:"rgba(255,179,71,0.1)", border:"1px solid rgba(255,179,71,0.25)",
+                            borderRadius:6, padding:"2px 7px" }}>
+                            <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
+                            <span style={{ color:"#FFB347", fontSize:9, fontWeight:700 }}>{rating}</span>
+                          </div>
+                        )}
+                        {/* Distance */}
                         {distLabel && (
-                          <span style={{ color:"#6a5a40", fontSize:9, fontWeight:600, flexShrink:0 }}>
-                            📍 {distLabel}
-                          </span>
+                          <div style={{ display:"flex", alignItems:"center", gap:3,
+                            background:"rgba(74,143,245,0.08)", border:"1px solid rgba(74,143,245,0.2)",
+                            borderRadius:6, padding:"2px 7px" }}>
+                            <span style={{ fontSize:8 }}>📍</span>
+                            <span style={{ color:"#4a8ff5", fontSize:9, fontWeight:600 }}>{distLabel}</span>
+                          </div>
                         )}
-                      </div>
-                      <div style={{ display:"flex", gap:5, marginTop:4, alignItems:"center" }}>
+                        {/* Open/closed */}
                         {s.is_open ? (
-                          <span style={{ background:"rgba(62,207,110,0.08)", border:"1px solid rgba(62,207,110,0.2)",
-                            color:"#3ecf6e", fontSize:7.5, borderRadius:5, padding:"2px 7px", fontWeight:600 }}>🟢 Đang mở</span>
+                          <div style={{ display:"flex", alignItems:"center", gap:3,
+                            background:"rgba(62,207,110,0.08)", border:"1px solid rgba(62,207,110,0.2)",
+                            borderRadius:6, padding:"2px 7px" }}>
+                            <div style={{ width:5, height:5, borderRadius:"50%", background:"#3ecf6e",
+                              animation:"pulse 1.5s infinite" }} />
+                            <span style={{ color:"#3ecf6e", fontSize:8, fontWeight:600 }}>Đang mở</span>
+                          </div>
                         ) : (
-                          <>
-                            <span style={{ background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)",
-                              color:"#ff6060", fontSize:7.5, borderRadius:5, padding:"2px 7px" }}>🔴 Đóng cửa</span>
-                            {reopenLabel && (
-                              <span style={{ color:"#FFB347", fontSize:7.5, fontWeight:600 }}>· {reopenLabel}</span>
-                            )}
-                          </>
+                          <div style={{ display:"flex", alignItems:"center", gap:3,
+                            background:"rgba(255,64,64,0.07)", border:"1px solid rgba(255,64,64,0.18)",
+                            borderRadius:6, padding:"2px 7px" }}>
+                            <span style={{ color:"#ff6060", fontSize:8 }}>Đóng cửa</span>
+                          </div>
                         )}
-                      </div>
-                      <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:4 }}>
-                        <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
-                        <span style={{ color:"#b0956a", fontSize:8.5 }}>{s.rating_avg?.toFixed(1) ?? "Mới"}</span>
                       </div>
                     </div>
                   </div>
                 </a>
-                {/* Favorite toggle button */}
+
+                {/* Favourite ❤️ */}
                 <button onClick={e => { e.preventDefault(); toggleFavorite(s.id) }}
-                  style={{ position:"absolute", top:10, right:10, width:28, height:28, borderRadius:8, border:"none",
-                    background: isFav ? "rgba(255,64,64,0.15)" : "rgba(255,255,255,0.07)",
+                  style={{ position:"absolute", top:11, right:11, width:28, height:28,
+                    borderRadius:8, border:"none",
+                    background: isFav ? "rgba(255,64,64,0.15)" : "rgba(255,255,255,0.06)",
                     color: isFav ? "#ff4040" : "#6a5a40", fontSize:14, cursor:"pointer",
                     display:"flex", alignItems:"center", justifyContent:"center",
                     transition:"all .2s", zIndex:1 }}>
