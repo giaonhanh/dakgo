@@ -15,7 +15,7 @@ interface OrderItem {
 }
 interface Order {
   id: string; status: OrderStatus; total_amount: number; ship_fee: number
-  drop_address: string; created_at: string; pay_method: string; note: string | null
+  delivery_address: string; created_at: string; pay_method: string; note: string | null
   customer_id: string; driver_id: string | null
   shopName: string; customerName: string; customerPhone: string
   driverName: string | null; driverPhone: string | null
@@ -255,12 +255,25 @@ export default function AdminOrdersPage() {
   const load = useCallback(async () => {
     setLoading(true)
     const supabase = createClient()
+
+    // Không join order_items trong nested query để tránh RLS block
     const { data: rows, error } = await supabase
       .from("orders")
-      .select("id,status,total_amount,ship_fee,drop_address,created_at,customer_id,driver_id,pay_method,note,shops!shop_id(name),order_items(id,name,qty,price,breakdown)")
+      .select("id,status,total_amount,ship_fee,delivery_address,created_at,customer_id,driver_id,pay_method,note,shops!shop_id(name)")
       .order("created_at", { ascending: false })
       .limit(100)
     if (error || !rows) { setLoading(false); return }
+
+    // Fetch order_items riêng (tránh nested join RLS)
+    const orderIds = rows.map(r => r.id)
+    const { data: allItems } = orderIds.length
+      ? await supabase.from("order_items").select("order_id,id,name,qty,price,breakdown").in("order_id", orderIds)
+      : { data: [] }
+    const itemsByOrder: Record<string, OrderItem[]> = {}
+    ;(allItems ?? []).forEach((it: { order_id: string; id: string; name: string; qty: number; price: number; breakdown?: unknown }) => {
+      if (!itemsByOrder[it.order_id]) itemsByOrder[it.order_id] = []
+      itemsByOrder[it.order_id].push({ id: it.id, name: it.name, qty: it.qty, price: it.price, breakdown: it.breakdown as OrderItem["breakdown"] })
+    })
 
     const custIds = [...new Set(rows.map(r => r.customer_id).filter(Boolean))]
     const drvIds  = [...new Set(rows.map(r => r.driver_id).filter(Boolean) as string[])]
@@ -278,16 +291,17 @@ export default function AdminOrdersPage() {
       const shopName = Array.isArray(s) ? (s[0] as {name:string})?.name ?? "—" : (s as {name:string}|null)?.name ?? "—"
       return {
         id: r.id, status: r.status as OrderStatus, total_amount: r.total_amount,
-        ship_fee:  (r.ship_fee  as number)      ?? 0,
-        drop_address: r.drop_address, created_at: r.created_at,
-        pay_method: (r.pay_method as string)    ?? "cash",
-        note:       (r.note      as string|null) ?? null,
+        ship_fee:         (r.ship_fee    as number)      ?? 0,
+        delivery_address: r.delivery_address ?? "",
+        created_at:       r.created_at,
+        pay_method:       (r.pay_method  as string)      ?? "cash",
+        note:             (r.note        as string|null) ?? null,
         customer_id: r.customer_id, driver_id: r.driver_id, shopName,
-        customerName:  pMap[r.customer_id]  ?? "Khách hàng",
+        customerName:  pMap[r.customer_id]   ?? "Khách hàng",
         customerPhone: pPhone[r.customer_id] ?? "",
         driverName:  r.driver_id ? (dMap[r.driver_id]   ?? null) : null,
         driverPhone: r.driver_id ? (dPhone[r.driver_id] ?? null) : null,
-        items: (r.order_items ?? []) as OrderItem[],
+        items: itemsByOrder[r.id] ?? [],
       }
     }))
     setLoading(false)
@@ -467,7 +481,7 @@ export default function AdminOrdersPage() {
           const fee  = i === 0 ? baseFee : EXTRA_SHOP
           const { data: order, error: oe } = await supabase.from("orders").insert({
             customer_id: eid, shop_id: slot.shopId, status: "pending",
-            drop_address: delivAddr,
+            delivery_address: delivAddr,
             total: sub, ship_fee: fee,
             total_amount: sub + fee, pay_method: payment,
             note: ((i > 0 ? `[+quán ${i+1}/${filledSlots.length}] ` : "") + (note || "")) || null,
@@ -669,7 +683,7 @@ export default function AdminOrdersPage() {
                 </div>
                 <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginBottom:3 }}>{order.customerName}</div>
                 <div style={{ color:"#6a5a40", fontSize:9, marginBottom:3 }}>🏪 {order.shopName} · {order.items.length} món</div>
-                <div style={{ color:"#6a5a40", fontSize:9, marginBottom:6 }}>📍 {order.drop_address}</div>
+                <div style={{ color:"#6a5a40", fontSize:9, marginBottom:6 }}>📍 {order.delivery_address}</div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <div style={{ color:"#6a5a40", fontSize:9 }}>{order.driverName?`🛵 ${order.driverName}`:"⏳ Chưa có tài xế"}</div>
                   <span style={{ background:"linear-gradient(90deg,#FF6B00,#FFB347)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text", fontSize:13, fontWeight:800 }}>{fmt(order.total_amount)}</span>
@@ -783,7 +797,7 @@ export default function AdminOrdersPage() {
                       <div style={{ color:"#4a8ff5", fontSize:9, fontWeight:700, marginBottom:6 }}>👤 Khách hàng</div>
                       <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:700, marginBottom:3 }}>{selected.customerName}</div>
                       {selected.customerPhone && <div style={{ color:"#6a5a40", fontSize:9, marginBottom:3 }}>📞 {selected.customerPhone}</div>}
-                      <div style={{ color:"#6a5a40", fontSize:8.5, lineHeight:1.4 }}>📍 {selected.drop_address}</div>
+                      <div style={{ color:"#6a5a40", fontSize:8.5, lineHeight:1.4 }}>📍 {selected.delivery_address}</div>
                     </div>
                     <div style={{ background:selected.driverName?"rgba(62,207,110,0.04)":"rgba(255,255,255,0.02)", border:`1px solid ${selected.driverName?"rgba(62,207,110,0.15)":"rgba(255,255,255,0.07)"}`, borderRadius:12, padding:"10px 12px" }}>
                       <div style={{ color:"#3ecf6e", fontSize:9, fontWeight:700, marginBottom:6 }}>🛵 Tài xế</div>
