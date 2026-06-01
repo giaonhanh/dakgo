@@ -764,23 +764,30 @@ export default function MerchantDashboard() {
                                   )}
 
                                   {/* Bảng giá */}
-                                  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
-                                    borderRadius: 8, overflow: "hidden" }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
-                                      borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                      <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Thành tiền</span>
-                                      <span style={{ fontSize: 9.5, color: "#b0956a", fontWeight: 600 }}>{fmt(item.price)}</span>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
-                                      borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                      <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Số lượng</span>
-                                      <span style={{ fontSize: 11, color: "#f8f0e0", fontWeight: 700 }}>×{item.qty}</span>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 9px" }}>
-                                      <span style={{ fontSize: 10, color: "#b0956a", fontWeight: 600 }}>Tổng tiền</span>
-                                      <span style={{ fontSize: 12, color: "#FF8C00", fontWeight: 800 }}>{fmt(item.price * item.qty)}</span>
-                                    </div>
-                                  </div>
+                                  {(() => {
+                                    const perUnit = bd
+                                      ? (bd.basePrice) + (bd.sizeDiff ?? 0) + (bd.toppings ?? []).reduce((s, t) => s + t.price, 0)
+                                      : item.price
+                                    return (
+                                      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                                        borderRadius: 8, overflow: "hidden" }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
+                                          borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                          <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Thành tiền</span>
+                                          <span style={{ fontSize: 9.5, color: "#b0956a", fontWeight: 600 }}>{fmt(perUnit)}</span>
+                                        </div>
+                                        <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
+                                          borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                          <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Số lượng</span>
+                                          <span style={{ fontSize: 11, color: "#f8f0e0", fontWeight: 700 }}>×{item.qty}</span>
+                                        </div>
+                                        <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 9px" }}>
+                                          <span style={{ fontSize: 10, color: "#b0956a", fontWeight: 600 }}>Tổng tiền</span>
+                                          <span style={{ fontSize: 12, color: "#FF8C00", fontWeight: 800 }}>{fmt(perUnit * item.qty)}</span>
+                                        </div>
+                                      </div>
+                                    )
+                                  })()}
 
                                   {/* Ghi chú của item */}
                                   {item.note && (

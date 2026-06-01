@@ -38,7 +38,9 @@ function distKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
 }
 type LiveOrderRow = { id: string; status: string; shops: { name: string } | { name: string }[] | null }
-type RecoRow = { id: string; name: string; price: number; original_price: number | null; image_url: string | null; sold_count: number; shop_id: string; shop_name: string; order_count: number }
+type RecoRow    = { id: string; name: string; price: number; original_price: number | null; image_url: string | null; sold_count: number; shop_id: string; shop_name: string; order_count: number }
+type BannerRow  = { id: string; title: string; subtitle: string | null; image_url: string | null; link_url: string | null; sort_order: number }
+type NewMenuRow = { id: string; name: string; price: number; image_url: string | null; shop_id: string; created_at: string; shops: { name: string } | null }
 
 const MEAL_TIMES = [
   { icon:"☀️",  label:"Buổi sáng",  value:"buoi-sang"  },
@@ -149,6 +151,10 @@ export default function HomePage() {
   const [recos,         setRecos]         = useState<RecoRow[]>([])
   const [favoriteIds,   setFavoriteIds]   = useState<string[]>([])
   const [favoriteShops, setFavoriteShops] = useState<ShopRow[]>([])
+  const [adminBanners,   setAdminBanners]   = useState<BannerRow[]>([])
+  const [adminBannerIdx, setAdminBannerIdx] = useState(0)
+  const [newMenuItems,   setNewMenuItems]   = useState<NewMenuRow[]>([])
+  const [searchSuggest,  setSearchSuggest]  = useState<ProductRow[]>([])
 
   // ─── Fetch real data from Supabase ────────────────────────
   useEffect(() => {
@@ -217,6 +223,24 @@ export default function HomePage() {
         .limit(6)
       setPromos((promoData ?? []) as ProductRow[])
 
+      // Admin banners
+      const { data: bannerData } = await supabase
+        .from("banners")
+        .select("id,title,subtitle,image_url,link_url,sort_order")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+        .limit(5)
+      setAdminBanners((bannerData ?? []) as BannerRow[])
+
+      // Vừa lên menu — sản phẩm mới nhất
+      const { data: newMenuData } = await supabase
+        .from("products")
+        .select("id,name,price,image_url,shop_id,shops(name),created_at")
+        .eq("is_available", true)
+        .order("created_at", { ascending: false })
+        .limit(10)
+      setNewMenuItems((newMenuData ?? []) as unknown as NewMenuRow[])
+
       // Reorders (last 5 delivered orders for this user)
       const { data: orderData } = await supabase
         .from("orders")
@@ -276,6 +300,34 @@ export default function HomePage() {
     } catch { /* ignore */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Search-based suggestions from gn_search_history
+  useEffect(() => {
+    async function loadSearchSuggestions() {
+      try {
+        const history: string[] = JSON.parse(localStorage.getItem("gn_search_history") ?? "[]")
+        if (history.length === 0) return
+        const terms = history.slice(0, 3)
+        const filter = terms.map(t => `name.ilike.%${t}%`).join(",")
+        const { data } = await supabase
+          .from("products")
+          .select("id,name,price,sold_count,shop_id,shops(name)")
+          .eq("is_available", true)
+          .or(filter)
+          .limit(8)
+        if (data?.length) setSearchSuggest(data as ProductRow[])
+      } catch { /* ignore */ }
+    }
+    loadSearchSuggestions()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Admin banner auto-slide
+  useEffect(() => {
+    if (adminBanners.length <= 1) return
+    const t = setInterval(() => setAdminBannerIdx(i => (i + 1) % adminBanners.length), 4000)
+    return () => clearInterval(t)
+  }, [adminBanners])
 
   const toggleFavorite = (shopId: string) => {
     setFavoriteIds(prev => {
@@ -673,19 +725,16 @@ export default function HomePage() {
           </AnimatePresence>
 
           {/* ──────────────────────────────────────
-              S4 — FlashSaleBanner (real vouchers)
+              S4 — FlashSaleBanner / AdminBanner / InviteFriend
           ────────────────────────────────────── */}
-          {(() => {
+          {vouchers.length > 0 ? (() => {
             const DEAL_EMOJI: Record<string, string> = { percent:"🔥", fixed:"💰", freeship:"🛵" }
-            const deal = vouchers.length > 0 ? vouchers[bannerIdx % vouchers.length] : null
-            const dealEmoji   = deal ? (DEAL_EMOJI[deal.discount_type] ?? "⚡") : "⚡"
-            const dealTitle   = deal?.title ?? "Ưu đãi hôm nay"
-            const dealSubLine = deal
-              ? deal.discount_type === "percent"  ? `Giảm ${deal.discount_value}% · Áp dụng ngay`
+            const deal = vouchers[bannerIdx % vouchers.length]
+            const dealEmoji   = DEAL_EMOJI[deal.discount_type] ?? "⚡"
+            const dealTitle   = deal.title
+            const dealSubLine = deal.discount_type === "percent"  ? `Giảm ${deal.discount_value}% · Áp dụng ngay`
               : deal.discount_type === "fixed"    ? `Giảm ${fmt(deal.discount_value)} · Đặt ngay`
               : "Miễn phí giao hàng · Đơn từ bất kỳ"
-              : "Khuyến mãi đặc biệt dành cho bạn"
-            const dotCount = Math.max(vouchers.length, 1)
             return (
               <div style={{ margin:"0 16px 8px" }}>
                 <div style={{
@@ -694,64 +743,118 @@ export default function HomePage() {
                   position:"relative",
                   background:"linear-gradient(135deg,#1a0d00,#2d1500,#0d0900)",
                 }}>
-                  {/* Glow */}
-                  <div style={{ position:"absolute", top:-20, right:-15,
-                    width:130, height:130,
+                  <div style={{ position:"absolute", top:-20, right:-15, width:130, height:130,
                     background:"radial-gradient(circle,rgba(255,107,0,0.32) 0%,transparent 65%)" }} />
-                  <div style={{ position:"absolute", bottom:-15, left:10,
-                    width:80, height:80,
+                  <div style={{ position:"absolute", bottom:-15, left:10, width:80, height:80,
                     background:"radial-gradient(circle,rgba(255,179,71,0.12) 0%,transparent 65%)" }} />
-                  {/* Shine */}
                   <div style={{ position:"absolute", top:0, left:"-100%", width:"50%", height:"100%",
                     background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)",
                     animation:"logoShine 3.5s infinite" }} />
-                  {/* Content */}
                   <div style={{ position:"relative", zIndex:1, padding:"13px 15px" }}>
-                    <div style={{
-                      display:"inline-block",
+                    <div style={{ display:"inline-block",
                       background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
                       borderRadius:8, padding:"2px 9px", marginBottom:5,
-                      color:"#000", fontSize:8, fontWeight:700, letterSpacing:.4,
-                    }}>
+                      color:"#000", fontSize:8, fontWeight:700, letterSpacing:.4 }}>
                       ⚡ FLASH SALE · {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
                     </div>
-                    <div style={{ color:"#fff", fontSize:14, fontWeight:700, lineHeight:1.25,
-                      maxWidth:"62%", wordBreak:"break-word" }}>
+                    <div style={{ color:"#fff", fontSize:14, fontWeight:700, lineHeight:1.25, maxWidth:"62%", wordBreak:"break-word" }}>
                       {dealTitle}
                     </div>
                     <div style={{ color:"rgba(255,255,255,0.4)", fontSize:9, marginTop:3 }}>
                       {dealSubLine}
                     </div>
                     <div onClick={() => router.push(deal?.shop_id ? `/shop/${deal.shop_id}` : "/vouchers")}
-                      style={{
-                        display:"inline-block", marginTop:6, cursor:"pointer",
-                        background:"rgba(255,255,255,0.12)",
-                        border:"1px solid rgba(255,255,255,0.2)",
-                        borderRadius:6, padding:"3px 9px",
-                        color:"#fff", fontSize:8.5, fontWeight:600,
-                      }}>Đặt ngay →</div>
+                      style={{ display:"inline-block", marginTop:6, cursor:"pointer",
+                        background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)",
+                        borderRadius:6, padding:"3px 9px", color:"#fff", fontSize:8.5, fontWeight:600 }}>
+                      Đặt ngay →
+                    </div>
                   </div>
-                  {/* Big emoji */}
-                  <div style={{ position:"absolute", right:14, top:"50%",
-                    transform:"translateY(-50%)", fontSize:52, zIndex:1,
-                    filter:"drop-shadow(0 0 14px rgba(255,107,0,0.5))" }}>
+                  <div style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)",
+                    fontSize:52, zIndex:1, filter:"drop-shadow(0 0 14px rgba(255,107,0,0.5))" }}>
                     {dealEmoji}
                   </div>
                 </div>
-                {/* Dots */}
                 <div style={{ display:"flex", gap:4, justifyContent:"center", padding:"7px 0 8px" }}>
-                  {Array.from({ length: dotCount }).map((_,i) => (
+                  {vouchers.map((_,i) => (
                     <div key={i} onClick={() => setBannerIdx(i)} style={{
-                      width: bannerIdx===i ? 18 : 5, height:5, borderRadius:3, cursor:"pointer",
-                      background: bannerIdx===i ? "#FF6B00" : "rgba(255,255,255,0.08)",
-                      transition:"all .3s",
-                      boxShadow: bannerIdx===i ? "0 0 5px #FF6B00" : "none",
+                      width:bannerIdx===i?18:5, height:5, borderRadius:3, cursor:"pointer",
+                      background:bannerIdx===i?"#FF6B00":"rgba(255,255,255,0.08)",
+                      transition:"all .3s", boxShadow:bannerIdx===i?"0 0 5px #FF6B00":"none",
                     }} />
                   ))}
                 </div>
               </div>
             )
-          })()}
+          })() : adminBanners.length > 0 ? (
+            <div style={{ margin:"0 16px 8px" }}>
+              <div style={{ height:110, borderRadius:16, overflow:"hidden",
+                border:"1px solid rgba(255,255,255,0.12)", position:"relative",
+                cursor:"pointer", background:"#0d1a2d" }}
+                onClick={() => { const b = adminBanners[adminBannerIdx]; if (b?.link_url) router.push(b.link_url) }}>
+                {adminBanners[adminBannerIdx]?.image_url ? (
+                  <img src={adminBanners[adminBannerIdx].image_url!} alt={adminBanners[adminBannerIdx].title}
+                    style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                ) : (
+                  <div style={{ width:"100%", height:"100%",
+                    background:"linear-gradient(135deg,#0d1a2d,#1a2d40)",
+                    display:"flex", alignItems:"center", padding:"16px 15px" }}>
+                    <div>
+                      <div style={{ color:"#fff", fontSize:14, fontWeight:700, marginBottom:4 }}>
+                        {adminBanners[adminBannerIdx]?.title}
+                      </div>
+                      {adminBanners[adminBannerIdx]?.subtitle && (
+                        <div style={{ color:"rgba(255,255,255,0.55)", fontSize:10 }}>
+                          {adminBanners[adminBannerIdx].subtitle}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {adminBanners.length > 1 && (
+                <div style={{ display:"flex", gap:4, justifyContent:"center", padding:"7px 0 8px" }}>
+                  {adminBanners.map((_,i) => (
+                    <div key={i} onClick={() => setAdminBannerIdx(i)} style={{
+                      width:adminBannerIdx===i?18:5, height:5, borderRadius:3, cursor:"pointer",
+                      background:adminBannerIdx===i?"#4a8ff5":"rgba(255,255,255,0.08)", transition:"all .3s",
+                    }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ margin:"0 16px 14px" }}>
+              <div style={{ height:110, borderRadius:16, overflow:"hidden",
+                border:"1px solid rgba(62,207,110,0.3)", position:"relative",
+                background:"linear-gradient(135deg,#081a10,#0d2d18,#081510)", cursor:"pointer" }}
+                onClick={() => router.push("/invite")}>
+                <div style={{ position:"absolute", top:-20, right:-15, width:130, height:130,
+                  background:"radial-gradient(circle,rgba(62,207,110,0.25) 0%,transparent 65%)" }} />
+                <div style={{ position:"relative", zIndex:1, padding:"13px 15px" }}>
+                  <div style={{ display:"inline-block",
+                    background:"linear-gradient(135deg,#3ecf6e,#27ae60)",
+                    borderRadius:8, padding:"2px 9px", marginBottom:5,
+                    color:"#000", fontSize:8, fontWeight:700, letterSpacing:.4 }}>
+                    🎁 MỜI BẠN BÈ
+                  </div>
+                  <div style={{ color:"#fff", fontSize:13, fontWeight:700, lineHeight:1.3, maxWidth:"62%", wordBreak:"break-word" }}>
+                    Mời bạn bè, nhận ngay ưu đãi!
+                  </div>
+                  <div style={{ color:"rgba(255,255,255,0.45)", fontSize:9, marginTop:3 }}>
+                    Bạn và người được mời đều nhận 20k đơn đầu
+                  </div>
+                  <div style={{ display:"inline-block", marginTop:6,
+                    background:"rgba(62,207,110,0.15)", border:"1px solid rgba(62,207,110,0.35)",
+                    borderRadius:6, padding:"3px 9px", color:"#3ecf6e", fontSize:8.5, fontWeight:600 }}>
+                    Chia sẻ ngay →
+                  </div>
+                </div>
+                <div style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)",
+                  fontSize:52, zIndex:1, filter:"drop-shadow(0 0 14px rgba(62,207,110,0.4))" }}>🎁</div>
+              </div>
+            </div>
+          )}
 
           {/* ──────────────────────────────────────
               S5 — ServiceGrid (4 dịch vụ nhanh)
@@ -1153,6 +1256,111 @@ export default function HomePage() {
               </div>
             )})}
           </div>
+
+          {/* ──────────────────────────────────────
+              S9.5 — Vừa lên menu (sản phẩm mới nhất)
+          ────────────────────────────────────── */}
+          {newMenuItems.length > 0 && (
+            <>
+              <SectionHeader title="🆕 Vừa lên menu" more="Xem thêm →" href="/search?sort=newest" />
+              <HScroll>
+                {newMenuItems.map(p => {
+                  const shopName = (p.shops as {name:string}|null)?.name ?? ""
+                  return (
+                    <a key={p.id} href={`/shop/${p.shop_id}`}
+                      style={{ textDecoration:"none", flexShrink:0, width:110,
+                        display:"flex", flexDirection:"column",
+                        background:"rgba(255,255,255,0.04)",
+                        border:"1px solid rgba(62,207,110,0.15)",
+                        borderRadius:13, overflow:"hidden" }}>
+                      {p.image_url ? (
+                        <img src={p.image_url} alt={p.name} style={{ width:110, height:78, objectFit:"cover" }} />
+                      ) : (
+                        <div style={{ width:110, height:78,
+                          background:"linear-gradient(135deg,rgba(62,207,110,0.07),rgba(62,207,110,0.03))",
+                          display:"flex", alignItems:"center", justifyContent:"center",
+                          fontSize:30, position:"relative" }}>
+                          🍽️
+                          <div style={{ position:"absolute", top:5, left:5,
+                            background:"rgba(62,207,110,0.85)", color:"#000",
+                            fontSize:7, fontWeight:700, padding:"2px 5px", borderRadius:5 }}>MỚI</div>
+                        </div>
+                      )}
+                      <div style={{ padding:"7px 8px 8px" }}>
+                        <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600,
+                          lineHeight:1.3, marginBottom:3,
+                          display:"-webkit-box", WebkitLineClamp:2,
+                          WebkitBoxOrient:"vertical", overflow:"hidden" }}>
+                          {p.name}
+                        </div>
+                        <div style={{ color:"#6a5a40", fontSize:8.5, marginBottom:4,
+                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                          {shopName}
+                        </div>
+                        <div style={{ background:"linear-gradient(90deg,#FF6B00,#FFB347)",
+                          WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                          backgroundClip:"text", fontSize:11, fontWeight:700 }}>
+                          {fmt(p.price)}
+                        </div>
+                      </div>
+                    </a>
+                  )
+                })}
+              </HScroll>
+            </>
+          )}
+
+          {/* ──────────────────────────────────────
+              S9.6 — Món ăn gợi ý (theo lịch sử tìm kiếm)
+          ────────────────────────────────────── */}
+          {searchSuggest.length > 0 && (
+            <>
+              <SectionHeader title="🔍 Món ăn gợi ý" more="Tìm kiếm →" href="/search" />
+              <HScroll>
+                {searchSuggest.map(p => {
+                  const shopName = (p.shops as {name:string}|null)?.name ?? ""
+                  return (
+                    <div key={p.id} className="promo-card" style={{
+                      minWidth:120, flexShrink:0,
+                      background:"rgba(255,255,255,0.04)", backdropFilter:"blur(10px)",
+                      border:"1px solid rgba(180,100,255,0.15)",
+                      borderRadius:14, overflow:"hidden", cursor:"pointer",
+                    }}>
+                      <div style={{ height:74, display:"flex", alignItems:"center",
+                        justifyContent:"center", fontSize:32, position:"relative",
+                        background:"rgba(180,100,255,0.04)" }}>
+                        <div style={{ position:"absolute", inset:0,
+                          background:"radial-gradient(circle at 50% 65%,rgba(180,100,255,0.1) 0%,transparent 65%)" }} />
+                        🍽️
+                      </div>
+                      <div style={{ padding:"7px 9px 8px" }}>
+                        <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600,
+                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
+                        <div style={{ color:"#6a5a40", fontSize:8, marginTop:1,
+                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
+                        <div style={{ background:"linear-gradient(135deg,#FF6B00,#FFB347)",
+                          WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                          backgroundClip:"text", fontSize:11, fontWeight:700, marginTop:3 }}>{fmt(p.price)}</div>
+                        <div style={{ display:"flex", alignItems:"center",
+                          justifyContent:"space-between", marginTop:4 }}>
+                          <span style={{ color:"#6a5a40", fontSize:7.5 }}>🔥 {p.sold_count} đã bán</span>
+                          <button
+                            onClick={e => { e.preventDefault(); e.stopPropagation();
+                              handleAdd(e.currentTarget as HTMLElement,
+                                { id:p.id, name:p.name, price:p.price, shop:shopName, shopId:p.shop_id }) }}
+                            style={{ width:22, height:22, borderRadius:7,
+                              background:"linear-gradient(135deg,#b464ff,#8a40cc)",
+                              border:"none", color:"#fff", fontSize:14, fontWeight:700,
+                              cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+                              boxShadow:"0 2px 6px rgba(180,100,255,0.4)", flexShrink:0 }}>+</button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </HScroll>
+            </>
+          )}
 
           {/* ──────────────────────────────────────
               S10a — Smart Recommendations

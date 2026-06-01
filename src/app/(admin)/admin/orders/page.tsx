@@ -9,11 +9,17 @@ type OrderStatus  = "pending" | "accepted" | "preparing" | "ready" | "delivering
 type PayMethod    = "cash" | "vietqr" | "momo"
 type ServiceType  = "food" | "motorbike" | "taxi" | "buy_for_me" | "deliver_for_me"
 
+interface OrderItem {
+  id: string; name: string; qty: number; price: number
+  breakdown?: { basePrice?: number; sizeLabel?: string; sizeDiff?: number; toppings?: { name: string; price: number }[] }
+}
 interface Order {
-  id: string; status: OrderStatus; total_amount: number
-  drop_address: string; created_at: string
+  id: string; status: OrderStatus; total_amount: number; ship_fee: number
+  drop_address: string; created_at: string; pay_method: string; note: string | null
   customer_id: string; driver_id: string | null
-  shopName: string; itemCount: number; customerName: string; driverName: string | null
+  shopName: string; customerName: string; customerPhone: string
+  driverName: string | null; driverPhone: string | null
+  items: OrderItem[]
 }
 interface ManItem  { productId: string; name: string; price: number; qty: number }
 interface ShopSlot { shopId: string; shopName: string; items: ManItem[] }
@@ -21,6 +27,9 @@ interface ShopSlot { shopId: string; shopName: string; items: ManItem[] }
 type PricingMap = Record<string, { rows: string[]; extra: string }>
 
 const EXTRA_SHOP = 5_000 // phí thêm mỗi quán (cố định)
+
+const CANCEL_REASONS    = ["Xe bị sự cố", "Ngược đường", "Ô nhập thông tin sai", "Khách yêu cầu hủy", "Khác"]
+const CHANGE_DRV_REASONS = ["Xe bị sự cố", "Ngược đường", "Không liên lạc được tài xế", "Yêu cầu của khách", "Khác"]
 
 const STATUS_CFG: Record<OrderStatus, { label: string; color: string; bg: string }> = {
   pending:    { label: "Chờ xử lý",  color: "#FFB347", bg: "rgba(255,179,71,0.1)"  },
@@ -158,6 +167,20 @@ export default function AdminOrdersPage() {
   const [loading,  setLoading]  = useState(true)
   const [adminId,  setAdminId]  = useState("")
 
+  // Cancel modal
+  const [cancelModal,    setCancelModal]    = useState<Order | null>(null)
+  const [cancelReason,   setCancelReason]   = useState("")
+  const [cancelCustom,   setCancelCustom]   = useState("")
+  const [cancelling,     setCancelling]     = useState(false)
+
+  // Change driver modal
+  const [drvModal,       setDrvModal]       = useState<Order | null>(null)
+  const [drvReason,      setDrvReason]      = useState("")
+  const [drvCustom,      setDrvCustom]      = useState("")
+  const [newDriverId,    setNewDriverId]    = useState("")
+  const [driverList,     setDriverList]     = useState<{id:string;name:string;phone:string}[]>([])
+  const [changingDriver, setChangingDriver] = useState(false)
+
   // Pricing from app_settings
   const [pricing, setPricing] = useState<PricingMap | null>(null)
 
@@ -234,7 +257,7 @@ export default function AdminOrdersPage() {
     const supabase = createClient()
     const { data: rows, error } = await supabase
       .from("orders")
-      .select("id,status,total_amount,drop_address,created_at,customer_id,driver_id,shops!shop_id(name),order_items(id)")
+      .select("id,status,total_amount,ship_fee,drop_address,created_at,customer_id,driver_id,pay_method,note,shops!shop_id(name),order_items(id,name,qty,price,breakdown)")
       .order("created_at", { ascending: false })
       .limit(100)
     if (error || !rows) { setLoading(false); return }
@@ -242,22 +265,29 @@ export default function AdminOrdersPage() {
     const custIds = [...new Set(rows.map(r => r.customer_id).filter(Boolean))]
     const drvIds  = [...new Set(rows.map(r => r.driver_id).filter(Boolean) as string[])]
     const [{ data: profs }, { data: drvProfs }] = await Promise.all([
-      custIds.length ? supabase.from("profiles").select("id,full_name").in("id", custIds) : Promise.resolve({ data: [] }),
-      drvIds.length  ? supabase.from("profiles").select("id,full_name").in("id", drvIds)  : Promise.resolve({ data: [] }),
+      custIds.length ? supabase.from("profiles").select("id,full_name,phone").in("id", custIds) : Promise.resolve({ data: [] }),
+      drvIds.length  ? supabase.from("profiles").select("id,full_name,phone").in("id", drvIds)  : Promise.resolve({ data: [] }),
     ])
-    const pMap = Object.fromEntries((profs ?? []).map(p => [p.id, p.full_name ?? "Khách hàng"]))
-    const dMap = Object.fromEntries((drvProfs ?? []).map(p => [p.id, p.full_name ?? "Tài xế"]))
+    const pMap   = Object.fromEntries((profs ?? []).map(p => [p.id, p.full_name ?? "Khách hàng"]))
+    const pPhone = Object.fromEntries((profs ?? []).map(p => [p.id, p.phone ?? ""]))
+    const dMap   = Object.fromEntries((drvProfs ?? []).map(p => [p.id, p.full_name ?? "Tài xế"]))
+    const dPhone = Object.fromEntries((drvProfs ?? []).map(p => [p.id, p.phone ?? ""]))
 
     setOrders(rows.map(r => {
       const s = r.shops as unknown
       const shopName = Array.isArray(s) ? (s[0] as {name:string})?.name ?? "—" : (s as {name:string}|null)?.name ?? "—"
       return {
         id: r.id, status: r.status as OrderStatus, total_amount: r.total_amount,
+        ship_fee:  (r.ship_fee  as number)      ?? 0,
         drop_address: r.drop_address, created_at: r.created_at,
+        pay_method: (r.pay_method as string)    ?? "cash",
+        note:       (r.note      as string|null) ?? null,
         customer_id: r.customer_id, driver_id: r.driver_id, shopName,
-        itemCount: (r.order_items as unknown[])?.length ?? 0,
-        customerName: pMap[r.customer_id] ?? "Khách hàng",
-        driverName: r.driver_id ? (dMap[r.driver_id] ?? null) : null,
+        customerName:  pMap[r.customer_id]  ?? "Khách hàng",
+        customerPhone: pPhone[r.customer_id] ?? "",
+        driverName:  r.driver_id ? (dMap[r.driver_id]   ?? null) : null,
+        driverPhone: r.driver_id ? (dPhone[r.driver_id] ?? null) : null,
+        items: (r.order_items ?? []) as OrderItem[],
       }
     }))
     setLoading(false)
@@ -359,11 +389,63 @@ export default function AdminOrdersPage() {
     return `${fmt(fee)} (theo bảng cước ${km}km)`
   }
 
-  /* ── Cancel ── */
-  const handleCancel = async (orderId: string) => {
-    await createClient().from("orders").update({ status:"cancelled", cancelled_at:new Date().toISOString() }).eq("id", orderId)
-    setOrders(p => p.map(o => o.id === orderId ? {...o, status:"cancelled"} : o))
-    if (selected?.id === orderId) setSelected(p => p ? {...p, status:"cancelled"} : p)
+  /* ── Cancel with reason + notifications ── */
+  const handleCancelWithReason = async (order: Order, reason: string) => {
+    setCancelling(true)
+    const supabase  = createClient()
+    const finalRsn  = reason === "Khác" ? (cancelCustom.trim() || "Không có lý do") : reason
+    await supabase.from("orders").update({ status:"cancelled", cancelled_at: new Date().toISOString() }).eq("id", order.id)
+    const notifs: { user_id:string; type:string; title:string; body:string; data:object }[] = [
+      { user_id: order.customer_id, type:"order",
+        title:"❌ Đơn hàng đã bị hủy",
+        body:`Đơn #${order.id.slice(0,8).toUpperCase()} đã bị hủy bởi admin. Lý do: ${finalRsn}`,
+        data:{ order_id: order.id } },
+    ]
+    if (order.driver_id) notifs.push({
+      user_id: order.driver_id, type:"order",
+      title:"❌ Đơn bị hủy",
+      body:`Đơn #${order.id.slice(0,8).toUpperCase()} đã bị admin hủy. Lý do: ${finalRsn}`,
+      data:{ order_id: order.id },
+    })
+    await supabase.from("notifications").insert(notifs)
+    setOrders(p => p.map(o => o.id === order.id ? {...o, status:"cancelled"} : o))
+    setCancelModal(null); setCancelReason(""); setCancelCustom("")
+    setCancelling(false)
+  }
+
+  /* ── Change driver + notifications (3 bên) ── */
+  const loadAvailableDrivers = async () => {
+    const { data } = await createClient().from("profiles")
+      .select("id,full_name,phone").eq("role","driver").eq("is_active",true).order("full_name")
+    setDriverList((data ?? []).map(d => ({ id:d.id, name:d.full_name ?? "Tài xế", phone:d.phone ?? "" })))
+  }
+
+  const handleChangeDriver = async (order: Order, newDrvId: string, reason: string) => {
+    setChangingDriver(true)
+    const supabase  = createClient()
+    const finalRsn  = reason === "Khác" ? (drvCustom.trim() || "Không có lý do") : reason
+    await supabase.from("orders").update({ driver_id: newDrvId }).eq("id", order.id)
+    const newDrv = driverList.find(d => d.id === newDrvId)
+    const notifs: { user_id:string; type:string; title:string; body:string; data:object }[] = [
+      { user_id: order.customer_id, type:"order",
+        title:"🔄 Tài xế đã được thay đổi",
+        body:`Đơn #${order.id.slice(0,8).toUpperCase()} — tài xế mới: ${newDrv?.name ?? "Tài xế"}. Lý do: ${finalRsn}`,
+        data:{ order_id: order.id } },
+      { user_id: newDrvId, type:"order",
+        title:"📦 Bạn nhận đơn hàng mới",
+        body:`Admin đã phân công đơn #${order.id.slice(0,8).toUpperCase()} cho bạn`,
+        data:{ order_id: order.id } },
+    ]
+    if (order.driver_id) notifs.push({
+      user_id: order.driver_id, type:"order",
+      title:"🔄 Đơn hàng đã được chuyển",
+      body:`Đơn #${order.id.slice(0,8).toUpperCase()} đã được chuyển cho tài xế khác. Lý do: ${finalRsn}`,
+      data:{ order_id: order.id },
+    })
+    await supabase.from("notifications").insert(notifs)
+    setOrders(p => p.map(o => o.id === order.id ? {...o, driver_id:newDrvId, driverName:newDrv?.name ?? null} : o))
+    setDrvModal(null); setDrvReason(""); setDrvCustom(""); setNewDriverId("")
+    setChangingDriver(false)
   }
 
   /* ── Submit ── */
@@ -586,7 +668,7 @@ export default function AdminOrdersPage() {
                   <span style={{ color:"#6a5a40", fontSize:9 }}>{fmtTime(order.created_at)}</span>
                 </div>
                 <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginBottom:3 }}>{order.customerName}</div>
-                <div style={{ color:"#6a5a40", fontSize:9, marginBottom:3 }}>🏪 {order.shopName} · {order.itemCount} món</div>
+                <div style={{ color:"#6a5a40", fontSize:9, marginBottom:3 }}>🏪 {order.shopName} · {order.items.length} món</div>
                 <div style={{ color:"#6a5a40", fontSize:9, marginBottom:6 }}>📍 {order.drop_address}</div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <div style={{ color:"#6a5a40", fontSize:9 }}>{order.driverName?`🛵 ${order.driverName}`:"⏳ Chưa có tài xế"}</div>
@@ -601,34 +683,152 @@ export default function AdminOrdersPage() {
         <AnimatePresence>
           {selected && (
             <>
-              <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>setSelected(null)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:50, backdropFilter:"blur(4px)" }} />
+              <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+                onClick={()=>setSelected(null)}
+                style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:50, backdropFilter:"blur(4px)" }} />
               <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}} transition={{type:"spring",damping:22,stiffness:300}}
-                style={{ position:"fixed", bottom:0, left:0, right:0, background:"#0e0c09", borderRadius:"20px 20px 0 0", border:"1px solid rgba(255,255,255,0.08)", padding:"20px 16px 32px", zIndex:51 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-                  <div>
-                    <div style={{ color:"#FF8C00", fontSize:16, fontWeight:800 }}>#{selected.id.slice(0,8).toUpperCase()}</div>
-                    <div style={{ color:"#6a5a40", fontSize:9 }}>{fmtTime(selected.created_at)} · {STATUS_CFG[selected.status].label}</div>
+                style={{ position:"fixed", bottom:0, left:0, right:0, background:"#0e0c09",
+                  borderRadius:"20px 20px 0 0", border:"1px solid rgba(255,255,255,0.08)",
+                  zIndex:51, maxHeight:"92dvh", display:"flex", flexDirection:"column" }}>
+
+                {/* ── Header ── */}
+                <div style={{ padding:"16px 16px 12px", borderBottom:"1px solid rgba(255,255,255,0.06)", flexShrink:0 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                    <div>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                        <span style={{ color:"#FF8C00", fontSize:16, fontWeight:800 }}>#{selected.id.slice(0,8).toUpperCase()}</span>
+                        <span style={{ background:STATUS_CFG[selected.status].bg, color:STATUS_CFG[selected.status].color, borderRadius:6, padding:"2px 7px", fontSize:8, fontWeight:700 }}>
+                          {STATUS_CFG[selected.status].label}
+                        </span>
+                      </div>
+                      <div style={{ color:"#6a5a40", fontSize:9 }}>🕐 {fmtTime(selected.created_at)} · 🏪 {selected.shopName}</div>
+                    </div>
+                    <button onClick={()=>setSelected(null)}
+                      style={{ width:32, height:32, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
                   </div>
-                  <button onClick={()=>setSelected(null)} style={{ width:32, height:32, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
                 </div>
-                {[
-                  ["Khách hàng", selected.customerName],
-                  ["Cửa hàng",   selected.shopName],
-                  ["Tài xế",     selected.driverName ?? "Chưa phân công"],
-                  ["Địa chỉ",    selected.drop_address],
-                  ["Số món",     `${selected.itemCount} món`],
-                  ["Tổng tiền",  fmt(selected.total_amount)],
-                ].map(([k,v]) => (
-                  <div key={k} style={{ display:"flex", justifyContent:"space-between", gap:12, marginBottom:8, paddingBottom:8, borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
-                    <span style={{ color:"#6a5a40", fontSize:9, flexShrink:0 }}>{k}</span>
-                    <span style={{ color:"#f8f0e0", fontSize:9, fontWeight:600, textAlign:"right" }}>{v}</span>
+
+                {/* ── Scrollable body ── */}
+                <div style={{ flex:1, overflowY:"auto", padding:"14px 16px" }}>
+
+                  {/* Items */}
+                  <div style={{ marginBottom:14 }}>
+                    <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:.5, marginBottom:10 }}>📋 Danh sách món ({selected.items.length})</div>
+                    {selected.items.length === 0 ? (
+                      <div style={{ color:"#6a5a40", fontSize:10, textAlign:"center", padding:"12px 0" }}>Chưa có dữ liệu món</div>
+                    ) : selected.items.map((item, idx) => {
+                      const bd       = item.breakdown
+                      const baseP    = bd?.basePrice ?? item.price
+                      const sizeDiff = bd?.sizeDiff   ?? 0
+                      const tops     = bd?.toppings   ?? []
+                      const perUnit  = baseP + sizeDiff + tops.reduce((s,t) => s + t.price, 0)
+                      const lineTotal = perUnit * item.qty
+                      return (
+                        <div key={item.id ?? idx} style={{ marginBottom:10, paddingBottom:10, borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                            <span style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, flex:1, marginRight:8 }}>{item.name}</span>
+                            <span style={{ color:"#b0956a", fontSize:10, flexShrink:0 }}>{fmt(baseP)}</span>
+                          </div>
+                          {bd?.sizeLabel && (
+                            <div style={{ display:"flex", justifyContent:"space-between", paddingLeft:10, marginTop:3 }}>
+                              <span style={{ color:"#6a5a40", fontSize:9 }}>▸ {bd.sizeLabel}</span>
+                              {sizeDiff > 0 && <span style={{ color:"#6a5a40", fontSize:9 }}>+{fmt(sizeDiff)}</span>}
+                            </div>
+                          )}
+                          {tops.map((t, ti) => (
+                            <div key={ti} style={{ display:"flex", justifyContent:"space-between", paddingLeft:10, marginTop:2 }}>
+                              <span style={{ color:"#6a5a40", fontSize:9 }}>+ {t.name}</span>
+                              <span style={{ color:"#6a5a40", fontSize:9 }}>+{fmt(t.price)}</span>
+                            </div>
+                          ))}
+                          <div style={{ display:"flex", justifyContent:"space-between", marginTop:6 }}>
+                            <span style={{ color:"#6a5a40", fontSize:9 }}>× {item.qty}</span>
+                            <span style={{ color:"#FF8C00", fontSize:11, fontWeight:700 }}>{fmt(lineTotal)}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {/* Tổng */}
+                    <div style={{ borderTop:"1px solid rgba(255,107,0,0.12)", paddingTop:10, display:"flex", flexDirection:"column", gap:5 }}>
+                      {selected.items.length > 0 && (() => {
+                        const sub = selected.items.reduce((s, it) => {
+                          const bd = it.breakdown
+                          const p  = bd ? (bd.basePrice ?? it.price) + (bd.sizeDiff ?? 0) + (bd.toppings ?? []).reduce((ss,t)=>ss+t.price,0) : it.price
+                          return s + p * it.qty
+                        }, 0)
+                        return (
+                          <div style={{ display:"flex", justifyContent:"space-between" }}>
+                            <span style={{ color:"#6a5a40", fontSize:10 }}>Tạm tính</span>
+                            <span style={{ color:"#b0956a", fontSize:10, fontWeight:600 }}>{fmt(sub)}</span>
+                          </div>
+                        )
+                      })()}
+                      <div style={{ display:"flex", justifyContent:"space-between" }}>
+                        <span style={{ color:"#6a5a40", fontSize:10 }}>Phí giao</span>
+                        <span style={{ color:"#b0956a", fontSize:10, fontWeight:600 }}>{fmt(selected.ship_fee)}</span>
+                      </div>
+                      <div style={{ display:"flex", justifyContent:"space-between", paddingTop:6, borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                        <span style={{ color:"#f8f0e0", fontSize:12, fontWeight:700 }}>Tổng cộng</span>
+                        <span style={{ background:"linear-gradient(90deg,#FF6B00,#FFB347)",
+                          WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                          backgroundClip:"text", fontSize:15, fontWeight:800 }}>{fmt(selected.total_amount)}</span>
+                      </div>
+                    </div>
                   </div>
-                ))}
-                {(selected.status==="pending"||selected.status==="accepted"||selected.status==="preparing") && (
-                  <button onClick={()=>handleCancel(selected.id)}
-                    style={{ width:"100%", height:44, borderRadius:12, background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)", color:"#ff4040", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", marginTop:8 }}>
-                    ❌ Hủy đơn
-                  </button>
+
+                  {/* Customer + Driver */}
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
+                    <div style={{ background:"rgba(74,143,245,0.04)", border:"1px solid rgba(74,143,245,0.12)", borderRadius:12, padding:"10px 12px" }}>
+                      <div style={{ color:"#4a8ff5", fontSize:9, fontWeight:700, marginBottom:6 }}>👤 Khách hàng</div>
+                      <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:700, marginBottom:3 }}>{selected.customerName}</div>
+                      {selected.customerPhone && <div style={{ color:"#6a5a40", fontSize:9, marginBottom:3 }}>📞 {selected.customerPhone}</div>}
+                      <div style={{ color:"#6a5a40", fontSize:8.5, lineHeight:1.4 }}>📍 {selected.drop_address}</div>
+                    </div>
+                    <div style={{ background:selected.driverName?"rgba(62,207,110,0.04)":"rgba(255,255,255,0.02)", border:`1px solid ${selected.driverName?"rgba(62,207,110,0.15)":"rgba(255,255,255,0.07)"}`, borderRadius:12, padding:"10px 12px" }}>
+                      <div style={{ color:"#3ecf6e", fontSize:9, fontWeight:700, marginBottom:6 }}>🛵 Tài xế</div>
+                      {selected.driverName ? (
+                        <>
+                          <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:700, marginBottom:3 }}>{selected.driverName}</div>
+                          {selected.driverPhone && <div style={{ color:"#6a5a40", fontSize:9 }}>📞 {selected.driverPhone}</div>}
+                        </>
+                      ) : (
+                        <div style={{ color:"#6a5a40", fontSize:9, marginTop:4 }}>⏳ Chưa có tài xế</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Payment + Note */}
+                  <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:12, padding:"10px 12px" }}>
+                    <div style={{ display:"flex", gap:16 }}>
+                      <div>
+                        <div style={{ color:"#6a5a40", fontSize:9, marginBottom:4 }}>Thanh toán</div>
+                        <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600 }}>
+                          {selected.pay_method==="cash"?"💵 Tiền mặt":selected.pay_method==="vietqr"?"🏦 VietQR":"💜 MoMo"}
+                        </div>
+                      </div>
+                      {selected.note && (
+                        <div style={{ flex:1 }}>
+                          <div style={{ color:"#6a5a40", fontSize:9, marginBottom:4 }}>Ghi chú</div>
+                          <div style={{ color:"#f8f0e0", fontSize:10 }}>{selected.note}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Action buttons ── */}
+                {selected.status !== "cancelled" && selected.status !== "delivered" && (
+                  <div style={{ padding:"10px 16px 28px", borderTop:"1px solid rgba(255,255,255,0.05)", display:"flex", gap:8, flexShrink:0 }}>
+                    <button onClick={() => { setCancelModal(selected); setSelected(null) }}
+                      style={{ flex:1, height:44, borderRadius:12, background:"rgba(255,64,64,0.08)", border:"1px solid rgba(255,64,64,0.2)", color:"#ff4040", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
+                      ❌ Hủy đơn
+                    </button>
+                    <button onClick={() => { setDrvModal(selected); loadAvailableDrivers(); setSelected(null) }}
+                      style={{ flex:1, height:44, borderRadius:12, background:"rgba(74,143,245,0.08)", border:"1px solid rgba(74,143,245,0.2)", color:"#4a8ff5", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
+                      🔄 Đổi tài xế
+                    </button>
+                  </div>
                 )}
               </motion.div>
             </>
@@ -1037,6 +1237,130 @@ export default function AdminOrdersPage() {
           )}
         </AnimatePresence>
         </div>
+
+        {/* ══════════════════════════════════════════════
+            CANCEL REASON MODAL
+        ══════════════════════════════════════════════ */}
+        <AnimatePresence>
+          {cancelModal && (
+            <>
+              <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+                onClick={() => { setCancelModal(null); setCancelReason(""); setCancelCustom("") }}
+                style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.72)", zIndex:70, backdropFilter:"blur(4px)" }} />
+              <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}} transition={{type:"spring",damping:22,stiffness:300}}
+                style={{ position:"fixed", bottom:0, left:0, right:0, background:"#0e0c09", borderRadius:"20px 20px 0 0", border:"1px solid rgba(255,64,64,0.2)", padding:"20px 16px 36px", zIndex:71 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+                  <div>
+                    <div style={{ color:"#ff4040", fontSize:15, fontWeight:800 }}>❌ Hủy đơn hàng</div>
+                    <div style={{ color:"#6a5a40", fontSize:9 }}>#{cancelModal.id.slice(0,8).toUpperCase()} · {cancelModal.customerName}</div>
+                  </div>
+                  <button onClick={() => { setCancelModal(null); setCancelReason(""); setCancelCustom("") }}
+                    style={{ width:32, height:32, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
+                </div>
+                <div style={{ color:"#6a5a40", fontSize:10, marginBottom:10 }}>Chọn lý do hủy đơn</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:7, marginBottom:12 }}>
+                  {CANCEL_REASONS.map(r => (
+                    <button key={r} onClick={() => setCancelReason(r)}
+                      style={{ padding:"10px 14px", borderRadius:10, textAlign:"left", fontFamily:"Lexend", cursor:"pointer",
+                        border:cancelReason===r?"1px solid rgba(255,64,64,0.4)":"1px solid rgba(255,255,255,0.08)",
+                        background:cancelReason===r?"rgba(255,64,64,0.1)":"rgba(255,255,255,0.04)",
+                        color:cancelReason===r?"#ff4040":"#b0956a", fontSize:11, fontWeight:cancelReason===r?700:400 }}>
+                      {cancelReason===r ? "● " : "○ "}{r}
+                    </button>
+                  ))}
+                </div>
+                {cancelReason === "Khác" && (
+                  <textarea value={cancelCustom} onChange={e => setCancelCustom(e.target.value)}
+                    rows={2} placeholder="Nhập lý do cụ thể..."
+                    style={{ width:"100%", padding:"9px 13px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,64,64,0.2)", borderRadius:10, color:"#f0eaff", fontSize:11, resize:"none", marginBottom:12 }} />
+                )}
+                <button disabled={!cancelReason || cancelling || (cancelReason==="Khác" && !cancelCustom.trim())}
+                  onClick={() => handleCancelWithReason(cancelModal, cancelReason)}
+                  style={{ width:"100%", height:46, borderRadius:12, fontFamily:"Lexend",
+                    background:"rgba(255,64,64,0.15)", border:"1px solid rgba(255,64,64,0.35)",
+                    color:"#ff4040", fontSize:13, fontWeight:700, cursor:"pointer",
+                    opacity:(!cancelReason||(cancelReason==="Khác"&&!cancelCustom.trim()))?0.38:1 }}>
+                  {cancelling ? "⏳ Đang hủy..." : "❌ Xác nhận hủy đơn"}
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ══════════════════════════════════════════════
+            CHANGE DRIVER MODAL
+        ══════════════════════════════════════════════ */}
+        <AnimatePresence>
+          {drvModal && (
+            <>
+              <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+                onClick={() => { setDrvModal(null); setDrvReason(""); setDrvCustom(""); setNewDriverId("") }}
+                style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.72)", zIndex:70, backdropFilter:"blur(4px)" }} />
+              <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}} transition={{type:"spring",damping:22,stiffness:300}}
+                style={{ position:"fixed", bottom:0, left:0, right:0, background:"#0e0c09", borderRadius:"20px 20px 0 0",
+                  border:"1px solid rgba(74,143,245,0.2)", padding:"20px 16px 36px", zIndex:71, maxHeight:"88dvh", overflowY:"auto" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+                  <div>
+                    <div style={{ color:"#4a8ff5", fontSize:15, fontWeight:800 }}>🔄 Đổi tài xế</div>
+                    <div style={{ color:"#6a5a40", fontSize:9 }}>#{drvModal.id.slice(0,8).toUpperCase()} · Hiện tại: {drvModal.driverName ?? "Chưa có tài xế"}</div>
+                  </div>
+                  <button onClick={() => { setDrvModal(null); setDrvReason(""); setDrvCustom(""); setNewDriverId("") }}
+                    style={{ width:32, height:32, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
+                </div>
+
+                <div style={{ color:"#6a5a40", fontSize:10, marginBottom:8 }}>Lý do đổi tài xế</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:12 }}>
+                  {CHANGE_DRV_REASONS.map(r => (
+                    <button key={r} onClick={() => setDrvReason(r)}
+                      style={{ padding:"9px 14px", borderRadius:10, textAlign:"left", fontFamily:"Lexend", cursor:"pointer",
+                        border:drvReason===r?"1px solid rgba(74,143,245,0.4)":"1px solid rgba(255,255,255,0.08)",
+                        background:drvReason===r?"rgba(74,143,245,0.1)":"rgba(255,255,255,0.04)",
+                        color:drvReason===r?"#4a8ff5":"#b0956a", fontSize:11, fontWeight:drvReason===r?700:400 }}>
+                      {drvReason===r ? "● " : "○ "}{r}
+                    </button>
+                  ))}
+                </div>
+                {drvReason === "Khác" && (
+                  <textarea value={drvCustom} onChange={e => setDrvCustom(e.target.value)}
+                    rows={2} placeholder="Nhập lý do cụ thể..."
+                    style={{ width:"100%", padding:"9px 13px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(74,143,245,0.2)", borderRadius:10, color:"#f0eaff", fontSize:11, resize:"none", marginBottom:12 }} />
+                )}
+
+                <div style={{ color:"#6a5a40", fontSize:10, marginBottom:8 }}>Chọn tài xế mới</div>
+                {driverList.length === 0 ? (
+                  <div style={{ textAlign:"center", color:"#6a5a40", fontSize:11, padding:"16px 0" }}>Đang tải danh sách tài xế...</div>
+                ) : (
+                  <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:16 }}>
+                    {driverList.filter(d => d.id !== drvModal.driver_id).map(d => (
+                      <button key={d.id} onClick={() => setNewDriverId(d.id)}
+                        style={{ padding:"10px 14px", borderRadius:10, textAlign:"left", fontFamily:"Lexend", cursor:"pointer",
+                          display:"flex", alignItems:"center", gap:10,
+                          border:newDriverId===d.id?"1px solid rgba(62,207,110,0.4)":"1px solid rgba(255,255,255,0.08)",
+                          background:newDriverId===d.id?"rgba(62,207,110,0.1)":"rgba(255,255,255,0.04)" }}>
+                        <div style={{ width:34, height:34, borderRadius:9, background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17, flexShrink:0 }}>🛵</div>
+                        <div style={{ flex:1 }}>
+                          <div style={{ color:newDriverId===d.id?"#3ecf6e":"#f8f0e0", fontSize:12, fontWeight:newDriverId===d.id?700:500 }}>{d.name}</div>
+                          <div style={{ color:"#6a5a40", fontSize:9 }}>{d.phone}</div>
+                        </div>
+                        {newDriverId===d.id && <span style={{ color:"#3ecf6e", fontSize:16 }}>✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <button disabled={!newDriverId||!drvReason||changingDriver||(drvReason==="Khác"&&!drvCustom.trim())}
+                  onClick={() => handleChangeDriver(drvModal, newDriverId, drvReason)}
+                  style={{ width:"100%", height:46, borderRadius:12, fontFamily:"Lexend",
+                    background:"rgba(74,143,245,0.15)", border:"1px solid rgba(74,143,245,0.35)",
+                    color:"#4a8ff5", fontSize:13, fontWeight:700, cursor:"pointer",
+                    opacity:(!newDriverId||!drvReason||(drvReason==="Khác"&&!drvCustom.trim()))?0.38:1 }}>
+                  {changingDriver ? "⏳ Đang xử lý..." : "🔄 Xác nhận đổi tài xế"}
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
       </AdminShell>
     </>
   )
