@@ -11,11 +11,16 @@ import { createClient } from "@/lib/supabase/client"
 type Status = "delivering" | "preparing" | "pending" | "accepted" | "ready" | "completed" | "cancelled"
 type ServiceType = "food" | "errand_deliver" | "errand_buy" | "ride_motorbike" | "ride_car"
 
-interface Topping { name: string; price: number }
+interface ItemBreakdown {
+  basePrice: number
+  sizeLabel?: string
+  sizeDiff?: number
+  toppings?: { name: string; price: number }[]
+}
 interface Item {
   emoji: string; name: string; qty: number; price: number
-  productId?: string
-  size?: string; sugar?: string; ice?: string; toppings?: Topping[]
+  productId?: string; note?: string
+  breakdown?: ItemBreakdown
 }
 interface Order {
   id: string; shopId: string; shopName: string; shopEmoji: string; shopColor: string
@@ -23,11 +28,11 @@ interface Order {
   serviceType: ServiceType
   status: Status; items: Item[]
   subtotal: number; deliveryFee: number; discount: number
-  nightFee?: number; weatherFee?: string
+  nightFee?: number
   createdAt: string; createdAtRaw: string; address: string; note?: string
   driver?: { name: string; plate: string; phone: string; rating: number; eta: number }
-  payMethod: string; rating?: number; cancelReason?: string
-  // Errand-specific
+  payMethod: string; payMethodRaw: string; rating?: number; cancelReason?: string
+  paymentStatus: string; xuUsed: number
   senderName?: string; senderPhone?: string
   recipientName?: string; recipientPhone?: string
   packagePhotoUrl?: string; pickupAddress?: string
@@ -60,6 +65,14 @@ const STATUS_CFG: Record<Status, { label: string; c: string; bg: string; bd: str
 const calcTotal = (o: Order) =>
   (o.subtotal ?? 0) + (o.deliveryFee ?? 0) - (o.discount ?? 0) + (o.nightFee ?? 0)
 
+const SERVICE_CFG: Record<ServiceType, { label: string; emoji: string; color: string; chipBg: string; chipBd: string }> = {
+  food:           { label: "Đồ ăn",   emoji: "🍜", color: "#FF6B00", chipBg: "rgba(255,107,0,0.12)",  chipBd: "rgba(255,107,0,0.35)"  },
+  errand_deliver: { label: "Giao hộ", emoji: "📦", color: "#b464ff", chipBg: "rgba(180,100,255,0.12)", chipBd: "rgba(180,100,255,0.35)" },
+  errand_buy:     { label: "Mua hộ",  emoji: "🛒", color: "#3ecf6e", chipBg: "rgba(62,207,110,0.12)",  chipBd: "rgba(62,207,110,0.35)"  },
+  ride_motorbike: { label: "Xe ôm",   emoji: "🏍", color: "#4a8ff5", chipBg: "rgba(74,143,245,0.12)",  chipBd: "rgba(74,143,245,0.35)"  },
+  ride_car:       { label: "Taxi",    emoji: "🚕", color: "#FFB347", chipBg: "rgba(255,179,71,0.12)",   chipBd: "rgba(255,179,71,0.35)"  },
+}
+
 const SHOP_COLORS = ["#FF8C00","#4a8ff5","#3ecf6e","#FFB347","#b464ff","#ff6060"]
 function shopColor(idx: number) { return SHOP_COLORS[idx % SHOP_COLORS.length] }
 
@@ -83,6 +96,17 @@ function fmtPayMethod(pm: string): string {
     momo: "MoMo", zalopay: "ZaloPay", wallet: "Ví GiaoNhanh",
   }
   return map[pm] ?? pm
+}
+
+function parseItemName(fullName: string) {
+  const match = fullName.match(/^(.+?)\s*\((.+)\)$/)
+  if (!match) return { base: fullName, size: null, toppings: [] as string[] }
+  const base = match[1].trim()
+  const parts = match[2].split(/\s*·\s*/).map(s => s.trim()).filter(Boolean)
+  const sizeIdx = parts.findIndex(p => /^size/i.test(p))
+  const size = sizeIdx >= 0 ? parts[sizeIdx] : null
+  const toppings = parts.filter((_, i) => i !== sizeIdx)
+  return { base, size, toppings }
 }
 
 function fmtDate(iso: string): string {
@@ -153,13 +177,13 @@ export default function OrdersPage() {
   const [loading,      setLoading]      = useState(true)
   const [activeTab,    setActiveTab]    = useState("all")
   const [expanded,     setExpanded]     = useState<string | null>(null)
-  const [showCancel,   setShowCancel]   = useState<string | null>(null)
-  const [showReview,   setShowReview]   = useState<string | null>(null)
-  const [cancelRsn,    setCancelRsn]    = useState("")
-  const [foodStar,     setFoodStar]     = useState(5)
-  const [driverStar,   setDriverStar]   = useState(5)
-  const [reviewTxt,    setReviewTxt]    = useState("")
-  const [toast,        setToast]        = useState("")
+  const [showCancel,       setShowCancel]       = useState<string | null>(null)
+  const [cancelRsn,        setCancelRsn]        = useState("")
+  const [shopStar,         setShopStar]         = useState(5)
+  const [driverReviewStar, setDriverReviewStar] = useState(5)
+  const [shopReviewTxt,    setShopReviewTxt]    = useState("")
+  const [driverReviewTxt,  setDriverReviewTxt]  = useState("")
+  const [toast,            setToast]            = useState("")
   const [userId,       setUserId]       = useState<string | null>(null)
   const [cancelLocked, setCancelLocked] = useState(false)
   const [cancelSecsLeft, setCancelSecsLeft] = useState(0)
@@ -183,6 +207,7 @@ export default function OrdersPage() {
         .select(`
           id, status, drop_address, note, total, ship_fee,
           pay_method, cancel_reason, created_at, driver_id, shop_id,
+          payment_status, xu_used,
           shops(id, name, category)
         `)
         .eq("customer_id", user.id)
@@ -198,12 +223,12 @@ export default function OrdersPage() {
       // Fetch order_items riêng (tránh nested join RLS)
       const { data: allItems } = await supabase
         .from("order_items")
-        .select("order_id, id, product_id, name, price, qty")
+        .select("order_id, id, product_id, name, price, qty, note, breakdown")
         .in("order_id", orderIds)
-      const itemsByOrder: Record<string, { id: string; product_id: string | null; name: string; price: number; qty: number }[]> = {}
-      ;(allItems ?? []).forEach(item => {
+      const itemsByOrder: Record<string, { id: string; product_id: string | null; name: string; price: number; qty: number; note?: string; breakdown?: ItemBreakdown }[]> = {}
+      ;(allItems ?? []).forEach((item: { order_id: string; id: string; product_id: string | null; name: string; price: number; qty: number; note?: string; breakdown?: ItemBreakdown }) => {
         if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = []
-        itemsByOrder[item.order_id].push({ id: item.id, product_id: item.product_id, name: item.name, price: item.price, qty: item.qty })
+        itemsByOrder[item.order_id].push({ id: item.id, product_id: item.product_id, name: item.name, price: item.price, qty: item.qty, note: item.note, breakdown: item.breakdown })
       })
 
       // Fetch driver profiles for orders that have a driver
@@ -254,6 +279,8 @@ export default function OrdersPage() {
             qty: i.qty,
             price: i.price,
             productId: i.product_id ?? i.id,
+            note: i.note ?? undefined,
+            breakdown: i.breakdown ?? undefined,
           })),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           subtotal:    (o as any).total    ?? 0,
@@ -273,7 +300,13 @@ export default function OrdersPage() {
             eta: 0,
           } : undefined,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          payMethod: fmtPayMethod((o as any).pay_method ?? "cash"),
+          payMethod:     fmtPayMethod((o as any).pay_method ?? "cash"),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          payMethodRaw:  (o as any).pay_method ?? "cash",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          paymentStatus: (o as any).payment_status ?? "pending",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          xuUsed:        (o as any).xu_used ?? 0,
           rating: reviewMap[o.id] ?? undefined,
           cancelReason: o.cancel_reason ?? undefined,
         }
@@ -313,6 +346,9 @@ export default function OrdersPage() {
         pickupAddress: e.pickup_address ?? undefined,
         note:          e.note ?? undefined,
         payMethod:     fmtPayMethod(e.payment_method ?? "cash"),
+        payMethodRaw:  e.payment_method ?? "cash",
+        paymentStatus: "pending",
+        xuUsed:        0,
         senderName:    e.sender_name    ?? undefined,
         senderPhone:   e.sender_phone   ?? undefined,
         recipientName: e.recipient_name ?? undefined,
@@ -354,6 +390,9 @@ export default function OrdersPage() {
           pickupAddress:r.pickup_address ?? undefined,
           note:         r.note ?? undefined,
           payMethod:    fmtPayMethod(r.payment_method ?? "cash"),
+          payMethodRaw: r.payment_method ?? "cash",
+          paymentStatus:"pending",
+          xuUsed:       0,
         }
       })
 
@@ -404,9 +443,14 @@ export default function OrdersPage() {
     }
   }, [router])
 
-  const cancelOrder    = orders.find(o => o.id === showCancel)
+  const cancelOrder      = orders.find(o => o.id === showCancel)
   const willRefundWallet = cancelOrder?.payMethod === "Ví GiaoNhanh"
-  const reviewOrder    = orders.find(o => o.id === showReview)
+
+  // Reset review inputs khi chuyển sang đơn khác
+  useEffect(() => {
+    setShopStar(5); setDriverReviewStar(5)
+    setShopReviewTxt(""); setDriverReviewTxt("")
+  }, [expanded])
 
   // 30s countdown khi mở cancel modal
   useEffect(() => {
@@ -666,79 +710,6 @@ export default function OrdersPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Review Sheet ── */}
-      <AnimatePresence>
-        {showReview && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setShowReview(null)}
-              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 190, backdropFilter: "blur(4px)" }} />
-            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 28, stiffness: 320 }}
-              style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 191,
-                background: "#0e0c09", border: "1px solid rgba(255,107,0,0.15)",
-                borderRadius: "20px 20px 0 0", padding: "20px 18px 36px" }}>
-              <div style={{ width: 36, height: 4, background: "rgba(255,255,255,0.12)", borderRadius: 2, margin: "0 auto 18px" }} />
-              <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700, marginBottom: 14 }}>
-                Đánh giá đơn #{showReview?.slice(0,8).toUpperCase()}
-              </div>
-              {([
-                { label: "🍽️ Chất lượng món",  star: foodStar,   set: setFoodStar   },
-                { label: "🚵 Tài xế giao hàng", star: driverStar, set: setDriverStar },
-              ] as const).map(s => (
-                <div key={s.label} style={{ marginBottom: 14 }}>
-                  <div style={{ color: "#b0956a", fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>{s.label}</div>
-                  <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-                    {[1,2,3,4,5].map(n => (
-                      <span key={n} onClick={() => s.set(n)}
-                        style={{ fontSize: 28, cursor: "pointer", transition: "transform .15s",
-                          opacity: n <= s.star ? 1 : 0.2,
-                          filter: n <= s.star ? "drop-shadow(0 0 4px rgba(255,179,71,0.6))" : "none" }}>⭐</span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ color: "#b0956a", fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Nhận xét</div>
-                <textarea value={reviewTxt} onChange={e => setReviewTxt(e.target.value)}
-                  placeholder="Món ngon, giao đúng giờ..." rows={2}
-                  style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 10, padding: "9px 11px", color: "#f8f0e0", fontSize: 11, fontFamily: "Lexend", outline: "none", resize: "none" }} />
-              </div>
-              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 14 }}>
-                {["Món ngon", "Giao nhanh", "Đóng gói cẩn thận", "Tài xế thân thiện"].map(t => (
-                  <div key={t} onClick={() => setReviewTxt(p => p ? p + ", " + t : t)}
-                    style={{ padding: "4px 10px", borderRadius: 8, cursor: "pointer",
-                      background: "rgba(255,107,0,0.07)", border: "1px solid rgba(255,107,0,0.2)", color: "#FF8C00", fontSize: 9 }}>{t}</div>
-                ))}
-              </div>
-              <button
-                onClick={async () => {
-                  if (!showReview || !userId || !reviewOrder) return
-                  await supabase.from("reviews").insert({
-                    order_id: showReview,
-                    reviewer_id: userId,
-                    shop_id: reviewOrder.shopId,
-                    driver_id: reviewOrder.driverId,
-                    food_rating: foodStar,
-                    driver_rating: driverStar,
-                    comment: reviewTxt || null,
-                  })
-                  fireToast("Đã gửi đánh giá, cảm ơn bạn!")
-                  setShowReview(null); setReviewTxt(""); setFoodStar(5); setDriverStar(5)
-                }}
-                style={{ width: "100%", height: 46, borderRadius: 12, border: "none", position: "relative", overflow: "hidden",
-                  background: "linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)",
-                  color: "#fff", fontSize: 12, fontWeight: 700, fontFamily: "Lexend", cursor: "pointer",
-                  boxShadow: "0 3px 14px rgba(255,107,0,0.35)" }}>
-                <div style={{ position: "absolute", top: 0, left: "-60%", width: "35%", height: "100%",
-                  background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)", animation: "oShimmer 2.5s infinite" }} />
-                <span style={{ position: "relative", zIndex: 1 }}>⭐ Gửi đánh giá</span>
-              </button>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       <div ref={rootRef}
         style={{ position: "fixed", inset: 0, background: "#080806", zIndex: 60,
@@ -814,12 +785,12 @@ export default function OrdersPage() {
           ) : (
             filtered.map((order, idx) => {
               const cfg        = STATUS_CFG[order.status]
+              const svc        = SERVICE_CFG[order.serviceType]
               const isOpen     = expanded === order.id
               const total      = calcTotal(order)
               const isActive   = ["delivering","preparing","pending","ready"].includes(order.status)
               const isCompleted  = order.status === "completed"
               const isCancelled  = order.status === "cancelled"
-              const itemPreview  = order.items.map(i => `${i.emoji} ${i.name} ×${i.qty}`).join(" · ")
 
               return (
                 <motion.div key={order.id}
@@ -835,39 +806,67 @@ export default function OrdersPage() {
                     <div onClick={() => setExpanded(p => p === order.id ? null : order.id)}
                       style={{ padding: "12px 13px", cursor: "pointer" }}>
 
-                      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)",
-                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-                          {order.shopEmoji}
+                      {/* Row 1: chip dịch vụ + tên quán + status badge */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                          background: svc.chipBg, border: `1px solid ${svc.chipBd}`, borderRadius: 6,
+                          padding: "2px 7px" }}>
+                          <span style={{ fontSize: 11 }}>{svc.emoji}</span>
+                          <span style={{ color: svc.color, fontSize: 8.5, fontWeight: 700 }}>{svc.label}</span>
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ color: "#f8f0e0", fontSize: 11.5, fontWeight: 600,
-                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {order.shopName}
-                          </div>
-                          <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 1 }}>
-                            #{order.id.slice(0,8).toUpperCase()} · {order.createdAt}
-                          </div>
+                        <div style={{ flex: 1, color: "#f8f0e0", fontSize: 11.5, fontWeight: 600,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {order.shopName}
                         </div>
                         <StatusBadge status={order.status} />
                       </div>
 
-                      <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
-                        borderRadius: 8, padding: "5px 9px", color: "#b0956a", fontSize: 9, marginBottom: 7,
-                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {itemPreview}
+                      {/* Row 2: mã đơn + ngày giờ */}
+                      <div style={{ color: "#6a5a40", fontSize: 8.5, marginBottom: 8 }}>
+                        #{order.id.slice(0,8).toUpperCase()} · {order.createdAt}
                       </div>
 
-                      {isCompleted && order.rating && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 3, marginBottom: 7,
-                          padding: "5px 8px", background: "rgba(255,179,71,0.06)",
-                          border: "1px solid rgba(255,179,71,0.15)", borderRadius: 7 }}>
-                          {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 12, opacity: s <= order.rating! ? 1 : 0.2 }}>⭐</span>)}
-                          <span style={{ color: "#b0956a", fontSize: 8.5, marginLeft: 4 }}>Bạn đã đánh giá đơn này</span>
-                        </div>
-                      )}
+                      {/* Danh sách món preview */}
+                      <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
+                        borderRadius: 9, overflow: "hidden", marginBottom: 8 }}>
+                        {order.items.slice(0, 3).map((item, ii) => {
+                          const parsed2 = parseItemName(item.name)
+                          const sLbl = item.breakdown?.sizeLabel
+                            ? (/^size/i.test(item.breakdown.sizeLabel) ? item.breakdown.sizeLabel : `Size ${item.breakdown.sizeLabel}`)
+                            : parsed2.size ? (/^size/i.test(parsed2.size) ? parsed2.size : `Size ${parsed2.size}`) : null
+                          const tNames = item.breakdown?.toppings?.map(t => t.name) ?? parsed2.toppings
+                          return (
+                            <div key={ii} style={{ padding: "5px 9px",
+                              borderBottom: ii < Math.min(order.items.length, 3) - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                              display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{ color: "#b0956a", fontSize: 9.5, fontWeight: 600 }}>{parsed2.base}</span>
+                                {(sLbl || tNames.length > 0) && (
+                                  <div style={{ fontSize: 8, marginTop: 1, display: "flex", flexWrap: "wrap", gap: 3 }}>
+                                    {sLbl && <span style={{ color: "#4a8ff5" }}>{sLbl}</span>}
+                                    {tNames.map((t, ti) => (
+                                      <span key={ti} style={{ color: "#3ecf6e" }}>{(sLbl || ti > 0) ? "· " : ""}{t}</span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div style={{ flexShrink: 0, textAlign: "right" }}>
+                                <span style={{ color: "#6a5a40", fontSize: 8.5 }}>×{item.qty}</span>
+                                <span style={{ color: "#f8f0e0", fontSize: 9.5, fontWeight: 600, marginLeft: 4 }}>
+                                  {formatPrice(item.price * item.qty)}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {order.items.length > 3 && (
+                          <div style={{ padding: "3px 9px", color: "#6a5a40", fontSize: 8 }}>
+                            +{order.items.length - 3} món khác
+                          </div>
+                        )}
+                      </div>
 
+                      {/* Lý do hủy */}
                       {isCancelled && order.cancelReason && (
                         <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 7,
                           padding: "5px 9px", background: "rgba(255,64,64,0.05)",
@@ -877,7 +876,8 @@ export default function OrdersPage() {
                         </div>
                       )}
 
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      {/* Tổng + expand arrow */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
                         <div>
                           <span style={{ color: "#6a5a40", fontSize: 9 }}>Tổng thanh toán: </span>
                           <span style={{ background: "linear-gradient(135deg,#FF6B00,#FFB347)",
@@ -888,7 +888,7 @@ export default function OrdersPage() {
                           </span>
                         </div>
                         <span style={{ color: "#6a5a40", fontSize: 12,
-                          transform: isOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s", display: "inline-block" }}>⌾</span>
+                          transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .2s", display: "inline-block" }}>⌾</span>
                       </div>
                     </div>
 
@@ -900,6 +900,7 @@ export default function OrdersPage() {
                           transition={{ duration: 0.25 }} style={{ overflow: "hidden" }}>
                           <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "12px 13px" }}>
 
+                            {/* Tracking card */}
                             {order.status === "delivering" && order.driver && (
                               <button onClick={() => router.push(`/tracking/${order.id}`)}
                                 style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", marginBottom: 10 }}>
@@ -915,11 +916,9 @@ export default function OrdersPage() {
                                       <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>Tài xế đang đến</span>
                                     </div>
                                     <div style={{ color: "#f8f0e0", fontSize: 10, fontWeight: 600, marginTop: 2 }}>
-                                      {order.driver.name} · {order.driver.plate}
+                                      {order.driver.name}{order.driver.plate ? ` · ${order.driver.plate}` : ""}
                                     </div>
-                                    <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 8, marginTop: 1 }}>
-                                      ⭐ {order.driver.rating} · Nhấn để mở bản đồ
-                                    </div>
+                                    <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 8, marginTop: 1 }}>Nhấn để mở bản đồ</div>
                                   </div>
                                   <span style={{ color: "#3ecf6e", fontSize: 16, position: "relative", zIndex: 1 }}>›</span>
                                 </div>
@@ -937,52 +936,163 @@ export default function OrdersPage() {
                               </div>
                             )}
 
-                            <SLabel>Chi tiết đơn hàng</SLabel>
+                            {/* ── 1. Chi tiết món ── */}
+                            <SLabel>Chi tiết món</SLabel>
                             <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
                               borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
-                              {order.items.map((item, i) => (
-                                <div key={i} style={{ padding: "8px 10px",
-                                  borderBottom: i < order.items.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <div style={{ display: "flex", gap: 6 }}>
-                                      <span style={{ fontSize: 13 }}>{item.emoji}</span>
-                                      <div>
-                                        <span style={{ color: "#b0956a", fontSize: 10 }}>{item.name}</span>
-                                        <span style={{ color: "#6a5a40", fontSize: 9, marginLeft: 5 }}>×{item.qty}</span>
-                                      </div>
+                              {order.items.map((item, i) => {
+                                const parsed = parseItemName(item.name)
+                                const bd = item.breakdown
+                                const displaySize = bd?.sizeLabel
+                                  ? (/^size/i.test(bd.sizeLabel) ? bd.sizeLabel : `Size ${bd.sizeLabel}`)
+                                  : parsed.size ? (/^size/i.test(parsed.size) ? parsed.size : `Size ${parsed.size}`) : null
+                                const hasBd = !!(bd && (bd.basePrice > 0 || (bd.sizeDiff ?? 0) > 0 || (bd.toppings?.length ?? 0) > 0))
+                                const hasOpts = !!(displaySize || parsed.toppings.length > 0 || hasBd)
+                                return (
+                                  <div key={i} style={{ padding: "10px 12px",
+                                    borderBottom: i < order.items.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                                    {/* Số thứ tự + Tên + Số lượng */}
+                                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
+                                      <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                                        background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.3)",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        color: "#FF8C00", fontSize: 9, fontWeight: 800 }}>{i + 1}</span>
+                                      <span style={{ color: "#f8f0e0", fontSize: 11.5, fontWeight: 700, flex: 1 }}>{parsed.base}</span>
+                                      <span style={{ color: "#6a5a40", fontSize: 9 }}>×{item.qty}</span>
                                     </div>
-                                    <span style={{ color: "#f8f0e0", fontSize: 10, fontWeight: 600 }}>
-                                      {formatPrice(item.price * item.qty)}
-                                    </span>
+                                    {/* Bảng giá */}
+                                    {hasOpts && (
+                                      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                                        borderRadius: 8, overflow: "hidden", marginBottom: 6 }}>
+                                        {hasBd ? (
+                                          <>
+                                            <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
+                                              borderBottom: (displaySize || (bd?.toppings?.length ?? 0) > 0) ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                                              <span style={{ color: "#6a5a40", fontSize: 9 }}>Giá gốc</span>
+                                              <span style={{ color: "#b0956a", fontSize: 9, fontWeight: 600 }}>{formatPrice(bd!.basePrice)}</span>
+                                            </div>
+                                            {displaySize && (bd?.sizeDiff ?? 0) > 0 && (
+                                              <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
+                                                borderBottom: (bd?.toppings?.length ?? 0) > 0 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                                                <span style={{ color: "#4a8ff5", fontSize: 9 }}>▸ {displaySize}</span>
+                                                <span style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 600 }}>+{formatPrice(bd!.sizeDiff!)}</span>
+                                              </div>
+                                            )}
+                                            {bd?.toppings?.map((tp, ti) => (
+                                              <div key={ti} style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
+                                                borderBottom: ti < (bd?.toppings?.length ?? 0) - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                                                <span style={{ color: "#3ecf6e", fontSize: 9 }}>+ {tp.name}</span>
+                                                <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>+{formatPrice(tp.price)}</span>
+                                              </div>
+                                            ))}
+                                          </>
+                                        ) : (
+                                          <>
+                                            {displaySize && (
+                                              <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
+                                                borderBottom: parsed.toppings.length > 0 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                                                <span style={{ color: "#4a8ff5", fontSize: 9 }}>▸ {displaySize}</span>
+                                                <span style={{ color: "#6a5a40", fontSize: 8 }}>đã tính</span>
+                                              </div>
+                                            )}
+                                            {parsed.toppings.map((t, ti) => (
+                                              <div key={ti} style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
+                                                borderBottom: ti < parsed.toppings.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                                                <span style={{ color: "#3ecf6e", fontSize: 9 }}>+ {t}</span>
+                                                <span style={{ color: "#6a5a40", fontSize: 8 }}>đã tính</span>
+                                              </div>
+                                            ))}
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                    {/* Thành tiền */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                      <span style={{ color: "#b0956a", fontSize: 9.5 }}>
+                                        Thành tiền{item.qty > 1 ? ` (×${item.qty})` : ""}
+                                      </span>
+                                      <span style={{ color: "#FF8C00", fontSize: 12, fontWeight: 800 }}>
+                                        {formatPrice(item.price * item.qty)}
+                                      </span>
+                                    </div>
+                                    {/* Ghi chú món */}
+                                    {item.note && (
+                                      <div style={{ marginTop: 6, padding: "5px 9px", borderRadius: 7,
+                                        background: "rgba(245,197,66,0.08)", border: "1px solid rgba(245,197,66,0.2)",
+                                        color: "#f5c542", fontSize: 9, display: "flex", gap: 5, alignItems: "flex-start" }}>
+                                        <span style={{ flexShrink: 0, fontWeight: 700 }}>📝</span>
+                                        <span>{item.note}</span>
+                                      </div>
+                                    )}
                                   </div>
+                                )
+                              })}
+                              {order.note && (
+                                <div style={{ padding: "7px 12px", borderTop: "1px solid rgba(255,255,255,0.04)",
+                                  background: "rgba(245,197,66,0.04)", display: "flex", gap: 6, alignItems: "flex-start" }}>
+                                  <span style={{ fontSize: 11, flexShrink: 0 }}>📝</span>
+                                  <span style={{ color: "#b0956a", fontSize: 9 }}>{order.note}</span>
                                 </div>
-                              ))}
+                              )}
                             </div>
 
-                            <SLabel>Chi tiết thanh toán</SLabel>
-                            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
-                              borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
-                              {[
-                                { label: "Tiền món",       val: order.subtotal,     c: "#b0956a" },
-                                order.deliveryFee > 0 ? { label: "Phí giao hàng", val: order.deliveryFee, c: "#b0956a" } : null,
-                                order.discount > 0    ? { label: "Giảm giá",      val: -order.discount,   c: "#3ecf6e" } : null,
-                              ].filter((r): r is { label: string; val: number; c: string } => r !== null)
-                               .map((r, i) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
-                                  <span style={{ color: "#6a5a40", fontSize: 9 }}>{r.label}</span>
-                                  <span style={{ color: r.c, fontSize: 9 }}>{r.val < 0 ? "-" : ""}{formatPrice(Math.abs(r.val))}</span>
-                                </div>
-                              ))}
-                              <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "6px 0" }} />
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <span style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600 }}>Tổng cộng</span>
-                                <span style={{ background: "linear-gradient(135deg,#FF6B00,#FFB347)",
-                                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                                  backgroundClip: "text", fontSize: 14, fontWeight: 700 }}>{formatPrice(total)}</span>
-                              </div>
-                            </div>
+                            {/* ── 2. Thông tin thanh toán ── */}
+                            {(() => {
+                              const xuUsed = order.xuUsed ?? 0
+                              const payable = total - xuUsed
+                              const raw = order.payMethodRaw ?? "cash"
+                              const pStat = order.paymentStatus ?? "pending"
+                              let statusText = ""
+                              let statusColor = "#6a5a40"
+                              if (pStat === "paid") { statusText = "✅ Đã thanh toán"; statusColor = "#3ecf6e" }
+                              else if (raw === "cash") { statusText = `💵 Chưa thanh toán · ${formatPrice(payable)}`; statusColor = "#ff6060" }
+                              else { statusText = `⏳ Chờ chuyển khoản · ${formatPrice(payable)}`; statusColor = "#FFB347" }
+                              return (
+                                <>
+                                  <SLabel>Thông tin thanh toán</SLabel>
+                                  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
+                                    borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
+                                    {[
+                                      { label: "Tiền món",       val: order.subtotal,   c: "#b0956a" },
+                                      order.deliveryFee > 0 ? { label: "Phí giao hàng", val: order.deliveryFee, c: "#b0956a" } : null,
+                                      order.discount > 0    ? { label: "Voucher giảm",  val: -order.discount,   c: "#3ecf6e" } : null,
+                                      xuUsed > 0            ? { label: "🪙 Xu đã dùng", val: -xuUsed,           c: "#FFB347" } : null,
+                                    ].filter((r): r is { label: string; val: number; c: string } => r !== null)
+                                     .map((r, ri) => (
+                                      <div key={ri} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
+                                        <span style={{ color: "#6a5a40", fontSize: 9 }}>{r.label}</span>
+                                        <span style={{ color: r.c, fontSize: 9 }}>{r.val < 0 ? "−" : ""}{formatPrice(Math.abs(r.val))}</span>
+                                      </div>
+                                    ))}
+                                    <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "6px 0" }} />
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                      <span style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600 }}>Tổng cộng</span>
+                                      <span style={{ background: "linear-gradient(135deg,#FF6B00,#FFB347)",
+                                        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                                        backgroundClip: "text", fontSize: 14, fontWeight: 700 }}>{formatPrice(total)}</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                      padding: "6px 0", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                                      <span style={{ color: "#6a5a40", fontSize: 9 }}>{order.payMethod}</span>
+                                      <span style={{ color: statusColor, fontSize: 9.5, fontWeight: 600 }}>{statusText}</span>
+                                    </div>
+                                  </div>
+                                </>
+                              )
+                            })()}
 
-                            {/* Ảnh gói hàng (errand_deliver) */}
+                            {/* ── 3. Thông tin giao hàng ── */}
+                            <SLabel>Thông tin giao hàng</SLabel>
+                            <InfoBox rows={[
+                              ...(order.pickupAddress ? [{ icon: "📤", key: "Lấy tại",     val: order.pickupAddress }] : []),
+                              { icon: "📍", key: order.serviceType === "food" ? "Địa chỉ giao" : "Giao đến", val: order.address },
+                              ...(order.senderName    ? [{ icon: "👤", key: "Người gửi",    val: `${order.senderName} · ${order.senderPhone ?? ""}` }] : []),
+                              ...(order.recipientName ? [{ icon: "📬", key: "Người nhận",   val: `${order.recipientName} · ${order.recipientPhone ?? ""}` }] : []),
+                              ...(order.driver        ? [{ icon: "🛵", key: "Tài xế",        val: `${order.driver.name}${order.driver.plate ? " · " + order.driver.plate : ""}` }] : []),
+                              ...(order.driver?.phone ? [{ icon: "📞", key: "SĐT tài xế",   val: order.driver.phone }] : []),
+                              ...(order.note          ? [{ icon: "📝", key: "Ghi chú đơn",  val: order.note }] : []),
+                            ]} />
+
                             {order.packagePhotoUrl && (
                               <>
                                 <SLabel>Ảnh gói hàng</SLabel>
@@ -991,20 +1101,120 @@ export default function OrdersPage() {
                               </>
                             )}
 
-                            <SLabel>Thông tin giao hàng</SLabel>
-                            <InfoBox rows={[
-                              ...(order.pickupAddress ? [{ icon: "📍", key: "Lấy tại",    val: order.pickupAddress }] : []),
-                              { icon: "📍", key: order.serviceType === "food" ? "Địa chỉ" : "Giao đến", val: order.address },
-                              ...(order.senderName   ? [{ icon: "👤", key: "Người gửi",   val: `${order.senderName} · ${order.senderPhone ?? ""}` }] : []),
-                              ...(order.recipientName ? [{ icon: "📬", key: "Người nhận", val: `${order.recipientName} · ${order.recipientPhone ?? ""}` }] : []),
-                              ...(order.note   ? [{ icon: "📝", key: "Ghi chú",     val: order.note! }] : []),
-                              { icon: "💳", key: "Thanh toán", val: order.payMethod },
-                              ...(order.driver ? [{ icon: "🛵", key: "Tài xế",
-                                val: `${order.driver.name} · ${order.driver.plate} ⭐${order.driver.rating}` }] : []),
-                              ...(order.cancelReason ? [{ icon: "✕", key: "Lý do hủy", val: order.cancelReason }] : []),
-                            ]} />
+                            {/* ── 4. Đánh giá inline (completed + chưa đánh giá) ── */}
+                            {isCompleted && !order.rating && (
+                              <div style={{ marginBottom: 10, background: "rgba(255,179,71,0.04)",
+                                border: "1px solid rgba(255,179,71,0.15)", borderRadius: 12, padding: "12px 12px" }}>
+                                <div style={{ color: "#FFB347", fontSize: 10, fontWeight: 700, marginBottom: 12 }}>
+                                  ⭐ Đánh giá đơn hàng
+                                </div>
+                                {/* Tài xế */}
+                                {order.driverId && (
+                                  <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                                    <div style={{ color: "#b0956a", fontSize: 9, fontWeight: 600,
+                                      textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 7 }}>🛵 Tài xế giao hàng</div>
+                                    <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                                      {[1,2,3,4,5].map(n => (
+                                        <span key={n} onClick={() => setDriverReviewStar(n)}
+                                          style={{ fontSize: 26, cursor: "pointer",
+                                            opacity: n <= driverReviewStar ? 1 : 0.2,
+                                            filter: n <= driverReviewStar ? "drop-shadow(0 0 3px rgba(255,179,71,0.7))" : "none" }}>⭐</span>
+                                      ))}
+                                    </div>
+                                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 7 }}>
+                                      {["Giao nhanh","Thân thiện","Đúng giờ","Cẩn thận","Biết đường"].map(chip => (
+                                        <div key={chip} onClick={() => setDriverReviewTxt(p => p.includes(chip) ? p.replace(`, ${chip}`,"").replace(chip,"").trim() : p ? `${p}, ${chip}` : chip)}
+                                          style={{ padding: "3px 9px", borderRadius: 8, cursor: "pointer", fontSize: 8.5,
+                                            background: driverReviewTxt.includes(chip) ? "rgba(74,143,245,0.12)" : "rgba(255,255,255,0.04)",
+                                            border: `1px solid ${driverReviewTxt.includes(chip) ? "rgba(74,143,245,0.4)" : "rgba(255,255,255,0.08)"}`,
+                                            color: driverReviewTxt.includes(chip) ? "#4a8ff5" : "#6a5a40" }}>{chip}</div>
+                                      ))}
+                                    </div>
+                                    <div style={{ position: "relative" }}>
+                                      <textarea value={driverReviewTxt}
+                                        onChange={e => setDriverReviewTxt(e.target.value.slice(0,200))}
+                                        placeholder="Nhận xét về tài xế..." rows={2}
+                                        style={{ width:"100%", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)",
+                                          borderRadius:9, padding:"7px 9px 14px", color:"#f8f0e0", fontSize:10, fontFamily:"Lexend",
+                                          outline:"none", resize:"none", boxSizing:"border-box" }} />
+                                      <span style={{ position:"absolute", bottom:5, right:8, color:"#6a5a40", fontSize:7.5, pointerEvents:"none" }}>
+                                        {driverReviewTxt.length}/200
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Quán ăn */}
+                                {order.serviceType === "food" && (
+                                  <div style={{ marginBottom: 12 }}>
+                                    <div style={{ color: "#b0956a", fontSize: 9, fontWeight: 600,
+                                      textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 7 }}>🍽️ Chất lượng quán</div>
+                                    <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                                      {[1,2,3,4,5].map(n => (
+                                        <span key={n} onClick={() => setShopStar(n)}
+                                          style={{ fontSize: 26, cursor: "pointer",
+                                            opacity: n <= shopStar ? 1 : 0.2,
+                                            filter: n <= shopStar ? "drop-shadow(0 0 3px rgba(255,179,71,0.7))" : "none" }}>⭐</span>
+                                      ))}
+                                    </div>
+                                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 7 }}>
+                                      {["Món ngon","Đúng mô tả","Đóng gói đẹp","Sạch sẽ","Phục vụ tốt"].map(chip => (
+                                        <div key={chip} onClick={() => setShopReviewTxt(p => p.includes(chip) ? p.replace(`, ${chip}`,"").replace(chip,"").trim() : p ? `${p}, ${chip}` : chip)}
+                                          style={{ padding: "3px 9px", borderRadius: 8, cursor: "pointer", fontSize: 8.5,
+                                            background: shopReviewTxt.includes(chip) ? "rgba(62,207,110,0.1)" : "rgba(255,255,255,0.04)",
+                                            border: `1px solid ${shopReviewTxt.includes(chip) ? "rgba(62,207,110,0.35)" : "rgba(255,255,255,0.08)"}`,
+                                            color: shopReviewTxt.includes(chip) ? "#3ecf6e" : "#6a5a40" }}>{chip}</div>
+                                      ))}
+                                    </div>
+                                    <div style={{ position: "relative" }}>
+                                      <textarea value={shopReviewTxt}
+                                        onChange={e => setShopReviewTxt(e.target.value.slice(0,200))}
+                                        placeholder="Nhận xét về quán..." rows={2}
+                                        style={{ width:"100%", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)",
+                                          borderRadius:9, padding:"7px 9px 14px", color:"#f8f0e0", fontSize:10, fontFamily:"Lexend",
+                                          outline:"none", resize:"none", boxSizing:"border-box" }} />
+                                      <span style={{ position:"absolute", bottom:5, right:8, color:"#6a5a40", fontSize:7.5, pointerEvents:"none" }}>
+                                        {shopReviewTxt.length}/200
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+                                <button onClick={async () => {
+                                    if (!userId) return
+                                    await supabase.from("reviews").insert({
+                                      order_id: order.id, reviewer_id: userId,
+                                      shop_id: order.shopId || null, driver_id: order.driverId,
+                                      food_rating: shopStar, driver_rating: driverReviewStar,
+                                      shop_comment: shopReviewTxt || null,
+                                      driver_comment: driverReviewTxt || null,
+                                    })
+                                    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, rating: shopStar } : o))
+                                    fireToast("Đã gửi đánh giá, cảm ơn bạn!")
+                                    setShopStar(5); setDriverReviewStar(5)
+                                    setShopReviewTxt(""); setDriverReviewTxt("")
+                                  }}
+                                  style={{ width:"100%", height:44, borderRadius:11, border:"none", position:"relative", overflow:"hidden",
+                                    background:"linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)",
+                                    color:"#fff", fontSize:11, fontWeight:700, fontFamily:"Lexend", cursor:"pointer",
+                                    boxShadow:"0 3px 14px rgba(255,107,0,0.3)" }}>
+                                  <div style={{ position:"absolute", top:0, left:"-60%", width:"35%", height:"100%",
+                                    background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)", animation:"oShimmer 2.5s infinite" }} />
+                                  <span style={{ position:"relative", zIndex:1 }}>⭐ Gửi đánh giá</span>
+                                </button>
+                              </div>
+                            )}
 
-                            <div style={{ display: "flex", gap: 7, marginTop: 10 }}>
+                            {/* Đã đánh giá */}
+                            {isCompleted && order.rating && (
+                              <div style={{ display:"flex", alignItems:"center", gap:3, marginBottom:10,
+                                padding:"7px 10px", background:"rgba(255,179,71,0.06)",
+                                border:"1px solid rgba(255,179,71,0.15)", borderRadius:9 }}>
+                                {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize:12, opacity: s <= order.rating! ? 1 : 0.2 }}>⭐</span>)}
+                                <span style={{ color:"#b0956a", fontSize:8.5, marginLeft:5 }}>Bạn đã đánh giá đơn này</span>
+                              </div>
+                            )}
+
+                            {/* ── 5. Action buttons ── */}
+                            <div style={{ display: "flex", gap: 7, marginTop: 6 }}>
                               {order.status === "delivering" && (
                                 <button onClick={() => router.push(`/tracking/${order.id}`)}
                                   style={{ flex: 1, height: 36, borderRadius: 9, border: "none",
@@ -1042,38 +1252,18 @@ export default function OrdersPage() {
                                   📞 Liên hệ Admin
                                 </button>
                               )}
-                              {isCompleted && (
-                                <>
-                                  <button onClick={() => handleReorder(order)}
-                                    style={{ flex: 1, height: 36, borderRadius: 9, border: "none",
-                                      background: "linear-gradient(90deg,#FF6B00,#FF8C00)",
-                                      color: "#fff", fontSize: 10, fontWeight: 700, fontFamily: "Lexend", cursor: "pointer",
-                                      position: "relative", overflow: "hidden",
-                                      boxShadow: "0 3px 10px rgba(255,107,0,0.3)",
-                                      display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-                                    <div style={{ position: "absolute", top: 0, left: "-60%", width: "35%", height: "100%",
-                                      background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)",
-                                      animation: "oShimmer 2.5s infinite" }} />
-                                    <span style={{ position: "relative", zIndex: 1 }}>🔄 Đặt lại</span>
-                                  </button>
-                                  {!order.rating && (
-                                    <button onClick={() => setShowReview(order.id)}
-                                      style={{ height: 36, padding: "0 11px", borderRadius: 9,
-                                        border: "1px solid rgba(255,179,71,0.3)",
-                                        background: "rgba(255,179,71,0.07)", color: "#FFB347",
-                                        fontSize: 10, fontWeight: 600, fontFamily: "Lexend", cursor: "pointer", whiteSpace: "nowrap" }}>
-                                      ⭐ Đánh giá
-                                    </button>
-                                  )}
-                                </>
-                              )}
-                              {isCancelled && (
+                              {(isCompleted || isCancelled) && (
                                 <button onClick={() => handleReorder(order)}
-                                  style={{ flex: 1, height: 36, borderRadius: 9,
-                                    border: "1px solid rgba(255,107,0,0.25)",
-                                    background: "rgba(255,107,0,0.07)", color: "#FF8C00",
-                                    fontSize: 10, fontWeight: 600, fontFamily: "Lexend", cursor: "pointer" }}>
-                                  🔄 Đặt lại đơn này
+                                  style={{ flex: 1, height: 36, borderRadius: 9, border: "none",
+                                    background: "linear-gradient(90deg,#FF6B00,#FF8C00)",
+                                    color: "#fff", fontSize: 10, fontWeight: 700, fontFamily: "Lexend", cursor: "pointer",
+                                    position: "relative", overflow: "hidden",
+                                    boxShadow: "0 3px 10px rgba(255,107,0,0.3)",
+                                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                                  <div style={{ position: "absolute", top: 0, left: "-60%", width: "35%", height: "100%",
+                                    background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)",
+                                    animation: "oShimmer 2.5s infinite" }} />
+                                  <span style={{ position: "relative", zIndex: 1 }}>🔄 Đặt lại</span>
                                 </button>
                               )}
                             </div>

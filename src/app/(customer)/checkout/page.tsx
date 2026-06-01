@@ -1374,11 +1374,12 @@ export default function CheckoutPage() {
       await supabase.from("order_items").insert(
         cartItems.map(item => ({
           order_id:   order.id,
-          product_id: item.id.split("__")[0],   // extract real UUID (tách khỏi composite id size/topping)
-          name:       item.name,                 // giữ nguyên tên có suffix "(Size L · Trân châu)"
-          price:      item.price,                // giá đã gồm surcharge
+          product_id: item.id.split("__")[0],
+          name:       item.name,
+          price:      item.price,
           qty:        item.qty,
           note:       item.note || null,
+          breakdown:  item.breakdown ?? null,
         }))
       )
 

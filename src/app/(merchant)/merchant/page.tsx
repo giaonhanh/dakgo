@@ -18,7 +18,7 @@ interface MOrder {
   customerName: string
   customerPhone: string
   items: string
-  itemList: { name: string; qty: number; price: number; note?: string }[]
+  itemList: { name: string; qty: number; price: number; note?: string; breakdown?: { basePrice: number; sizeLabel?: string; sizeDiff?: number; toppings?: { name: string; price: number }[] } | null }[]
   shipFee: number
   total: number
   subtotal: number
@@ -151,11 +151,10 @@ export default function MerchantDashboard() {
     // Fetch order_items riêng (tránh nested join RLS)
     let { data: allItems, error: itemsErr } = await supabase
       .from("order_items")
-      .select("order_id, name, price, qty, note")
+      .select("order_id, name, price, qty, note, breakdown")
       .in("order_id", orderIds)
     if (itemsErr) {
       console.error("[Merchant] order_items error:", itemsErr.message, itemsErr.code, itemsErr.details)
-      // Thử lại không có cột note (phòng khi schema cache lỗi)
       const { data: fallback } = await supabase
         .from("order_items")
         .select("order_id, name, price, qty")
@@ -209,7 +208,7 @@ export default function MerchantDashboard() {
         customerName: profile.full_name ?? "Khách hàng",
         customerPhone: profile.phone ?? "",
         items: itemStr || "—",
-        itemList: items.map(i => ({ name: i.name, qty: i.qty, price: i.price, note: i.note })),
+        itemList: items.map(i => ({ name: i.name, qty: i.qty, price: i.price, note: i.note, breakdown: (i as { breakdown?: unknown }).breakdown as MOrder["itemList"][number]["breakdown"] ?? null })),
         total: o.total_amount,
         subtotal: o.total ?? o.total_amount,
         shipFee: o.ship_fee ?? 0,
@@ -662,47 +661,75 @@ export default function MerchantDashboard() {
                               </div>
                             ) : order.itemList.map((item, i) => {
                               const { base, size, toppings } = parseItemName(item.name)
-                              const hasOptions = !!(size || toppings.length > 0)
+                              const bd = item.breakdown
+                              const displaySz = bd?.sizeLabel
+                                ? (/^size/i.test(bd.sizeLabel) ? bd.sizeLabel : `Size ${bd.sizeLabel}`)
+                                : size ? (/^size/i.test(size) ? size : `Size ${size}`) : null
+                              const hasBd = !!(bd && ((bd.sizeDiff ?? 0) > 0 || (bd.toppings?.length ?? 0) > 0))
+                              const hasOptions = !!(displaySz || toppings.length > 0 || hasBd)
                               return (
                                 <div key={i} style={{ padding: "10px 12px",
                                   borderBottom: i < order.itemList.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
 
-                                  {/* Số thứ tự + Tên món */}
+                                  {/* Số thứ tự + Tên món + Số lượng */}
                                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
                                     <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
                                       background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.3)",
                                       display: "flex", alignItems: "center", justifyContent: "center",
                                       color: "#FF8C00", fontSize: 9, fontWeight: 800 }}>{i + 1}</span>
-                                    <span style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700 }}>{base}</span>
+                                    <span style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700, flex: 1 }}>{base}</span>
+                                    <span style={{ color: "#6a5a40", fontSize: 9 }}>×{item.qty}</span>
                                   </div>
 
                                   {/* Bảng tùy chọn */}
                                   {hasOptions && (
                                     <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
                                       borderRadius: 8, overflow: "hidden", marginBottom: 6 }}>
-                                      {size && (
-                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                                          padding: "5px 9px", borderBottom: toppings.length > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                                          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                            <span style={{ fontSize: 8.5, color: "#6a5a40" }}>📐 Size</span>
-                                            <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700,
-                                              background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.25)",
-                                              color: "#4a8ff5" }}>{size}</span>
-                                          </div>
-                                        </div>
+                                      {hasBd ? (
+                                        <>
+                                          {displaySz && (bd?.sizeDiff ?? 0) > 0 && (
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                              padding: "5px 9px", borderBottom: (bd?.toppings?.length ?? 0) > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                                              <span style={{ color: "#4a8ff5", fontSize: 9 }}>▸ {displaySz}</span>
+                                              <span style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700 }}>+{fmt(bd!.sizeDiff!)}</span>
+                                            </div>
+                                          )}
+                                          {bd?.toppings?.map((tp, ti) => (
+                                            <div key={ti} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                              padding: "5px 9px",
+                                              borderBottom: ti < (bd?.toppings?.length ?? 0) - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                                              <span style={{ color: "#3ecf6e", fontSize: 9 }}>+ {tp.name}</span>
+                                              <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 700 }}>+{fmt(tp.price)}</span>
+                                            </div>
+                                          ))}
+                                        </>
+                                      ) : (
+                                        <>
+                                          {displaySz && (
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                              padding: "5px 9px", borderBottom: toppings.length > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                                              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                                <span style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700 }}>▸</span>
+                                                <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700,
+                                                  background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.25)",
+                                                  color: "#4a8ff5" }}>{displaySz}</span>
+                                              </div>
+                                            </div>
+                                          )}
+                                          {toppings.map((t, ti) => (
+                                            <div key={ti} style={{ display: "flex", alignItems: "center",
+                                              padding: "5px 9px",
+                                              borderBottom: ti < toppings.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                                              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                                <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 700 }}>+</span>
+                                                <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600,
+                                                  background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.2)",
+                                                  color: "#3ecf6e" }}>{t}</span>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </>
                                       )}
-                                      {toppings.map((t, ti) => (
-                                        <div key={ti} style={{ display: "flex", alignItems: "center",
-                                          padding: "5px 9px",
-                                          borderBottom: ti < toppings.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                                          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                            <span style={{ fontSize: 8.5, color: "#6a5a40" }}>🫙 Topping</span>
-                                            <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600,
-                                              background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.2)",
-                                              color: "#3ecf6e" }}>{t}</span>
-                                          </div>
-                                        </div>
-                                      ))}
                                     </div>
                                   )}
 
