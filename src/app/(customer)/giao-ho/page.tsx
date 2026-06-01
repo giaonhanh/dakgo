@@ -383,9 +383,11 @@ export default function GiaoHoPage() {
                   <div style={{ color:weight===w.key?"#FF8C00":"#6a5a40",fontSize:9,fontWeight:weight===w.key?700:400 }}>
                     {w.label}
                   </div>
-                  <div style={{ color:weight===w.key?"#FF8C00":"#4a3a28",fontSize:8,marginTop:2 }}>
-                    {w.key==="nhe" ? "Miễn phí" : w.key==="vua" ? `+${fmt(weightMidFee)}` : `+${fmt(weightHeavyFee)}`}
-                  </div>
+                  {w.key !== "nhe" && (
+                    <div style={{ color:weight===w.key?"#FFB347":"#4a3a28",fontSize:8,marginTop:2,fontWeight:600 }}>
+                      +{fmt(w.key==="vua" ? weightMidFee : weightHeavyFee)}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -469,14 +471,16 @@ export default function GiaoHoPage() {
                   <span style={{ color:"#6a5a40",fontSize:10 }}>Phí vận chuyển ({distanceKm.toFixed(1)}km)</span>
                   <span style={{ color:"#b0956a",fontSize:10,fontWeight:600 }}>{fmt(baseFee)}</span>
                 </div>
-                <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
-                  <span style={{ color:"#6a5a40",fontSize:10 }}>
-                    Phụ phí cân nặng ({WEIGHTS.find(w=>w.key===weight)?.label})
-                  </span>
-                  <span style={{ color:weightSurcharge>0?"#b0956a":"#3ecf6e",fontSize:10,fontWeight:600 }}>
-                    {weightSurcharge > 0 ? `+${fmt(weightSurcharge)}` : "Miễn phí"}
-                  </span>
-                </div>
+                {weightSurcharge > 0 && (
+                  <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
+                    <span style={{ color:"#6a5a40",fontSize:10 }}>
+                      ⚖️ Phụ phí cân nặng ({WEIGHTS.find(w=>w.key===weight)?.label})
+                    </span>
+                    <span style={{ color:"#FFB347",fontSize:10,fontWeight:700 }}>
+                      +{fmt(weightSurcharge)}
+                    </span>
+                  </div>
+                )}
               </>
             )}
             <div style={{ height:1,background:"rgba(255,255,255,0.06)",margin:"8px 0" }} />
