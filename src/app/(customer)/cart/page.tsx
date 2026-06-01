@@ -279,7 +279,6 @@ export default function CartPage() {
                             </div>
                           </div>
 
-                          <p style={{ margin: "5px 0 0", fontSize: 9, color: "#6a5a40" }}>{item.shop}</p>
                         </div>
                       </div>
 
@@ -361,30 +360,6 @@ export default function CartPage() {
                 </motion.div>
               )}
 
-              {/* Tóm tắt giá (tạm tính — voucher & địa chỉ ở bước sau) */}
-              <SectionLabel>Tóm tắt</SectionLabel>
-              <Section style={{ padding: "12px 14px" }}>
-                <Row label="Tạm tính" value={formatPrice(subtotal)} />
-                <Row label="Phí giao hàng (ước tính)" value={formatPrice(SHIP_FEE)} />
-                {comboDiscount > 0 && (
-                  <Row label={`Combo (${appliedCombos.length} ưu đãi)`} value={`−${formatPrice(comboDiscount)}`} />
-                )}
-                <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "10px 0" }} />
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#f8f0e0" }}>Dự kiến</span>
-                  <span style={{
-                    fontSize: 16, fontWeight: 800,
-                    background: "linear-gradient(90deg,#FF6B00,#FFB347)",
-                    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                  } as React.CSSProperties}>
-                    {formatPrice(total)}
-                  </span>
-                </div>
-                <p style={{ margin: "8px 0 0", fontSize: 9, color: "#6a5a40", lineHeight: 1.5 }}>
-                  * Giá cuối sau khi áp mã giảm giá sẽ hiển thị ở bước tiếp theo
-                </p>
-              </Section>
             </>
           )}
         </div>
@@ -415,7 +390,7 @@ export default function CartPage() {
                 animation: "shimmer 2.5s infinite",
               }} />
               <span style={{ position: "relative", zIndex: 1 }}>
-                Tiếp tục · {formatPrice(total)}
+                Tiếp tục →
               </span>
             </button>
           )}
