@@ -720,16 +720,16 @@ export default function MerchantDashboard() {
                                 <div key={i} style={{ padding: "10px 12px",
                                   borderBottom: i < order.itemList.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
 
-                                  {/* Số thứ tự + Tên món ×SL */}
+                                  {/* Số thứ tự + Tên món + Giá gốc */}
                                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
                                     <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
                                       background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.3)",
                                       display: "flex", alignItems: "center", justifyContent: "center",
                                       color: "#FF8C00", fontSize: 9, fontWeight: 800 }}>{i + 1}</span>
                                     <span style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700, flex: 1 }}>{base}</span>
-                                    <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 8px", borderRadius: 5,
-                                      background: "rgba(255,107,0,0.12)", border: "1px solid rgba(255,107,0,0.3)",
-                                      color: "#FF8C00" }}>×{item.qty}</span>
+                                    <span style={{ color: "#b0956a", fontSize: 10, fontWeight: 600, flexShrink: 0 }}>
+                                      {fmt(bd?.basePrice ?? item.price)}
+                                    </span>
                                   </div>
 
                                   {/* Bảng tùy chọn */}
@@ -784,42 +784,21 @@ export default function MerchantDashboard() {
                                     </div>
                                   )}
 
-                                  {/* Bảng giá chi tiết */}
+                                  {/* Bảng giá */}
                                   <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
                                     borderRadius: 8, overflow: "hidden" }}>
-                                    {/* Giá gốc */}
-                                    {bd?.basePrice != null && (
-                                      <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
-                                        borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                        <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Giá gốc</span>
-                                        <span style={{ fontSize: 9.5, color: "#b0956a", fontWeight: 600 }}>{fmt(bd.basePrice)}</span>
-                                      </div>
-                                    )}
-                                    {/* Size giá */}
-                                    {bd && displaySz && (bd.sizeDiff ?? 0) > 0 && (
-                                      <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
-                                        borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                        <span style={{ fontSize: 9.5, color: "#4a8ff5" }}>▸ {displaySz}</span>
-                                        <span style={{ fontSize: 9.5, color: "#4a8ff5", fontWeight: 700 }}>+{fmt(bd.sizeDiff!)}</span>
-                                      </div>
-                                    )}
-                                    {/* Topping giá */}
-                                    {bd?.toppings?.map((tp, ti) => (
-                                      <div key={ti} style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
-                                        borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                        <span style={{ fontSize: 9.5, color: "#3ecf6e" }}>+ {tp.name}</span>
-                                        <span style={{ fontSize: 9.5, color: "#3ecf6e", fontWeight: 700 }}>+{fmt(tp.price)}</span>
-                                      </div>
-                                    ))}
-                                    {/* Đơn giá / món */}
                                     <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
                                       borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                      <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Đơn giá</span>
+                                      <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Thành tiền</span>
                                       <span style={{ fontSize: 9.5, color: "#b0956a", fontWeight: 600 }}>{fmt(item.price)}</span>
                                     </div>
-                                    {/* Tổng ×SL */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
+                                      borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                      <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Số lượng</span>
+                                      <span style={{ fontSize: 11, color: "#f8f0e0", fontWeight: 700 }}>×{item.qty}</span>
+                                    </div>
                                     <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 9px" }}>
-                                      <span style={{ fontSize: 10, color: "#b0956a", fontWeight: 600 }}>Tổng ×{item.qty}</span>
+                                      <span style={{ fontSize: 10, color: "#b0956a", fontWeight: 600 }}>Tổng tiền</span>
                                       <span style={{ fontSize: 12, color: "#FF8C00", fontWeight: 800 }}>{fmt(item.price * item.qty)}</span>
                                     </div>
                                   </div>
