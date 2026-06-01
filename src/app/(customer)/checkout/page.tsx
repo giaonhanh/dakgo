@@ -1142,7 +1142,7 @@ export default function CheckoutPage() {
   const [showVietQR,       setShowVietQR]       = useState(false)
   const [payosData,        setPayosData]        = useState<PayOSData | null>(null)
   const [useXuGN,          setUseXuGN]          = useState(false)
-  const [useXuGNRef,         setUseXuRef]         = useState(false)
+  const [useXuRef,         setUseXuRef]         = useState(false)
   const [payosLoading,     setPayosLoading]     = useState(false)
   const [mapAddress,       setMapAddress]       = useState<{ address: string; lat: number; lng: number } | null>(null)
   const [showAddressSheet, setShowAddressSheet] = useState(false)
@@ -1318,7 +1318,7 @@ export default function CheckoutPage() {
       const result = data as { ok: boolean; error?: string }
       if (result.ok) {
         setRefApplied(true)
-        setRefMsg({ ok: true, text: "Mã hợp lệ! Bạn sẽ nhận 10.000đ xu vào ví sau khi hoàn thành đơn đầu." })
+        setRefMsg({ ok: true, text: "Mã hợp lệ! Cả hai sẽ nhận 5.000 xu sau khi đơn đầu tiên của bạn từ 50.000đ hoàn thành." })
       } else {
         setRefMsg({ ok: false, text: result.error ?? "Mã không hợp lệ" })
       }
@@ -1452,7 +1452,7 @@ export default function CheckoutPage() {
     }
   }
 
-  const xuRefUsed   = (useXuGNRef && total >= 50000) ? Math.min(xuBonus, total) : 0
+  const xuRefUsed   = useXuRef ? Math.min(xuBonus, total) : 0
   const xuBonusUsed = xuRefUsed   // alias cho submit code cũ
   const xuUsed      = useXuGN ? Math.min(xuBalance, Math.max(0, total - xuRefUsed)) : 0
   const remaining   = total - xuRefUsed - xuUsed
@@ -1837,26 +1837,20 @@ export default function CheckoutPage() {
                   <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600 }}>Dùng XU Giới Thiệu</div>
                   <div style={{ color:"#6a5a40", fontSize:10, marginTop:3 }}>
                     Số dư: <span style={{ color:"#3ecf6e", fontWeight:700 }}>{xuBonus.toLocaleString("vi-VN")} xu</span>
-                    {total < 50000 && (
-                      <span style={{ color:"#ff6060", marginLeft:6 }}>· Đơn tối thiểu 50,000đ</span>
-                    )}
                   </div>
                 </div>
               </div>
               <button type="button"
-                disabled={total < 50000}
-                onClick={() => total >= 50000 && setUseXuRef(v => !v)}
-                style={{ width:46, height:26, borderRadius:13, border:"none",
-                  cursor: total >= 50000 ? "pointer" : "not-allowed",
-                  background: useXuGNRef ? "linear-gradient(90deg,#3ecf6e,#27ae60)" : "rgba(255,255,255,0.1)",
-                  position:"relative", flexShrink:0, transition:"background 0.2s",
-                  opacity: total < 50000 ? 0.4 : 1 }}>
+                onClick={() => setUseXuRef(v => !v)}
+                style={{ width:46, height:26, borderRadius:13, border:"none", cursor:"pointer",
+                  background: useXuRef ? "linear-gradient(90deg,#3ecf6e,#27ae60)" : "rgba(255,255,255,0.1)",
+                  position:"relative", flexShrink:0, transition:"background 0.2s" }}>
                 <div style={{ position:"absolute", top:3, width:20, height:20, borderRadius:10,
-                  background:"#fff", transition:"left 0.2s", left: useXuGNRef ? 23 : 3,
+                  background:"#fff", transition:"left 0.2s", left: useXuRef ? 23 : 3,
                   boxShadow:"0 1px 4px rgba(0,0,0,0.35)" }} />
               </button>
             </div>
-            {useXuGNRef && xuRefUsed > 0 && (
+            {useXuRef && xuRefUsed > 0 && (
               <div style={{ marginTop:10, padding:"9px 12px", borderRadius:10,
                 background:"rgba(62,207,110,0.05)", border:"1px solid rgba(62,207,110,0.18)" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
@@ -2040,6 +2034,14 @@ export default function CheckoutPage() {
                   color: refMsg.ok ? "#3ecf6e" : "#ff4040", fontSize: 10.5,
                 }}>
                   {refMsg.ok ? "✓" : "✗"} {refMsg.text}
+                </div>
+              )}
+              {(refApplied || refAlready) && total < 50000 && (
+                <div style={{ marginTop: 8, padding: "8px 11px", borderRadius: 9,
+                  background: "rgba(255,179,71,0.08)", border: "1px solid rgba(255,179,71,0.25)",
+                  color: "#FFB347", fontSize: 10.5, display: "flex", gap: 6, alignItems: "flex-start" }}>
+                  <span style={{ flexShrink:0 }}>⚠️</span>
+                  <span>Đơn hàng chưa đủ 50.000đ — bạn và người giới thiệu sẽ chưa nhận được 5.000 xu thưởng cho đơn này.</span>
                 </div>
               )}
             </SectionCard>
