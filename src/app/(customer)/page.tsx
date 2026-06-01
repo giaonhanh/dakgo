@@ -196,11 +196,12 @@ export default function HomePage() {
         .limit(10)
       setNearbyShops((shopData ?? []) as ShopRow[])
 
-      // Best sellers (top products by sold_count)
+      // Best sellers — chỉ lấy sản phẩm đã bán được ít nhất 1 lần
       const { data: bsData } = await supabase
         .from("products")
         .select("id,name,price,sold_count,shop_id,shops(name)")
         .eq("is_available", true)
+        .gt("sold_count", 0)
         .order("sold_count", { ascending: false })
         .limit(8)
       setBestSellers((bsData ?? []) as ProductRow[])
@@ -1202,12 +1203,8 @@ export default function HomePage() {
           {/* ──────────────────────────────────────
               S10 — BestSellers
           ────────────────────────────────────── */}
+          {bestSellers.length > 0 && (<>
           <SectionHeader title="🏆 Bán chạy tuần này" more="Xem tất cả →" href="/bestsellers" />
-          {bestSellers.length === 0 ? (
-            <div style={{ padding:"0 16px 14px", color:"#6a5a40", fontSize:11, textAlign:"center" }}>
-              Chưa có dữ liệu bán chạy
-            </div>
-          ) : (
             <HScroll>
               {bestSellers.map((b, idx) => {
                 const rank = idx + 1
@@ -1262,7 +1259,7 @@ export default function HomePage() {
                 )
               })}
             </HScroll>
-          )}
+          </>)}
 
           {/* S11 — LoyaltyPoints removed: điểm chỉ hiển thị trong Profile cá nhân */}
 
