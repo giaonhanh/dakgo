@@ -266,9 +266,10 @@ export default function AdminOrdersPage() {
 
     // Fetch order_items riêng (tránh nested join RLS)
     const orderIds = rows.map(r => r.id)
-    const { data: allItems } = orderIds.length
+    const { data: allItems, error: itemsErr } = orderIds.length
       ? await supabase.from("order_items").select("order_id,id,name,qty,price,breakdown").in("order_id", orderIds)
-      : { data: [] }
+      : { data: [], error: null }
+    if (itemsErr) console.error("[Admin] order_items RLS error:", itemsErr.code, itemsErr.message)
     const itemsByOrder: Record<string, OrderItem[]> = {}
     ;(allItems ?? []).forEach((it: { order_id: string; id: string; name: string; qty: number; price: number; breakdown?: unknown }) => {
       if (!itemsByOrder[it.order_id]) itemsByOrder[it.order_id] = []
