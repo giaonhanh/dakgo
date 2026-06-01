@@ -443,6 +443,30 @@ export default function OrdersPage() {
     }
   }, [router])
 
+  // ── Realtime: tự động cập nhật payment_status + status khi có thay đổi ──
+  useEffect(() => {
+    if (!userId) return
+    const ch = supabase
+      .channel(`orders-rt-${userId}`)
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "orders",
+        filter: `customer_id=eq.${userId}`,
+      }, ({ new: upd }) => {
+        const o = upd as { id: string; payment_status?: string; status?: string }
+        setOrders(prev => prev.map(ord => {
+          if (ord.id !== o.id) return ord
+          return {
+            ...ord,
+            ...(o.payment_status ? { paymentStatus: o.payment_status } : {}),
+            ...(o.status         ? { status: o.status as Status }       : {}),
+          }
+        }))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
+
   const cancelOrder      = orders.find(o => o.id === showCancel)
   const willRefundWallet = cancelOrder?.payMethod === "Ví GiaoNhanh"
 
