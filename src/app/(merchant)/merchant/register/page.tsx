@@ -3,24 +3,23 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
-const CATEGORIES = ["🍜 Bún / Phở","🍗 Gà rán","🥤 Đồ uống","🍱 Cơm hộp","☕ Cà phê","🥗 Chay","🛒 Tạp hóa","💊 Thuốc","🌸 Hoa","📦 Khác"]
 const ALL_DAYS = ["T2","T3","T4","T5","T6","T7","CN"]
 const STEPS = ["Thông tin cơ bản","Địa điểm & giờ mở","Xác nhận & gửi"]
 
 interface Form {
-  name:string; category:string; phone:string; description:string
+  name:string; phone:string; description:string
   address:string; openTime:string; closeTime:string; days:string[]
 }
 
 export default function MerchantRegisterPage() {
   const [step, setStep] = useState(0)
   const [submitted, setSubmitted] = useState(false)
-  const [form, setForm] = useState<Form>({ name:"",category:"",phone:"",description:"",address:"",openTime:"07:00",closeTime:"22:00",days:["T2","T3","T4","T5","T6","T7","CN"] })
+  const [form, setForm] = useState<Form>({ name:"",phone:"",description:"",address:"",openTime:"07:00",closeTime:"22:00",days:["T2","T3","T4","T5","T6","T7","CN"] })
 
   const update = (k: keyof Form, v: string) => setForm(f => ({ ...f, [k]: v }))
   const toggleDay = (d: string) => setForm(f => ({ ...f, days: f.days.includes(d) ? f.days.filter(x=>x!==d) : [...f.days,d] }))
   const canNext = () => {
-    if (step===0) return !!(form.name && form.category && form.phone)
+    if (step===0) return !!(form.name && form.phone)
     if (step===1) return !!(form.address && form.days.length)
     return true
   }
@@ -37,7 +36,7 @@ export default function MerchantRegisterPage() {
           <div style={{ color:"#FF8C00",fontSize:14,fontWeight:700 }}>1-2 ngày làm việc</div>
         </div>
         <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,width:"100%",maxWidth:340 }}>
-          {[["Tên cửa hàng",form.name],["Danh mục",form.category],["Số điện thoại",form.phone],["Địa chỉ",form.address]].map(([k,v]) => (
+          {[["Tên cửa hàng",form.name],["Số điện thoại",form.phone],["Địa chỉ",form.address]].map(([k,v]) => (
             <div key={k} style={{ display:"flex",justifyContent:"space-between",gap:12,marginBottom:8,paddingBottom:8,borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
               <span style={{ color:"#6a5a40",fontSize:9,flexShrink:0 }}>{k}</span>
               <span style={{ color:"#b0956a",fontSize:9,fontWeight:600,textAlign:"right" }}>{v}</span>
@@ -81,17 +80,6 @@ export default function MerchantRegisterPage() {
                 <div style={{ marginBottom:12 }}>
                   <label style={{ color:"#6a5a40",fontSize:9,fontWeight:600,display:"block",marginBottom:6 }}>TÊN CỬA HÀNG *</label>
                   <input value={form.name} onChange={e=>update("name",e.target.value)} placeholder="VD: Bún Bò Huế Ngon..." style={{ width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 14px",color:"#f8f0e0",fontSize:13 }} />
-                </div>
-                <div style={{ marginBottom:12 }}>
-                  <label style={{ color:"#6a5a40",fontSize:9,fontWeight:600,display:"block",marginBottom:8 }}>DANH MỤC *</label>
-                  <div style={{ display:"flex",flexWrap:"wrap",gap:7 }}>
-                    {CATEGORIES.map(cat => (
-                      <button key={cat} onClick={()=>update("category",cat)}
-                        style={{ padding:"7px 12px",borderRadius:10,background:form.category===cat?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",border:form.category===cat?"1px solid rgba(255,107,0,0.35)":"1px solid rgba(255,255,255,0.08)",color:form.category===cat?"#FF8C00":"#6a5a40",fontSize:10,fontWeight:form.category===cat?700:400,cursor:"pointer",fontFamily:"Lexend",transition:"all .15s" }}>
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
                 </div>
                 <div style={{ marginBottom:12 }}>
                   <label style={{ color:"#6a5a40",fontSize:9,fontWeight:600,display:"block",marginBottom:6 }}>SỐ ĐIỆN THOẠI *</label>
@@ -152,11 +140,10 @@ export default function MerchantRegisterPage() {
                 <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:16,marginBottom:12 }}>
                   <div style={{ display:"flex",gap:12,alignItems:"center",marginBottom:16 }}>
                     <div style={{ width:56,height:56,borderRadius:14,background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28 }}>
-                      {form.category.split(" ")[0] || "🏪"}
+                      🏪
                     </div>
                     <div>
                       <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:800 }}>{form.name || "Tên cửa hàng"}</div>
-                      <div style={{ color:"#6a5a40",fontSize:9,marginTop:2 }}>{form.category || "Chưa chọn danh mục"}</div>
                     </div>
                   </div>
                   {[["Số ĐT",form.phone],["Địa chỉ",form.address||"Chưa nhập"],["Giờ mở",`${form.openTime} – ${form.closeTime}`],["Ngày mở",form.days.join(", ")||"Chưa chọn"]].map(([k,v]) => (
