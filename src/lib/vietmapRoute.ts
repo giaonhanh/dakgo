@@ -72,8 +72,10 @@ export function calcDeliveryFeeFromPricing(
     return 0
   }
 
-  const wholeKm = Math.floor(km)
-  const fracKm  = km - wholeKm
+  // Tối thiểu 1km — tài xế luôn phải đến quán dù giao gần
+  const effectiveKm = Math.max(km, 1)
+  const wholeKm = Math.floor(effectiveKm)
+  const fracKm  = effectiveKm - wholeKm
   let total = 0
 
   for (let i = 0; i < Math.min(wholeKm, 10); i++) total += getPriceAt(i)
@@ -89,9 +91,10 @@ export function calcDeliveryFeeFromPricing(
 
 /** Fallback nếu chưa load được cấu hình admin */
 export function calcDeliveryFee(km: number): number {
-  if (km <= 1) return 10000
-  if (km <= 3) return 10000 + Math.round((km - 1) * 5000)
-  return 20000 + Math.round((km - 3) * 3500)
+  const k = Math.max(km, 1)
+  if (k <= 1) return 10000
+  if (k <= 3) return 10000 + Math.round((k - 1) * 5000)
+  return 20000 + Math.round((k - 3) * 3500)
 }
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
