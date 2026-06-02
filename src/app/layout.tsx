@@ -31,8 +31,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi" className={lexend.className}>
-      <body>
+    <html lang="vi" className={lexend.className} style={{ background: "#080806" }}>
+      <body style={{ background: "#080806", margin: 0 }}>
         <SessionProvider>{children}</SessionProvider>
         <ServiceWorkerRegistrar />
       </body>

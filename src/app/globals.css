@@ -27,7 +27,12 @@
 }
 
 /* ─── Base ─── */
+html {
+  background: #080806;
+  min-height: 100%;
+}
 html, body {
+  background: #080806;
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: "Lexend", "Inter", sans-serif;
