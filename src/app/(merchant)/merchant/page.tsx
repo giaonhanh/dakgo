@@ -927,7 +927,7 @@ export default function MerchantDashboard() {
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 16 }}>
-            [
+            {[
               { href: "/merchant/orders",     icon: "📋", label: "Lịch sử đơn"   },
               { href: "/merchant/menu",       icon: "🍽️", label: "Quản lý menu"  },
               { href: "/merchant/revenue",    icon: "📊", label: "Doanh thu"      },
