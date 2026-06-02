@@ -824,7 +824,13 @@ export default function HomePage() {
               )}
             </div>
           ) : (
-            <div style={{ margin:"0 16px 14px" }}>
+            <div style={{ height: 8 }} />
+          )}
+
+          {/* ──────────────────────────────────────
+              S4.5 — Mời bạn bè (luôn hiển thị)
+          ────────────────────────────────────── */}
+          <div style={{ margin:"0 16px 14px" }}>
               <div style={{ height:110, borderRadius:16, overflow:"hidden",
                 border:"1px solid rgba(62,207,110,0.3)", position:"relative",
                 background:"linear-gradient(135deg,#081a10,#0d2d18,#081510)", cursor:"pointer" }}
@@ -853,8 +859,7 @@ export default function HomePage() {
                 <div style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)",
                   fontSize:52, zIndex:1, filter:"drop-shadow(0 0 14px rgba(62,207,110,0.4))" }}>🎁</div>
               </div>
-            </div>
-          )}
+          </div>
 
           {/* ──────────────────────────────────────
               S5 — ServiceGrid (4 dịch vụ nhanh)
