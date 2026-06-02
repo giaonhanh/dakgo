@@ -21,10 +21,9 @@ const loader = new Loader({
 })
 
 export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }: MapPickerProps) {
-  const mapDivRef    = useRef<HTMLDivElement>(null)
-  const mapRef       = useRef<google.maps.Map | null>(null)
-  const markerRef    = useRef<google.maps.Marker | null>(null)
-  const geocoderRef  = useRef<google.maps.Geocoder | null>(null)
+  const mapDivRef   = useRef<HTMLDivElement>(null)
+  const mapRef      = useRef<google.maps.Map | null>(null)
+  const markerRef   = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
 
   const [pickedLat,  setPickedLat]  = useState(initialLat ?? DEFAULT_LAT)
   const [pickedLng,  setPickedLng]  = useState(initialLng ?? DEFAULT_LNG)
@@ -33,18 +32,22 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
   const [gpsLoading, setGpsLoading] = useState(false)
   const [mapLoaded,  setMapLoaded]  = useState(false)
 
-  const reverseGeocode = useCallback((lat: number, lng: number) => {
-    if (!geocoderRef.current) return
+  // Dùng Nominatim (miễn phí, không cần billing)
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     setGeocoding(true)
-    geocoderRef.current.geocode(
-      { location: { lat, lng } },
-      (results, status) => {
-        setGeocoding(false)
-        if (status === "OK" && results?.[0]) {
-          setGeocoded(results[0].formatted_address)
-        }
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        { headers: { "Accept-Language": "vi" } }
+      )
+      const data = await res.json()
+      if (data.display_name) {
+        const parts = (data.display_name as string).split(", ")
+        // Bỏ phần tử cuối cùng (thường là "Việt Nam")
+        setGeocoded(parts.slice(0, -1).join(", "))
       }
-    )
+    } catch { /* ignore */ }
+    setGeocoding(false)
   }, [])
 
   const updatePosition = useCallback((lat: number, lng: number) => {
@@ -59,46 +62,53 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
     const lat = initialLat ?? DEFAULT_LAT
     const lng = initialLng ?? DEFAULT_LNG
 
-    loader.load().then((google) => {
+    Promise.all([
+      loader.importLibrary("maps"),
+      loader.importLibrary("marker"),
+    ]).then(([mapsLib, markerLib]) => {
       if (!mapDivRef.current) return
 
-      const map = new google.maps.Map(mapDivRef.current, {
+      const map = new mapsLib.Map(mapDivRef.current, {
         center: { lat, lng },
         zoom: 17,
+        mapId: "DEMO_MAP_ID",  // bắt buộc cho AdvancedMarkerElement
         disableDefaultUI: true,
         zoomControl: true,
         gestureHandling: "greedy",
         mapTypeId: "roadmap",
       })
 
-      const marker = new google.maps.Marker({
+      const marker = new markerLib.AdvancedMarkerElement({
         position: { lat, lng },
         map,
-        draggable: true,
+        gmpDraggable: true,
         title: "Vị trí cửa hàng",
-        animation: google.maps.Animation.DROP,
       })
 
-      const geocoder = new google.maps.Geocoder()
-
-      mapRef.current      = map
-      markerRef.current   = marker
-      geocoderRef.current = geocoder
+      mapRef.current    = map
+      markerRef.current = marker
       setMapLoaded(true)
 
       reverseGeocode(lat, lng)
 
       marker.addListener("dragend", () => {
-        const pos = marker.getPosition()!
-        updatePosition(pos.lat(), pos.lng())
+        const pos = marker.position
+        if (!pos) return
+        const newLat = typeof (pos as google.maps.LatLng).lat === "function"
+          ? (pos as google.maps.LatLng).lat()
+          : (pos as google.maps.LatLngLiteral).lat
+        const newLng = typeof (pos as google.maps.LatLng).lng === "function"
+          ? (pos as google.maps.LatLng).lng()
+          : (pos as google.maps.LatLngLiteral).lng
+        updatePosition(newLat, newLng)
       })
 
       map.addListener("click", (e: google.maps.MapMouseEvent) => {
-        const lat = e.latLng!.lat()
-        const lng = e.latLng!.lng()
-        marker.setPosition({ lat, lng })
-        map.panTo({ lat, lng })
-        updatePosition(lat, lng)
+        const newLat = e.latLng!.lat()
+        const newLng = e.latLng!.lng()
+        marker.position = { lat: newLat, lng: newLng }
+        map.panTo({ lat: newLat, lng: newLng })
+        updatePosition(newLat, newLng)
       })
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -115,7 +125,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
         if (mapRef.current && markerRef.current) {
           mapRef.current.panTo({ lat, lng })
           mapRef.current.setZoom(18)
-          markerRef.current.setPosition({ lat, lng })
+          markerRef.current.position = { lat, lng }
         }
         updatePosition(lat, lng)
       },
