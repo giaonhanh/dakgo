@@ -36,7 +36,7 @@ interface ProductResult {
 
 type SearchResult = ShopResult | ProductResult
 
-const POPULAR_TAGS = ["?? B�n/Ph?", "?? �? u?ng", "?? G� r�n", "?? Com h?p", "?? B�nh", "?? Pizza"]
+const POPULAR_TAGS = ["🍜 Bún/Phở", "🧋 Đồ uống", "🍗 Gà rán", "🍱 Cơm hộp", "🧁 Bánh", "🍕 Pizza"]
 const LS_KEY = "gn_search_history"
 const MAX_HISTORY = 10
 
@@ -47,7 +47,7 @@ function saveHistory(list: string[]) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(list)) } catch { /* noop */ }
 }
 
-const formatPrice = (n: number) => n.toLocaleString("vi-VN") + "d"
+const formatPrice = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
 // Types returned by search_catalog RPC
 interface RpcProduct {

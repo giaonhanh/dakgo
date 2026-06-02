@@ -1431,10 +1431,15 @@ export default function HomePage() {
                   }}>
                     <div style={{ height:80, display:"flex", alignItems:"center",
                       justifyContent:"center", fontSize:34, position:"relative",
-                      background:"rgba(255,255,255,0.02)" }}>
-                      <div style={{ position:"absolute", inset:0,
-                        background:"radial-gradient(circle at 50% 60%,rgba(255,107,0,0.09) 0%,transparent 65%)" }} />
-                      🍽️
+                      background:"rgba(255,255,255,0.02)", overflow:"hidden" }}>
+                      {b.image_url
+                        ? <img src={b.image_url} alt={b.name} style={{ width:"100%", height:"100%", objectFit:"cover", position:"absolute", inset:0 }} />
+                        : <>
+                            <div style={{ position:"absolute", inset:0,
+                              background:"radial-gradient(circle at 50% 60%,rgba(255,107,0,0.09) 0%,transparent 65%)" }} />
+                            <span style={{ position:"relative", zIndex:1 }}>🍽️</span>
+                          </>
+                      }
                       <div style={{ position:"absolute", top:6, left:6,
                         width:20, height:20, borderRadius:6,
                         background: rank<=3 ? "rgba(255,215,0,0.15)" : "rgba(255,107,0,0.1)",
