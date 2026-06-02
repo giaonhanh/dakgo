@@ -22,15 +22,13 @@ function makeCode(uid: string): string {
   return code
 }
 
-const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
-
 export default function InvitePage() {
   const router = useRouter()
-  const [code, setCode]           = useState("")
-  const [totalUses, setTotalUses] = useState(0)
+  const [code,        setCode]        = useState("")
+  const [totalUses,   setTotalUses]   = useState(0)
   const [totalEarned, setTotalEarned] = useState(0)
-  const [copied, setCopied]       = useState(false)
-  const [loading, setLoading]     = useState(true)
+  const [copied,      setCopied]      = useState(false)
+  const [loading,     setLoading]     = useState(true)
 
   useEffect(() => {
     async function init() {
@@ -45,8 +43,8 @@ export default function InvitePage() {
 
       if (existing) {
         setCode(existing.code)
-        setTotalUses(existing.total_uses)
-        setTotalEarned(existing.total_earned)
+        setTotalUses(existing.total_uses ?? 0)
+        setTotalEarned(existing.total_earned ?? 0)
       } else {
         const generated = makeCode(user.id)
         const { data: inserted } = await supabase
@@ -61,7 +59,11 @@ export default function InvitePage() {
     init()
   }, [router])
 
-  const shareUrl = `https://giaonhanh.app/invite?ref=${code}`
+  // Link trỏ về trang chủ (đăng nhập) kèm mã ref
+  const shareUrl  = typeof window !== "undefined"
+    ? `${window.location.origin}/?ref=${code}`
+    : `https://giaonhanh.app/?ref=${code}`
+  const shareText = `Dùng mã ${code} để nhận 5.000 XU khi đặt đơn đầu trên Giao Nhanh (từ 50.000đ)! 🎁`
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code)
@@ -72,14 +74,10 @@ export default function InvitePage() {
   const handleShare = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: "Giao Nhanh — Mã giới thiệu",
-          text: `Dùng mã ${code} khi đặt đơn đầu trên Giao Nhanh để nhận 10.000đ xu! 🎁`,
-          url: shareUrl,
-        })
+        await navigator.share({ title: "Giao Nhanh — Mã giới thiệu", text: shareText, url: shareUrl })
       } catch { /* user dismissed */ }
     } else {
-      await navigator.clipboard.writeText(`Mã giới thiệu Giao Nhanh: ${code}\n${shareUrl}`)
+      await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
@@ -88,7 +86,7 @@ export default function InvitePage() {
   if (loading) {
     return (
       <div style={{ minHeight: "100dvh", background: "#080806", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "#6a5a40", fontSize: 13 }}>Đang tải...</div>
+        <div style={{ color: "#6a5a40", fontSize: 13, fontFamily: "'Lexend',sans-serif" }}>Đang tải...</div>
       </div>
     )
   }
@@ -96,29 +94,44 @@ export default function InvitePage() {
   return (
     <div style={{ minHeight: "100dvh", background: "#080806", fontFamily: "'Lexend',sans-serif", paddingBottom: 100 }}>
 
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 16px 0" }}>
-        <button onClick={() => router.back()}
-          style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", color: "#f8f0e0", fontSize: 16, cursor: "pointer" }}>
-          ←
-        </button>
-        <span style={{ color: "#f8f0e0", fontWeight: 700, fontSize: 16 }}>Mời bạn bè</span>
+      {/* Header — có safe-area-inset-top để tránh notch/status bar */}
+      <div style={{
+        paddingTop: "env(safe-area-inset-top, 16px)",
+        background: "rgba(8,8,6,0.95)",
+        backdropFilter: "blur(20px)",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        position: "sticky", top: 0, zIndex: 50,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
+          <button onClick={() => router.back()}
+            style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", color: "#f8f0e0", fontSize: 16, cursor: "pointer" }}>
+            ←
+          </button>
+          <span style={{ color: "#f8f0e0", fontWeight: 700, fontSize: 16 }}>Mời bạn bè</span>
+        </div>
       </div>
 
       <div style={{ padding: "20px 16px 0" }}>
 
         {/* Hero card */}
-        <div style={{ background: "linear-gradient(135deg,#1a0800,#2d1200,#0d0600)", border: "1px solid rgba(255,107,0,0.3)", borderRadius: 20, padding: "28px 20px 24px", textAlign: "center", marginBottom: 16, position: "relative", overflow: "hidden" }}>
-          {/* Glow */}
-          <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle,rgba(255,107,0,0.2),transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ background: "linear-gradient(135deg,#081a10,#0d2d18,#081510)", border: "1px solid rgba(62,207,110,0.3)", borderRadius: 20, padding: "28px 20px 24px", textAlign: "center", marginBottom: 16, position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: -40, right: -40, width: 160, height: 160, borderRadius: "50%", background: "radial-gradient(circle,rgba(62,207,110,0.2),transparent 70%)", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", bottom: -30, left: -30, width: 120, height: 120, borderRadius: "50%", background: "radial-gradient(circle,rgba(62,207,110,0.1),transparent 70%)", pointerEvents: "none" }} />
 
-          <div style={{ fontSize: 44, marginBottom: 10 }}>🎁</div>
-          <div style={{ color: "#f8f0e0", fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
+          <div style={{ fontSize: 48, marginBottom: 10 }}>🎁</div>
+          <div style={{ color: "#f8f0e0", fontSize: 18, fontWeight: 800, marginBottom: 8 }}>
             Mời bạn — Cùng nhận xu!
           </div>
-          <div style={{ color: "#b0956a", fontSize: 12, lineHeight: 1.6 }}>
-            Bạn nhận <span style={{ color: "#FF8C00", fontWeight: 700 }}>10.000đ xu</span> khi bạn bè<br />
-            đặt và hoàn thành đơn đầu tiên ≥ 50.000đ
+
+          {/* Reward callout */}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(62,207,110,0.12)", border: "1px solid rgba(62,207,110,0.35)", borderRadius: 12, padding: "8px 16px", marginBottom: 10 }}>
+            <span style={{ color: "#3ecf6e", fontSize: 20, fontWeight: 800 }}>5.000 XU</span>
+            <span style={{ color: "#6a8a70", fontSize: 11 }}>mỗi người</span>
+          </div>
+
+          <div style={{ color: "#6a8a70", fontSize: 11, lineHeight: 1.7 }}>
+            Cả bạn và bạn bè cùng nhận <strong style={{ color: "#3ecf6e" }}>5.000 XU</strong><br />
+            khi đơn đầu tiên của bạn bè hoàn thành ≥ 50.000đ
           </div>
         </div>
 
@@ -126,15 +139,20 @@ export default function InvitePage() {
         <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "18px 16px", marginBottom: 12 }}>
           <div style={{ color: "#6a5a40", fontSize: 10, fontWeight: 600, marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>Mã giới thiệu của bạn</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ flex: 1, background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.25)", borderRadius: 12, padding: "14px 16px" }}>
-              <span style={{ background: "linear-gradient(90deg,#FF6B00,#FFB347)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", fontSize: 24, fontWeight: 800, letterSpacing: 4 }}>
+            <div style={{ flex: 1, background: "rgba(62,207,110,0.07)", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 12, padding: "14px 16px" }}>
+              <span style={{ background: "linear-gradient(90deg,#3ecf6e,#27ae60)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", fontSize: 24, fontWeight: 800, letterSpacing: 4 }}>
                 {code}
               </span>
             </div>
             <button onClick={handleCopy}
-              style={{ width: 48, height: 48, borderRadius: 12, background: copied ? "rgba(62,207,110,0.15)" : "rgba(255,107,0,0.1)", border: `1px solid ${copied ? "rgba(62,207,110,0.35)" : "rgba(255,107,0,0.3)"}`, color: copied ? "#3ecf6e" : "#FF8C00", fontSize: 18, cursor: "pointer", flexShrink: 0, transition: "all .2s" }}>
+              style={{ width: 48, height: 48, borderRadius: 12, background: copied ? "rgba(62,207,110,0.15)" : "rgba(62,207,110,0.08)", border: `1px solid ${copied ? "rgba(62,207,110,0.5)" : "rgba(62,207,110,0.2)"}`, color: "#3ecf6e", fontSize: 18, cursor: "pointer", flexShrink: 0, transition: "all .2s" }}>
               {copied ? "✓" : "📋"}
             </button>
+          </div>
+          {/* Link preview */}
+          <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 9 }}>
+            <div style={{ color: "#6a5a40", fontSize: 8, marginBottom: 2 }}>Link chia sẻ</div>
+            <div style={{ color: "#4a8ff5", fontSize: 9.5, wordBreak: "break-all" }}>{shareUrl}</div>
           </div>
         </div>
 
@@ -142,7 +160,7 @@ export default function InvitePage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
           {[
             { label: "Đã giới thiệu", value: `${totalUses} người`, icon: "👥" },
-            { label: "Xu đã kiếm",    value: fmt(totalEarned),      icon: "🪙" },
+            { label: "XU đã kiếm",    value: `${(totalEarned).toLocaleString("vi-VN")} XU`, icon: "🪙" },
           ].map(s => (
             <div key={s.label} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "14px 14px 12px", textAlign: "center" }}>
               <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
@@ -154,21 +172,21 @@ export default function InvitePage() {
 
         {/* Share button */}
         <button onClick={handleShare}
-          style={{ width: "100%", height: 52, borderRadius: 14, background: "linear-gradient(90deg,#FF6B00,#FF8C00)", border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend", marginBottom: 20, boxShadow: "0 4px 20px rgba(255,107,0,0.35)" }}>
+          style={{ width: "100%", height: 52, borderRadius: 14, background: "linear-gradient(90deg,#27ae60,#3ecf6e)", border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend", marginBottom: 20, boxShadow: "0 4px 20px rgba(62,207,110,0.35)" }}>
           🔗 Chia sẻ mã với bạn bè
         </button>
 
         {/* Cách hoạt động */}
-        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "16px 16px 12px", marginBottom: 16 }}>
-          <div style={{ color: "#b0956a", fontSize: 11, fontWeight: 700, marginBottom: 14 }}>⚡ Cách hoạt động</div>
+        <div style={{ background: "rgba(62,207,110,0.04)", border: "1px solid rgba(62,207,110,0.12)", borderRadius: 16, padding: "16px 16px 12px", marginBottom: 16 }}>
+          <div style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 700, marginBottom: 14 }}>⚡ Cách hoạt động</div>
           {[
-            { step: "1", icon: "📤", text: "Chia sẻ mã GN của bạn với bạn bè" },
-            { step: "2", icon: "📲", text: "Bạn bè tải Giao Nhanh và nhập mã khi đặt đơn đầu" },
-            { step: "3", icon: "✅", text: "Đơn hoàn thành (≥ 50.000đ) → cả 2 nhận 10.000đ xu" },
-            { step: "4", icon: "🪙", text: "Xu dùng để thanh toán đơn hàng tiếp theo" },
+            { step: "1", icon: "📤", text: "Chia sẻ mã hoặc link với bạn bè" },
+            { step: "2", icon: "📲", text: "Bạn bè đăng ký và nhập mã khi thanh toán đơn đầu" },
+            { step: "3", icon: "✅", text: "Đơn hoàn thành ≥ 50.000đ → cả 2 nhận 5.000 XU" },
+            { step: "4", icon: "🪙", text: "XU dùng để thanh toán các đơn hàng tiếp theo" },
           ].map(({ step, icon, text }) => (
             <div key={step} style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
-              <div style={{ width: 24, height: 24, borderRadius: 8, background: "rgba(255,107,0,0.1)", border: "1px solid rgba(255,107,0,0.25)", display: "flex", alignItems: "center", justifyContent: "center", color: "#FF8C00", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
+              <div style={{ width: 24, height: 24, borderRadius: 8, background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.25)", display: "flex", alignItems: "center", justifyContent: "center", color: "#3ecf6e", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
                 {step}
               </div>
               <div style={{ flex: 1 }}>
@@ -180,10 +198,10 @@ export default function InvitePage() {
         </div>
 
         {/* Điều khoản */}
-        <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.7, textAlign: "center" }}>
-          • Mỗi tài khoản chỉ được nhận thưởng referee 1 lần<br />
-          • Xu không quy đổi thành tiền mặt<br />
-          • Giao Nhanh có quyền thu hồi xu nếu phát hiện gian lận
+        <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.8, textAlign: "center" }}>
+          • Mỗi tài khoản chỉ được nhận thưởng giới thiệu 1 lần<br />
+          • XU không quy đổi thành tiền mặt<br />
+          • Giao Nhanh có quyền thu hồi XU nếu phát hiện gian lận
         </div>
 
       </div>
