@@ -211,7 +211,7 @@ function ProductSheet({
                           fontSize:11, fontWeight: active ? 700 : 400 }}>{s.label}</div>
                         <div style={{ color: active ? "#4a8ff5" : "#6a5a40", fontSize:9, marginTop:2 }}>
                           {(s.priceDiff ?? 0) === 0
-                            ? "Miễn phí"
+                            ? "Giá gốc"
                             : `${(s.priceDiff ?? 0) > 0 ? "+" : ""}${(s.priceDiff ?? 0).toLocaleString("vi-VN")}đ`}
                         </div>
                       </div>
