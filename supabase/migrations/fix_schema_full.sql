@@ -527,18 +527,10 @@ CREATE INDEX IF NOT EXISTS idx_notif_user_unread
 -- 18. FUNCTIONS — sync profiles + wallet ops
 -- ════════════════════════════════════════════════
 
+-- Trigger rỗng: profile được tạo bởi API route /api/auth/register (service role)
+-- Trigger tự tạo profile gây lỗi enum user_role cast trên live DB
 CREATE OR REPLACE FUNCTION handle_new_user() RETURNS TRIGGER AS $$
-DECLARE v_phone TEXT; v_name TEXT;
 BEGIN
-  v_phone := COALESCE(
-    NULLIF(TRIM(NEW.phone), ''),
-    NULLIF(split_part(COALESCE(NEW.email, ''), '@', 1), ''),
-    'user_' || substr(NEW.id::text, 1, 8)
-  );
-  v_name := COALESCE(NULLIF(TRIM(NEW.raw_user_meta_data->>'full_name'), ''), v_phone);
-  INSERT INTO profiles (id, phone, full_name, role)
-  VALUES (NEW.id, v_phone, v_name, 'customer')
-  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

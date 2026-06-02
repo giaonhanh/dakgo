@@ -57,16 +57,11 @@ export async function POST(req: NextRequest) {
     })
 
     if (authErr || !data.user) {
-      const msg   = authErr?.message ?? ""
-      const code  = (authErr as { code?: string } | null)?.code ?? ""
-      const status = (authErr as { status?: number } | null)?.status ?? 0
-      console.error("[register] createUser error:", { msg, code, status, full: JSON.stringify(authErr) })
-
+      const msg = authErr?.message ?? ""
       if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("duplicate")) {
         return NextResponse.json({ error: "duplicate" }, { status: 409 })
       }
-      // Trả về full error để debug
-      return NextResponse.json({ error: msg || "Không tạo được tài khoản", code, authStatus: status }, { status: 400 })
+      return NextResponse.json({ error: "Đăng ký thất bại. Vui lòng thử lại." }, { status: 400 })
     }
 
     const userId = data.user.id
