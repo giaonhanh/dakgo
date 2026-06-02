@@ -6,14 +6,41 @@ import { motion } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 
 interface Shop {
-  id:       string
-  name:     string
-  category: string
-  address:  string
-  isOpen:   boolean
-  rating:   number
-  imageUrl: string | null
-  logoUrl:  string | null
+  id:          string
+  name:        string
+  category:    string
+  address:     string
+  isOpen:      boolean
+  rating:      number
+  imageUrl:    string | null
+  logoUrl:     string | null
+  lat:         number | null
+  lng:         number | null
+  distanceKm:  number | null
+}
+
+type GeoJSONPoint = { type: string; coordinates: number[] }
+
+function extractCoords(loc: unknown): { lat: number; lng: number } | null {
+  if (!loc || typeof loc !== "object") return null
+  const geo = loc as Partial<GeoJSONPoint>
+  if (!Array.isArray(geo.coordinates) || geo.coordinates.length < 2) return null
+  const [lng, lat] = geo.coordinates
+  if (typeof lng !== "number" || typeof lat !== "number") return null
+  return { lat, lng }
+}
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function formatDist(km: number): string {
+  return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)} km`
 }
 
 function catEmoji(cat: string): string {
@@ -28,122 +55,138 @@ function catEmoji(cat: string): string {
   if (c.includes("pizza")) return "🍕"
   if (c.includes("burger") || c.includes("fast food")) return "🍔"
   if (c.includes("kem")) return "🍦"
-  if (c.includes("salad") || c.includes("chay")) return "🥗"
+  if (c.includes("chay")) return "🥗"
   if (c.includes("uống") || c.includes("nước")) return "🥤"
   if (c.includes("hải sản") || c.includes("tôm") || c.includes("cua")) return "🦐"
   if (c.includes("lẩu")) return "🫕"
   if (c.includes("nướng") || c.includes("bbq")) return "🔥"
-  if (c.includes("cháo") || c.includes("súp")) return "🥣"
+  if (c.includes("cháo")) return "🥣"
   if (c.includes("xôi")) return "🍚"
   if (c.includes("chè")) return "🍮"
   if (c.includes("nhậu") || c.includes("bia")) return "🍺"
   return "🏪"
 }
 
-const TABS: { key: string; label: string; emoji: string; keywords: string[] }[] = [
-  {
-    key: "all",
-    label: "Tất cả",
-    emoji: "🗂️",
-    keywords: [],
-  },
-  {
-    key: "sang",
-    label: "Buổi sáng",
-    emoji: "🌅",
-    keywords: ["bún", "phở", "cháo", "bánh mì", "xôi", "hủ tiếu", "bánh cuốn", "dimsum", "cà phê", "cafe", "bánh bột", "mì quảng", "bột"],
-  },
-  {
-    key: "trua",
-    label: "Buổi trưa",
-    emoji: "☀️",
-    keywords: ["cơm", "bún", "phở", "mì", "hủ tiếu", "bánh mì", "cơm hộp", "cơm tấm", "bình dân", "cơm văn phòng"],
-  },
-  {
-    key: "toi",
-    label: "Buổi tối",
-    emoji: "🌙",
-    keywords: ["lẩu", "nướng", "hải sản", "bbq", "nhậu", "bia", "tôm", "cua", "mực", "bạch tuộc", "cơm chiều"],
-  },
-  {
-    key: "nuoc",
-    label: "Nước uống",
-    emoji: "🥤",
-    keywords: ["nước", "uống", "cà phê", "cafe", "trà", "sinh tố", "ép", "cocktail", "đồ uống", "trà sữa", "milk tea", "smoothie", "juice"],
-  },
-  {
-    key: "nhau",
-    label: "Món nhậu",
-    emoji: "🍺",
-    keywords: ["nhậu", "nướng", "lẩu", "hải sản", "bia", "mồi", "bbq", "tôm", "cua", "mực", "chân gà", "gà", "đồ nhậu"],
-  },
-  {
-    key: "anvat",
-    label: "Ăn vặt",
-    emoji: "🍢",
-    keywords: ["ăn vặt", "vặt", "chè", "bánh", "kem", "snack", "chân gà", "xiên que", "bắp", "khoai", "đồ ngọt", "tráng miệng", "dessert"],
-  },
+const TABS = [
+  { key: "all",   label: "Tất cả",     emoji: "🗂️", catKeys: [] },
+  { key: "sang",  label: "Buổi sáng",  emoji: "🌅", catKeys: ["buổi sáng", "sáng"] },
+  { key: "trua",  label: "Buổi trưa",  emoji: "☀️", catKeys: ["buổi trưa", "trưa"] },
+  { key: "toi",   label: "Buổi tối",   emoji: "🌙", catKeys: ["buổi tối", "tối"] },
+  { key: "nuoc",  label: "Nước uống",  emoji: "🥤", catKeys: ["nước uống", "đồ uống", "uống"] },
+  { key: "nhau",  label: "Món nhậu",   emoji: "🍺", catKeys: ["món nhậu", "nhậu"] },
+  { key: "anvat", label: "Ăn vặt",     emoji: "🍢", catKeys: ["ăn vặt", "vặt"] },
 ]
 
-function shopMatchesTab(shop: Shop, tab: typeof TABS[number]): boolean {
-  if (tab.key === "all") return true
-  const c = shop.category.toLowerCase()
-  return tab.keywords.some(kw => c.includes(kw))
+// shopId → list of product category strings
+type ProdCatMap = Record<string, string[]>
+
+function shopMatchesTab(shopId: string, tabCatKeys: string[], prodCatMap: ProdCatMap): boolean {
+  if (tabCatKeys.length === 0) return true
+  const cats = prodCatMap[shopId] ?? []
+  return cats.some(cat => tabCatKeys.some(key => cat.toLowerCase().includes(key)))
 }
 
 export default function NearbyShopsPage() {
   const router = useRouter()
-  const [shops, setShops]     = useState<Shop[]>([])
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("all")
+  const [shops, setShops]           = useState<Shop[]>([])
+  const [prodCatMap, setProdCatMap] = useState<ProdCatMap>({})
+  const [loading, setLoading]       = useState(true)
+  const [activeTab, setActiveTab]   = useState("all")
 
   useEffect(() => {
-    async function load() {
-      const supabase = createClient()
-      const { data: rows } = await supabase
+    const supabase = createClient()
+
+    // Load shops + product categories in parallel
+    Promise.all([
+      supabase
         .from("shops")
-        .select("id, name, category, address, is_open, rating_avg, cover_image_url, logo_url, status")
+        .select("id, name, category, address, is_open, rating_avg, cover_image_url, logo_url, status, location")
         .eq("status", "approved")
         .order("rating_avg", { ascending: false })
-        .limit(60)
+        .limit(60),
+      supabase
+        .from("products")
+        .select("shop_id, category")
+        .eq("is_available", true)
+        .not("category", "is", null),
+    ]).then(([shopsRes, prodsRes]) => {
+      // Build product category map
+      const catMap: ProdCatMap = {}
+      for (const row of prodsRes.data ?? []) {
+        if (!row.shop_id || !row.category) continue
+        if (!catMap[row.shop_id]) catMap[row.shop_id] = []
+        if (!catMap[row.shop_id].includes(row.category)) catMap[row.shop_id].push(row.category)
+      }
+      setProdCatMap(catMap)
 
-      if (!rows) { setLoading(false); return }
-
-      setShops(rows.map(r => ({
-        id:       r.id,
-        name:     r.name,
-        category: r.category ?? "",
-        address:  r.address ?? "",
-        isOpen:   r.is_open ?? false,
-        rating:   r.rating_avg ?? 0,
-        imageUrl: r.cover_image_url ?? null,
-        logoUrl:  r.logo_url ?? null,
-      })))
+      // Map shops (no distance yet)
+      const mapped: Shop[] = (shopsRes.data ?? []).map(r => {
+        const coords = extractCoords(r.location)
+        return {
+          id:         r.id,
+          name:       r.name,
+          category:   r.category ?? "",
+          address:    r.address ?? "",
+          isOpen:     r.is_open ?? false,
+          rating:     r.rating_avg ?? 0,
+          imageUrl:   r.cover_image_url ?? null,
+          logoUrl:    r.logo_url ?? null,
+          lat:        coords?.lat ?? null,
+          lng:        coords?.lng ?? null,
+          distanceKm: null,
+        }
+      })
+      setShops(mapped)
       setLoading(false)
-    }
-    load()
+
+      // Try geolocation separately so shops show immediately
+      if (typeof navigator !== "undefined" && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            const userLat = pos.coords.latitude
+            const userLng = pos.coords.longitude
+            setShops(prev =>
+              [...prev]
+                .map(s => ({
+                  ...s,
+                  distanceKm: s.lat !== null && s.lng !== null
+                    ? haversineKm(userLat, userLng, s.lat, s.lng)
+                    : null,
+                }))
+                .sort((a, b) => {
+                  if (a.distanceKm !== null && b.distanceKm !== null) return a.distanceKm - b.distanceKm
+                  if (a.distanceKm !== null) return -1
+                  if (b.distanceKm !== null) return 1
+                  return b.rating - a.rating
+                })
+            )
+          },
+          () => { /* location denied — no distance shown */ },
+          { timeout: 8000, maximumAge: 60000 }
+        )
+      }
+    })
   }, [])
 
   const currentTab = TABS.find(t => t.key === activeTab) ?? TABS[0]
 
   const filtered = useMemo(
-    () => shops.filter(s => shopMatchesTab(s, currentTab)),
-    [shops, currentTab]
+    () => shops.filter(s => shopMatchesTab(s.id, currentTab.catKeys, prodCatMap)),
+    [shops, currentTab, prodCatMap]
   )
 
-  // count per tab for display
   const tabCounts = useMemo(() => {
     const map: Record<string, number> = {}
     for (const tab of TABS) {
-      map[tab.key] = shops.filter(s => shopMatchesTab(s, tab)).length
+      map[tab.key] = shops.filter(s => shopMatchesTab(s.id, tab.catKeys, prodCatMap)).length
     }
     return map
-  }, [shops])
+  }, [shops, prodCatMap])
 
   return (
     <div style={{ minHeight: "100dvh", background: "#080806", fontFamily: "'Lexend',sans-serif", paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "calc(24px + env(safe-area-inset-bottom, 0px))" }}>
 
-      {/* Header */}
+      {/* Sticky header + tabs */}
       <div style={{ position: "sticky", top: 0, zIndex: 20, background: "rgba(8,8,6,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,107,0,0.15)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px 8px" }}>
           <button type="button" onClick={() => router.back()} style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#f8f0e0", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
@@ -156,7 +199,7 @@ export default function NearbyShopsPage() {
           <button type="button" onClick={() => router.push("/search")} style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#f8f0e0", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>🔍</button>
         </div>
 
-        {/* Tab bar */}
+        {/* Tab chips */}
         <div style={{ display: "flex", gap: 7, padding: "0 16px 10px", overflowX: "auto", scrollbarWidth: "none" }}>
           {TABS.map(tab => {
             const on = activeTab === tab.key
@@ -166,22 +209,7 @@ export default function NearbyShopsPage() {
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                style={{
-                  flexShrink: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "5px 11px",
-                  borderRadius: 20,
-                  background: on ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.05)",
-                  border: on ? "1px solid rgba(255,107,0,0.35)" : "1px solid rgba(255,255,255,0.08)",
-                  color: on ? "#FF8C00" : "#6a5a40",
-                  fontSize: 10,
-                  fontWeight: on ? 700 : 400,
-                  cursor: "pointer",
-                  fontFamily: "Lexend",
-                  transition: "all 0.15s",
-                }}
+                style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", borderRadius: 20, background: on ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.05)", border: on ? "1px solid rgba(255,107,0,0.35)" : "1px solid rgba(255,255,255,0.08)", color: on ? "#FF8C00" : "#6a5a40", fontSize: 10, fontWeight: on ? 700 : 400, cursor: "pointer", fontFamily: "Lexend", transition: "all 0.15s" }}
               >
                 <span style={{ fontSize: 13 }}>{tab.emoji}</span>
                 <span>{tab.label}</span>
@@ -194,11 +222,11 @@ export default function NearbyShopsPage() {
         </div>
       </div>
 
-      {/* List */}
+      {/* Shop list */}
       <div style={{ padding: "10px 16px 0", display: "flex", flexDirection: "column", gap: 10 }}>
         {loading ? (
           <>
-            {[0,1,2,3].map(i => (
+            {[0, 1, 2, 3].map(i => (
               <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "11px 12px", display: "flex", gap: 11, alignItems: "center" }}>
                 <div style={{ width: 58, height: 58, borderRadius: 14, background: "rgba(255,255,255,0.06)", flexShrink: 0 }} />
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -244,17 +272,16 @@ export default function NearbyShopsPage() {
 
                   <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.address}</div>
 
-                  <div style={{ display: "flex", gap: 4, marginTop: 5 }}>
-                    <span style={{ background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.2)", color: "#FF8C00", fontSize: 9, borderRadius: 5, padding: "2px 6px" }}>
-                      {catEmoji(s.category)} {s.category}
-                    </span>
-                  </div>
-
-                  {s.rating > 0 && (
-                    <div style={{ marginTop: 5 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5 }}>
+                    {s.distanceKm !== null && (
+                      <span style={{ background: "rgba(74,143,245,0.08)", border: "1px solid rgba(74,143,245,0.2)", color: "#4a8ff5", fontSize: 9, borderRadius: 5, padding: "2px 6px" }}>
+                        📍 {formatDist(s.distanceKm)}
+                      </span>
+                    )}
+                    {s.rating > 0 && (
                       <span style={{ color: "#FFB347", fontSize: 11 }}>★ {s.rating.toFixed(1)}</span>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
 
                 {/* Arrow */}
