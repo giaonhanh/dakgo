@@ -22,8 +22,7 @@ export async function POST(req: NextRequest) {
                  : role === "merchant" ? "merchant"
                  : "driver"
 
-    // Pre-check 1: profile với phone này đã tồn tại chưa?
-    // (trigger handle_new_user extract phone từ email → phone UNIQUE → trigger fail nếu trùng)
+    // Pre-check: phone tồn tại trong profiles?
     const { data: existingProfile } = await adminClient
       .from("profiles")
       .select("id")
@@ -31,7 +30,16 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     if (existingProfile) {
-      return NextResponse.json({ error: "duplicate" }, { status: 409 })
+      // Kiểm tra xem auth user tương ứng có còn tồn tại không
+      const { data: authUserData } = await adminClient.auth.admin.getUserById(existingProfile.id)
+
+      if (authUserData?.user) {
+        // Cả profile lẫn auth user đều tồn tại → số này đã đăng ký thật
+        return NextResponse.json({ error: "duplicate" }, { status: 409 })
+      }
+
+      // Auth user đã bị xóa nhưng profile còn sót (CASCADE không chạy) → xóa profile rác
+      await adminClient.from("profiles").delete().eq("id", existingProfile.id)
     }
 
     // Tạo auth user — admin API auto-confirm, không cần xác nhận email
@@ -44,13 +52,12 @@ export async function POST(req: NextRequest) {
 
     if (authErr || !data.user) {
       const msg = authErr?.message ?? ""
-      // "already registered" = email đã tồn tại trong auth.users
-      // "Database error creating new user" = trigger fail (thường do phone UNIQUE)
-      if (
-        msg.toLowerCase().includes("already") ||
-        msg.toLowerCase().includes("duplicate") ||
-        msg.includes("Database error creating new user")
-      ) {
+      // Email đã tồn tại trong auth.users (có thể phone pre-check bỏ sót)
+      if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("duplicate")) {
+        return NextResponse.json({ error: "duplicate" }, { status: 409 })
+      }
+      // "Database error creating new user" = trigger fail do phone UNIQUE trùng
+      if (msg.includes("Database error creating new user")) {
         return NextResponse.json({ error: "duplicate" }, { status: 409 })
       }
       return NextResponse.json({ error: msg || "Không tạo được tài khoản" }, { status: 400 })
