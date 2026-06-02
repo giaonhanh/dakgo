@@ -475,7 +475,12 @@ export default function ShopPage() {
   const [activeTab,     setActiveTab]     = useState("")
   const [scrolled,      setScrolled]      = useState(false)
   const [toast,         setToast]         = useState("")
-  const [favoured,      setFavoured]      = useState(false)
+  const [favoured,      setFavoured]      = useState(() => {
+    try {
+      const ids: string[] = JSON.parse(localStorage.getItem("favorite_shop_ids") ?? "[]")
+      return ids.includes(shopId as string)
+    } catch { return false }
+  })
   const [conflictItem,  setConflictItem]  = useState<PendingItem | null>(null)
   const [uploading,     setUploading]     = useState<"cover"|"logo"|null>(null)
   const [optSheet,      setOptSheet]      = useState<Product | null>(null)
@@ -755,7 +760,15 @@ export default function ShopPage() {
             </AnimatePresence>
 
             <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
-              <button onClick={() => setFavoured(f => !f)}
+              <button onClick={() => setFavoured(f => {
+                const next = !f
+                try {
+                  const ids: string[] = JSON.parse(localStorage.getItem("favorite_shop_ids") ?? "[]")
+                  const updated = next ? [...ids.filter(x => x !== shopId), shopId as string] : ids.filter(x => x !== shopId)
+                  localStorage.setItem("favorite_shop_ids", JSON.stringify(updated))
+                } catch { /* ignore */ }
+                return next
+              })}
                 style={{ width:32, height:32, borderRadius:9,
                   background:"rgba(0,0,0,0.35)",
                   border:`1px solid ${favoured?"rgba(255,64,64,0.4)":"rgba(255,255,255,0.12)"}`,
