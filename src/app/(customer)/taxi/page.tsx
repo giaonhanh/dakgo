@@ -179,7 +179,7 @@ export default function TaxiPage() {
                 <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:6 }}>{c.sub}</div>
                 <div style={{ display:"flex",alignItems:"center",gap:5 }}>
                   <span style={{ color:carType===key?"#b464ff":"#6a5a40",fontSize:9,fontWeight:700 }}>
-                    Từ {formatPrice(c.base)}
+                    Từ {formatPrice(key === "7cho" ? calcFeeFromRows(1, pricingRows7, pricingExtra7) : calcFeeFromRows(1, pricingRows, pricingExtra))}
                   </span>
                   <span style={{ color:"#4a3a28",fontSize:8 }}>· {c.seats} chỗ</span>
                 </div>
