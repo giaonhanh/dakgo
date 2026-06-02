@@ -20,6 +20,7 @@ interface DBProduct {
   id: string; name: string; price: number; original_price: number | null
   sold_count: number; image_url: string | null
   shop_id: string; shop_name: string; shop_rating: number
+  created_at: string
 }
 
 export default function CategoryPage() {
@@ -35,7 +36,7 @@ export default function CategoryPage() {
   const [items,       setItems]       = useState<DBProduct[]>([])
   const [loading,     setLoading]     = useState(true)
   const [toast,       setToast]       = useState("")
-  const [sortBy,      setSortBy]      = useState<"popular" | "price_asc" | "price_desc">("popular")
+  const [sortBy,      setSortBy]      = useState<"nearest" | "bestseller" | "newest">("nearest")
   const [conflict,    setConflict]    = useState<DBProduct | null>(null)
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export default function CategoryPage() {
       const { data } = await supabase
         .from("products")
         .select(`
-          id, name, price, original_price, sold_count, image_url, shop_id,
+          id, name, price, original_price, sold_count, image_url, shop_id, created_at,
           shops!inner(name, rating_avg, status, is_open)
         `)
         .eq("is_available", true)
@@ -61,7 +62,7 @@ export default function CategoryPage() {
 
       const rows = (data as Array<{
         id:string; name:string; price:number; original_price:number|null
-        sold_count:number; image_url:string|null; shop_id:string
+        sold_count:number; image_url:string|null; shop_id:string; created_at:string
         shops: { name:string; rating_avg:number } | Array<{ name:string; rating_avg:number }>
       }>)
 
@@ -74,6 +75,7 @@ export default function CategoryPage() {
           shop_id: r.shop_id,
           shop_name: shop?.name ?? "Cửa hàng",
           shop_rating: Number(shop?.rating_avg ?? 5),
+          created_at: r.created_at,
         }
       }))
       setLoading(false)
@@ -100,9 +102,9 @@ export default function CategoryPage() {
   }
 
   const sorted = [...items].sort((a, b) => {
-    if (sortBy === "price_asc")  return a.price - b.price
-    if (sortBy === "price_desc") return b.price - a.price
-    return b.sold_count - a.sold_count
+    if (sortBy === "bestseller") return b.sold_count - a.sold_count
+    if (sortBy === "newest")     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    return 0 // "nearest" giữ thứ tự DB
   })
 
   if (!meta) {
@@ -215,9 +217,9 @@ export default function CategoryPage() {
         {/* Sort bar */}
         <div style={{ display:"flex", gap:7, padding:"12px 16px 10px", overflowX:"auto", scrollbarWidth:"none" }}>
           {([
-            { key:"popular",    label:"🔥 Phổ biến"   },
-            { key:"price_asc",  label:"💰 Giá thấp"   },
-            { key:"price_desc", label:"💎 Giá cao"     },
+            { key:"nearest",    label:"📍 Gần bạn nhất" },
+            { key:"bestseller", label:"🔥 Bán chạy"     },
+            { key:"newest",     label:"🆕 Món mới"      },
           ] as const).map(opt => (
             <button key={opt.key} onClick={() => setSortBy(opt.key)}
               style={{ flexShrink:0, padding:"6px 13px", borderRadius:20, cursor:"pointer",
