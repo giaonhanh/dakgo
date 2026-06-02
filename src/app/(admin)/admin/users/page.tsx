@@ -75,6 +75,7 @@ interface MerchantRow {
   category: string; shopStatus: ShopStatus; isOpen: boolean
   ratingAvg: number | null; totalReviews: number
   commissionRate: number; isNegotiated: boolean; createdDate: string
+  shopType: "partner" | "delivery" | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -137,6 +138,8 @@ export default function AdminUsersPage() {
   const [merchantFilter,   setMerchantFilter]   = useState<"all" | ShopStatus>("all")
   const [merchantInline,   setMerchantInline]   = useState<{ id: string; value: string } | null>(null)
   const [merchantSaving,   setMerchantSaving]   = useState(false)
+  const [shopTypeModal,    setShopTypeModal]    = useState<{ id: string; name: string; current: "partner" | "delivery" | null } | null>(null)
+  const [shopTypeSaving,   setShopTypeSaving]   = useState(false)
 
   const [toast,   setToast]   = useState("")
   const [toastOk, setToastOk] = useState(true)
@@ -149,6 +152,7 @@ export default function AdminUsersPage() {
   const [cuName,          setCuName]          = useState("")
   const [cuPhone,         setCuPhone]         = useState("")
   const [cuRole,          setCuRole]          = useState<"customer" | "driver" | "merchant">("customer")
+  const [cuShopType,      setCuShopType]      = useState<"partner" | "delivery">("partner")
   const [cuSaving,        setCuSaving]        = useState(false)
   const [cuError,         setCuError]         = useState("")
 
@@ -162,13 +166,13 @@ export default function AdminUsersPage() {
       const res = await fetch("/api/admin/create-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: cuEmail, password: cuPassword, fullName: cuName, phone: cuPhone, role: cuRole }),
+        body: JSON.stringify({ email: cuEmail, password: cuPassword, fullName: cuName, phone: cuPhone, role: cuRole, shopType: cuRole === "merchant" ? cuShopType : undefined }),
       })
       const data = await res.json()
       if (!res.ok) { setCuError(data.error ?? "Lỗi không xác định"); return }
       fire("✅ Đã tạo tài khoản: " + cuEmail)
       setShowCreateUser(false)
-      setCuEmail(""); setCuPassword(""); setCuName(""); setCuPhone(""); setCuRole("customer")
+      setCuEmail(""); setCuPassword(""); setCuName(""); setCuPhone(""); setCuRole("customer"); setCuShopType("partner")
       loadUsers()
     } catch { setCuError("Lỗi kết nối") }
     finally { setCuSaving(false) }
@@ -320,7 +324,7 @@ export default function AdminUsersPage() {
     const supabase = createClient()
     const { data: rows, error: shopErr } = await supabase
       .from("shops")
-      .select("id, owner_id, name, category, status, is_open, rating_avg, total_reviews, commission_rate, is_negotiated_commission, created_at")
+      .select("id, owner_id, name, category, status, is_open, rating_avg, total_reviews, commission_rate, is_negotiated_commission, created_at, shop_type")
       .order("created_at", { ascending: false })
     if (shopErr) console.error("[loadMerchants] shops query error:", shopErr)
     if (!rows || rows.length === 0) { setMerchantsLoading(false); setMerchantsLoaded(true); return }
@@ -342,6 +346,7 @@ export default function AdminUsersPage() {
         commissionRate: r.commission_rate ?? 15,
         isNegotiated: r.is_negotiated_commission ?? false,
         createdDate: new Date(r.created_at).toLocaleDateString("vi-VN"),
+        shopType: (r.shop_type as "partner" | "delivery" | null) ?? null,
       }
     }))
     setMerchantsLoading(false)
@@ -497,6 +502,18 @@ export default function AdminUsersPage() {
     setMerchants(ms => ms.map(m => m.id === id ? { ...m, commissionRate: rate, isNegotiated: true } : m))
     setMerchantInline(null)
     fire(`✅ Hoa hồng thoả thuận ${rate}% đã lưu`)
+  }
+
+  const saveShopType = async (shopType: "partner" | "delivery") => {
+    if (!shopTypeModal) return
+    setShopTypeSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from("shops").update({ shop_type: shopType }).eq("id", shopTypeModal.id)
+    setShopTypeSaving(false)
+    if (error) { fire("❌ Lỗi cập nhật nhãn cửa hàng", false); return }
+    setMerchants(ms => ms.map(m => m.id === shopTypeModal.id ? { ...m, shopType } : m))
+    setShopTypeModal(null)
+    fire(`✅ Đã đặt nhãn: ${shopType === "partner" ? "Cửa hàng đối tác" : "Cửa hàng mua hộ"}`)
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────────
@@ -871,8 +888,8 @@ export default function AdminUsersPage() {
               <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 13, overflow: "hidden" }}>
                 <div style={{ overflowX: "auto" }}>
                   <div style={{ minWidth: 780 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 80px 55px 72px 80px", gap: 8, padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
-                      {["", "Cửa hàng", "Chủ / SĐT", "Danh mục", "Trạng thái", "Rating", "Hoa hồng", "Ngày tạo"].map(h => (
+                    <div style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 80px 55px 72px 80px 70px", gap: 8, padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
+                      {["", "Cửa hàng", "Chủ / SĐT", "Danh mục", "Trạng thái", "Rating", "Hoa hồng", "Ngày tạo", "Nhãn"].map(h => (
                         <div key={h} style={{ color: "rgba(144,128,176,0.4)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>{h}</div>
                       ))}
                     </div>
@@ -884,7 +901,7 @@ export default function AdminUsersPage() {
                       const ss = SHOP_STATUS_CFG[m.shopStatus]
                       return (
                         <div key={m.id} className="user-row"
-                          style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 80px 55px 72px 80px", gap: 8, padding: "10px 14px", alignItems: "center", borderBottom: idx < shownMerchants.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", transition: "all 0.15s" }}>
+                          style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 80px 55px 72px 80px 70px", gap: 8, padding: "10px 14px", alignItems: "center", borderBottom: idx < shownMerchants.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", transition: "all 0.15s" }}>
                           <div style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,179,71,0.12)", border: "1px solid rgba(255,179,71,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, position: "relative" }}>
                             {categoryIcon(m.category)}
                             {m.isOpen && <div style={{ position: "absolute", bottom: -2, right: -2, width: 10, height: 10, borderRadius: "50%", background: "#3ecf6e", border: "1.5px solid #06050a", boxShadow: "0 0 4px #3ecf6e" }} />}
@@ -909,6 +926,20 @@ export default function AdminUsersPage() {
                             {m.isNegotiated && <span style={{ fontSize: 7, color: "#f5c542", opacity: 0.8 }}>thoả thuận</span>}
                           </div>
                           <div style={{ color: "rgba(144,128,176,0.45)", fontSize: 9 }}>{m.createdDate}</div>
+                          {/* Nhãn loại cửa hàng + nút sửa */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                            <span style={{ fontSize: 7.5, fontWeight: 700, padding: "2px 5px", borderRadius: 5, whiteSpace: "nowrap",
+                              background: m.shopType === "delivery" ? "rgba(255,107,0,0.12)" : m.shopType === "partner" ? "rgba(62,207,110,0.1)" : "rgba(255,255,255,0.05)",
+                              border: `1px solid ${m.shopType === "delivery" ? "rgba(255,107,0,0.3)" : m.shopType === "partner" ? "rgba(62,207,110,0.25)" : "rgba(255,255,255,0.1)"}`,
+                              color: m.shopType === "delivery" ? "#FF8C00" : m.shopType === "partner" ? "#3ecf6e" : "rgba(144,128,176,0.5)",
+                            }}>
+                              {m.shopType === "delivery" ? "🛒 Mua hộ" : m.shopType === "partner" ? "🤝 Đối tác" : "—"}
+                            </span>
+                            <button onClick={() => setShopTypeModal({ id: m.id, name: m.shopName, current: m.shopType })}
+                              style={{ fontSize: 8, padding: "2px 5px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(144,128,176,0.6)", cursor: "pointer", fontFamily: "Lexend" }}>
+                              ✏️ Sửa
+                            </button>
+                          </div>
                         </div>
                       )
                     })}
@@ -1142,15 +1173,60 @@ export default function AdminUsersPage() {
 
       </AdminShell>
 
+      {/* ── Shop type modal ── */}
+      <AnimatePresence>
+        {shopTypeModal && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShopTypeModal(null)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+              <motion.div initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .95 }}
+                onClick={e => e.stopPropagation()}
+                style={{ width: "100%", maxWidth: 360, background: "#0e0b07", border: "1px solid rgba(255,107,0,0.3)", borderRadius: 20, padding: "22px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+                  <div style={{ flex: 1, color: "#f8f0e0", fontSize: 14, fontWeight: 800 }}>🏷️ Nhãn cửa hàng</div>
+                  <button onClick={() => setShopTypeModal(null)} style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "none", color: "#6a5a40", fontSize: 15, cursor: "pointer" }}>×</button>
+                </div>
+                <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 14 }}>{shopTypeModal.name}</div>
+                <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+                  {([
+                    { v: "partner"  as const, icon: "🤝", label: "Cửa hàng đối tác",  sub: "Ký hợp đồng trực tiếp", c: "#3ecf6e", bc: "rgba(62,207,110,0.5)", bg: "rgba(62,207,110,0.1)" },
+                    { v: "delivery" as const, icon: "🛒", label: "Cửa hàng mua hộ",   sub: "Tài xế mua thay khách", c: "#FF8C00", bc: "rgba(255,107,0,0.5)",  bg: "rgba(255,107,0,0.1)"  },
+                  ]).map(({ v, icon, label, sub, c, bc, bg }) => {
+                    const sel = shopTypeModal.current === v
+                    return (
+                      <button key={v} onClick={() => setShopTypeModal(m => m ? { ...m, current: v } : m)}
+                        style={{ flex: 1, padding: "12px 8px", borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", textAlign: "center", border: `2px solid ${sel ? bc : "rgba(255,255,255,0.1)"}`, background: sel ? bg : "rgba(255,255,255,0.04)", transition: "all .15s" }}>
+                        <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
+                        <div style={{ color: sel ? c : "#f8f0e0", fontSize: 10, fontWeight: 700, marginBottom: 3 }}>{label}</div>
+                        <div style={{ color: "#6a5a40", fontSize: 8 }}>{sub}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10 }}>
+                  <button onClick={() => setShopTypeModal(null)} style={{ height: 42, borderRadius: 11, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#b0956a", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>Hủy</button>
+                  <button onClick={() => shopTypeModal.current && saveShopType(shopTypeModal.current)} disabled={shopTypeSaving || !shopTypeModal.current}
+                    style={{ height: 42, borderRadius: 11, border: "none", background: shopTypeSaving ? "rgba(255,255,255,0.06)" : "linear-gradient(90deg,#FF6B00,#FF8C00)", color: shopTypeSaving ? "#6a5a40" : "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend" }}>
+                    {shopTypeSaving ? "⏳ Đang lưu..." : "✓ Lưu nhãn"}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* ── Create user modal ── */}
       <AnimatePresence>
         {showCreateUser && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowCreateUser(false)}
-              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", zIndex: 200 }} />
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
             <motion.div initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .95 }}
-              style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 201, width: "min(420px,92vw)", background: "#0e0b07", border: "1px solid rgba(255,107,0,0.3)", borderRadius: 20, padding: "22px 20px" }}>
+              onClick={e => e.stopPropagation()}
+              style={{ zIndex: 201, width: "100%", maxWidth: 420, maxHeight: "90vh", overflowY: "auto", background: "#0e0b07", border: "1px solid rgba(255,107,0,0.3)", borderRadius: 20, padding: "22px 20px" }}>
               <div style={{ display: "flex", alignItems: "center", marginBottom: 18 }}>
                 <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>➕ Tạo tài khoản thủ công</div>
                 <button onClick={() => setShowCreateUser(false)} style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "none", color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
@@ -1184,6 +1260,28 @@ export default function AdminUsersPage() {
                 </div>
               ))}
 
+              {/* Shop type — chỉ hiện khi chọn Cửa hàng */}
+              {cuRole === "merchant" && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ color: "#6a5a40", fontSize: 9.5, marginBottom: 6 }}>Loại cửa hàng *</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {([
+                      { v: "partner"  as const, icon: "🤝", label: "Cửa hàng đối tác",  sub: "Ký hợp đồng trực tiếp" },
+                      { v: "delivery" as const, icon: "🛒", label: "Cửa hàng mua hộ",   sub: "Tài xế mua thay khách" },
+                    ]).map(({ v, icon, label, sub }) => (
+                      <button key={v} onClick={() => setCuShopType(v)}
+                        style={{ flex: 1, padding: "9px 8px", borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", textAlign: "left",
+                          border: `1.5px solid ${cuShopType === v ? (v === "partner" ? "rgba(62,207,110,0.5)" : "rgba(255,107,0,0.5)") : "rgba(255,255,255,0.1)"}`,
+                          background: cuShopType === v ? (v === "partner" ? "rgba(62,207,110,0.1)" : "rgba(255,107,0,0.1)") : "rgba(255,255,255,0.04)" }}>
+                        <div style={{ fontSize: 16, marginBottom: 3 }}>{icon}</div>
+                        <div style={{ color: cuShopType === v ? (v === "partner" ? "#3ecf6e" : "#FF8C00") : "#f8f0e0", fontSize: 10, fontWeight: 700 }}>{label}</div>
+                        <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 1 }}>{sub}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {cuError && <div style={{ color: "#ff4040", fontSize: 11, marginBottom: 12 }}>⚠ {cuError}</div>}
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10, marginTop: 4 }}>
@@ -1192,6 +1290,7 @@ export default function AdminUsersPage() {
                   {cuSaving ? "⏳ Đang tạo..." : "✓ Tạo tài khoản"}
                 </button>
               </div>
+            </motion.div>
             </motion.div>
           </>
         )}

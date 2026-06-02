@@ -26,9 +26,9 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { email, password, fullName, phone, role } = body as {
+  const { email, password, fullName, phone, role, shopType } = body as {
     email?: string; password?: string; fullName?: string; phone?: string
-    role?: "customer" | "driver" | "merchant"
+    role?: "customer" | "driver" | "merchant"; shopType?: "partner" | "delivery"
   }
 
   if (!email || !password || !fullName || !role) {
@@ -65,9 +65,20 @@ export async function POST(req: NextRequest) {
     is_active: true,
   })
   if (profileErr) {
-    // Rollback: delete auth user
     await adminClient.auth.admin.deleteUser(newUserId)
     return NextResponse.json({ error: "Lỗi tạo profile: " + profileErr.message }, { status: 500 })
+  }
+
+  // If merchant, create a placeholder shop record with shop_type
+  if (role === "merchant" && shopType) {
+    await adminClient.from("shops").insert({
+      owner_id: newUserId,
+      name: fullName,
+      phone: phone ?? null,
+      shop_type: shopType,
+      status: "pending",
+      is_open: false,
+    })
   }
 
   return NextResponse.json({ success: true, userId: newUserId })
