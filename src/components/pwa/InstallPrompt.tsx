@@ -65,7 +65,7 @@ function InstallModal({ platform, onInstall, onConfirm, onDismiss }: {
           <div style={{ width: 52, height: 52, borderRadius: 14, background: "linear-gradient(135deg,#FF6B00,#FF8C00)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, flexShrink: 0, boxShadow: "0 4px 18px rgba(255,107,0,0.4)" }}>🛵</div>
           <div>
             <div style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 800, lineHeight: 1.3 }}>{cfg.title}</div>
-            <div style={{ color: "#6a5a40", fontSize: 10, marginTop: 4 }}>Giao hàng · Mua hộ · Xe ôm · Taxi — Phước An</div>
+            <div style={{ color: "#6a5a40", fontSize: 10, marginTop: 4 }}>Giao hàng · Mua hộ · Xe ôm · Taxi — Krông Pắc</div>
           </div>
           <button onClick={onDismiss} style={{ marginLeft: "auto", width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "none", color: "#6a5a40", fontSize: 18, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
         </div>

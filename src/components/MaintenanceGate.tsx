@@ -61,7 +61,7 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
         🔄 Kiểm tra lại
       </button>
       <div style={{ color: "rgba(106,90,64,0.4)", fontSize: 9.5, marginTop: 24 }}>
-        Giao Nhanh · Phước An, Krông Pắc
+        Giao Nhanh · Krông Pắc, Đắk Lắk
       </div>
     </div>
   )

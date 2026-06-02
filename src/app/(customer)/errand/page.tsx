@@ -124,7 +124,7 @@ function ErrandContent() {
             <a href="/" style={{ width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",color:"#f8f0e0",fontSize:16 }}>←</a>
             <div style={{ flex:1 }}>
               <div style={{ color:"#f8f0e0",fontSize:16,fontWeight:800 }}>Đặt dịch vụ</div>
-              <div style={{ color:"#6a5a40",fontSize:9 }}>Mua hộ · Giao hộ tại Phước An</div>
+              <div style={{ color:"#6a5a40",fontSize:9 }}>Mua hộ · Giao hộ tại Krông Pắc</div>
             </div>
           </div>
           <div style={{ display:"flex",background:"rgba(255,255,255,0.05)",borderRadius:12,padding:3,gap:3 }}>

@@ -91,9 +91,9 @@ export default function AdminBannersPage() {
     setUploading(true)
     const ext  = file.name.split(".").pop() ?? "jpg"
     const path = `banners/${Date.now()}.${ext}`
-    const { error } = await supabase.storage.from("public").upload(path, file, { upsert: true })
+    const { error } = await supabase.storage.from("banners").upload(path, file, { upsert: true })
     if (error) { fire("Upload thất bại: " + error.message, false); setUploading(false); return }
-    const { data: urlData } = supabase.storage.from("public").getPublicUrl(path)
+    const { data: urlData } = supabase.storage.from("banners").getPublicUrl(path)
     setForm(f => ({ ...f, image_url: urlData.publicUrl }))
     setUploading(false)
     fire("✅ Upload ảnh thành công")
@@ -171,7 +171,7 @@ export default function AdminBannersPage() {
           borderRadius: 12, padding: "10px 14px", marginBottom: 16,
           color: "#6a5a40", fontSize: 10, lineHeight: 1.7 }}>
           💡 Banner hiển thị trên trang chủ khi không có <strong style={{ color: "#f8f0e0" }}>voucher Flash Sale</strong>.
-          Kéo thứ tự để ưu tiên. Banner có ảnh sẽ hiển thị fullwidth. Kích thước tốt nhất: <strong style={{ color: "#f8f0e0" }}>1080 × 400px</strong> hoặc GIF động.
+          Kéo thứ tự để ưu tiên. Banner có ảnh sẽ hiển thị fullwidth. Kích thước tốt nhất: <strong style={{ color: "#f8f0e0" }}>1080 × 346px</strong> (tỉ lệ 3:1) hoặc GIF động. Nội dung quan trọng đặt giữa ảnh.
         </div>
 
         {loading ? (
@@ -321,7 +321,7 @@ export default function AdminBannersPage() {
                         <>
                           <span style={{ fontSize: 24 }}>📤</span>
                           <span style={{ color: "#6a5a40", fontSize: 10 }}>Bấm để chọn ảnh</span>
-                          <span style={{ color: "#6a5a40", fontSize: 9 }}>1080×400px · GIF động OK</span>
+                          <span style={{ color: "#6a5a40", fontSize: 9 }}>1080×346px (tỉ lệ 3:1) · GIF động OK · &lt;2MB</span>
                         </>
                       )}
                     </div>

@@ -11,8 +11,8 @@ const lexend = Lexend({
 })
 
 export const metadata: Metadata = {
-  title: "Giao Nhanh — Phước An",
-  description: "Giao hàng · Mua hộ · Xe ôm · Taxi tại Phước An, Krông Pắc",
+  title: "Giao Nhanh Krông Pắc",
+  description: "Giao hàng · Mua hộ · Xe ôm · Taxi tại Krông Pắc, Đắk Lắk",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

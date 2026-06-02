@@ -377,7 +377,7 @@ function LoginContent() {
                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
               }}>GIAO NHANH</div>
               <div style={{ color: "rgba(176,149,106,.6)", fontSize: 12, textAlign: "center", lineHeight: 1.6 }}>
-                Giao hàng · Mua hộ · Xe ôm · Taxi<br />tại Phước An, Krông Pắc
+                Giao hàng · Mua hộ · Xe ôm · Taxi<br />tại Krông Pắc, Đắk Lắk
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 {[0, .2, .4].map((d, i) => (

@@ -506,7 +506,7 @@ export default function ProfilePage() {
           <div style={CARD_STYLE}>
             <SettingRow icon="📍" label="Địa chỉ lưu" sub="Quản lý địa chỉ nhà, công ty" onClick={() => router.push("/addresses")} />
             <SettingRow icon="🎟️" label="Voucher của tôi" onClick={() => router.push("/vouchers")} />
-            <SettingRow icon="🎁" label="Mời bạn bè" sub="Chia sẻ mã — cả 2 nhận 10.000đ xu" onClick={() => router.push("/invite")} />
+            <SettingRow icon="🎁" label="Mời bạn bè" sub="Chia sẻ mã — cả 2 nhận 5.000 XU" onClick={() => router.push("/invite")} />
             <SettingRow icon="💼" label="Ví của tôi" sub={`${walletXu.toLocaleString("vi-VN")} xu · ${points.toLocaleString("vi-VN")} điểm`} onClick={() => router.push("/wallet")} />
             <SettingRow icon="🌐" label="Ngôn ngữ" right={<span style={{ color: "#b0956a", fontSize: 10 }}>Tiếng Việt</span>} />
           </div>

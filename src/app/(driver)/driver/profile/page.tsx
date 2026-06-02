@@ -623,7 +623,7 @@ export default function DriverProfilePage() {
             <Row icon="🔑" label="Đổi mật khẩu" sub="Cập nhật mật khẩu đăng nhập" onClick={() => setShowPw(true)} arrow />
             <Row icon="💬" label="Chat với hỗ trợ" sub="Nhắn tin Zalo hỗ trợ" onClick={() => window.open("https://zalo.me/0000000000", "_blank")} arrow />
             <Row icon="⚠️" label="Báo cáo vấn đề" sub="Khiếu nại, sự cố khi giao hàng" onClick={() => window.open("https://zalo.me/0000000000", "_blank")} arrow />
-            <Row icon="🚀" label="Giao Nhanh v1.0" sub="© 2025 Giao Nhanh · Phước An" />
+            <Row icon="🚀" label="Giao Nhanh v1.0" sub="© 2025 Giao Nhanh · Krông Pắc" />
             <Row icon="🚪" label="Đăng xuất" danger last
               onClick={async () => { await createClient().auth.signOut(); window.location.href = "/login" }} arrow />
           </Section>
