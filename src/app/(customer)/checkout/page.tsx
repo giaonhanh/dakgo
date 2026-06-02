@@ -12,6 +12,7 @@ import AddressPicker from "@/components/map/AddressPicker"
 import type { AddressPickerResult } from "@/types"
 import { formatPrice } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { getRouteKm, calcDeliveryFee } from "@/lib/vietmapRoute"
 
 const supabase = createClient()
 
@@ -1155,6 +1156,10 @@ export default function CheckoutPage() {
   const [refAlready, setRefAlready]             = useState(false)
   const [surcharge,      setSurcharge]      = useState(0)
   const [surchargeLabel, setSurchargeLabel] = useState<string | null>(null)
+  const [shopCoords,     setShopCoords]     = useState<{ lat: number; lng: number } | null>(null)
+  const [routeKm,        setRouteKm]        = useState<number | null>(null)
+  const [deliveryFee,    setDeliveryFee]    = useState(15000)
+  const [feeLoading,     setFeeLoading]     = useState(false)
 
   // ── Load user, saved addresses, xu balance ──
   useEffect(() => {
@@ -1244,6 +1249,17 @@ export default function CheckoutPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Fetch shop coords khi biết shopId ──
+  const shopId = cartItems[0]?.shopId ?? null
+  useEffect(() => {
+    if (!shopId) return
+    supabase.from("shops").select("lat, lng").eq("id", shopId).single()
+      .then(({ data }) => {
+        if (data?.lat && data?.lng) setShopCoords({ lat: data.lat as number, lng: data.lng as number })
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopId])
+
   // ── Address helpers ──
   const tempAddr: AddrOption | null = mapAddress
     ? { id: "map", label: "📍 Bản đồ", address: mapAddress.address, isDefault: false, lat: mapAddress.lat, lng: mapAddress.lng }
@@ -1251,6 +1267,20 @@ export default function CheckoutPage() {
   const allAddrs: AddrOption[] = [...savedAddrs, ...(tempAddr ? [tempAddr] : [])]
   const currentAddr = allAddrs.find(a => a.id === selectedAddr) ?? allAddrs[0] ?? null
   const TIER_ADDR_LIMIT = 3
+
+  // ── Tính phí theo cung đường VietMap khi có đủ tọa độ ──
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const dLat = currentAddr?.lat
+    const dLng = currentAddr?.lng
+    if (!shopCoords || !dLat || !dLng) return
+    setFeeLoading(true)
+    getRouteKm(shopCoords.lat, shopCoords.lng, dLat, dLng).then(km => {
+      setRouteKm(km)
+      setDeliveryFee(calcDeliveryFee(km))
+      setFeeLoading(false)
+    })
+  }, [shopCoords, currentAddr?.lat, currentAddr?.lng]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Shop hours (mock — replace from shops.opening_hours[weekday]) ──
   const shopOpenH = 7, shopCloseH = 21
@@ -1275,9 +1305,8 @@ export default function CheckoutPage() {
   })()
 
   // ── Prices ──
-  const subtotal    = cartItems.reduce((s, i) => s + i.price * i.qty, 0)
-  const deliveryFee = 15000
-  const discount    = appliedVouchers.reduce((s, v) => s + v.discount, 0)
+  const subtotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0)
+  const discount = appliedVouchers.reduce((s, v) => s + v.discount, 0)
   const total       = subtotal + deliveryFee + surcharge - discount
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2000) }
@@ -2093,7 +2122,15 @@ export default function CheckoutPage() {
             <div style={{ marginTop: 10 }}>
               {[
                 { label: "Tạm tính",  val: fmt(subtotal),    color: "#b0956a" },
-                { label: "Phí giao",  val: fmt(deliveryFee), color: "#b0956a" },
+                {
+                  label: feeLoading
+                    ? "Phí giao  ⏳"
+                    : routeKm != null
+                      ? `Phí giao  (${routeKm.toFixed(1)} km)`
+                      : "Phí giao",
+                  val: fmt(deliveryFee),
+                  color: "#b0956a",
+                },
                 ...(surcharge > 0 && surchargeLabel ? [{
                   label: `Phụ phí ${surchargeLabel}`, val: `+${fmt(surcharge)}`, color: "#FFB347",
                 }] : []),

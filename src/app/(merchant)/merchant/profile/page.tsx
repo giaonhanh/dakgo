@@ -128,6 +128,8 @@ export default function MerchantProfilePage() {
       }
       if (lat !== null && lng !== null) {
         updatePayload.location = `SRID=4326;POINT(${lng} ${lat})`
+        updatePayload.lat = lat
+        updatePayload.lng = lng
       }
       const { error } = await supabase.from("shops").update(updatePayload).eq("id", shopId)
       if (error) { addToast("❌ Lỗi lưu: " + error.message, "error"); return }
