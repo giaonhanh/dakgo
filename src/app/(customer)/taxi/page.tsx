@@ -214,7 +214,7 @@ export default function TaxiPage() {
               <div style={{ fontSize:48,lineHeight:1 }}>{car.emoji}</div>
             </div>
             <div style={{ display:"flex",gap:0,borderTop:"1px solid rgba(180,100,255,0.1)" }}>
-              {[[`${formatPrice(car.base)}`,`Giá mở cửa`],[`${formatPrice(car.perKm)}/km`,"Mỗi km tiếp"],["~5 phút","Thời gian đến"]].map(([val,lab],i) => (
+              {[[`${formatPrice(carType === "7cho" ? calcFeeFromRows(1, pricingRows7, pricingExtra7) : calcFeeFromRows(1, pricingRows, pricingExtra))}`, "Giá mở cửa"],["Theo km","Mỗi km tiếp"],["~5 phút","Thời gian đến"]].map(([val,lab],i) => (
                 <div key={i} style={{ flex:1,padding:"8px 0",textAlign:"center",
                   borderLeft:i>0?"1px solid rgba(180,100,255,0.08)":"none" }}>
                   <div style={{ color:"#b464ff",fontSize:9.5,fontWeight:700 }}>{val}</div>
