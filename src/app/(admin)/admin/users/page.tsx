@@ -187,9 +187,9 @@ export default function AdminUsersPage() {
         if (!data) return
         const v = data.value as { minRate?: string; maxRate?: string; driverSharePercent?: string }
         setCommCfg({
-          minRate:     parseFloat(v.minRate     ?? "5")  || 5,
-          maxRate:     parseFloat(v.maxRate     ?? "35") || 35,
-          driverShare: parseFloat(v.driverSharePercent ?? "80") || 80,
+          minRate:     v.minRate     != null ? parseFloat(v.minRate)             : 5,
+          maxRate:     v.maxRate     != null ? parseFloat(v.maxRate)             : 35,
+          driverShare: v.driverSharePercent != null ? parseFloat(v.driverSharePercent) : 80,
         })
       })
     loadUsers()

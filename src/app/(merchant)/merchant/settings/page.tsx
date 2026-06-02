@@ -310,6 +310,8 @@ export default function MerchantSettingsPage() {
   const [shopIsOpen,       setShopIsOpen]       = useState(false)
   const [shopRating,       setShopRating]       = useState<number | null>(null)
   const [shopCommission,   setShopCommission]   = useState(15)
+  const [isNegotiated,     setIsNegotiated]     = useState(false)
+  const [commCfg,          setCommCfg]          = useState({ defaultRate: 15, minRate: 0, maxRate: 35 })
 
   useEffect(() => {
     getAdminContact().then(c => {
@@ -317,9 +319,22 @@ export default function MerchantSettingsPage() {
       setAdminPhone(c.phone)
     })
     const supabase = createClient()
+
+    // Load commission config from app_settings
+    supabase.from("app_settings").select("value").eq("key", "commission").maybeSingle()
+      .then(({ data }) => {
+        if (!data?.value) return
+        const v = data.value as { defaultRate?: string; minRate?: string; maxRate?: string }
+        setCommCfg({
+          defaultRate: v.defaultRate != null ? parseFloat(v.defaultRate) : 15,
+          minRate:     v.minRate     != null ? parseFloat(v.minRate)     : 0,
+          maxRate:     v.maxRate     != null ? parseFloat(v.maxRate)     : 35,
+        })
+      })
+
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-      supabase.from("shops").select("name, address, is_open, rating_avg, commission_rate").eq("owner_id", user.id).maybeSingle()
+      supabase.from("shops").select("name, address, is_open, rating_avg, commission_rate, is_negotiated_commission").eq("owner_id", user.id).maybeSingle()
         .then(({ data }) => {
           if (!data) return
           setShopName(data.name ?? "")
@@ -327,6 +342,7 @@ export default function MerchantSettingsPage() {
           setShopIsOpen(data.is_open ?? false)
           setShopRating(data.rating_avg ?? null)
           setShopCommission(data.commission_rate ?? 15)
+          setIsNegotiated(data.is_negotiated_commission ?? false)
         })
     })
   }, [])
@@ -390,11 +406,39 @@ export default function MerchantSettingsPage() {
           </div>
 
           {/* commission info */}
-          <div style={{ background: "rgba(74,143,245,0.06)", border: "1px solid rgba(74,143,245,0.18)", borderRadius: 14, padding: "12px 14px", marginBottom: 18, display: "flex", gap: 10 }}>
-            <span style={{ fontSize: 18, flexShrink: 0 }}>📊</span>
-            <div>
-              <div style={{ color: "#4a8ff5", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>Hoa hồng nền tảng: {shopCommission}%</div>
-              <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.5 }}>Áp dụng cho mỗi đơn hàng. Thanh toán ngay khi tài xế nhận đơn. Liên hệ Admin để đàm phán điều chỉnh nếu có nhu cầu.</div>
+          <div style={{ background: "rgba(74,143,245,0.06)", border: "1px solid rgba(74,143,245,0.18)", borderRadius: 14, padding: "12px 14px", marginBottom: 18 }}>
+            <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>📊</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <div style={{ color: "#4a8ff5", fontSize: 13, fontWeight: 800 }}>{shopCommission}% hoa hồng</div>
+                  {isNegotiated && (
+                    <span style={{ background: "rgba(180,100,255,0.12)", border: "1px solid rgba(180,100,255,0.3)", borderRadius: 6, padding: "1px 7px", color: "#b464ff", fontSize: 8, fontWeight: 700 }}>⭐ Thoả thuận riêng</span>
+                  )}
+                </div>
+                <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.5 }}>
+                  Khấu trừ trên mỗi đơn hàng hoàn thành. Liên hệ Admin nếu muốn đàm phán điều chỉnh.
+                </div>
+              </div>
+            </div>
+            {/* Biểu đồ thanh so với min/max */}
+            <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: "8px 10px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                <span style={{ color: "#6a5a40", fontSize: 8.5 }}>Tối thiểu: {commCfg.minRate}%</span>
+                <span style={{ color: "#4a8ff5", fontSize: 8.5, fontWeight: 700 }}>Của bạn: {shopCommission}%</span>
+                <span style={{ color: "#6a5a40", fontSize: 8.5 }}>Tối đa: {commCfg.maxRate}%</span>
+              </div>
+              <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.07)", position: "relative", overflow: "visible" }}>
+                <div style={{
+                  height: "100%", borderRadius: 3,
+                  background: "linear-gradient(90deg,#4a8ff5,#b464ff)",
+                  width: `${commCfg.maxRate > commCfg.minRate ? Math.min(100, ((shopCommission - commCfg.minRate) / (commCfg.maxRate - commCfg.minRate)) * 100) : 50}%`,
+                  transition: "width .4s",
+                }} />
+              </div>
+              <div style={{ color: "#6a5a40", fontSize: 8, marginTop: 5 }}>
+                Mặc định hệ thống: <strong style={{ color: "#f8f0e0" }}>{commCfg.defaultRate}%</strong>
+              </div>
             </div>
           </div>
 
