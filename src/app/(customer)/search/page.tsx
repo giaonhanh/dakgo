@@ -153,7 +153,36 @@ function SearchContent() {
   const [activeTab, setActiveTab]   = useState<"all" | "shops" | "products">("all")
   const [recentSearches, setRecentSearches] = useState<string[]>([])
 
+  const isNewest = params.get("sort") === "newest"
+
   useEffect(() => { setRecentSearches(loadHistory()) }, [])
+
+  // Auto-load newest products khi vào từ "Vừa lên menu > Xem thêm"
+  useEffect(() => {
+    if (!isNewest || query) return
+    setLoading(true)
+    supabase
+      .from("products")
+      .select("id, name, price, original_price, image_url, sold_count, shop_id, shops!shop_id(name)")
+      .eq("is_available", true)
+      .order("created_at", { ascending: false })
+      .limit(40)
+      .then(({ data }) => {
+        if (!data) { setLoading(false); return }
+        const items: ProductResult[] = data.map(p => {
+          const shop = p.shops as { name: string } | null
+          return {
+            id: p.id, type: "product" as const,
+            name: p.name, shop_name: shop?.name ?? "",
+            shop_id: p.shop_id, image_url: p.image_url ?? "",
+            price: p.price, original_price: p.original_price ?? undefined,
+            rating: 5, sold_count: p.sold_count ?? 0,
+          }
+        })
+        setResults(items)
+        setLoading(false)
+      })
+  }, [isNewest]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const addToHistory = useCallback((q: string) => {
     const trimmed = q.trim().toLowerCase()
@@ -270,7 +299,7 @@ function SearchContent() {
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && query.trim()) addToHistory(query) }}
-                placeholder="Tìm món ăn, cửa hàng..."
+                placeholder={isNewest ? "🆕 Món mới nhất — tìm thêm..." : "Tìm món ăn, cửa hàng..."}
                 style={{
                   width: "100%", boxSizing: "border-box",
                   height: 42, padding: "0 36px 0 40px",
@@ -410,7 +439,7 @@ function SearchContent() {
           )}
 
           {/* Loading */}
-          {loading && query && (
+          {loading && (query || isNewest) && (
             <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
               <div style={{
                 width: 28, height: 28, borderRadius: "50%",
@@ -421,7 +450,7 @@ function SearchContent() {
           )}
 
           {/* Results */}
-          {!loading && query && (
+          {!loading && (query || isNewest) && (
             <AnimatePresence mode="popLayout">
               {filtered.length === 0 ? (
                 <motion.div
