@@ -170,7 +170,7 @@ function SearchContent() {
       .then(({ data }) => {
         if (!data) { setLoading(false); return }
         const items: ProductResult[] = data.map(p => {
-          const shop = p.shops as { name: string } | null
+          const shop = (Array.isArray(p.shops) ? p.shops[0] : p.shops) as { name: string } | null
           return {
             id: p.id, type: "product" as const,
             name: p.name, shop_name: shop?.name ?? "",
