@@ -47,23 +47,30 @@ export default function TaxiPage() {
   const [loading,     setLoading]     = useState(false)
   const [toast,       setToast]       = useState("")
 
-  const [pricingRows,  setPricingRows]  = useState<string[]>(["15000","13000","11000","10000","9500","9000","8500","8000","7500","7000"])
-  const [pricingExtra, setPricingExtra] = useState("6500")
+  const [pricingRows,   setPricingRows]   = useState<string[]>(["15000","13000","11000","10000","9500","9000","8500","8000","7500","7000"])
+  const [pricingExtra,  setPricingExtra]  = useState("6500")
+  const [pricingRows7,  setPricingRows7]  = useState<string[]>(["20000","17000","14000","12000","11000","10000","9500","9000","8500","8000"])
+  const [pricingExtra7, setPricingExtra7] = useState("7500")
 
   useEffect(() => {
     createClient().from("app_settings").select("value").eq("key","pricing").maybeSingle()
       .then(({ data }) => {
-        const tx = (data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null)?.taxi
-        if (tx?.rows) setPricingRows(tx.rows)
+        const p = data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null
+        const tx  = p?.taxi
+        const tx7 = p?.taxi7
+        if (tx?.rows)  setPricingRows(tx.rows)
         if (tx?.extra) setPricingExtra(tx.extra)
+        if (tx7?.rows)  setPricingRows7(tx7.rows)
+        if (tx7?.extra) setPricingExtra7(tx7.extra)
       })
   }, [])
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
   const car          = CARS[carType]
   const estimatedKm  = estimateKm(dest)
-  const basePrice    = calcFeeFromRows(estimatedKm, pricingRows, pricingExtra)
-  const estimatedPrice = carType === "7cho" ? Math.round(basePrice * 1.3 / 1000) * 1000 : basePrice
+  const estimatedPrice = carType === "7cho"
+    ? calcFeeFromRows(estimatedKm, pricingRows7, pricingExtra7)
+    : calcFeeFromRows(estimatedKm, pricingRows,  pricingExtra)
 
   const handleBook = async () => {
     if (!dest.trim()) { fireToast("Vui lòng nhập điểm đến"); return }
@@ -195,7 +202,7 @@ export default function TaxiPage() {
                   <span style={{ background:"linear-gradient(90deg,#b464ff,#d49aff)",
                     WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
                     backgroundClip:"text",fontSize:22,fontWeight:900 }}>
-                    {dest ? formatPrice(estimatedPrice) : `Từ ${formatPrice(calcFeeFromRows(1, pricingRows, pricingExtra))}`}
+                    {dest ? formatPrice(estimatedPrice) : `Từ ${formatPrice(carType === "7cho" ? calcFeeFromRows(1, pricingRows7, pricingExtra7) : calcFeeFromRows(1, pricingRows, pricingExtra))}`}
                   </span>
                 </div>
                 {dest && (

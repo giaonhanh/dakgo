@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import AdminShell from "@/components/admin/AdminShell"
 
 type SettingSection = "pricing" | "commission" | "area" | "features" | "account" | "maintenance"
-type ServiceType    = "food" | "delivery_pkg" | "errand" | "motorbike" | "taxi"
+type ServiceType    = "food" | "delivery_pkg" | "errand" | "motorbike" | "taxi" | "taxi7"
 
 interface ToggleSetting { key: string; label: string; description: string; value: boolean }
 
@@ -76,14 +76,16 @@ export default function AdminSettingsPage() {
     errand:       { rows: ["20000","17000","14000","12000","11000","10000","9000","8500","8000","7500"], extra: "7000", weightMid: "5000", weightHeavy: "10000" },
     motorbike:    { rows: ["10000","8000","7000","6500","6000","5500","5000","4800","4600","4500"],    extra: "4000" },
     taxi:         { rows: ["15000","13000","11000","10000","9500","9000","8500","8000","7500","7000"], extra: "6500" },
+    taxi7:        { rows: ["20000","17000","14000","12000","11000","10000","9500","9000","8500","8000"], extra: "7500" },
   })
 
   const SERVICE_META: Record<ServiceType, { label: string; icon: string; color: string; desc: string }> = {
     food:         { label: "Giao đồ ăn",  icon: "🍜", color: "#FF6B00", desc: "Giao thức ăn từ cửa hàng đến khách" },
     delivery_pkg: { label: "Giao hàng",   icon: "📦", color: "#4a8ff5", desc: "Giao bưu kiện, hàng hóa thông thường" },
     errand:       { label: "Mua hộ",      icon: "🛒", color: "#3ecf6e", desc: "Tài xế mua hàng theo yêu cầu và giao" },
-    motorbike:    { label: "Xe ôm",       icon: "🏍️", color: "#b464ff", desc: "Đặt xe ôm di chuyển cá nhân" },
-    taxi:         { label: "Taxi",         icon: "🚗", color: "#f5c542", desc: "Đặt taxi 4 chỗ / 7 chỗ" },
+    motorbike:    { label: "Xe ôm",      icon: "🏍️", color: "#b464ff", desc: "Đặt xe ôm di chuyển cá nhân" },
+    taxi:         { label: "Taxi 4 chỗ", icon: "🚕", color: "#f5c542", desc: "Đặt taxi Sedan 4 chỗ" },
+    taxi7:        { label: "Taxi 7 chỗ", icon: "🚙", color: "#3ecf6e", desc: "Đặt taxi SUV / 7 chỗ" },
   }
 
   const updateKmPrice = (service: ServiceType, kmIndex: number, value: string) =>
