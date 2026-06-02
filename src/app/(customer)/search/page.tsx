@@ -64,7 +64,6 @@ async function searchSupabase(query: string): Promise<SearchResult[]> {
   const q = query.trim()
   if (!q) return []
 
-  // Try pg_trgm RPC first (fuzzy + ranked), fall back to ILIKE if not available
   const { data: rpc, error } = await supabase.rpc("search_catalog", { query: q }) as
     { data: RpcResult | null; error: unknown }
 
@@ -87,7 +86,7 @@ async function searchSupabase(query: string): Promise<SearchResult[]> {
     return [...shopResults, ...productResults]
   }
 
-  // Fallback: plain ILIKE queries (works without pg_trgm)
+  // Fallback: plain ILIKE queries
   const [{ data: shops }, { data: products }] = await Promise.all([
     supabase
       .from("shops")
@@ -200,7 +199,6 @@ function SearchContent() {
     inputRef.current?.focus()
   }, [])
 
-  // Apply filters
   const filtered = results.filter(r => {
     if (filter.only_open && r.type === "shop" && !(r as ShopResult).is_open) return false
     if (filter.min_rating !== null) {
@@ -233,7 +231,6 @@ function SearchContent() {
 
   const shopCount    = filtered.filter(r => r.type === "shop").length
   const productCount = filtered.filter(r => r.type === "product").length
-
   const hasActiveFilter = filter.only_open || filter.min_rating !== null || filter.has_promo || filter.max_delivery !== null
 
   return (
@@ -258,21 +255,22 @@ function SearchContent() {
                 background: "rgba(255,255,255,0.06)", border: "none",
                 color: "#f8f0e0", fontSize: 18, cursor: "pointer", flexShrink: 0,
                 display: "flex", alignItems: "center", justifyContent: "center",
+                fontFamily: "'Lexend', sans-serif",
               }}
-            >?</button>
+            >←</button>
 
             {/* Search input */}
             <div style={{ flex: 1, position: "relative" }}>
               <span style={{
                 position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)",
                 fontSize: 16, pointerEvents: "none",
-              }}>??</span>
+              }}>🔍</span>
               <input
                 ref={inputRef}
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && query.trim()) addToHistory(query) }}
-                placeholder="T�m m�n an, c?a h�ng�"
+                placeholder="Tìm món ăn, cửa hàng..."
                 style={{
                   width: "100%", boxSizing: "border-box",
                   height: 42, padding: "0 36px 0 40px",
@@ -290,7 +288,7 @@ function SearchContent() {
                     background: "none", border: "none", color: "#6a5a40",
                     fontSize: 14, cursor: "pointer", padding: 2,
                   }}
-                >?</button>
+                >×</button>
               )}
             </div>
 
@@ -305,16 +303,16 @@ function SearchContent() {
                 fontSize: 18, cursor: "pointer", flexShrink: 0,
                 display: "flex", alignItems: "center", justifyContent: "center",
               } as React.CSSProperties}
-            >?</button>
+            >⚙️</button>
           </div>
 
           {/* Tabs */}
           {results.length > 0 && (
             <div style={{ display: "flex", gap: 8, paddingBottom: 12 }}>
               {([
-                { key: "all",      label: `T?t c? (${filtered.length})` },
-                { key: "shops",    label: `Qu�n (${shopCount})` },
-                { key: "products", label: `M�n (${productCount})` },
+                { key: "all",      label: `Tất cả (${filtered.length})` },
+                { key: "shops",    label: `Quán (${shopCount})` },
+                { key: "products", label: `Món (${productCount})` },
               ] as const).map(t => (
                 <button
                   key={t.key}
@@ -343,7 +341,7 @@ function SearchContent() {
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                     <p style={{ margin: 0, fontSize: 12, color: "#6a5a40", fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase" }}>
-                      T�m ki?m g?n d�y
+                      Tìm kiếm gần đây
                     </p>
                     <button
                       onClick={clearHistory}
@@ -352,7 +350,7 @@ function SearchContent() {
                         color: "#FF6B00", fontSize: 12, fontWeight: 600,
                         cursor: "pointer", fontFamily: "'Lexend', sans-serif",
                       }}
-                    >X�a t?t c?</button>
+                    >Xóa tất cả</button>
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {recentSearches.map(s => (
@@ -371,7 +369,7 @@ function SearchContent() {
                             color: "#b0956a", fontSize: 13, cursor: "pointer",
                             fontFamily: "'Lexend', sans-serif",
                           }}
-                        >?? {s}</button>
+                        >🕐 {s}</button>
                         <button
                           onClick={() => removeFromHistory(s)}
                           style={{
@@ -381,7 +379,7 @@ function SearchContent() {
                             color: "#6a5a40", fontSize: 10, cursor: "pointer", flexShrink: 0,
                             lineHeight: 1,
                           }}
-                        >?</button>
+                        >×</button>
                       </div>
                     ))}
                   </div>
@@ -391,7 +389,7 @@ function SearchContent() {
               {/* Popular tags */}
               <div>
                 <p style={{ fontSize: 12, color: "#6a5a40", fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>
-                  Ph? bi?n h�m nay
+                  Phổ biến hôm nay
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {POPULAR_TAGS.map(t => (
@@ -432,12 +430,12 @@ function SearchContent() {
                   animate={{ opacity: 1 }}
                   style={{ textAlign: "center", padding: "60px 20px" }}
                 >
-                  <div style={{ fontSize: 48, marginBottom: 16 }}>??</div>
+                  <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
                   <p style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
-                    Kh�ng t�m th?y "{query}"
+                    Không tìm thấy &ldquo;{query}&rdquo;
                   </p>
                   <p style={{ color: "#6a5a40", fontSize: 13 }}>
-                    Th? t? kh�a kh�c ho?c x�a b? l?c
+                    Thử từ khóa khác hoặc xóa bộ lọc
                   </p>
                 </motion.div>
               ) : (
@@ -463,17 +461,17 @@ function SearchContent() {
 
         {/* Bottom Nav */}
         <div style={{
-          position: "absolute", bottom:"max(16px,env(safe-area-inset-bottom))",left:14, right: 14, height: 56,
+          position: "fixed", bottom: "max(16px,env(safe-area-inset-bottom))", left: 14, right: 14, height: 56,
           background: "rgba(8,8,6,0.92)", backdropFilter: "blur(20px)",
           borderRadius: 9999, border: "1px solid rgba(255,107,0,0.2)",
           boxShadow: "0 0 20px rgba(255,107,0,0.1)", zIndex: 50,
           display: "flex", alignItems: "center", justifyContent: "space-around",
         }}>
           {([
-            { icon: "??", label: "Trang ch?", href: "/",         active: false },
-            { icon: "??", label: "�on h�ng",  href: "/orders",   active: false },
-            { icon: "??", label: "Gi? h�ng",  href: "/cart",     active: false },
-            { icon: "??", label: "C�i d?t",   href: "/profile", active: false },
+            { icon: "🏠", label: "Trang chủ", href: "/",        active: false },
+            { icon: "📋", label: "Đơn hàng",  href: "/orders",  active: false },
+            { icon: "🛒", label: "Giỏ hàng",  href: "/cart",    active: false },
+            { icon: "⚙️", label: "Cài đặt",   href: "/profile", active: false },
           ] as const).map(tab => (
             <button
               key={tab.href}
@@ -482,6 +480,7 @@ function SearchContent() {
                 flex: 1, height: "100%", background: "none", border: "none",
                 display: "flex", flexDirection: "column", alignItems: "center",
                 justifyContent: "center", gap: 2, cursor: "pointer", borderRadius: 9999,
+                fontFamily: "'Lexend', sans-serif",
               }}
             >
               <span style={{ fontSize: 20 }}>{tab.icon}</span>
@@ -523,24 +522,29 @@ export default function SearchPage() {
 
 // --- Shop Card ---
 function ShopCard({ shop, onClick }: { shop: ShopResult; onClick: () => void }) {
-  const emoji = shop.category === "B�n/Ph?" ? "??"
-    : shop.category === "Com h?p" ? "??"
-    : shop.category === "�? u?ng" ? "??"
-    : shop.category === "B�nh"    ? "??"
-    : shop.category === "G� r�n"  ? "??"
-    : "??"
+  const emoji = shop.category === "Bún/Phở" ? "🍜"
+    : shop.category === "Cơm hộp" ? "🍱"
+    : shop.category === "Đồ uống" ? "🧋"
+    : shop.category === "Bánh"    ? "🧁"
+    : shop.category === "Gà rán"  ? "🍗"
+    : "🏪"
   return (
     <div onClick={onClick} style={{
       background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
       borderRadius: 14, padding: "12px 14px", marginBottom: 10, cursor: "pointer",
       display: "flex", gap: 12, alignItems: "center",
     }}>
-      {/* Logo */}
       <div style={{
         width: 54, height: 54, borderRadius: 12, flexShrink: 0,
-        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)",
+        background: shop.logo_url ? "transparent" : "rgba(255,255,255,0.06)",
+        border: "1px solid rgba(255,255,255,0.08)",
         display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26,
-      }}>{emoji}</div>
+        overflow: "hidden",
+      }}>
+        {shop.logo_url
+          ? <img src={shop.logo_url} alt={shop.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : emoji}
+      </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -549,23 +553,23 @@ function ShopCard({ shop, onClick }: { shop: ShopResult; onClick: () => void }) 
             <span style={{
               fontSize: 10, fontWeight: 700, color: "#6a5a40",
               background: "rgba(255,255,255,0.06)", borderRadius: 4, padding: "2px 6px",
-            }}>��ng c?a</span>
+            }}>Đóng cửa</span>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: "#6a5a40" }}>
-          <span>? {shop.rating_avg}</span>
-          <span>?? {shop.distance_km}km</span>
-          <span>{shop.delivery_fee === 0 ? "?? Free ship" : `?? ${formatPrice(shop.delivery_fee)}`}</span>
+          <span>⭐ {shop.rating_avg}</span>
+          <span>📍 {shop.distance_km}km</span>
+          <span>{shop.delivery_fee === 0 ? "🆓 Free ship" : `🛵 ${formatPrice(shop.delivery_fee)}`}</span>
         </div>
         {shop.promo && (
           <span style={{
             fontSize: 11, fontWeight: 700, color: "#3ecf6e",
             background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.25)",
             borderRadius: 6, padding: "2px 8px", marginTop: 6, display: "inline-block",
-          }}>?? {shop.promo}</span>
+          }}>🏷️ {shop.promo}</span>
         )}
       </div>
-      <span style={{ color: "#6a5a40", fontSize: 16 }}>�</span>
+      <span style={{ color: "#6a5a40", fontSize: 16 }}>›</span>
     </div>
   )
 }
@@ -581,14 +585,15 @@ function ProductCard({ product, onClick }: { product: ProductResult; onClick: ()
       borderRadius: 14, padding: "12px 14px", marginBottom: 10, cursor: "pointer",
       display: "flex", gap: 12, alignItems: "center",
     }}>
-      {/* Image placeholder */}
       <div style={{
         width: 64, height: 64, borderRadius: 12, flexShrink: 0,
         background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.15)",
         display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28,
-        position: "relative",
+        position: "relative", overflow: "hidden",
       }}>
-        ??
+        {product.image_url
+          ? <img src={product.image_url} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : "🍽️"}
         {discount > 0 && (
           <div style={{
             position: "absolute", top: -4, right: -4,
@@ -601,7 +606,7 @@ function ProductCard({ product, onClick }: { product: ProductResult; onClick: ()
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ margin: "0 0 3px", fontWeight: 700, fontSize: 14, color: "#f8f0e0" }}>{product.name}</p>
-        <p style={{ margin: "0 0 6px", fontSize: 12, color: "#6a5a40" }}>?? {product.shop_name}</p>
+        <p style={{ margin: "0 0 6px", fontSize: 12, color: "#6a5a40" }}>🏪 {product.shop_name}</p>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{
             background: "linear-gradient(90deg,#FF6B00,#FFB347)",
@@ -615,7 +620,7 @@ function ProductCard({ product, onClick }: { product: ProductResult; onClick: ()
               {formatPrice(product.original_price)}
             </span>
           )}
-          <span style={{ fontSize: 11, color: "#6a5a40" }}>? {product.rating} � {product.sold_count} b�n</span>
+          <span style={{ fontSize: 11, color: "#6a5a40" }}>⭐ {product.rating} · {product.sold_count} bán</span>
         </div>
       </div>
     </div>
@@ -645,6 +650,7 @@ function FilterSheet({
         position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 190,
         background: "#0e0c09", borderRadius: "20px 20px 0 0",
         border: "1px solid rgba(255,107,0,0.2)", padding: "0 20px 32px",
+        fontFamily: "'Lexend', sans-serif",
       }}
     >
       <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 8px" }}>
@@ -652,19 +658,19 @@ function FilterSheet({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#f8f0e0" }}>B? l?c</h3>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: "#6a5a40", fontSize: 20, cursor: "pointer" }}>?</button>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#f8f0e0" }}>Bộ lọc</h3>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "#6a5a40", fontSize: 20, cursor: "pointer" }}>×</button>
       </div>
 
       {/* Sort */}
-      <p style={filterLabelStyle}>S?p x?p</p>
+      <p style={filterLabelStyle}>Sắp xếp</p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
         {([
-          { key: "relevant",   label: "Ph� h?p nh?t" },
-          { key: "rating",     label: "��nh gi� cao" },
-          { key: "distance",   label: "G?n nh?t" },
-          { key: "price_asc",  label: "Gi� tang d?n" },
-          { key: "price_desc", label: "Gi� gi?m d?n" },
+          { key: "relevant",   label: "Phù hợp nhất" },
+          { key: "rating",     label: "Đánh giá cao" },
+          { key: "distance",   label: "Gần nhất" },
+          { key: "price_asc",  label: "Giá tăng dần" },
+          { key: "price_desc", label: "Giá giảm dần" },
         ] as const).map(s => (
           <button
             key={s.key}
@@ -682,14 +688,14 @@ function FilterSheet({
       </div>
 
       {/* Toggles */}
-      <p style={filterLabelStyle}>�i?u ki?n</p>
+      <p style={filterLabelStyle}>Điều kiện</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-        <FilterToggleRow label="Ch? qu�n dang m?" value={local.only_open} onChange={v => update("only_open", v)} />
-        <FilterToggleRow label="�ang c� khuy?n m�i" value={local.has_promo} onChange={v => update("has_promo", v)} />
+        <FilterToggleRow label="Chỉ quán đang mở" value={local.only_open} onChange={v => update("only_open", v)} />
+        <FilterToggleRow label="Đang có khuyến mãi" value={local.has_promo} onChange={v => update("has_promo", v)} />
       </div>
 
       {/* Min rating */}
-      <p style={filterLabelStyle}>��nh gi� t?i thi?u</p>
+      <p style={filterLabelStyle}>Đánh giá tối thiểu</p>
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
         {[null, 4, 4.5, 4.8].map(val => (
           <button
@@ -703,7 +709,7 @@ function FilterSheet({
               color: local.min_rating === val ? "#FF8C00" : "#6a5a40",
               fontFamily: "'Lexend', sans-serif",
             }}
-          >{val === null ? "T?t c?" : `?${val}+`}</button>
+          >{val === null ? "Tất cả" : `⭐${val}+`}</button>
         ))}
       </div>
 
@@ -717,7 +723,7 @@ function FilterSheet({
             color: "#b0956a", fontSize: 14, fontWeight: 600, cursor: "pointer",
             fontFamily: "'Lexend', sans-serif",
           }}
-        >�?t l?i</button>
+        >Đặt lại</button>
         <button
           onClick={() => { onChange(local); onClose() }}
           style={{
@@ -727,7 +733,7 @@ function FilterSheet({
             fontFamily: "'Lexend', sans-serif",
             boxShadow: "0 4px 16px rgba(255,107,0,0.3)",
           }}
-        >�p d?ng</button>
+        >Áp dụng</button>
       </div>
     </motion.div>
   )
