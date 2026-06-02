@@ -149,11 +149,6 @@ export default function InvitePage() {
               {copied ? "✓" : "📋"}
             </button>
           </div>
-          {/* Link preview */}
-          <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 9 }}>
-            <div style={{ color: "#6a5a40", fontSize: 8, marginBottom: 2 }}>Link chia sẻ</div>
-            <div style={{ color: "#4a8ff5", fontSize: 9.5, wordBreak: "break-all" }}>{shareUrl}</div>
-          </div>
         </div>
 
         {/* Stats */}
