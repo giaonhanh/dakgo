@@ -336,7 +336,7 @@ function SearchContent() {
           </div>
 
           {/* Tabs */}
-          {results.length > 0 && (
+          {!isNewest && results.length > 0 && (
             <div style={{ display: "flex", gap: 8, paddingBottom: 12 }}>
               {([
                 { key: "all",      label: `Tất cả (${filtered.length})` },
@@ -416,7 +416,7 @@ function SearchContent() {
               )}
 
               {/* Popular tags */}
-              <div>
+              {!isNewest && <div>
                 <p style={{ fontSize: 12, color: "#6a5a40", fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>
                   Phổ biến hôm nay
                 </p>
@@ -434,7 +434,7 @@ function SearchContent() {
                     >{t}</button>
                   ))}
                 </div>
-              </div>
+              </div>}
             </>
           )}
 
