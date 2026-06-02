@@ -923,27 +923,14 @@ export default function ShopPage() {
                     overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                     {shop.name}
                   </div>
-                  {/* Description + category chip */}
-                  <div style={{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap" }}>
-                    {shop.description && (
-                      <span style={{ color:"#6a5a40", fontSize:9.5, lineHeight:1.5,
-                        overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
-                        maxWidth:150 }}>
-                        {shop.description}
-                      </span>
-                    )}
-                    {shop.category && (
-                      <span style={{
-                        background:"rgba(255,107,0,0.09)",
-                        border:"1px solid rgba(255,107,0,0.22)",
-                        borderRadius:6, padding:"1px 7px",
-                        color:"#FF8C00", fontSize:8, fontWeight:600,
-                        whiteSpace:"nowrap", flexShrink:0,
-                      }}>
-                        {shop.category}
-                      </span>
-                    )}
-                  </div>
+                  {/* Mô tả quán */}
+                  {shop.description && (
+                    <span style={{ color:"#6a5a40", fontSize:9.5, lineHeight:1.5,
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+                      maxWidth:180, display:"block" }}>
+                      {shop.description}
+                    </span>
+                  )}
                 </div>
               </div>
 
