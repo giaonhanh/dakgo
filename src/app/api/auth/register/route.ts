@@ -22,7 +22,19 @@ export async function POST(req: NextRequest) {
                  : role === "merchant" ? "merchant"
                  : "driver"
 
-    // Create auth user — admin API auto-confirms, no email verification needed
+    // Pre-check 1: profile với phone này đã tồn tại chưa?
+    // (trigger handle_new_user extract phone từ email → phone UNIQUE → trigger fail nếu trùng)
+    const { data: existingProfile } = await adminClient
+      .from("profiles")
+      .select("id")
+      .eq("phone", phone)
+      .maybeSingle()
+
+    if (existingProfile) {
+      return NextResponse.json({ error: "duplicate" }, { status: 409 })
+    }
+
+    // Tạo auth user — admin API auto-confirm, không cần xác nhận email
     const { data, error: authErr } = await adminClient.auth.admin.createUser({
       email:         `${phone}@giaonhanh.local`,
       password,
@@ -32,8 +44,13 @@ export async function POST(req: NextRequest) {
 
     if (authErr || !data.user) {
       const msg = authErr?.message ?? ""
-      // Supabase trả về "already registered" hoặc "User already registered"
-      if (msg.toLowerCase().includes("already")) {
+      // "already registered" = email đã tồn tại trong auth.users
+      // "Database error creating new user" = trigger fail (thường do phone UNIQUE)
+      if (
+        msg.toLowerCase().includes("already") ||
+        msg.toLowerCase().includes("duplicate") ||
+        msg.includes("Database error creating new user")
+      ) {
         return NextResponse.json({ error: "duplicate" }, { status: 409 })
       }
       return NextResponse.json({ error: msg || "Không tạo được tài khoản" }, { status: 400 })
@@ -41,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     const userId = data.user.id
 
-    // Update profile — trigger đã tạo row với role='customer', ta update đúng role
+    // Cập nhật profile — trigger đã tạo row với role='customer', update đúng role
     const { error: profileErr } = await adminClient.from("profiles").upsert({
       id:        userId,
       phone,
@@ -51,12 +68,11 @@ export async function POST(req: NextRequest) {
     }, { onConflict: "id" })
 
     if (profileErr) {
-      // Rollback: xóa auth user vừa tạo
       await adminClient.auth.admin.deleteUser(userId)
       return NextResponse.json({ error: "Lỗi tạo profile: " + profileErr.message }, { status: 500 })
     }
 
-    // Tạo bản ghi drivers nếu đăng ký tài xế
+    // Tạo bản ghi drivers
     if (dbRole === "driver") {
       const { error: driverErr } = await adminClient.from("drivers").upsert({
         id:            userId,
@@ -73,7 +89,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Tạo bản ghi shops nếu đăng ký merchant
+    // Tạo bản ghi shops
     if (dbRole === "merchant") {
       const { data: settingRow } = await adminClient
         .from("app_settings").select("value").eq("key", "commission").maybeSingle()
