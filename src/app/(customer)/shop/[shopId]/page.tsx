@@ -498,7 +498,7 @@ export default function ShopPage() {
       // Shop info
       const { data: shopData } = await supabase
         .from("shops")
-        .select("name,description,address,category,shop_type,rating_avg,total_reviews,is_open,logo_url,cover_image_url,phone,opening_hours,menu_groups_data")
+        .select("name,description,address,category,shop_type,rating_avg,total_reviews,is_open,logo_url,cover_image_url,phone,opening_hours,menu_groups_data,prep_time")
         .eq("id", shopId)
         .single()
       if (shopData) setShop({
@@ -510,7 +510,7 @@ export default function ShopPage() {
         category: shopData.category ?? null,
         shop_type: (shopData.shop_type as "partner" | "delivery" | null) ?? null,
         opening_hours: shopData.opening_hours ?? null,
-        prep_time: null,
+        prep_time: (shopData.prep_time as string | null) ?? null,
         menu_groups: (shopData.menu_groups_data as MenuGroupMeta[] | null) ?? null,
       } as ShopInfo)
 
@@ -937,7 +937,7 @@ export default function ShopPage() {
               {/* Stats row: chuẩn bị → giờ mở → đánh giá */}
               <div style={{ display:"flex", gap:8, marginBottom:4 }}>
                 {[
-                  { icon:"⏱️", val: shop.prep_time ?? "10–15 phút", sub:"Thời gian chuẩn bị" },
+                  { icon:"⏱️", val: shop.prep_time ? `${shop.prep_time} phút` : "10–15 phút", sub:"Thời gian chuẩn bị" },
                   { icon:"🕐", val: (() => {
                       if (!shop.opening_hours) return "07:00–21:00"
                       const hours = shop.opening_hours as { open?: string; close?: string } | null

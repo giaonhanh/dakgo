@@ -305,13 +305,13 @@ export default function MerchantSettingsPage() {
   const [toast, setToast]           = useState("")
   const [adminContactLink, setAdminContactLink] = useState("mailto:giaonhanh.phuocan@gmail.com")
   const [adminPhone,       setAdminPhone]       = useState("")
+  const [shopId,           setShopId]           = useState<string | null>(null)
   const [shopName,         setShopName]         = useState("")
   const [shopAddress,      setShopAddress]      = useState("")
   const [shopIsOpen,       setShopIsOpen]       = useState(false)
   const [shopRating,       setShopRating]       = useState<number | null>(null)
   const [shopCommission,   setShopCommission]   = useState(15)
   const [isNegotiated,     setIsNegotiated]     = useState(false)
-  const [commCfg,          setCommCfg]          = useState({ defaultRate: 15, minRate: 0, maxRate: 35 })
 
   useEffect(() => {
     getAdminContact().then(c => {
@@ -320,37 +320,55 @@ export default function MerchantSettingsPage() {
     })
     const supabase = createClient()
 
-    // Load commission config from app_settings
-    supabase.from("app_settings").select("value").eq("key", "commission").maybeSingle()
-      .then(({ data }) => {
-        if (!data?.value) return
-        const v = data.value as { defaultRate?: string; minRate?: string; maxRate?: string }
-        setCommCfg({
-          defaultRate: v.defaultRate != null ? parseFloat(v.defaultRate) : 15,
-          minRate:     v.minRate     != null ? parseFloat(v.minRate)     : 0,
-          maxRate:     v.maxRate     != null ? parseFloat(v.maxRate)     : 35,
-        })
-      })
-
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-      supabase.from("shops").select("name, address, is_open, rating_avg, commission_rate, is_negotiated_commission").eq("owner_id", user.id).maybeSingle()
+      supabase.from("shops")
+        .select("id, name, address, is_open, rating_avg, commission_rate, is_negotiated_commission, prep_time, auto_accept, busy_mode, preorder_allow, show_rating, show_sold_count")
+        .eq("owner_id", user.id).maybeSingle()
         .then(({ data }) => {
           if (!data) return
+          setShopId(data.id)
           setShopName(data.name ?? "")
           setShopAddress(data.address ?? "")
           setShopIsOpen(data.is_open ?? false)
           setShopRating(data.rating_avg ?? null)
           setShopCommission(data.commission_rate ?? 15)
           setIsNegotiated(data.is_negotiated_commission ?? false)
+          // Load shop operation settings từ DB (ưu tiên DB hơn localStorage)
+          const d = data as Record<string, unknown>
+          if (d.auto_accept != null || d.busy_mode != null) {
+            setShop({
+              autoAccept:    (d.auto_accept    as boolean) ?? false,
+              busyMode:      (d.busy_mode      as boolean) ?? false,
+              preorderAllow: (d.preorder_allow as boolean) ?? true,
+              showRating:    (d.show_rating    as boolean) ?? true,
+              showSoldCount: (d.show_sold_count as boolean) ?? true,
+            })
+          }
+          if (d.prep_time) setPrepTime(d.prep_time as string)
         })
     })
   }, [])
 
   const fire = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2200) }
 
+  const COL_MAP: Record<string, string> = {
+    autoAccept:    "auto_accept",
+    busyMode:      "busy_mode",
+    preorderAllow: "preorder_allow",
+    showRating:    "show_rating",
+    showSoldCount: "show_sold_count",
+  }
   const sw = (k: keyof typeof shop) => setShop(p => {
     const next = { ...p, [k]: !p[k] }
+    // Lưu vào DB
+    const colName = COL_MAP[k as string]
+    if (shopId && colName) {
+      const sb = createClient()
+      sb.from("shops").update({ [colName]: next[k] }).eq("id", shopId)
+        .then(({ error }) => { if (error) console.error("sw save error:", error.message) })
+    }
+    // Fallback cache localStorage
     try { localStorage.setItem("merchant_shop_settings", JSON.stringify(next)) } catch { /* ignore */ }
     return next
   })
@@ -419,25 +437,6 @@ export default function MerchantSettingsPage() {
                 <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.5 }}>
                   Khấu trừ trên mỗi đơn hàng hoàn thành. Liên hệ Admin nếu muốn đàm phán điều chỉnh.
                 </div>
-              </div>
-            </div>
-            {/* Biểu đồ thanh so với min/max */}
-            <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: "8px 10px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                <span style={{ color: "#6a5a40", fontSize: 8.5 }}>Tối thiểu: {commCfg.minRate}%</span>
-                <span style={{ color: "#4a8ff5", fontSize: 8.5, fontWeight: 700 }}>Của bạn: {shopCommission}%</span>
-                <span style={{ color: "#6a5a40", fontSize: 8.5 }}>Tối đa: {commCfg.maxRate}%</span>
-              </div>
-              <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.07)", position: "relative", overflow: "visible" }}>
-                <div style={{
-                  height: "100%", borderRadius: 3,
-                  background: "linear-gradient(90deg,#4a8ff5,#b464ff)",
-                  width: `${commCfg.maxRate > commCfg.minRate ? Math.min(100, ((shopCommission - commCfg.minRate) / (commCfg.maxRate - commCfg.minRate)) * 100) : 50}%`,
-                  transition: "width .4s",
-                }} />
-              </div>
-              <div style={{ color: "#6a5a40", fontSize: 8, marginTop: 5 }}>
-                Mặc định hệ thống: <strong style={{ color: "#f8f0e0" }}>{commCfg.defaultRate}%</strong>
               </div>
             </div>
           </div>
@@ -536,7 +535,15 @@ export default function MerchantSettingsPage() {
       <AnimatePresence>
         {showPw        && <PwSheet      onClose={() => setShowPw(false)}        />}
         {showHours     && <HoursSheet   onClose={() => setShowHours(false)}     />}
-        {showPrepSheet && <PrepTimeSheet value={prepTime} onSelect={v => { setPrepTime(v); try { localStorage.setItem("merchant_prep_time", v) } catch { /* ignore */ } }} onClose={() => setShowPrepSheet(false)} />}
+        {showPrepSheet && <PrepTimeSheet value={prepTime} onSelect={v => {
+          setPrepTime(v)
+          try { localStorage.setItem("merchant_prep_time", v) } catch { /* ignore */ }
+          if (shopId) {
+            const sb = createClient()
+            sb.from("shops").update({ prep_time: v }).eq("id", shopId)
+              .then(({ error }) => { if (error) console.error("prep_time save error:", error.message) })
+          }
+        }} onClose={() => setShowPrepSheet(false)} />}
       </AnimatePresence>
     </>
   )
