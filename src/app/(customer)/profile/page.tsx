@@ -530,7 +530,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Bottom Nav */}
-        <div style={{ position: "absolute", bottom: "max(16px,env(safe-area-inset-bottom))", left: 14, right: 14, height: 56, background: "rgba(8,8,6,0.92)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 9999, display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 6px", zIndex: 50, boxShadow: "0 0 20px rgba(255,107,0,0.1)" }}>
+        <div style={{ position: "fixed", bottom: "max(16px,env(safe-area-inset-bottom))", left: 14, right: 14, height: 56, background: "rgba(8,8,6,0.92)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 9999, display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 6px", zIndex: 70, boxShadow: "0 0 20px rgba(255,107,0,0.1)" }}>
           {([
             { icon: "🏠", label: "Trang chủ", href: "/",        active: false },
             { icon: "📋", label: "Đơn hàng",  href: "/orders",  active: false },
