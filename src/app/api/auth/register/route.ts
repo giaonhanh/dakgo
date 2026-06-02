@@ -57,17 +57,16 @@ export async function POST(req: NextRequest) {
     })
 
     if (authErr || !data.user) {
-      const msg = authErr?.message ?? ""
-      console.error("[register] createUser error:", msg)
-      // Email đã tồn tại trong auth.users
+      const msg   = authErr?.message ?? ""
+      const code  = (authErr as { code?: string } | null)?.code ?? ""
+      const status = (authErr as { status?: number } | null)?.status ?? 0
+      console.error("[register] createUser error:", { msg, code, status, full: JSON.stringify(authErr) })
+
       if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("duplicate")) {
         return NextResponse.json({ error: "duplicate" }, { status: 409 })
       }
-      // "Database error creating new user" = trigger fail do phone UNIQUE trong profiles còn sót
-      if (msg.includes("Database error creating new user")) {
-        return NextResponse.json({ error: "db_trigger_error", detail: "Phone UNIQUE constraint in profiles. Run: DELETE FROM profiles WHERE id NOT IN (SELECT id FROM auth.users)" }, { status: 500 })
-      }
-      return NextResponse.json({ error: msg || "Không tạo được tài khoản" }, { status: 400 })
+      // Trả về full error để debug
+      return NextResponse.json({ error: msg || "Không tạo được tài khoản", code, authStatus: status }, { status: 400 })
     }
 
     const userId = data.user.id
