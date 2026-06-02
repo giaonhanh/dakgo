@@ -31,15 +31,21 @@ export async function POST(req: NextRequest) {
 
     if (existingProfile) {
       // Kiểm tra xem auth user tương ứng có còn tồn tại không
-      const { data: authUserData } = await adminClient.auth.admin.getUserById(existingProfile.id)
+      const { data: authUserData, error: getUserErr } = await adminClient.auth.admin.getUserById(existingProfile.id)
+      console.log("[register] existingProfile:", existingProfile.id, "authUser:", authUserData?.user?.id ?? null, "getUserErr:", getUserErr?.message ?? null)
 
       if (authUserData?.user) {
         // Cả profile lẫn auth user đều tồn tại → số này đã đăng ký thật
         return NextResponse.json({ error: "duplicate" }, { status: 409 })
       }
 
-      // Auth user đã bị xóa nhưng profile còn sót (CASCADE không chạy) → xóa profile rác
-      await adminClient.from("profiles").delete().eq("id", existingProfile.id)
+      // Auth user không tồn tại → xóa profile rác rồi tiếp tục đăng ký
+      const { error: delErr } = await adminClient.from("profiles").delete().eq("id", existingProfile.id)
+      if (delErr) {
+        console.error("[register] delete orphaned profile failed:", delErr.message)
+        return NextResponse.json({ error: "Lỗi dọn dữ liệu cũ: " + delErr.message }, { status: 500 })
+      }
+      console.log("[register] deleted orphaned profile for phone:", phone)
     }
 
     // Tạo auth user — admin API auto-confirm, không cần xác nhận email
@@ -52,13 +58,14 @@ export async function POST(req: NextRequest) {
 
     if (authErr || !data.user) {
       const msg = authErr?.message ?? ""
-      // Email đã tồn tại trong auth.users (có thể phone pre-check bỏ sót)
+      console.error("[register] createUser error:", msg)
+      // Email đã tồn tại trong auth.users
       if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("duplicate")) {
         return NextResponse.json({ error: "duplicate" }, { status: 409 })
       }
-      // "Database error creating new user" = trigger fail do phone UNIQUE trùng
+      // "Database error creating new user" = trigger fail do phone UNIQUE trong profiles còn sót
       if (msg.includes("Database error creating new user")) {
-        return NextResponse.json({ error: "duplicate" }, { status: 409 })
+        return NextResponse.json({ error: "db_trigger_error", detail: "Phone UNIQUE constraint in profiles. Run: DELETE FROM profiles WHERE id NOT IN (SELECT id FROM auth.users)" }, { status: 500 })
       }
       return NextResponse.json({ error: msg || "Không tạo được tài khoản" }, { status: 400 })
     }
