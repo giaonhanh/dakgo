@@ -142,6 +142,38 @@ export default function AdminUsersPage() {
   const [toastOk, setToastOk] = useState(true)
   const fire = (msg: string, ok = true) => { setToast(msg); setToastOk(ok); setTimeout(() => setToast(""), 3000) }
 
+  // ── Create user modal ──
+  const [showCreateUser,  setShowCreateUser]  = useState(false)
+  const [cuEmail,         setCuEmail]         = useState("")
+  const [cuPassword,      setCuPassword]      = useState("")
+  const [cuName,          setCuName]          = useState("")
+  const [cuPhone,         setCuPhone]         = useState("")
+  const [cuRole,          setCuRole]          = useState<"customer" | "driver" | "merchant">("customer")
+  const [cuSaving,        setCuSaving]        = useState(false)
+  const [cuError,         setCuError]         = useState("")
+
+  const handleCreateUser = async () => {
+    if (!cuEmail.trim() || !cuPassword.trim() || !cuName.trim()) {
+      setCuError("Vui lòng điền Email, Mật khẩu và Họ tên"); return
+    }
+    if (cuPassword.length < 6) { setCuError("Mật khẩu tối thiểu 6 ký tự"); return }
+    setCuSaving(true); setCuError("")
+    try {
+      const res = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: cuEmail, password: cuPassword, fullName: cuName, phone: cuPhone, role: cuRole }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setCuError(data.error ?? "Lỗi không xác định"); return }
+      fire("✅ Đã tạo tài khoản: " + cuEmail)
+      setShowCreateUser(false)
+      setCuEmail(""); setCuPassword(""); setCuName(""); setCuPhone(""); setCuRole("customer")
+      loadUsers()
+    } catch { setCuError("Lỗi kết nối") }
+    finally { setCuSaving(false) }
+  }
+
   // ── Load: Customers ──────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -574,7 +606,16 @@ export default function AdminUsersPage() {
         )}
       </AnimatePresence>
 
-      <AdminShell pageTitle="👤 Tài khoản" pageSubtitle="Khách hàng · Tài xế · Cửa hàng">
+      <AdminShell
+        pageTitle="👤 Tài khoản"
+        pageSubtitle="Khách hàng · Tài xế · Cửa hàng"
+        actions={
+          <button onClick={() => setShowCreateUser(true)}
+            style={{ height: 34, padding: "0 14px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "Lexend", fontSize: 11, fontWeight: 700, background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff" }}>
+            + Tạo tài khoản
+          </button>
+        }
+      >
         <div style={{ flex: 1, overflowY: "auto", padding: 16, height: "100%" }}>
 
           {/* ── Main tabs ── */}
@@ -1100,6 +1141,61 @@ export default function AdminUsersPage() {
         </AnimatePresence>
 
       </AdminShell>
+
+      {/* ── Create user modal ── */}
+      <AnimatePresence>
+        {showCreateUser && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowCreateUser(false)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)", zIndex: 200 }} />
+            <motion.div initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .95 }}
+              style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 201, width: "min(420px,92vw)", background: "#0e0b07", border: "1px solid rgba(255,107,0,0.3)", borderRadius: 20, padding: "22px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", marginBottom: 18 }}>
+                <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>➕ Tạo tài khoản thủ công</div>
+                <button onClick={() => setShowCreateUser(false)} style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "none", color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
+              </div>
+
+              {/* Role selector */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+                {([
+                  { r: "customer" as const, icon: "👤", label: "Khách hàng" },
+                  { r: "driver"   as const, icon: "🛵", label: "Tài xế" },
+                  { r: "merchant" as const, icon: "🏪", label: "Cửa hàng" },
+                ]).map(({ r, icon, label }) => (
+                  <button key={r} onClick={() => setCuRole(r)}
+                    style={{ flex: 1, height: 38, borderRadius: 9, cursor: "pointer", fontFamily: "Lexend", fontSize: 10, fontWeight: cuRole === r ? 700 : 400, border: `1px solid ${cuRole === r ? "rgba(255,107,0,0.45)" : "rgba(255,255,255,0.1)"}`, background: cuRole === r ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.04)", color: cuRole === r ? "#FF8C00" : "#6a5a40" }}>
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Fields */}
+              {([
+                { label: "Email *", val: cuEmail, set: setCuEmail, type: "email", ph: "example@email.com" },
+                { label: "Mật khẩu * (tối thiểu 6 ký tự)", val: cuPassword, set: setCuPassword, type: "password", ph: "••••••••" },
+                { label: "Họ và tên *", val: cuName, set: setCuName, type: "text", ph: "Nguyễn Văn A" },
+                { label: "Số điện thoại", val: cuPhone, set: setCuPhone, type: "tel", ph: "0901234567" },
+              ] as Array<{ label: string; val: string; set: (v: string) => void; type: string; ph: string }>).map(({ label, val, set, type, ph }) => (
+                <div key={label} style={{ marginBottom: 12 }}>
+                  <div style={{ color: "#6a5a40", fontSize: 9.5, marginBottom: 5 }}>{label}</div>
+                  <input type={type} value={val} onChange={e => { set(e.target.value); setCuError("") }} placeholder={ph}
+                    style={{ width: "100%", height: 42, padding: "0 13px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.25)", borderRadius: 10, color: "#f8f0e0", fontSize: 12, fontFamily: "Lexend" }} />
+                </div>
+              ))}
+
+              {cuError && <div style={{ color: "#ff4040", fontSize: 11, marginBottom: 12 }}>⚠ {cuError}</div>}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10, marginTop: 4 }}>
+                <button onClick={() => setShowCreateUser(false)} style={{ height: 44, borderRadius: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#b0956a", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>Hủy</button>
+                <button onClick={handleCreateUser} disabled={cuSaving} style={{ height: 44, borderRadius: 12, border: "none", background: cuSaving ? "rgba(255,255,255,0.08)" : "linear-gradient(90deg,#FF6B00,#FF8C00)", color: cuSaving ? "#6a5a40" : "#fff", fontSize: 13, fontWeight: 800, cursor: cuSaving ? "not-allowed" : "pointer", fontFamily: "Lexend" }}>
+                  {cuSaving ? "⏳ Đang tạo..." : "✓ Tạo tài khoản"}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   )
 }

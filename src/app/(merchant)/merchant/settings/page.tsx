@@ -310,9 +310,6 @@ export default function MerchantSettingsPage() {
   const [shopIsOpen,       setShopIsOpen]       = useState(false)
   const [shopRating,       setShopRating]       = useState<number | null>(null)
   const [shopCommission,   setShopCommission]   = useState(15)
-  const [shopLat,          setShopLat]          = useState<number | null>(null)
-  const [shopLng,          setShopLng]          = useState<number | null>(null)
-  const [savingLoc,        setSavingLoc]        = useState(false)
 
   useEffect(() => {
     getAdminContact().then(c => {
@@ -322,7 +319,7 @@ export default function MerchantSettingsPage() {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-      supabase.from("shops").select("name, address, is_open, rating_avg, commission_rate, location").eq("owner_id", user.id).maybeSingle()
+      supabase.from("shops").select("name, address, is_open, rating_avg, commission_rate").eq("owner_id", user.id).maybeSingle()
         .then(({ data }) => {
           if (!data) return
           setShopName(data.name ?? "")
@@ -330,38 +327,11 @@ export default function MerchantSettingsPage() {
           setShopIsOpen(data.is_open ?? false)
           setShopRating(data.rating_avg ?? null)
           setShopCommission(data.commission_rate ?? 15)
-          const loc = data.location as { coordinates?: [number, number] } | null
-          if (loc?.coordinates) {
-            setShopLng(loc.coordinates[0])
-            setShopLat(loc.coordinates[1])
-          }
         })
     })
   }, [])
 
   const fire = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2200) }
-
-  const handleSaveLocation = () => {
-    if (!navigator.geolocation) { fire("❌ Thiết bị không hỗ trợ GPS"); return }
-    setSavingLoc(true)
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude
-        const lng = pos.coords.longitude
-        const sb  = createClient()
-        const { data: { user } } = await sb.auth.getUser()
-        if (!user) { setSavingLoc(false); return }
-        const { error } = await sb.from("shops")
-          .update({ location: `SRID=4326;POINT(${lng} ${lat})` })
-          .eq("owner_id", user.id)
-        if (error) { fire("❌ Lỗi lưu vị trí · Thử lại") }
-        else { setShopLat(lat); setShopLng(lng); fire("✅ Đã lưu vị trí quán!") }
-        setSavingLoc(false)
-      },
-      () => { fire("❌ Không lấy được GPS · Hãy cấp quyền vị trí"); setSavingLoc(false) },
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
-  }
 
   const sw = (k: keyof typeof shop) => setShop(p => {
     const next = { ...p, [k]: !p[k] }
@@ -446,26 +416,6 @@ export default function MerchantSettingsPage() {
               <Toggle on={shop.showSoldCount} onToggle={() => sw("showSoldCount")} />
             </Row>
             <Row icon="⏱️" label="Thời gian chuẩn bị đơn" sub={`${prepTime} phút · hiển thị cho khách trên trang quán`} onClick={() => setShowPrepSheet(true)} arrow last />
-          </Section>
-
-          {/* location */}
-          <Section title="Vị trí cửa hàng">
-            <div style={{ padding: "12px 0" }}>
-              <div style={{ fontSize: 10, marginBottom: 10, lineHeight: 1.6,
-                color: shopLat && shopLng ? "#3ecf6e" : "#FFB347" }}>
-                {shopLat && shopLng
-                  ? `📍 Đã lưu: ${shopLat.toFixed(5)}, ${shopLng.toFixed(5)}`
-                  : "⚠️ Chưa có tọa độ — khách không thấy khoảng cách tới quán"}
-              </div>
-              <button onClick={handleSaveLocation} disabled={savingLoc}
-                style={{ width: "100%", height: 42, borderRadius: 11, border: "none",
-                  background: savingLoc ? "rgba(255,255,255,0.06)" : "linear-gradient(90deg,#FF6B00,#FF8C00)",
-                  color: savingLoc ? "#6a5a40" : "#fff",
-                  fontSize: 11, fontWeight: 700, cursor: savingLoc ? "default" : "pointer",
-                  fontFamily: "Lexend" }}>
-                {savingLoc ? "⏳ Đang lấy GPS..." : "📍 Lấy vị trí hiện tại & Lưu"}
-              </button>
-            </div>
           </Section>
 
           {/* hours */}

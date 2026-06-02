@@ -2,7 +2,18 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/client"
+
+const MapPicker = dynamic(() => import("@/components/merchant/MapPicker"), {
+  ssr: false,
+  loading: () => (
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "#080806", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
+      <div style={{ fontSize: 32 }}>🗺️</div>
+      <div style={{ color: "#6a5a40", fontSize: 12, fontFamily: "Lexend" }}>Đang tải bản đồ...</div>
+    </div>
+  ),
+})
 
 const AVATAR_LIST = ["🍜","🍗","🍕","🥗","🍱","🥤","🧁","🍛","🥩","🦐","🍔","🌮"]
 
@@ -13,7 +24,6 @@ interface FormErrors { name: string; phone: string; address: string }
 export default function MerchantProfilePage() {
   const supabase = createClient()
 
-  // Data state
   const [shopId,      setShopId]      = useState<string | null>(null)
   const [loading,     setLoading]     = useState(true)
   const [isOpen,      setIsOpen]      = useState(false)
@@ -26,12 +36,14 @@ export default function MerchantProfilePage() {
   const [totalReview, setTotalReview] = useState(0)
   const [commission,  setCommission]  = useState(15)
   const [joined,      setJoined]      = useState("")
+  const [lat,         setLat]         = useState<number | null>(null)
+  const [lng,         setLng]         = useState<number | null>(null)
 
-  // UI state
-  const [editing,           setEditing]           = useState(false)
-  const [showAvatarPicker,  setShowAvatarPicker]  = useState(false)
-  const [toasts,            setToasts]            = useState<Toast[]>([])
-  const [errors,            setErrors]            = useState<FormErrors>({ name:"", phone:"", address:"" })
+  const [editing,          setEditing]          = useState(false)
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false)
+  const [showMapPicker,    setShowMapPicker]    = useState(false)
+  const [toasts,           setToasts]           = useState<Toast[]>([])
+  const [errors,           setErrors]           = useState<FormErrors>({ name:"", phone:"", address:"" })
 
   useEffect(() => {
     async function load() {
@@ -42,7 +54,7 @@ export default function MerchantProfilePage() {
         const [{ data: profile }, { data: shop }] = await Promise.all([
           supabase.from("profiles").select("created_at").eq("id", user.id).single(),
           supabase.from("shops")
-            .select("id,name,phone,address,category,is_open,rating_avg,total_reviews,commission_rate,opening_hours")
+            .select("id,name,phone,address,category,is_open,rating_avg,total_reviews,commission_rate,location")
             .eq("owner_id", user.id)
             .single(),
         ])
@@ -60,6 +72,11 @@ export default function MerchantProfilePage() {
           setRating(shop.rating_avg ?? null)
           setTotalReview(shop.total_reviews ?? 0)
           setCommission(shop.commission_rate ?? 15)
+          const loc = shop.location as { coordinates?: [number, number] } | null
+          if (loc?.coordinates) {
+            setLng(loc.coordinates[0])
+            setLat(loc.coordinates[1])
+          }
         }
       } catch { /* ignore */ }
       setLoading(false)
@@ -76,7 +93,6 @@ export default function MerchantProfilePage() {
 
   const clearError = (key: keyof FormErrors) => setErrors(e => ({ ...e, [key]: "" }))
 
-
   const handleToggleOpen = async () => {
     const next = !isOpen
     setIsOpen(next)
@@ -89,6 +105,13 @@ export default function MerchantProfilePage() {
 
   const handleStartEdit = () => { setErrors({ name:"", phone:"", address:"" }); setEditing(true) }
 
+  const handleMapConfirm = (pickedLat: number, pickedLng: number, geocodedAddr: string) => {
+    setLat(pickedLat)
+    setLng(pickedLng)
+    if (geocodedAddr) setAddress(geocodedAddr)
+    setShowMapPicker(false)
+  }
+
   const handleSave = async () => {
     const next: FormErrors = { name:"", phone:"", address:"" }
     let valid = true
@@ -99,10 +122,14 @@ export default function MerchantProfilePage() {
     if (!valid) { addToast("❌ Vui lòng điền đầy đủ thông tin", "error"); return }
 
     if (shopId) {
-      const { error } = await supabase.from("shops").update({
+      const updatePayload: Record<string, unknown> = {
         name, phone, address,
         updated_at: new Date().toISOString(),
-      }).eq("id", shopId)
+      }
+      if (lat !== null && lng !== null) {
+        updatePayload.location = `SRID=4326;POINT(${lng} ${lat})`
+      }
+      const { error } = await supabase.from("shops").update(updatePayload).eq("id", shopId)
       if (error) { addToast("❌ Lỗi lưu: " + error.message, "error"); return }
     }
     setEditing(false)
@@ -124,9 +151,9 @@ export default function MerchantProfilePage() {
     <>
       <style>{`
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        html,body{background:#080806}
-        input{outline:none}
-        input[type="time"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:0.5;cursor:pointer}
+        html,body{background:#080806;font-family:'Lexend',sans-serif}
+        input,textarea{outline:none;font-family:'Lexend',sans-serif}
+        textarea{resize:none}
       `}</style>
 
       {/* Toast stack */}
@@ -137,6 +164,16 @@ export default function MerchantProfilePage() {
           </div>
         ))}
       </div>
+
+      {/* Map Picker overlay */}
+      {showMapPicker && (
+        <MapPicker
+          initialLat={lat}
+          initialLng={lng}
+          onConfirm={handleMapConfirm}
+          onClose={() => setShowMapPicker(false)}
+        />
+      )}
 
       <div style={{ position:"fixed",inset:0,background:"#080806",display:"flex",flexDirection:"column",overflow:"hidden" }}>
 
@@ -196,47 +233,105 @@ export default function MerchantProfilePage() {
           {/* Shop info */}
           <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,marginBottom:10 }}>
             <div style={{ color:"#6a5a40",fontSize:10,fontWeight:600,marginBottom:12 }}>THÔNG TIN CỬA HÀNG</div>
-            {([
-              { label:"Tên cửa hàng",  value:name,    key:"name"    as const, setter: setName    },
-              { label:"Số điện thoại", value:phone,   key:"phone"   as const, setter: setPhone   },
-              { label:"Địa chỉ",       value:address, key:"address" as const, setter: setAddress },
-              { label:"Ngày tham gia", value:joined || "—", key: null, setter: null },
-            ] as Array<{ label:string; value:string; key: keyof FormErrors | null; setter: ((v:string)=>void) | null }>)
-              .map(({ label, value, key, setter }, idx, arr) => {
-                const isLast = idx === arr.length - 1
-                const hasError = key ? errors[key] : ""
-                return (
-                  <div key={label} style={{ marginBottom: isLast ? 0 : 10 }}>
-                    <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",paddingBottom:isLast?0:10,borderBottom:isLast?"none":"1px solid rgba(255,255,255,0.04)" }}>
-                      <span style={{ color:"#6a5a40",fontSize:10,flexShrink:0,marginRight:8 }}>{label}</span>
-                      {editing && setter && key ? (
-                        <input value={value} onChange={e => { setter(e.target.value); clearError(key) }}
-                          style={{ background:"rgba(255,255,255,0.06)",border:`1px solid ${hasError?"rgba(255,64,64,0.5)":"rgba(255,107,0,0.3)"}`,borderRadius:8,padding:"4px 10px",color:"#f8f0e0",fontSize:10,textAlign:"right",maxWidth:200,width:"100%" }} />
-                      ) : (
-                        <span style={{ color:"#f8f0e0",fontSize:10,fontWeight:600,textAlign:"right",maxWidth:200 }}>{value || "—"}</span>
-                      )}
-                    </div>
-                    {hasError && <div style={{ color:"#ff4040",fontSize:9,textAlign:"right",marginTop:3 }}>{hasError}</div>}
+
+            {/* Tên */}
+            <FieldRow
+              label="Tên cửa hàng"
+              editing={editing}
+              error={errors.name}
+              value={name}
+              onChange={v => { setName(v); clearError("name") }}
+            />
+
+            {/* Điện thoại */}
+            <FieldRow
+              label="Số điện thoại"
+              editing={editing}
+              error={errors.phone}
+              value={phone}
+              onChange={v => { setPhone(v); clearError("phone") }}
+            />
+
+            {/* Địa chỉ — custom: textarea + bản đồ */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",paddingBottom:10,borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
+                <span style={{ color:"#6a5a40",fontSize:10,flexShrink:0,marginRight:8,paddingTop:3 }}>Địa chỉ</span>
+                {editing ? (
+                  <div style={{ flex:1,display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end" }}>
+                    <textarea
+                      value={address}
+                      onChange={e => { setAddress(e.target.value); clearError("address") }}
+                      rows={3}
+                      placeholder="Số nhà, tên đường, khu phố, phường/xã, quận/huyện..."
+                      style={{
+                        width:"100%", padding:"7px 10px",
+                        background:"rgba(255,255,255,0.06)",
+                        border:`1px solid ${errors.address?"rgba(255,64,64,0.5)":"rgba(255,107,0,0.3)"}`,
+                        borderRadius:8, color:"#f8f0e0", fontSize:10,
+                        lineHeight:1.5,
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowMapPicker(true)}
+                      style={{
+                        display:"flex",alignItems:"center",gap:5,
+                        padding:"5px 11px", borderRadius:8,
+                        background:"rgba(74,143,245,0.1)", border:"1px solid rgba(74,143,245,0.28)",
+                        color:"#4a8ff5", fontSize:9.5, fontWeight:700, cursor:"pointer",
+                      }}>
+                      📍 Chọn trên bản đồ
+                      {lat && lng && <span style={{ color:"#3ecf6e" }}>✓</span>}
+                    </button>
+                    {lat && lng && (
+                      <div style={{ color:"#3ecf6e",fontSize:8.5 }}>
+                        ✅ Có tọa độ · {lat.toFixed(5)}, {lng.toFixed(5)}
+                      </div>
+                    )}
+                    {errors.address && (
+                      <div style={{ color:"#ff4040",fontSize:9 }}>{errors.address}</div>
+                    )}
                   </div>
-                )
-              })
-            }
+                ) : (
+                  <div style={{ flex:1,textAlign:"right" }}>
+                    <span style={{ color:"#f8f0e0",fontSize:10,fontWeight:600 }}>{address || "—"}</span>
+                    {lat && lng && (
+                      <div style={{ color:"#3ecf6e",fontSize:8.5,marginTop:3 }}>📍 Đã có tọa độ</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Ngày tham gia */}
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+              <span style={{ color:"#6a5a40",fontSize:10 }}>Ngày tham gia</span>
+              <span style={{ color:"#f8f0e0",fontSize:10,fontWeight:600 }}>{joined || "—"}</span>
+            </div>
           </div>
 
-          {/* Quick links */}
-          {[
-            { icon:"👁",  label:"Xem trước cửa hàng", sub:"Khách nhìn thấy thế này",    href:"/merchant/shop-preview" },
-          ].map(({ icon, label, sub, href }) => (
-            <Link key={label} href={href}
-              style={{ display:"flex",alignItems:"center",gap:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,marginBottom:8,textDecoration:"none" }}>
-              <div style={{ width:40,height:40,borderRadius:11,background:"rgba(255,107,0,0.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>{icon}</div>
-              <div style={{ flex:1 }}>
-                <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:600 }}>{label}</div>
-                <div style={{ color:"#6a5a40",fontSize:10,marginTop:2 }}>{sub}</div>
+          {/* Địa chỉ hint khi editing */}
+          {editing && (
+            <div style={{ background:"rgba(74,143,245,0.06)",border:"1px solid rgba(74,143,245,0.18)",borderRadius:12,padding:"10px 13px",marginBottom:10 }}>
+              <div style={{ color:"#4a8ff5",fontSize:10,fontWeight:600,marginBottom:4 }}>💡 Hướng dẫn nhập địa chỉ</div>
+              <div style={{ color:"#6a5a40",fontSize:9.5,lineHeight:1.6 }}>
+                1. Nhấn <strong style={{ color:"#4a8ff5" }}>Chọn trên bản đồ</strong> để ghim vị trí — app sẽ tự điền địa chỉ cơ bản.<br />
+                2. Chỉnh sửa thêm <strong style={{ color:"#f8f0e0" }}>số nhà, tên đường, khu phố, phường/xã</strong> nếu bản đồ chưa đầy đủ.<br />
+                3. Bấm <strong style={{ color:"#FF8C00" }}>Lưu</strong> — tọa độ và địa chỉ cùng được cập nhật.
               </div>
-              <span style={{ color:"#6a5a40",fontSize:16 }}>›</span>
-            </Link>
-          ))}
+            </div>
+          )}
+
+          {/* Quick links */}
+          <Link href="/merchant/shop-preview"
+            style={{ display:"flex",alignItems:"center",gap:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,marginBottom:8,textDecoration:"none" }}>
+            <div style={{ width:40,height:40,borderRadius:11,background:"rgba(255,107,0,0.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>👁</div>
+            <div style={{ flex:1 }}>
+              <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:600 }}>Xem trước cửa hàng</div>
+              <div style={{ color:"#6a5a40",fontSize:10,marginTop:2 }}>Khách nhìn thấy thế này</div>
+            </div>
+            <span style={{ color:"#6a5a40",fontSize:16 }}>›</span>
+          </Link>
 
         </div>
 
@@ -263,5 +358,25 @@ export default function MerchantProfilePage() {
 
       </div>
     </>
+  )
+}
+
+/* ── simple field row ── */
+function FieldRow({ label, editing, error, value, onChange }: {
+  label: string; editing: boolean; error: string; value: string; onChange: (v: string) => void
+}) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",paddingBottom:10,borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
+        <span style={{ color:"#6a5a40",fontSize:10,flexShrink:0,marginRight:8 }}>{label}</span>
+        {editing ? (
+          <input value={value} onChange={e => onChange(e.target.value)}
+            style={{ background:"rgba(255,255,255,0.06)",border:`1px solid ${error?"rgba(255,64,64,0.5)":"rgba(255,107,0,0.3)"}`,borderRadius:8,padding:"4px 10px",color:"#f8f0e0",fontSize:10,textAlign:"right",maxWidth:200,width:"100%" }} />
+        ) : (
+          <span style={{ color:"#f8f0e0",fontSize:10,fontWeight:600,textAlign:"right",maxWidth:200 }}>{value || "—"}</span>
+        )}
+      </div>
+      {error && <div style={{ color:"#ff4040",fontSize:9,textAlign:"right",marginTop:3 }}>{error}</div>}
+    </div>
   )
 }

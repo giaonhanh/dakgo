@@ -31,6 +31,7 @@ interface ShopInfo {
   name:          string
   description:   string | null
   address:       string
+  shop_type:     "partner" | "delivery" | null
   rating:        number | null
   rating_count:  number | null
   is_open:       boolean
@@ -496,7 +497,7 @@ export default function ShopPage() {
       // Shop info
       const { data: shopData } = await supabase
         .from("shops")
-        .select("name,description,address,rating_avg,total_reviews,is_open,logo_url,cover_image_url,phone,opening_hours,menu_groups_data")
+        .select("name,description,address,shop_type,rating_avg,total_reviews,is_open,logo_url,cover_image_url,phone,opening_hours,menu_groups_data")
         .eq("id", shopId)
         .single()
       if (shopData) setShop({
@@ -505,6 +506,7 @@ export default function ShopPage() {
         rating_count: shopData.total_reviews,
         avatar_url: shopData.logo_url,
         cover_url: shopData.cover_image_url,
+        shop_type: (shopData.shop_type as "partner" | "delivery" | null) ?? null,
         opening_hours: shopData.opening_hours ?? null,
         prep_time: null,
         menu_groups: (shopData.menu_groups_data as MenuGroupMeta[] | null) ?? null,
@@ -883,28 +885,64 @@ export default function ShopPage() {
                 marginTop:-40, marginBottom:14,
                 position:"relative", zIndex:10 }}>
 
-                {/* Logo circle */}
-                <div style={{ width:78, height:78, borderRadius:"50%",
-                  border:"3px solid #080806", overflow:"hidden", flexShrink:0,
-                  background:"rgba(255,255,255,0.06)",
-                  display:"flex", alignItems:"center", justifyContent:"center", fontSize:34,
-                  boxShadow:"0 0 0 1px rgba(255,107,0,0.25),0 4px 20px rgba(0,0,0,0.6)" }}>
-                  {shop.avatar_url
-                    ? <img src={shop.avatar_url} alt={shop.name}
-                        style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                    : "🏪"}
+                {/* Logo circle + shop_type corner badge */}
+                <div style={{ position:"relative", flexShrink:0 }}>
+                  <div style={{ width:78, height:78, borderRadius:"50%",
+                    border:"3px solid #080806", overflow:"hidden",
+                    background:"rgba(255,255,255,0.06)",
+                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:34,
+                    boxShadow:"0 0 0 1px rgba(255,107,0,0.25),0 4px 20px rgba(0,0,0,0.6)" }}>
+                    {shop.avatar_url
+                      ? <img src={shop.avatar_url} alt={shop.name}
+                          style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                      : "🏪"}
+                  </div>
+                  {/* Corner badge */}
+                  {shop.shop_type && (
+                    <div style={{
+                      position:"absolute", bottom:-4, right:-6,
+                      background: shop.shop_type === "delivery"
+                        ? "linear-gradient(135deg,#FF6B00,#FF8C00)"
+                        : "linear-gradient(135deg,#3ecf6e,#27ae60)",
+                      borderRadius:7, padding:"2px 6px",
+                      border:"2px solid #080806",
+                      fontSize:7, fontWeight:700, color:"#fff",
+                      whiteSpace:"nowrap",
+                    }}>
+                      {shop.shop_type === "delivery" ? "🛒 Mua hộ" : "🤝 Đối tác"}
+                    </div>
+                  )}
                 </div>
 
-                {/* Name + address */}
+                {/* Name + description + label */}
                 <div style={{ flex:1, minWidth:0, paddingBottom:6 }}>
                   <div style={{ color:"#f8f0e0", fontSize:18, fontWeight:800, lineHeight:1.2,
                     marginBottom:4,
                     overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                     {shop.name}
                   </div>
-                  <div style={{ color:"#6a5a40", fontSize:9.5, lineHeight:1.5,
-                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                    {shop.description ? `${shop.description} · ` : ""}{shop.address.split(",")[0]}
+                  {/* Description + nhãn loại (ẩn địa chỉ) */}
+                  <div style={{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap" }}>
+                    {shop.description && (
+                      <span style={{ color:"#6a5a40", fontSize:9.5, lineHeight:1.5,
+                        overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+                        maxWidth:160 }}>
+                        {shop.description}
+                      </span>
+                    )}
+                    {shop.shop_type && (
+                      <span style={{
+                        background: shop.shop_type === "delivery"
+                          ? "rgba(255,107,0,0.12)"
+                          : "rgba(62,207,110,0.1)",
+                        border: `1px solid ${shop.shop_type === "delivery" ? "rgba(255,107,0,0.3)" : "rgba(62,207,110,0.25)"}`,
+                        borderRadius:6, padding:"1px 7px",
+                        color: shop.shop_type === "delivery" ? "#FF8C00" : "#3ecf6e",
+                        fontSize:8, fontWeight:700, whiteSpace:"nowrap", flexShrink:0,
+                      }}>
+                        {shop.shop_type === "delivery" ? "🛒 Cửa hàng mua hộ" : "🤝 Cửa hàng đối tác"}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

@@ -839,10 +839,10 @@ export default function HomePage() {
                     🎁 MỜI BẠN BÈ
                   </div>
                   <div style={{ color:"#fff", fontSize:13, fontWeight:700, lineHeight:1.3, maxWidth:"62%", wordBreak:"break-word" }}>
-                    Mời bạn bè, nhận ngay ưu đãi!
+                    Mời bạn bè, nhận 5.000 XU!
                   </div>
                   <div style={{ color:"rgba(255,255,255,0.45)", fontSize:9, marginTop:3 }}>
-                    Bạn và người được mời đều nhận 20k đơn đầu
+                    Cả hai nhận 5.000 xu · Đơn đầu từ 50.000đ
                   </div>
                   <div style={{ display:"inline-block", marginTop:6,
                     background:"rgba(62,207,110,0.15)", border:"1px solid rgba(62,207,110,0.35)",
