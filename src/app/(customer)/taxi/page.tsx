@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
@@ -10,9 +10,23 @@ import type { AddressPickerResult } from "@/types"
 
 type CarType = "4cho" | "7cho"
 
-const CARS: Record<CarType, { emoji: string; label: string; sub: string; base: number; perKm: number; seats: number }> = {
-  "4cho": { emoji:"🚕", label:"Sedan 4 chỗ",  sub:"Tiết kiệm · Phổ biến",   base:15000, perKm:8000,  seats:4 },
-  "7cho": { emoji:"🚙", label:"SUV / 7 chỗ",   sub:"Rộng rãi · Gia đình",   base:20000, perKm:10000, seats:7 },
+const CARS: Record<CarType, { emoji: string; label: string; sub: string; seats: number }> = {
+  "4cho": { emoji:"🚕", label:"Sedan 4 chỗ", sub:"Tiết kiệm · Phổ biến", seats:4 },
+  "7cho": { emoji:"🚙", label:"SUV / 7 chỗ",  sub:"Rộng rãi · Gia đình",  seats:7 },
+}
+
+function calcFeeFromRows(km: number, rows: string[], extra: string): number {
+  const kmInt = Math.ceil(Math.max(km, 1))
+  let total = 0
+  for (let i = 0; i < Math.min(kmInt, 10); i++) {
+    let price = 0
+    for (let j = i; j >= 0; j--) {
+      if (rows[j] && rows[j] !== "") { price = parseInt(rows[j]) || 0; break }
+    }
+    total += price
+  }
+  if (kmInt > 10) total += (kmInt - 10) * (parseInt(extra) || 0)
+  return total
 }
 
 function estimateKm(dest: string): number {
@@ -33,10 +47,23 @@ export default function TaxiPage() {
   const [loading,     setLoading]     = useState(false)
   const [toast,       setToast]       = useState("")
 
+  const [pricingRows,  setPricingRows]  = useState<string[]>(["15000","13000","11000","10000","9500","9000","8500","8000","7500","7000"])
+  const [pricingExtra, setPricingExtra] = useState("6500")
+
+  useEffect(() => {
+    createClient().from("app_settings").select("value").eq("key","pricing").maybeSingle()
+      .then(({ data }) => {
+        const tx = (data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null)?.taxi
+        if (tx?.rows) setPricingRows(tx.rows)
+        if (tx?.extra) setPricingExtra(tx.extra)
+      })
+  }, [])
+
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
-  const car = CARS[carType]
-  const estimatedKm = estimateKm(dest)
-  const estimatedPrice = car.base + Math.round(car.perKm * estimatedKm)
+  const car          = CARS[carType]
+  const estimatedKm  = estimateKm(dest)
+  const basePrice    = calcFeeFromRows(estimatedKm, pricingRows, pricingExtra)
+  const estimatedPrice = carType === "7cho" ? Math.round(basePrice * 1.3 / 1000) * 1000 : basePrice
 
   const handleBook = async () => {
     if (!dest.trim()) { fireToast("Vui lòng nhập điểm đến"); return }
@@ -168,7 +195,7 @@ export default function TaxiPage() {
                   <span style={{ background:"linear-gradient(90deg,#b464ff,#d49aff)",
                     WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
                     backgroundClip:"text",fontSize:22,fontWeight:900 }}>
-                    {dest ? formatPrice(estimatedPrice) : `Từ ${formatPrice(car.base)}`}
+                    {dest ? formatPrice(estimatedPrice) : `Từ ${formatPrice(calcFeeFromRows(1, pricingRows, pricingExtra))}`}
                   </span>
                 </div>
                 {dest && (

@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState, Suspense } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import AddressPicker from "@/components/map/AddressPicker"
@@ -9,6 +9,28 @@ import type { AddressPickerResult } from "@/types"
 
 type BuyItem = { id: number; name: string; qty: number; price: string }
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
+
+function calcFeeFromRows(km: number, rows: string[], extra: string): number {
+  const kmInt = Math.ceil(Math.max(km, 1))
+  let total = 0
+  for (let i = 0; i < Math.min(kmInt, 10); i++) {
+    let price = 0
+    for (let j = i; j >= 0; j--) {
+      if (rows[j] && rows[j] !== "") { price = parseInt(rows[j]) || 0; break }
+    }
+    total += price
+  }
+  if (kmInt > 10) total += (kmInt - 10) * (parseInt(extra) || 0)
+  return total
+}
 
 function ErrandContent() {
   const params   = useSearchParams()
@@ -26,6 +48,30 @@ function ErrandContent() {
   const [mapMode,      setMapMode]      = useState<null | "pickup" | "delivery">(null)
   const [loading,      setLoading]      = useState(false)
   const [toast,        setToast]        = useState("")
+
+  const [errandRows,    setErrandRows]    = useState<string[]>(["20000","17000","14000","12000","11000","10000","9000","8500","8000","7500"])
+  const [errandExtra,   setErrandExtra]   = useState("7000")
+  const [delivPkgRows,  setDelivPkgRows]  = useState<string[]>(["18000","15000","12000","10000","9000","8500","8000","7500","7000","6500"])
+  const [delivPkgExtra, setDelivPkgExtra] = useState("6000")
+  const [distanceKm,    setDistanceKm]   = useState<number | null>(null)
+
+  useEffect(() => {
+    createClient().from("app_settings").select("value").eq("key","pricing").maybeSingle()
+      .then(({ data }) => {
+        const p = data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null
+        const er = p?.errand
+        const dp = p?.delivery_pkg
+        if (er?.rows) setErrandRows(er.rows)
+        if (er?.extra) setErrandExtra(er.extra)
+        if (dp?.rows) setDelivPkgRows(dp.rows)
+        if (dp?.extra) setDelivPkgExtra(dp.extra)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (pickupCoord && deliveryCoord)
+      setDistanceKm(haversineKm(pickupCoord.lat, pickupCoord.lng, deliveryCoord.lat, deliveryCoord.lng))
+  }, [pickupCoord, deliveryCoord])
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2200) }
 
@@ -73,7 +119,7 @@ function ErrandContent() {
         estimated_items_cost:  estimatedCost,
         package_description:   tab === "deliver" ? pkgDesc : null,
         note:                  note || null,
-        service_fee:           25000,
+        service_fee:           serviceFee,
         payment_method:        "cash",
       })
 
@@ -92,7 +138,9 @@ function ErrandContent() {
     setItems(p => p.map(i => i.id === id ? { ...i, [field]: value } : i))
 
   const estimatedBudget = items.reduce((s, i) => s + parseInt(i.price.replace(/\D/g, "") || "0") * i.qty, 0)
-  const serviceFee = 25000
+  const serviceFee = tab === "buy"
+    ? calcFeeFromRows(distanceKm ?? 2, errandRows, errandExtra)
+    : calcFeeFromRows(distanceKm ?? 2, delivPkgRows, delivPkgExtra)
 
   return (
     <>
@@ -234,7 +282,9 @@ function ErrandContent() {
               </div>
             )}
             <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
-              <span style={{ color:"#6a5a40",fontSize:10 }}>Phí dịch vụ</span>
+              <span style={{ color:"#6a5a40",fontSize:10 }}>
+                {tab === "buy" ? "Phí mua hộ" : "Phí giao hộ"}{distanceKm ? ` (${distanceKm.toFixed(1)} km)` : ""}
+              </span>
               <span style={{ color:"#b0956a",fontSize:10,fontWeight:600 }}>{fmt(serviceFee)}</span>
             </div>
             <div style={{ height:1,background:"rgba(255,255,255,0.06)",margin:"8px 0" }} />

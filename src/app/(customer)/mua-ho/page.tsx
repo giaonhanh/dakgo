@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import AddressPicker from "@/components/map/AddressPicker"
@@ -9,6 +9,28 @@ import type { AddressPickerResult } from "@/types"
 
 type BuyItem = { id: number; name: string; qty: number; price: string }
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
+
+function calcFeeFromRows(km: number, rows: string[], extra: string): number {
+  const kmInt = Math.ceil(Math.max(km, 1))
+  let total = 0
+  for (let i = 0; i < Math.min(kmInt, 10); i++) {
+    let price = 0
+    for (let j = i; j >= 0; j--) {
+      if (rows[j] && rows[j] !== "") { price = parseInt(rows[j]) || 0; break }
+    }
+    total += price
+  }
+  if (kmInt > 10) total += (kmInt - 10) * (parseInt(extra) || 0)
+  return total
+}
 
 export default function MuaHoPage() {
   const router   = useRouter()
@@ -23,6 +45,24 @@ export default function MuaHoPage() {
   const [loading,       setLoading]       = useState(false)
   const [toast,         setToast]         = useState("")
 
+  const [pricingRows,  setPricingRows]  = useState<string[]>(["20000","17000","14000","12000","11000","10000","9000","8500","8000","7500"])
+  const [pricingExtra, setPricingExtra] = useState("7000")
+  const [distanceKm,   setDistanceKm]  = useState<number | null>(null)
+
+  useEffect(() => {
+    createClient().from("app_settings").select("value").eq("key","pricing").maybeSingle()
+      .then(({ data }) => {
+        const er = (data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null)?.errand
+        if (er?.rows) setPricingRows(er.rows)
+        if (er?.extra) setPricingExtra(er.extra)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (pickupCoord && deliveryCoord)
+      setDistanceKm(haversineKm(pickupCoord.lat, pickupCoord.lng, deliveryCoord.lat, deliveryCoord.lng))
+  }, [pickupCoord, deliveryCoord])
+
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2300) }
 
   const addItem    = () => setItems(p => [...p, { id: Date.now(), name: "", qty: 1, price: "" }])
@@ -31,7 +71,7 @@ export default function MuaHoPage() {
     setItems(p => p.map(i => i.id === id ? { ...i, [field]: value } : i))
 
   const estimatedBudget = items.reduce((s, i) => s + parseInt(i.price.replace(/\D/g, "") || "0") * i.qty, 0)
-  const serviceFee = 25000
+  const serviceFee = calcFeeFromRows(distanceKm ?? 2, pricingRows, pricingExtra)
 
   const handleSubmit = async () => {
     if (!pickup.trim())   { fireToast("Vui lòng nhập địa chỉ cửa hàng / chợ"); return }
@@ -226,7 +266,7 @@ export default function MuaHoPage() {
               </span>
             </div>
             <div style={{ display:"flex",justifyContent:"space-between",marginBottom:7 }}>
-              <span style={{ color:"#6a5a40",fontSize:10 }}>Phí dịch vụ mua hộ</span>
+              <span style={{ color:"#6a5a40",fontSize:10 }}>Phí dịch vụ mua hộ{distanceKm ? ` (${distanceKm.toFixed(1)} km)` : ""}</span>
               <span style={{ color:"#b0956a",fontSize:10,fontWeight:600 }}>{fmt(serviceFee)}</span>
             </div>
             <div style={{ height:1,background:"rgba(255,255,255,0.06)",margin:"8px 0" }} />

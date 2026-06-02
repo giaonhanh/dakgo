@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
@@ -8,8 +8,19 @@ import AddressPicker from "@/components/map/AddressPicker"
 import { createClient } from "@/lib/supabase/client"
 import type { AddressPickerResult } from "@/types"
 
-const BASE_PRICE = 10000
-const PER_KM     = 4500
+function calcFeeFromRows(km: number, rows: string[], extra: string): number {
+  const kmInt = Math.ceil(Math.max(km, 1))
+  let total = 0
+  for (let i = 0; i < Math.min(kmInt, 10); i++) {
+    let price = 0
+    for (let j = i; j >= 0; j--) {
+      if (rows[j] && rows[j] !== "") { price = parseInt(rows[j]) || 0; break }
+    }
+    total += price
+  }
+  if (kmInt > 10) total += (kmInt - 10) * (parseInt(extra) || 0)
+  return total
+}
 
 function estimateKm(dest: string): number {
   if (!dest) return 0
@@ -28,9 +39,21 @@ export default function XeOmPage() {
   const [loading,     setLoading]     = useState(false)
   const [toast,       setToast]       = useState("")
 
+  const [pricingRows,  setPricingRows]  = useState<string[]>(["10000","8000","7000","6500","6000","5500","5000","4800","4600","4500"])
+  const [pricingExtra, setPricingExtra] = useState("4000")
+
+  useEffect(() => {
+    createClient().from("app_settings").select("value").eq("key","pricing").maybeSingle()
+      .then(({ data }) => {
+        const mb = (data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null)?.motorbike
+        if (mb?.rows) setPricingRows(mb.rows)
+        if (mb?.extra) setPricingExtra(mb.extra)
+      })
+  }, [])
+
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
-  const estimatedKm = estimateKm(dest)
-  const estimatedPrice = BASE_PRICE + Math.round(PER_KM * estimatedKm)
+  const estimatedKm    = estimateKm(dest)
+  const estimatedPrice = calcFeeFromRows(estimatedKm, pricingRows, pricingExtra)
 
   const handleBook = async () => {
     if (!dest.trim()) { fireToast("Vui lòng nhập điểm đến"); return }
@@ -134,7 +157,7 @@ export default function XeOmPage() {
                   <span style={{ background:"linear-gradient(90deg,#4a8ff5,#7ab3ff)",
                     WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
                     backgroundClip:"text",fontSize:22,fontWeight:900 }}>
-                    {dest ? formatPrice(estimatedPrice) : "Từ 10.000đ"}
+                    {dest ? formatPrice(estimatedPrice) : `Từ ${formatPrice(calcFeeFromRows(1, pricingRows, pricingExtra))}`}
                   </span>
                 </div>
                 {dest && (
