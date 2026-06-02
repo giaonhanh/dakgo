@@ -12,7 +12,7 @@ import AddressPicker from "@/components/map/AddressPicker"
 import type { AddressPickerResult } from "@/types"
 import { formatPrice } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
-import { getRouteKm, calcDeliveryFee } from "@/lib/vietmapRoute"
+import { getRouteKm, calcDeliveryFee, calcDeliveryFeeFromPricing } from "@/lib/vietmapRoute"
 
 const supabase = createClient()
 
@@ -1160,6 +1160,7 @@ export default function CheckoutPage() {
   const [routeKm,        setRouteKm]        = useState<number | null>(null)
   const [deliveryFee,    setDeliveryFee]    = useState(15000)
   const [feeLoading,     setFeeLoading]     = useState(false)
+  const [foodPricing,    setFoodPricing]    = useState<{ rows: string[]; extra: string } | null>(null)
 
   // ── Load user, saved addresses, xu balance ──
   useEffect(() => {
@@ -1173,11 +1174,15 @@ export default function CheckoutPage() {
         supabase.from("wallets").select("id, balance, bonus_balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
         supabase.from("vouchers").select("id,code,title,discount_type,discount_value,min_order,max_discount,valid_to,shop_id,is_active,per_person_limit").eq("is_active", true).gte("valid_to", new Date().toISOString()).limit(30),
         supabase.from("referral_usages").select("id").eq("referee_id", user.id).maybeSingle(),
-        supabase.from("app_settings").select("key,value").in("key", ["weather_surcharge","night_surcharge"]),
+        supabase.from("app_settings").select("key,value").in("key", ["weather_surcharge","night_surcharge","pricing"]),
       ])
 
       // Tính phụ phí có điều kiện
       const settingsMap = Object.fromEntries((settingsData ?? []).map((r: {key:string;value:unknown}) => [r.key, r.value]))
+
+      // Giá cước giao đồ ăn từ admin
+      const pricingCfg = settingsMap.pricing as Record<string, { rows: string[]; extra: string }> | undefined
+      if (pricingCfg?.food?.rows) setFoodPricing({ rows: pricingCfg.food.rows, extra: pricingCfg.food.extra ?? "5000" })
       const weatherCfg = settingsMap.weather_surcharge as { enabled: boolean; type: "percent"|"fixed"; value: string } | undefined
       const nightCfg   = settingsMap.night_surcharge   as { enabled: boolean; start: string; end: string; fee: string } | undefined
       const nowH = new Date().getHours()
@@ -1268,7 +1273,7 @@ export default function CheckoutPage() {
   const currentAddr = allAddrs.find(a => a.id === selectedAddr) ?? allAddrs[0] ?? null
   const TIER_ADDR_LIMIT = 3
 
-  // ── Tính phí theo cung đường VietMap khi có đủ tọa độ ──
+  // ── Tính phí theo cung đường VietMap + giá cước admin ──
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const dLat = currentAddr?.lat
@@ -1277,10 +1282,14 @@ export default function CheckoutPage() {
     setFeeLoading(true)
     getRouteKm(shopCoords.lat, shopCoords.lng, dLat, dLng).then(km => {
       setRouteKm(km)
-      setDeliveryFee(calcDeliveryFee(km))
+      setDeliveryFee(
+        foodPricing
+          ? calcDeliveryFeeFromPricing(km, foodPricing.rows, foodPricing.extra)
+          : calcDeliveryFee(km)
+      )
       setFeeLoading(false)
     })
-  }, [shopCoords, currentAddr?.lat, currentAddr?.lng]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shopCoords, currentAddr?.lat, currentAddr?.lng, foodPricing]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Shop hours (mock — replace from shops.opening_hours[weekday]) ──
   const shopOpenH = 7, shopCloseH = 21

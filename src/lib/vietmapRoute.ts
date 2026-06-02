@@ -56,7 +56,38 @@ export async function getRouteKm(
   return haversineKm(fromLat, fromLng, toLat, toLng)
 }
 
-/** Tính phí giao hàng theo km cung đường */
+/** Tính phí theo cấu hình admin (pricing.food từ app_settings) */
+export function calcDeliveryFeeFromPricing(
+  km: number,
+  rows: string[],
+  extra: string,
+): number {
+  const extraPrice = parseInt(extra) || 0
+
+  const getPriceAt = (i: number): number => {
+    const idx = Math.min(i, rows.length - 1)
+    for (let j = idx; j >= 0; j--) {
+      if (rows[j] && rows[j] !== "") return parseInt(rows[j]) || 0
+    }
+    return 0
+  }
+
+  const wholeKm = Math.floor(km)
+  const fracKm  = km - wholeKm
+  let total = 0
+
+  for (let i = 0; i < Math.min(wholeKm, 10); i++) total += getPriceAt(i)
+  if (wholeKm > 10) total += (wholeKm - 10) * extraPrice
+
+  if (fracKm > 0) {
+    const fracPrice = wholeKm < 10 ? getPriceAt(wholeKm) : extraPrice
+    total += Math.round(fracKm * fracPrice)
+  }
+
+  return total
+}
+
+/** Fallback nếu chưa load được cấu hình admin */
 export function calcDeliveryFee(km: number): number {
   if (km <= 1) return 10000
   if (km <= 3) return 10000 + Math.round((km - 1) * 5000)
