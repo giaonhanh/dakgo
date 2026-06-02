@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { icon: "💰",  label: "Tài chính",        href: "/admin/finance" },
   { icon: "🗺️", label: "Bản đồ live",      href: "/admin/map" },
   { icon: "🏷️", label: "Khuyến mãi",       href: "/admin/promotions" },
+  { icon: "🖼️", label: "Banner ảnh",       href: "/admin/banners" },
   { icon: "⚖️",  label: "Tranh chấp",       href: "/admin/disputes" },
   { icon: "📣",  label: "Thông báo",        href: "/admin/notifications" },
   { icon: "💳",  label: "Lịch sử nạp/rút", href: "/admin/wallet-history" },
