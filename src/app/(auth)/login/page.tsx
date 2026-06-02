@@ -235,86 +235,57 @@ function LoginContent() {
     if (password.length < 6) { setError("Mật khẩu tối thiểu 6 ký tự"); return }
     if (!role)               { setError("Vui lòng chọn vai trò"); return }
 
-    const dbRole = role === "customer" ? "customer"
-                 : role === "merchant" ? "merchant"
-                 : "driver"
     const cleanPhone = phone.replace(/\s/g, "")
 
     submitting.current = true
     setLoading(true); setError("")
     try {
-      const { data, error: err } = await supabase.auth.signUp({
-        email: phoneToEmail(phone), password,
-        options: {
-          data: {
-            full_name:    name.trim(),
-            phone:        cleanPhone,
-            role:         dbRole,
-            vehicle_type: role === "driver_moto" ? vehicleType || "motorbike"
-                        : role === "driver_taxi" ? "car"
-                        : undefined,
-            shop_name:    role === "merchant" ? shopName : undefined,
-            shop_address: role === "merchant" ? shopAddr : undefined,
-          },
-        },
+      // Gọi API route (service role) để tạo user + profile + driver/shop — bypass RLS và email confirmation
+      const res = await fetch("/api/auth/register", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          phone:       cleanPhone,
+          password,
+          name:        name.trim(),
+          role,
+          vehicleType: vehicleType || undefined,
+          plate:       plate.trim() || undefined,
+          carModel:    carModel.trim() || undefined,
+          shopName:    shopName.trim() || undefined,
+          shopAddr:    shopAddr.trim() || undefined,
+          shopCat:     shopCat || undefined,
+        }),
       })
-      if (err) {
-        setError(
-          err.message.includes("already registered")
-            ? "Số điện thoại này đã được đăng ký. Vui lòng đăng nhập."
-            : "Đăng ký thất bại. Vui lòng thử lại."
-        )
+
+      const json = await res.json() as { error?: string; success?: boolean; role?: string }
+
+      if (!res.ok) {
+        if (res.status === 409) {
+          setError("Số điện thoại này đã được đăng ký. Vui lòng đăng nhập.")
+        } else {
+          setError("Đăng ký thất bại. Vui lòng thử lại.")
+        }
         return
       }
 
-      // Tạo profile thủ công vì trigger handle_new_user dùng phone OTP (NEW.phone = null với email auth)
-      if (data.user) {
-        const { error: profileErr } = await supabase.from("profiles").upsert({
-          id:        data.user.id,
-          phone:     cleanPhone,
-          full_name: name.trim(),
-          role:      dbRole,
-          is_active: true,
-        }, { onConflict: "id" })
-        if (profileErr) {
-          setError("Tạo tài khoản thất bại. Vui lòng thử lại.")
-          return
-        }
+      // Đăng nhập ngay để lấy session (user đã auto-confirm từ API)
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: phoneToEmail(cleanPhone),
+        password,
+      })
 
-        // Tạo hàng drivers nếu đăng ký tài xế
-        if (dbRole === "driver") {
-          await supabase.from("drivers").upsert({
-            id:            data.user.id,
-            vehicle_type:  role === "driver_taxi" ? "car" : (vehicleType || "motorbike"),
-            license_plate: plate.trim() || "—",
-            vehicle_model: role === "driver_taxi" ? (carModel.trim() || null) : null,
-            is_approved:   false,
-            status:        "offline",
-          }, { onConflict: "id" })
-        }
-
-        // Tạo hàng shops nếu đăng ký merchant
-        if (dbRole === "merchant") {
-          const { data: settingRow } = await supabase
-            .from("app_settings").select("value").eq("key", "commission").maybeSingle()
-          const defaultCommission = parseInt((settingRow?.value as { defaultRate?: string } | null)?.defaultRate ?? "15") || 15
-          await supabase.from("shops").insert({
-            owner_id:        data.user.id,
-            name:            shopName.trim() || `Cửa hàng của ${name.trim()}`,
-            address:         shopAddr.trim() || "Phước An, Krông Pắc",
-            category:        shopCat.replace(/^[^\s]+ /, "").trim() || "Đồ ăn",
-            status:          "pending",
-            is_open:         false,
-            commission_rate: defaultCommission,
-          })
-        }
+      if (signInErr) {
+        // User đã tạo thành công nhưng sign-in thất bại — chuyển sang tab đăng nhập
+        setSuccess("Tạo tài khoản thành công! Vui lòng đăng nhập.")
+        redirectTimer.current = setTimeout(() => switchTab("login"), 1500)
+        return
       }
 
-      const successDest = dbRole === "driver" ? "/driver"
-                        : dbRole === "merchant" ? "/merchant"
-                        : "/"
+      const dbRole = json.role ?? "customer"
+      const dest   = dbRole === "driver" ? "/driver" : dbRole === "merchant" ? "/merchant" : "/"
       setSuccess("Đăng ký thành công! Đang chuyển hướng...")
-      redirectTimer.current = setTimeout(() => { window.location.href = successDest }, 1200)
+      redirectTimer.current = setTimeout(() => { window.location.href = dest }, 1200)
     } finally {
       setLoading(false)
       submitting.current = false
