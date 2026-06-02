@@ -31,6 +31,7 @@ interface ShopInfo {
   name:          string
   description:   string | null
   address:       string
+  category:      string | null
   shop_type:     "partner" | "delivery" | null
   rating:        number | null
   rating_count:  number | null
@@ -497,7 +498,7 @@ export default function ShopPage() {
       // Shop info
       const { data: shopData } = await supabase
         .from("shops")
-        .select("name,description,address,shop_type,rating_avg,total_reviews,is_open,logo_url,cover_image_url,phone,opening_hours,menu_groups_data")
+        .select("name,description,address,category,shop_type,rating_avg,total_reviews,is_open,logo_url,cover_image_url,phone,opening_hours,menu_groups_data")
         .eq("id", shopId)
         .single()
       if (shopData) setShop({
@@ -506,6 +507,7 @@ export default function ShopPage() {
         rating_count: shopData.total_reviews,
         avatar_url: shopData.logo_url,
         cover_url: shopData.cover_image_url,
+        category: shopData.category ?? null,
         shop_type: (shopData.shop_type as "partner" | "delivery" | null) ?? null,
         opening_hours: shopData.opening_hours ?? null,
         prep_time: null,
@@ -921,26 +923,24 @@ export default function ShopPage() {
                     overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                     {shop.name}
                   </div>
-                  {/* Description + nhãn loại (ẩn địa chỉ) */}
+                  {/* Description + category chip */}
                   <div style={{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap" }}>
                     {shop.description && (
                       <span style={{ color:"#6a5a40", fontSize:9.5, lineHeight:1.5,
                         overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
-                        maxWidth:160 }}>
+                        maxWidth:150 }}>
                         {shop.description}
                       </span>
                     )}
-                    {shop.shop_type && (
+                    {shop.category && (
                       <span style={{
-                        background: shop.shop_type === "delivery"
-                          ? "rgba(255,107,0,0.12)"
-                          : "rgba(62,207,110,0.1)",
-                        border: `1px solid ${shop.shop_type === "delivery" ? "rgba(255,107,0,0.3)" : "rgba(62,207,110,0.25)"}`,
+                        background:"rgba(255,107,0,0.09)",
+                        border:"1px solid rgba(255,107,0,0.22)",
                         borderRadius:6, padding:"1px 7px",
-                        color: shop.shop_type === "delivery" ? "#FF8C00" : "#3ecf6e",
-                        fontSize:8, fontWeight:700, whiteSpace:"nowrap", flexShrink:0,
+                        color:"#FF8C00", fontSize:8, fontWeight:600,
+                        whiteSpace:"nowrap", flexShrink:0,
                       }}>
-                        {shop.shop_type === "delivery" ? "🛒 Cửa hàng mua hộ" : "🤝 Cửa hàng đối tác"}
+                        {shop.category}
                       </span>
                     )}
                   </div>
