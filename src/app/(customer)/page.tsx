@@ -738,40 +738,40 @@ export default function HomePage() {
             return (
               <div style={{ margin:"0 16px 8px" }}>
                 <div style={{
-                  height:110, borderRadius:16, overflow:"hidden",
+                  aspectRatio:"2/1", borderRadius:16, overflow:"hidden",
                   border:"1px solid rgba(255,107,0,0.35)",
                   position:"relative",
                   background:"linear-gradient(135deg,#1a0d00,#2d1500,#0d0900)",
                 }}>
-                  <div style={{ position:"absolute", top:-20, right:-15, width:130, height:130,
+                  <div style={{ position:"absolute", top:-30, right:-20, width:200, height:200,
                     background:"radial-gradient(circle,rgba(255,107,0,0.32) 0%,transparent 65%)" }} />
-                  <div style={{ position:"absolute", bottom:-15, left:10, width:80, height:80,
+                  <div style={{ position:"absolute", bottom:-20, left:10, width:120, height:120,
                     background:"radial-gradient(circle,rgba(255,179,71,0.12) 0%,transparent 65%)" }} />
                   <div style={{ position:"absolute", top:0, left:"-100%", width:"50%", height:"100%",
                     background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)",
                     animation:"logoShine 3.5s infinite" }} />
-                  <div style={{ position:"relative", zIndex:1, padding:"13px 15px" }}>
+                  <div style={{ position:"relative", zIndex:1, padding:"20px 20px" }}>
                     <div style={{ display:"inline-block",
                       background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
-                      borderRadius:8, padding:"2px 9px", marginBottom:5,
-                      color:"#000", fontSize:8, fontWeight:700, letterSpacing:.4 }}>
+                      borderRadius:8, padding:"3px 11px", marginBottom:8,
+                      color:"#000", fontSize:10, fontWeight:700, letterSpacing:.4 }}>
                       ⚡ FLASH SALE · {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
                     </div>
-                    <div style={{ color:"#fff", fontSize:14, fontWeight:700, lineHeight:1.25, maxWidth:"62%", wordBreak:"break-word" }}>
+                    <div style={{ color:"#fff", fontSize:18, fontWeight:700, lineHeight:1.25, maxWidth:"62%", wordBreak:"break-word" }}>
                       {dealTitle}
                     </div>
-                    <div style={{ color:"rgba(255,255,255,0.4)", fontSize:9, marginTop:3 }}>
+                    <div style={{ color:"rgba(255,255,255,0.4)", fontSize:11, marginTop:5 }}>
                       {dealSubLine}
                     </div>
                     <div onClick={() => router.push(deal?.shop_id ? `/shop/${deal.shop_id}` : "/vouchers")}
-                      style={{ display:"inline-block", marginTop:6, cursor:"pointer",
+                      style={{ display:"inline-block", marginTop:10, cursor:"pointer",
                         background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)",
-                        borderRadius:6, padding:"3px 9px", color:"#fff", fontSize:8.5, fontWeight:600 }}>
+                        borderRadius:8, padding:"5px 14px", color:"#fff", fontSize:11, fontWeight:600 }}>
                       Đặt ngay →
                     </div>
                   </div>
-                  <div style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)",
-                    fontSize:52, zIndex:1, filter:"drop-shadow(0 0 14px rgba(255,107,0,0.5))" }}>
+                  <div style={{ position:"absolute", right:18, top:"50%", transform:"translateY(-50%)",
+                    fontSize:72, zIndex:1, filter:"drop-shadow(0 0 18px rgba(255,107,0,0.5))" }}>
                     {dealEmoji}
                   </div>
                 </div>
@@ -788,7 +788,7 @@ export default function HomePage() {
             )
           })() : adminBanners.length > 0 ? (
             <div style={{ margin:"0 16px 8px" }}>
-              <div style={{ height:110, borderRadius:16, overflow:"hidden",
+              <div style={{ aspectRatio:"2/1", borderRadius:16, overflow:"hidden",
                 border:"1px solid rgba(255,255,255,0.12)", position:"relative",
                 cursor:"pointer", background:"#0d1a2d" }}
                 onClick={() => { const b = adminBanners[adminBannerIdx]; if (b?.link_url) router.push(b.link_url) }}>
@@ -798,13 +798,13 @@ export default function HomePage() {
                 ) : (
                   <div style={{ width:"100%", height:"100%",
                     background:"linear-gradient(135deg,#0d1a2d,#1a2d40)",
-                    display:"flex", alignItems:"center", padding:"16px 15px" }}>
+                    display:"flex", alignItems:"center", padding:"24px 20px" }}>
                     <div>
-                      <div style={{ color:"#fff", fontSize:14, fontWeight:700, marginBottom:4 }}>
+                      <div style={{ color:"#fff", fontSize:18, fontWeight:700, marginBottom:6 }}>
                         {adminBanners[adminBannerIdx]?.title}
                       </div>
                       {adminBanners[adminBannerIdx]?.subtitle && (
-                        <div style={{ color:"rgba(255,255,255,0.55)", fontSize:10 }}>
+                        <div style={{ color:"rgba(255,255,255,0.55)", fontSize:12 }}>
                           {adminBanners[adminBannerIdx].subtitle}
                         </div>
                       )}
