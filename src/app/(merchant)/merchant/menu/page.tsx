@@ -72,7 +72,8 @@ function SortableProductCard({ p, groups, onEdit, onToggle, onDelete }: ProductC
   const gName = groups.find(g => g.id === p.menuGroupId)?.name ?? ""
   return (
     <div ref={setNodeRef} style={{ transform:CSS.Transform.toString(transform), transition,
-      background:"rgba(255,255,255,0.04)", border:`1px solid ${p.available?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.04)"}`,
+      background: bc ? `${bc.bg}` : "rgba(255,255,255,0.04)",
+      border:`1px solid ${bc ? bc.border : p.available?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.04)"}`,
       borderRadius:14, padding:11, marginBottom:8, display:"flex", gap:10, alignItems:"center",
       opacity: isDragging ? 0.5 : p.available ? 1 : 0.6 }}>
       {/* Drag handle */}
@@ -96,7 +97,13 @@ function SortableProductCard({ p, groups, onEdit, onToggle, onDelete }: ProductC
             <span style={{background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"1px 6px",color:"#ff4040",fontSize:9,fontWeight:700}}>{fmt(p.promoPrice)}</span>
           )}
         </div>
-        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
+          {/* Badge — hiện nổi bật để merchant dễ nhận biết */}
+          {bc && (
+            <span style={{background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:5,padding:"2px 7px",color:bc.color,fontSize:8,fontWeight:800,letterSpacing:".02em"}}>
+              {bc.label}
+            </span>
+          )}
           {gName && <span style={{background:"rgba(74,143,245,0.1)",border:"1px solid rgba(74,143,245,0.2)",borderRadius:4,padding:"1px 5px",color:"#4a8ff5",fontSize:7}}>{gName}</span>}
           {p.categories.slice(0,2).map(c => (
             <span key={c} style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:4,padding:"1px 5px",color:"#6a5a40",fontSize:7}}>{c}</span>
