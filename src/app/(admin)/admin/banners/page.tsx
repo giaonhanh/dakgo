@@ -321,7 +321,7 @@ export default function AdminBannersPage() {
                         <>
                           <span style={{ fontSize: 24 }}>📤</span>
                           <span style={{ color: "#6a5a40", fontSize: 10 }}>Bấm để chọn ảnh</span>
-                          <span style={{ color: "#6a5a40", fontSize: 9 }}>1080×346px (tỉ lệ 3:1) · GIF động OK · &lt;2MB</span>
+                          <span style={{ color: "#6a5a40", fontSize: 9 }}>1000×500px (tỉ lệ 2:1) · GIF động OK · &lt;2MB</span>
                         </>
                       )}
                     </div>
