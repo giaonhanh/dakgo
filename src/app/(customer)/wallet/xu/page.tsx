@@ -73,8 +73,54 @@ export default function XuPage() {
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2400) }
   const finalTopup = customAmount ? parseInt(customAmount.replace(/\D/g,"")) || 0 : topupAmount
-  const vietQRUrl  = `https://img.vietqr.io/image/BIDV-1234567890-qr_only.png?amount=${finalTopup}&addInfo=NAP%20XU%20GIAONHANH`
   const filtered   = txs.filter(t => filterType === "all" || t.type === filterType)
+
+  const [qrUrl,       setQrUrl]       = useState<string | null>(null)
+  const [topupCode,   setTopupCode]   = useState<number | null>(null)
+  const [qrLoading,   setQrLoading]   = useState(false)
+
+  const handleCreateQR = async () => {
+    if (finalTopup < 10000) return
+    setQrLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { fireToast("Vui lòng đăng nhập lại"); return }
+
+      const code = Math.floor(10000000 + Math.random() * 90000000)
+
+      // Tạo wallet_topups record để webhook nhận diện
+      await supabase.from("wallet_topups").insert({
+        user_id:      user.id,
+        wallet_type:  "customer",
+        amount:       finalTopup,
+        payment_code: code,
+        status:       "pending",
+      })
+
+      // Gọi PayOS tạo QR thật
+      const res = await fetch("/api/payment/payos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderCode:   code,
+          amount:      finalTopup,
+          description: `NAP XU GN${code}`,
+          returnUrl:   `${window.location.origin}/wallet/xu?topup=success`,
+          cancelUrl:   `${window.location.origin}/wallet/xu`,
+        }),
+      })
+      const data = await res.json() as { qrCode?: string; error?: string }
+      if (data.error || !data.qrCode) throw new Error(data.error ?? "Không thể tạo QR")
+
+      setQrUrl(data.qrCode)
+      setTopupCode(code)
+      setShowQR(true)
+    } catch {
+      fireToast("Không thể tạo QR, vui lòng thử lại")
+    } finally {
+      setQrLoading(false)
+    }
+  }
 
   return (
     <>
@@ -147,8 +193,8 @@ export default function XuPage() {
                         Tối thiểu 10.000 xu · Cộng tự động sau khi quét QR
                       </div>
                     </div>
-                    <button onClick={() => finalTopup >= 10000 && setShowQR(true)}
-                      disabled={finalTopup < 10000}
+                    <button onClick={handleCreateQR}
+                      disabled={finalTopup < 10000 || qrLoading}
                       style={{ width:"100%", height:46, borderRadius:12, border:"none",
                         background: finalTopup >= 10000 ? "linear-gradient(90deg,#b464ff,#d484ff)" : "rgba(255,255,255,0.07)",
                         color: finalTopup >= 10000 ? "#fff" : "#6a5a40",
@@ -162,7 +208,7 @@ export default function XuPage() {
                           animation:"shimmer 2.5s infinite" }} />
                       )}
                       <span style={{ position:"relative", zIndex:1 }}>
-                        {finalTopup >= 10000 ? `Tạo QR nạp ${finalTopup.toLocaleString("vi-VN")} xu` : "Nhập tối thiểu 10.000 xu"}
+                        {qrLoading ? "Đang tạo QR..." : finalTopup >= 10000 ? `Tạo QR nạp ${finalTopup.toLocaleString("vi-VN")} xu` : "Nhập tối thiểu 10.000 xu"}
                       </span>
                     </button>
                   </>
@@ -171,19 +217,18 @@ export default function XuPage() {
                     <div style={{ color:"#b464ff", fontSize:12, fontWeight:600, marginBottom:14 }}>
                       Quét mã để nạp {finalTopup.toLocaleString("vi-VN")} xu
                     </div>
-                    <div style={{ display:"inline-block", background:"#fff", padding:12, borderRadius:16, marginBottom:12 }}>
-                      <img src={vietQRUrl} alt="VietQR" style={{ width:180, height:180, display:"block" }}
-                        onError={e => {
-                          (e.target as HTMLImageElement).style.display = "none"
-                          const p = document.createElement("div")
-                          p.style.cssText = "width:180px;height:180px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:40px;border-radius:8px"
-                          p.textContent = "📱"
-                          ;(e.target as HTMLImageElement).parentNode?.appendChild(p)
-                        }} />
-                    </div>
+                    {qrUrl ? (
+                      <div style={{ display:"inline-block", background:"#fff", padding:12, borderRadius:16, marginBottom:12 }}>
+                        <img src={qrUrl} alt="VietQR" style={{ width:180, height:180, display:"block" }} />
+                      </div>
+                    ) : (
+                      <div style={{ width:180, height:180, background:"rgba(180,100,255,0.08)", borderRadius:16,
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        fontSize:40, margin:"0 auto 12px" }}>📱</div>
+                    )}
                     <div style={{ color:"#6a5a40", fontSize: 11, lineHeight:1.7, marginBottom:12 }}>
-                      Ngân hàng BIDV · TK: 1234567890<br />
-                      Nội dung: <strong style={{ color:"#b464ff" }}>NAP XU GIAONHANH</strong>
+                      Mã nạp: <strong style={{ color:"#b464ff" }}>GN{topupCode}</strong><br />
+                      Quét QR để thanh toán qua ngân hàng
                     </div>
                     <div style={{ background:"rgba(180,100,255,0.08)", border:"1px solid rgba(180,100,255,0.2)",
                       borderRadius:9, padding:"7px 12px", marginBottom:12,

@@ -19,6 +19,9 @@ export async function POST(req: NextRequest) {
       payment_method = "cash",
       voucher_id,
       scheduled_at,
+      payment_code: clientPaymentCode,
+      surcharge = 0,
+      delivery_fee: clientDeliveryFee,
     } = await req.json()
 
     if (!shop_id || !items?.length || !delivery_address || delivery_lat == null || delivery_lng == null) {
@@ -53,13 +56,12 @@ export async function POST(req: NextRequest) {
     })
 
     const total        = orderItems.reduce((s: number, i: { subtotal: number }) => s + i.subtotal, 0)
-    const ship_fee     = 15000
+    const ship_fee     = (clientDeliveryFee ?? 15000) + (surcharge ?? 0)
     const total_amount = total + ship_fee
 
-    // payment_code: số nguyên 8 chữ số, dùng làm orderCode cho PayOS webhook
-    const payment_code = payment_method !== "cash"
-      ? Math.floor(10000000 + Math.random() * 90000000)
-      : null
+    // payment_code: từ client hoặc tạo mới nếu thanh toán online
+    const payment_code = clientPaymentCode
+      ?? (payment_method !== "cash" ? Math.floor(10000000 + Math.random() * 90000000) : null)
 
     // Tạo đơn hàng
     const { data: order, error: orderErr } = await supabase

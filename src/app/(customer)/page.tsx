@@ -888,7 +888,7 @@ export default function HomePage() {
                   {s.badge && (
                     <div style={{ position:"absolute", top:-3, right:4,
                       background:"#ff4040", color:"#fff",
-                      fontSize:6, fontWeight:700, padding:"1px 4px", borderRadius:4 }}>
+                      fontSize:10, fontWeight:700, padding:"1px 5px", borderRadius:4 }}>
                       {s.badge}
                     </div>
                   )}

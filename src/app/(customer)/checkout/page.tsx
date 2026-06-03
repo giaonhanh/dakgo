@@ -1157,6 +1157,8 @@ export default function CheckoutPage() {
   const [surcharge,      setSurcharge]      = useState(0)
   const [surchargeLabel, setSurchargeLabel] = useState<string | null>(null)
   const [shopCoords,     setShopCoords]     = useState<{ lat: number; lng: number } | null>(null)
+  const [shopOpenH,      setShopOpenH]      = useState(7)
+  const [shopCloseH,     setShopCloseH]     = useState(21)
   const [routeKm,        setRouteKm]        = useState<number | null>(null)
   const [deliveryFee,    setDeliveryFee]    = useState(15000)
   const [feeLoading,     setFeeLoading]     = useState(false)
@@ -1258,9 +1260,18 @@ export default function CheckoutPage() {
   const shopId = cartItems[0]?.shopId ?? null
   useEffect(() => {
     if (!shopId) return
-    supabase.from("shops").select("lat, lng").eq("id", shopId).single()
+    supabase.from("shops").select("lat, lng, opening_hours").eq("id", shopId).single()
       .then(({ data }) => {
         if (data?.lat && data?.lng) setShopCoords({ lat: data.lat as number, lng: data.lng as number })
+        if (data?.opening_hours) {
+          const weekday = new Date().getDay() // 0=CN, 1=T2...
+          const dayKey = ["sun","mon","tue","wed","thu","fri","sat"][weekday]
+          const hours = (data.opening_hours as Record<string, { open: string; close: string }>)[dayKey]
+          if (hours?.open && hours?.close) {
+            setShopOpenH(parseInt(hours.open.split(":")[0]))
+            setShopCloseH(parseInt(hours.close.split(":")[0]))
+          }
+        }
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shopId])
@@ -1291,8 +1302,6 @@ export default function CheckoutPage() {
     })
   }, [shopCoords, currentAddr?.lat, currentAddr?.lng, foodPricing]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Shop hours (mock — replace from shops.opening_hours[weekday]) ──
-  const shopOpenH = 7, shopCloseH = 21
   const nowH         = nowDate.getHours()
   const isBeforeOpen = nowH < shopOpenH
   const isAfterClose = nowH >= shopCloseH
@@ -1389,38 +1398,32 @@ export default function CheckoutPage() {
         ? `${new Date().toISOString().split("T")[0]}T${scheduledTime.start}:00`
         : null
 
-      const { data: order, error: orderErr } = await supabase
-        .from("orders")
-        .insert({
-          customer_id:  uid,
-          shop_id:      shopId,
-          service_type: "food",
-          status:       "pending",
-          drop_address: currentAddr.address,
-          note:         driverNote || null,
-          total:        subtotal,
-          ship_fee:     deliveryFee + surcharge,
-          total_amount: total,
-          pay_method:   payment,
-          payment_code: payment === "vietqr" ? orderCode : null,
-          scheduled_at: scheduledAt,
-        })
-        .select("id")
-        .single()
-
-      if (orderErr) throw orderErr
-
-      await supabase.from("order_items").insert(
-        cartItems.map(item => ({
-          order_id:   order.id,
-          product_id: item.id.split("__")[0],
-          name:       item.name,
-          price:      item.price,
-          qty:        item.qty,
-          note:       item.note || null,
-          breakdown:  item.breakdown ?? null,
-        }))
-      )
+      // Gọi /api/orders — validate giá từ DB, tạo order + order_items server-side
+      const orderRes = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shop_id:          shopId,
+          items:            cartItems.map(item => ({
+            product_id: item.id.split("__")[0],
+            quantity:   item.qty,
+            note:       item.note || null,
+          })),
+          delivery_address: currentAddr.address,
+          delivery_lat:     deliveryLat,
+          delivery_lng:     deliveryLng,
+          note:             driverNote || null,
+          payment_method:   payment,
+          voucher_id:       appliedVouchers[0]?.id ?? null,
+          scheduled_at:     scheduledAt,
+          payment_code:     payment === "vietqr" ? orderCode : null,
+          surcharge,
+          delivery_fee:     deliveryFee,
+        }),
+      })
+      const orderJson = await orderRes.json() as { orderId?: string; error?: string }
+      if (!orderRes.ok || !orderJson.orderId) throw new Error(orderJson.error ?? "Không thể tạo đơn hàng")
+      const order = { id: orderJson.orderId }
 
       // Trừ xu server-side (validate số dư thực tế trước khi trừ)
       if (xuBonusUsed > 0 || xuUsed > 0) {

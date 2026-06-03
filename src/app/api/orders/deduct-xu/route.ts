@@ -63,24 +63,28 @@ export async function POST(req: NextRequest) {
     const newBonus = (wallet.bonus_balance ?? 0) - xuBonusUsed
     const newBal   = (wallet.balance ?? 0) - xuUsed
 
-    // Trừ xu
-    const { error: updateErr } = await db
-      .from("wallets")
-      .update({ balance: newBal, bonus_balance: newBonus, updated_at: new Date().toISOString() })
-      .eq("id", wallet.id)
+    // Dùng RPC để trừ xu + ghi lịch sử trong 1 transaction atomic
+    const { error: rpcErr } = await db.rpc("deduct_xu_atomic", {
+      p_wallet_id:    wallet.id,
+      p_xu_used:      xuUsed,
+      p_xu_bonus:     xuBonusUsed,
+      p_new_bal:      newBal,
+      p_new_bonus:    newBonus,
+      p_order_id:     order_id,
+    })
 
-    if (updateErr) return NextResponse.json({ error: "Không thể trừ xu" }, { status: 500 })
+    if (rpcErr) {
+      // Fallback: update thủ công nếu RPC chưa tồn tại
+      const { error: updateErr } = await db
+        .from("wallets")
+        .update({ balance: newBal, bonus_balance: newBonus, updated_at: new Date().toISOString() })
+        .eq("id", wallet.id)
+      if (updateErr) return NextResponse.json({ error: "Không thể trừ xu" }, { status: 500 })
 
-    // Ghi lịch sử giao dịch
-    const txRows = []
-    if (xuBonusUsed > 0) {
-      txRows.push({ wallet_id: wallet.id, type: "payment", amount: xuBonusUsed, balance_after: newBonus, ref_type: "order", ref_id: order_id, note: "Thanh toán bằng xu thưởng" })
-    }
-    if (xuUsed > 0) {
-      txRows.push({ wallet_id: wallet.id, type: "payment", amount: xuUsed, balance_after: newBal, ref_type: "order", ref_id: order_id, note: "Thanh toán bằng xu Giao Nhanh" })
-    }
-    if (txRows.length > 0) {
-      await db.from("transactions").insert(txRows)
+      const txRows = []
+      if (xuBonusUsed > 0) txRows.push({ wallet_id: wallet.id, type: "payment", amount: xuBonusUsed, balance_after: newBonus, ref_type: "order", ref_id: order_id, note: "Thanh toán bằng xu thưởng" })
+      if (xuUsed > 0)      txRows.push({ wallet_id: wallet.id, type: "payment", amount: xuUsed,      balance_after: newBal,   ref_type: "order", ref_id: order_id, note: "Thanh toán bằng xu Giao Nhanh" })
+      if (txRows.length > 0) await db.from("transactions").insert(txRows)
     }
 
     return NextResponse.json({ ok: true, newBal, newBonus })
