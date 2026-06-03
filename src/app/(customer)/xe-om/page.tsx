@@ -39,16 +39,22 @@ export default function XeOmPage() {
   const [loading,     setLoading]     = useState(false)
   const [toast,       setToast]       = useState("")
 
-  const [pricingRows,  setPricingRows]  = useState<string[]>(["10000","8000","7000","6500","6000","5500","5000","4800","4600","4500"])
-  const [pricingExtra, setPricingExtra] = useState("4000")
+  const [pricingRows,    setPricingRows]    = useState<string[]>(["10000","8000","7000","6500","6000","5500","5000","4800","4600","4500"])
+  const [pricingExtra,   setPricingExtra]   = useState("4000")
+  const [serviceEnabled, setServiceEnabled] = useState(true)
 
   useEffect(() => {
-    createClient().from("app_settings").select("value").eq("key","pricing").maybeSingle()
-      .then(({ data }) => {
-        const mb = (data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null)?.motorbike
-        if (mb?.rows) setPricingRows(mb.rows)
-        if (mb?.extra) setPricingExtra(mb.extra)
-      })
+    const supabase = createClient()
+    Promise.all([
+      supabase.from("app_settings").select("value").eq("key","pricing").maybeSingle(),
+      supabase.from("app_settings").select("value").eq("key","service_toggles").maybeSingle(),
+    ]).then(([pricingRes, toggleRes]) => {
+      const mb = (pricingRes.data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null)?.motorbike
+      if (mb?.rows) setPricingRows(mb.rows)
+      if (mb?.extra) setPricingExtra(mb.extra)
+      const toggles = toggleRes.data?.value as Record<string, boolean> | null
+      if (toggles && toggles.motorbike === false) setServiceEnabled(false)
+    })
   }, [])
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
@@ -111,6 +117,16 @@ export default function XeOmPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Tạm ngừng dịch vụ */}
+      {!serviceEnabled && (
+        <div style={{ position:"fixed", inset:0, zIndex:200, background:"#080806", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:16, padding:24 }}>
+          <div style={{ fontSize:56 }}>🛵</div>
+          <div style={{ color:"#f8f0e0", fontSize:18, fontWeight:700, textAlign:"center" }}>Xe ôm tạm ngừng phục vụ</div>
+          <div style={{ color:"#6a5a40", fontSize:12, textAlign:"center", lineHeight:1.6 }}>Hiện không có tài xế xe ôm trực tuyến.{"\n"}Vui lòng thử lại sau hoặc chọn dịch vụ khác.</div>
+          <button onClick={() => router.back()} style={{ marginTop:8, padding:"12px 28px", borderRadius:14, background:"linear-gradient(135deg,#FF6B00,#FF8C00)", color:"#fff", fontSize:13, fontWeight:700, border:"none", cursor:"pointer" }}>← Quay lại</button>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ position:"fixed",top:0,left:0,right:0,zIndex:40,

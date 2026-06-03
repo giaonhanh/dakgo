@@ -47,22 +47,31 @@ export default function TaxiPage() {
   const [loading,     setLoading]     = useState(false)
   const [toast,       setToast]       = useState("")
 
-  const [pricingRows,   setPricingRows]   = useState<string[]>(["15000","13000","11000","10000","9500","9000","8500","8000","7500","7000"])
-  const [pricingExtra,  setPricingExtra]  = useState("6500")
-  const [pricingRows7,  setPricingRows7]  = useState<string[]>(["20000","17000","14000","12000","11000","10000","9500","9000","8500","8000"])
-  const [pricingExtra7, setPricingExtra7] = useState("7500")
+  const [pricingRows,    setPricingRows]    = useState<string[]>(["15000","13000","11000","10000","9500","9000","8500","8000","7500","7000"])
+  const [pricingExtra,   setPricingExtra]   = useState("6500")
+  const [pricingRows7,   setPricingRows7]   = useState<string[]>(["20000","17000","14000","12000","11000","10000","9500","9000","8500","8000"])
+  const [pricingExtra7,  setPricingExtra7]  = useState("7500")
+  const [taxi4Enabled,   setTaxi4Enabled]   = useState(true)
+  const [taxi7Enabled,   setTaxi7Enabled]   = useState(true)
 
   useEffect(() => {
-    createClient().from("app_settings").select("value").eq("key","pricing").maybeSingle()
-      .then(({ data }) => {
-        const p = data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null
-        const tx  = p?.taxi
-        const tx7 = p?.taxi7
-        if (tx?.rows)  setPricingRows(tx.rows)
-        if (tx?.extra) setPricingExtra(tx.extra)
-        if (tx7?.rows)  setPricingRows7(tx7.rows)
-        if (tx7?.extra) setPricingExtra7(tx7.extra)
-      })
+    const supabase = createClient()
+    Promise.all([
+      supabase.from("app_settings").select("value").eq("key","pricing").maybeSingle(),
+      supabase.from("app_settings").select("value").eq("key","service_toggles").maybeSingle(),
+    ]).then(([pricingRes, toggleRes]) => {
+      const p = pricingRes.data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null
+      const tx  = p?.taxi;  const tx7 = p?.taxi7
+      if (tx?.rows)   setPricingRows(tx.rows)
+      if (tx?.extra)  setPricingExtra(tx.extra)
+      if (tx7?.rows)  setPricingRows7(tx7.rows)
+      if (tx7?.extra) setPricingExtra7(tx7.extra)
+      const toggles = toggleRes.data?.value as Record<string, boolean> | null
+      if (toggles) {
+        if (toggles.taxi_4cho === false) setTaxi4Enabled(false)
+        if (toggles.taxi_7cho === false) setTaxi7Enabled(false)
+      }
+    })
   }, [])
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
@@ -160,31 +169,39 @@ export default function TaxiPage() {
 
           {/* Chọn loại xe */}
           <div style={{ display:"flex",gap:10,marginBottom:14 }}>
-            {(Object.entries(CARS) as [CarType, typeof CARS[CarType]][]).map(([key, c]) => (
-              <motion.button key={key} whileTap={{ scale:0.97 }}
-                onClick={() => setCarType(key)}
-                style={{ flex:1,padding:"14px 10px",borderRadius:16,cursor:"pointer",textAlign:"left",
-                  background:carType===key?"rgba(180,100,255,0.1)":"rgba(255,255,255,0.04)",
-                  border:`1px solid ${carType===key?"rgba(180,100,255,0.4)":"rgba(255,255,255,0.07)"}`,
-                  boxShadow:carType===key?"0 4px 20px rgba(180,100,255,0.15)":"none",
-                  fontFamily:"Lexend",position:"relative",overflow:"hidden" }}>
-                {carType===key && (
-                  <div style={{ position:"absolute",top:8,right:8,width:16,height:16,borderRadius:"50%",
-                    background:"#b464ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9 }}>✓</div>
-                )}
-                <div style={{ fontSize:28,marginBottom:6 }}>{c.emoji}</div>
-                <div style={{ color:carType===key?"#b464ff":"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:2 }}>
-                  {c.label}
-                </div>
-                <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:6 }}>{c.sub}</div>
-                <div style={{ display:"flex",alignItems:"center",gap:5 }}>
-                  <span style={{ color:carType===key?"#b464ff":"#6a5a40",fontSize:9,fontWeight:700 }}>
-                    Từ {formatPrice(key === "7cho" ? calcFeeFromRows(1, pricingRows7, pricingExtra7) : calcFeeFromRows(1, pricingRows, pricingExtra))}
-                  </span>
-                  <span style={{ color:"#4a3a28",fontSize:8 }}>· {c.seats} chỗ</span>
-                </div>
-              </motion.button>
-            ))}
+            {(Object.entries(CARS) as [CarType, typeof CARS[CarType]][]).map(([key, c]) => {
+              const isDisabled = key === "4cho" ? !taxi4Enabled : !taxi7Enabled
+              return (
+                <motion.button key={key} whileTap={{ scale: isDisabled ? 1 : 0.97 }}
+                  onClick={() => { if (!isDisabled) setCarType(key) }}
+                  style={{ flex:1,padding:"14px 10px",borderRadius:16,cursor:isDisabled?"not-allowed":"pointer",textAlign:"left",
+                    background:isDisabled?"rgba(255,255,255,0.02)":carType===key?"rgba(180,100,255,0.1)":"rgba(255,255,255,0.04)",
+                    border:`1px solid ${isDisabled?"rgba(255,64,64,0.2)":carType===key?"rgba(180,100,255,0.4)":"rgba(255,255,255,0.07)"}`,
+                    boxShadow:carType===key&&!isDisabled?"0 4px 20px rgba(180,100,255,0.15)":"none",
+                    fontFamily:"Lexend",position:"relative",overflow:"hidden",opacity:isDisabled?0.5:1 }}>
+                  {isDisabled && (
+                    <div style={{ position:"absolute",top:6,right:6,background:"rgba(255,64,64,0.15)",border:"1px solid rgba(255,64,64,0.3)",borderRadius:6,padding:"2px 6px",fontSize:8,fontWeight:700,color:"#ff4040" }}>Tạm đóng</div>
+                  )}
+                  {!isDisabled && carType===key && (
+                    <div style={{ position:"absolute",top:8,right:8,width:16,height:16,borderRadius:"50%",
+                      background:"#b464ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9 }}>✓</div>
+                  )}
+                  <div style={{ fontSize:28,marginBottom:6 }}>{c.emoji}</div>
+                  <div style={{ color:isDisabled?"#6a5a40":carType===key?"#b464ff":"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:2 }}>
+                    {c.label}
+                  </div>
+                  <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:6 }}>{isDisabled?"Tạm ngừng phục vụ":c.sub}</div>
+                  {!isDisabled && (
+                    <div style={{ display:"flex",alignItems:"center",gap:5 }}>
+                      <span style={{ color:carType===key?"#b464ff":"#6a5a40",fontSize:9,fontWeight:700 }}>
+                        Từ {formatPrice(key === "7cho" ? calcFeeFromRows(1, pricingRows7, pricingExtra7) : calcFeeFromRows(1, pricingRows, pricingExtra))}
+                      </span>
+                      <span style={{ color:"#4a3a28",fontSize:8 }}>· {c.seats} chỗ</span>
+                    </div>
+                  )}
+                </motion.button>
+              )
+            })}
           </div>
 
           {/* Hero price card */}

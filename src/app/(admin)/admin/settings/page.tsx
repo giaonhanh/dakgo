@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import AdminShell from "@/components/admin/AdminShell"
 
-type SettingSection = "pricing" | "commission" | "area" | "features" | "account" | "maintenance"
+type SettingSection = "pricing" | "commission" | "area" | "services" | "features" | "account" | "maintenance"
 type ServiceType    = "food" | "delivery_pkg" | "errand" | "motorbike" | "taxi" | "taxi7"
 
 interface ToggleSetting { key: string; label: string; description: string; value: boolean }
@@ -128,6 +128,10 @@ export default function AdminSettingsPage() {
         const f = map.features as Record<string, boolean>
         setFeatures(prev => prev.map(item => ({ ...item, value: f[item.key] ?? item.value })))
       }
+      if (map.service_toggles) {
+        const st = map.service_toggles as Record<string, boolean>
+        setServiceToggles(prev => prev.map(item => ({ ...item, value: st[item.key] ?? item.value })))
+      }
       if (map.area)             setAreaSettings(map.area)
       if (map.delivery)         setDeliverySettings(map.delivery)
       if (map.app_hours)        setAppHours(map.app_hours)
@@ -165,6 +169,18 @@ export default function AdminSettingsPage() {
     setApplyingCommission(false)
     setTimeout(() => setApplyCommissionMsg(""), 5000)
   }
+
+  /* ── Service Toggles ── */
+  const [serviceToggles, setServiceToggles] = useState<ToggleSetting[]>([
+    { key:"motorbike", label:"Xe ôm",     description:"Cho phép khách đặt xe ôm. Tắt khi không có tài xế xe máy trực tuyến.", value:true },
+    { key:"taxi_4cho", label:"Taxi 4 chỗ", description:"Cho phép khách đặt taxi 4 chỗ. Tắt khi toàn bộ tài xế taxi 4 chỗ bận.", value:true },
+    { key:"taxi_7cho", label:"Taxi 7 chỗ", description:"Cho phép khách đặt taxi 7 chỗ. Tắt khi không có xe 7 chỗ khả dụng.", value:true },
+    { key:"mua_ho",    label:"Mua hộ",    description:"Cho phép khách đặt dịch vụ mua hộ (đi chợ, siêu thị).", value:true },
+    { key:"giao_ho",   label:"Giao hộ",   description:"Cho phép khách đặt dịch vụ giao hộ (giao bưu phẩm).", value:true },
+  ])
+
+  const toggleService = (key: string) =>
+    setServiceToggles(p => p.map(s => s.key === key ? { ...s, value: !s.value } : s))
 
   /* ── Features ── */
   const [features, setFeatures] = useState<ToggleSetting[]>([
@@ -205,11 +221,13 @@ export default function AdminSettingsPage() {
       else localStorage.removeItem("admin_contact_link")
 
       // Persist all app settings to Supabase
-      const featuresMap = Object.fromEntries(features.map(f => [f.key, f.value]))
+      const featuresMap      = Object.fromEntries(features.map(f => [f.key, f.value]))
+      const serviceToggleMap = Object.fromEntries(serviceToggles.map(s => [s.key, s.value]))
       const upsertRows = [
         { key: "pricing",           value: pricing },
         { key: "commission",        value: commissionSettings },
         { key: "features",          value: featuresMap },
+        { key: "service_toggles",   value: serviceToggleMap },
         { key: "area",              value: areaSettings },
         { key: "delivery",          value: deliverySettings },
         { key: "app_hours",         value: appHours },
@@ -271,6 +289,7 @@ export default function AdminSettingsPage() {
     { key:"pricing",     label:"Cước & Phí",      icon:"💵" },
     { key:"commission",  label:"Hoa hồng",        icon:"💰" },
     { key:"area",        label:"Khu vực",          icon:"🗺️" },
+    { key:"services",    label:"Dịch vụ",          icon:"🔌" },
     { key:"features",    label:"Tính năng",        icon:"⚙️" },
     { key:"account",     label:"Tài khoản admin",  icon:"👤" },
     { key:"maintenance", label:"Bảo trì",          icon:"🔧" },
@@ -602,6 +621,50 @@ export default function AdminSettingsPage() {
               <div style={{ marginTop:12, padding:"14px 16px", background:"rgba(74,143,245,0.06)", border:"1px solid rgba(74,143,245,0.15)", borderRadius:12 }}>
                 <div style={{ color:"#4a8ff5", fontSize:11, fontWeight:700 }}>ℹ️ Phước An, Krông Pắc, Đắk Lắk</div>
                 <div style={{ color:"#6a5a40", fontSize:10, marginTop:4 }}>Tọa độ hiện tại: 12.6521°N, 108.5073°E · Múi giờ: GMT+7</div>
+              </div>
+            </div>
+          )}
+
+          {/* SERVICES */}
+          {activeSection === "services" && (
+            <div style={{ animation:"fadeUp .3s ease" }}>
+              <div style={{ color:"#f0eaff", fontSize:15, fontWeight:700, marginBottom:4 }}>🔌 Bật / Tắt dịch vụ</div>
+              <div style={{ color:"#6a5a40", fontSize:11, marginBottom:20 }}>Tắt dịch vụ khi không có tài xế khả dụng — khách sẽ thấy thông báo tạm ngừng thay vì chờ mãi không có ai nhận</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {serviceToggles.map(s => {
+                  const SERVICE_ICON: Record<string,string> = { motorbike:"🛵", taxi_4cho:"🚕", taxi_7cho:"🚙", mua_ho:"🛒", giao_ho:"📦" }
+                  const SERVICE_COLOR: Record<string,string> = { motorbike:"#4a8ff5", taxi_4cho:"#FF8C00", taxi_7cho:"#b464ff", mua_ho:"#3ecf6e", giao_ho:"#FFB347" }
+                  const icon  = SERVICE_ICON[s.key]  ?? "🔧"
+                  const color = SERVICE_COLOR[s.key] ?? "#6a5a40"
+                  return (
+                    <div key={s.key} style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderRadius:14, background: s.value ? "rgba(62,207,110,0.05)" : "rgba(255,64,64,0.05)", border:`1px solid ${s.value ? "rgba(62,207,110,0.2)" : "rgba(255,64,64,0.2)"}`, transition:"all .2s" }}>
+                      <div style={{ width:44, height:44, borderRadius:12, background:`${color}18`, border:`1px solid ${color}30`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>
+                        {icon}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ color:"#f0eaff", fontSize:13, fontWeight:700, marginBottom:2 }}>{s.label}</div>
+                        <div style={{ color:"#6a5a40", fontSize:10, lineHeight:1.4 }}>{s.description}</div>
+                      </div>
+                      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, flexShrink:0 }}>
+                        <button onClick={() => toggleService(s.key)} style={{
+                          width:52, height:28, borderRadius:14, border:"none", cursor:"pointer", position:"relative", transition:"background .2s",
+                          background: s.value ? "#3ecf6e" : "rgba(255,255,255,0.1)",
+                        }}>
+                          <div style={{ position:"absolute", top:3, left: s.value ? 26 : 3, width:22, height:22, borderRadius:11, background:"#fff", transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,0.3)" }} />
+                        </button>
+                        <span style={{ fontSize:9, fontWeight:700, color: s.value ? "#3ecf6e" : "#ff4040" }}>
+                          {s.value ? "Mở" : "Tắt"}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div style={{ marginTop:16, padding:"12px 14px", borderRadius:12, background:"rgba(255,179,71,0.08)", border:"1px solid rgba(255,179,71,0.2)" }}>
+                <div style={{ color:"#FFB347", fontSize:11, fontWeight:600, marginBottom:4 }}>💡 Lưu ý</div>
+                <div style={{ color:"#6a5a40", fontSize:10, lineHeight:1.6 }}>
+                  Nhấn <b style={{color:"#f0eaff"}}>Lưu cài đặt</b> để áp dụng thay đổi. Trang đặt dịch vụ phía khách sẽ hiện thông báo "Tạm ngừng phục vụ" thay vì form đặt hàng.
+                </div>
               </div>
             </div>
           )}

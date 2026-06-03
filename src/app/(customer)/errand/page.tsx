@@ -55,17 +55,27 @@ function ErrandContent() {
   const [delivPkgExtra, setDelivPkgExtra] = useState("6000")
   const [distanceKm,    setDistanceKm]   = useState<number | null>(null)
 
+  const [muaHoEnabled, setMuaHoEnabled] = useState(true)
+  const [giaoHoEnabled, setGiaoHoEnabled] = useState(true)
+
   useEffect(() => {
-    createClient().from("app_settings").select("value").eq("key","pricing").maybeSingle()
-      .then(({ data }) => {
-        const p = data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null
-        const er = p?.errand
-        const dp = p?.delivery_pkg
-        if (er?.rows) setErrandRows(er.rows)
-        if (er?.extra) setErrandExtra(er.extra)
-        if (dp?.rows) setDelivPkgRows(dp.rows)
-        if (dp?.extra) setDelivPkgExtra(dp.extra)
-      })
+    const supabase = createClient()
+    Promise.all([
+      supabase.from("app_settings").select("value").eq("key","pricing").maybeSingle(),
+      supabase.from("app_settings").select("value").eq("key","service_toggles").maybeSingle(),
+    ]).then(([pricingRes, toggleRes]) => {
+      const p = pricingRes.data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null
+      const er = p?.errand;  const dp = p?.delivery_pkg
+      if (er?.rows) setErrandRows(er.rows)
+      if (er?.extra) setErrandExtra(er.extra)
+      if (dp?.rows) setDelivPkgRows(dp.rows)
+      if (dp?.extra) setDelivPkgExtra(dp.extra)
+      const toggles = toggleRes.data?.value as Record<string, boolean> | null
+      if (toggles) {
+        if (toggles.mua_ho  === false) setMuaHoEnabled(false)
+        if (toggles.giao_ho === false) setGiaoHoEnabled(false)
+      }
+    })
   }, [])
 
   useEffect(() => {
@@ -164,6 +174,20 @@ function ErrandContent() {
         </div>
       )}
 
+      {/* Banner tạm ngừng theo tab */}
+      {((tab === "buy" && !muaHoEnabled) || (tab === "deliver" && !giaoHoEnabled)) && (
+        <div style={{ position:"fixed",inset:0,zIndex:200,background:"#080806",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:24 }}>
+          <div style={{ fontSize:56 }}>{tab === "buy" ? "🛒" : "📦"}</div>
+          <div style={{ color:"#f8f0e0",fontSize:18,fontWeight:700,textAlign:"center" }}>
+            {tab === "buy" ? "Mua hộ" : "Giao hộ"} tạm ngừng phục vụ
+          </div>
+          <div style={{ color:"#6a5a40",fontSize:12,textAlign:"center",lineHeight:1.6 }}>
+            Dịch vụ này hiện không khả dụng.{"\n"}Vui lòng thử lại sau hoặc chọn dịch vụ khác.
+          </div>
+          <a href="/" style={{ marginTop:8,padding:"12px 28px",borderRadius:14,background:"linear-gradient(135deg,#FF6B00,#FF8C00)",color:"#fff",fontSize:13,fontWeight:700,textDecoration:"none" }}>← Quay lại</a>
+        </div>
+      )}
+
       <div style={{ position:"fixed",inset:0,background:"#080806",display:"flex",flexDirection:"column",overflow:"hidden" }}>
 
         {/* Header */}
@@ -176,12 +200,15 @@ function ErrandContent() {
             </div>
           </div>
           <div style={{ display:"flex",background:"rgba(255,255,255,0.05)",borderRadius:12,padding:3,gap:3 }}>
-            {(["buy","deliver"] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)}
-                style={{ flex:1,height:38,borderRadius:9,background:tab===t?"linear-gradient(90deg,#FF6B00,#FF8C00)":"transparent",border:"none",cursor:"pointer",color:tab===t?"#fff":"#6a5a40",fontSize:12,fontWeight:tab===t?700:500,fontFamily:"Lexend",transition:"all .2s" }}>
-                {t === "buy" ? "🛍️ Mua hộ" : "📦 Giao hộ"}
-              </button>
-            ))}
+            {(["buy","deliver"] as const).map(t => {
+              const isOff = t === "buy" ? !muaHoEnabled : !giaoHoEnabled
+              return (
+                <button key={t} onClick={() => setTab(t)}
+                  style={{ flex:1,height:38,borderRadius:9,background:tab===t?"linear-gradient(90deg,#FF6B00,#FF8C00)":"transparent",border:"none",cursor:isOff?"not-allowed":"pointer",color:tab===t?"#fff":isOff?"#3a2a18":"#6a5a40",fontSize:12,fontWeight:tab===t?700:500,fontFamily:"Lexend",transition:"all .2s",opacity:isOff?0.5:1 }}>
+                  {t === "buy" ? "🛍️ Mua hộ" : "📦 Giao hộ"}{isOff?" (Tạm đóng)":""}
+                </button>
+              )
+            })}
           </div>
         </div>
 
