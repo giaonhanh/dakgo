@@ -1422,28 +1422,26 @@ export default function CheckoutPage() {
         }))
       )
 
-      // Trừ xu nếu dùng — referral trước, GiaoNhanh sau
-      if (xuWalletId && (xuBonusUsed > 0 || xuUsed > 0)) {
-        const newBonus = Math.max(0, xuBonus - xuBonusUsed)
-        const newBal   = Math.max(0, xuBalance - xuUsed)
-        await supabase.from("wallets").update({
-          balance: newBal, bonus_balance: newBonus, updated_at: new Date().toISOString()
-        }).eq("id", xuWalletId)
-        if (xuBonusUsed > 0) {
-          await supabase.from("transactions").insert({
-            wallet_id: xuWalletId, type: "payment", amount: xuBonusUsed,
-            balance_after: newBonus, ref_type: "order", ref_id: order.id,
-            note: "Thanh toán bằng xu thưởng",
-          })
-        }
-        if (xuUsed > 0) {
-          await supabase.from("transactions").insert({
-            wallet_id: xuWalletId, type: "payment", amount: xuUsed,
-            balance_after: newBal, ref_type: "order", ref_id: order.id,
-            note: "Thanh toán bằng xu Giao Nhanh",
-          })
+      // Trừ xu server-side (validate số dư thực tế trước khi trừ)
+      if (xuBonusUsed > 0 || xuUsed > 0) {
+        const xuRes = await fetch("/api/orders/deduct-xu", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order_id: order.id, xu_used: xuUsed, xu_bonus_used: xuBonusUsed }),
+        })
+        if (!xuRes.ok) {
+          const { error } = await xuRes.json() as { error: string }
+          await supabase.from("orders").delete().eq("id", order.id)
+          throw new Error(error ?? "Không thể trừ xu")
         }
       }
+
+      // Trigger auto-dispatch (fire & forget — không chặn nếu thất bại)
+      fetch("/api/orders/trigger-dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: order.id }),
+      }).catch(() => {/* driver tự nhận nếu dispatch thất bại */})
 
       clearCart()
       router.push(`/order-success?orderId=${order.id}`)

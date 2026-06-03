@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
-// Admin client để bypass RLS khi gán tài xế
-function adminClient() {
+function adminDb() {
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -12,19 +11,22 @@ function adminClient() {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 })
+    // Internal call từ order creation hoặc cron — dùng CRON_SECRET header
+    const internalSecret = req.headers.get("x-internal-secret")
+    const isInternal = !!internalSecret && internalSecret === process.env.CRON_SECRET
 
-    // Chỉ admin hoặc system mới được dispatch
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single()
+    if (!isInternal) {
+      // Fallback: yêu cầu admin auth
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 })
 
-    if (profile?.role !== "admin") {
-      return NextResponse.json({ error: "Không có quyền" }, { status: 403 })
+      const { data: profile } = await supabase
+        .from("profiles").select("role").eq("id", user.id).single()
+
+      if (profile?.role !== "admin") {
+        return NextResponse.json({ error: "Không có quyền" }, { status: 403 })
+      }
     }
 
     const { order_id, order_lat, order_lng } = await req.json()
@@ -32,9 +34,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Thiếu thông tin bắt buộc" }, { status: 400 })
     }
 
-    const admin = adminClient()
+    const admin = adminDb()
 
-    // Tìm tài xế online gần nhất
+    // Tìm tài xế online gần nhất (trong vòng 5km)
     const { data: driverId, error: rpcErr } = await admin.rpc("find_nearest_driver", {
       order_lat,
       order_lng,
