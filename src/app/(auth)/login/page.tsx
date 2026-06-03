@@ -1,6 +1,7 @@
 ﻿"use client"
 
 import { useState, useEffect, useRef, Suspense } from "react"
+import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -339,12 +340,11 @@ function LoginContent() {
               exit={{ opacity: 0, scale: .95 }} transition={{ duration: .4 }}
               style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
               <div style={{
-                width: 88, height: 88, borderRadius: 24, fontSize: 44,
-                background: "linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
+                width: 88, height: 88, borderRadius: 24,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 position: "relative", overflow: "hidden", animation: "goldGlow 2s ease-in-out infinite",
               }}>
-                🚀
+                <Image src="/icon-512.png" alt="Giao Nhanh" width={88} height={88} style={{ borderRadius: 24, objectFit: "contain" }} priority />
                 <div style={{
                   position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
                   background: "linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent)",
@@ -386,13 +386,12 @@ function LoginContent() {
                 initial={{ scale: 0, rotate: -10 }} animate={{ scale: 1, rotate: 0 }}
                 transition={{ delay: .1, type: "spring", damping: 12 }}
                 style={{
-                  width: 56, height: 56, borderRadius: 16, fontSize: 26,
-                  background: "linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
+                  width: 56, height: 56, borderRadius: 16,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   marginBottom: 10, position: "relative", overflow: "hidden",
                   boxShadow: "0 0 20px rgba(255,107,0,.4),0 6px 16px rgba(0,0,0,.4)",
                 }}>
-                🚀
+                <Image src="/icon-512.png" alt="Giao Nhanh" width={56} height={56} style={{ borderRadius: 16, objectFit: "contain" }} />
                 <div style={{
                   position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
                   background: "linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent)",
