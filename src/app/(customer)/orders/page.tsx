@@ -76,19 +76,6 @@ const SERVICE_CFG: Record<ServiceType, { label: string; emoji: string; color: st
 const SHOP_COLORS = ["#FF8C00","#4a8ff5","#3ecf6e","#FFB347","#b464ff","#ff6060"]
 function shopColor(idx: number) { return SHOP_COLORS[idx % SHOP_COLORS.length] }
 
-function categoryToEmoji(cat: string | null): string {
-  if (!cat) return "🍽️"
-  const c = cat.toLowerCase()
-  if (c.includes("bun") || c.includes("phở") || c.includes("mì")) return "🍜"
-  if (c.includes("trà") || c.includes("tra") || c.includes("drink")) return "🧋"
-  if (c.includes("gà") || c.includes("ga")) return "🍗"
-  if (c.includes("cơm") || c.includes("com")) return "🍱"
-  if (c.includes("burger") || c.includes("fast")) return "🍔"
-  if (c.includes("cafe") || c.includes("cà phê")) return "☕"
-  if (c.includes("bánh") || c.includes("cake")) return "🍰"
-  if (c.includes("pizza")) return "🍕"
-  return "🍽️"
-}
 
 function fmtPayMethod(pm: string): string {
   const map: Record<string, string> = {
@@ -208,7 +195,7 @@ export default function OrdersPage() {
           id, status, drop_address, note, total, ship_fee,
           pay_method, cancel_reason, created_at, driver_id, shop_id,
           payment_status, xu_used,
-          shops(id, name, category)
+          shops(id, name)
         `)
         .eq("customer_id", user.id)
         .order("created_at", { ascending: false })
@@ -270,7 +257,7 @@ export default function OrdersPage() {
           shopId: o.shop_id ?? "",
           driverId: o.driver_id ?? null,
           shopName: shop?.name ?? "Cửa hàng",
-          shopEmoji: categoryToEmoji(shop?.category ?? null),
+          shopEmoji: "🍽️",
           shopColor: shopColor(idx),
           status: mapStatus(o.status),
           items: items.map(i => ({

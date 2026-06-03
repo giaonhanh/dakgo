@@ -551,12 +551,7 @@ export default function SearchPage() {
 
 // --- Shop Card ---
 function ShopCard({ shop, onClick }: { shop: ShopResult; onClick: () => void }) {
-  const emoji = shop.category === "Bún/Phở" ? "🍜"
-    : shop.category === "Cơm hộp" ? "🍱"
-    : shop.category === "Đồ uống" ? "🧋"
-    : shop.category === "Bánh"    ? "🧁"
-    : shop.category === "Gà rán"  ? "🍗"
-    : "🏪"
+  const emoji = "🏪"
   return (
     <div onClick={onClick} style={{
       background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",

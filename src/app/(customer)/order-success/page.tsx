@@ -81,7 +81,7 @@ function OrderSuccessContent() {
         .from("orders")
         .select(`
           id, total_amount, delivery_address, driver_id,
-          shops(name, category),
+          shops(name),
           order_items(name, qty)
         `)
         .eq("id", orderId)

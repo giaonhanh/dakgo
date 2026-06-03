@@ -19,15 +19,6 @@ interface OrderData {
   createdAt: string
 }
 
-function categoryToEmoji(cat: string | null): string {
-  if (!cat) return "🍽️"
-  const c = cat.toLowerCase()
-  if (c.includes("bun") || c.includes("phở")) return "🍜"
-  if (c.includes("trà") || c.includes("drink")) return "🧋"
-  if (c.includes("gà")) return "🍗"
-  if (c.includes("cơm")) return "🍱"
-  return "🍽️"
-}
 
 function fmtDate(iso: string): string {
   const d = new Date(iso)
@@ -117,7 +108,7 @@ export default function ReviewPage() {
         .from("orders")
         .select(`
           id, total_amount, created_at, driver_id, shop_id,
-          shops(id, name, category),
+          shops(id, name),
           order_items(name),
           drivers(id, license_plate, rating_avg)
         `)
@@ -140,7 +131,7 @@ export default function ReviewPage() {
         id: data.id,
         shopId: data.shop_id ?? "",
         shopName: shop?.name ?? "Cửa hàng",
-        shopEmoji: categoryToEmoji(shop?.category ?? null),
+        shopEmoji: "🍽️",
         items: items.map(i => i.name),
         total: data.total_amount,
         driverId: data.driver_id ?? null,

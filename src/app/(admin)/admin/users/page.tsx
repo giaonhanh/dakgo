@@ -46,10 +46,6 @@ const DRIVER_STATUS_CFG: Record<DriverStatus, { label: string; color: string; bg
   busy:    { label: "Bận",     color: "#FFB347", bg: "rgba(255,179,71,0.12)"  },
 }
 
-function categoryIcon(cat: string): string {
-  const map: Record<string, string> = { "Bún/Phở": "🍜", "Cơm hộp": "🍱", "Gà rán": "🍗", "Đồ uống": "🥤", "Bánh mì": "🥖", "Pizza": "🍕", "Bánh/Kem": "🧁", "Cà phê": "☕", "Hải sản": "🦐", "Lẩu": "🍲" }
-  return map[cat] ?? "🏪"
-}
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -72,7 +68,7 @@ interface DriverRow {
 
 interface MerchantRow {
   id: string; shopName: string; ownerName: string; phone: string
-  category: string; shopStatus: ShopStatus; isOpen: boolean
+  shopStatus: ShopStatus; isOpen: boolean
   ratingAvg: number | null; totalReviews: number
   commissionRate: number; isNegotiated: boolean; createdDate: string
   shopType: "partner" | "delivery" | null
@@ -324,7 +320,7 @@ export default function AdminUsersPage() {
     const supabase = createClient()
     const { data: rows, error: shopErr } = await supabase
       .from("shops")
-      .select("id, owner_id, name, category, status, is_open, rating_avg, total_reviews, commission_rate, is_negotiated_commission, created_at, shop_type")
+      .select("id, owner_id, name, status, is_open, rating_avg, total_reviews, commission_rate, is_negotiated_commission, created_at, shop_type")
       .order("created_at", { ascending: false })
     if (shopErr) console.error("[loadMerchants] shops query error:", shopErr)
     if (!rows || rows.length === 0) { setMerchantsLoading(false); setMerchantsLoaded(true); return }
@@ -338,7 +334,6 @@ export default function AdminUsersPage() {
         shopName: r.name,
         ownerName: (p as { full_name?: string }).full_name ?? "Chủ quán",
         phone: (p as { phone?: string }).phone ?? "—",
-        category: r.category ?? "Khác",
         shopStatus: (r.status ?? "pending") as ShopStatus,
         isOpen: r.is_open ?? false,
         ratingAvg: r.rating_avg ?? null,
@@ -888,8 +883,8 @@ export default function AdminUsersPage() {
               <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 13, overflow: "hidden" }}>
                 <div style={{ overflowX: "auto" }}>
                   <div style={{ minWidth: 780 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 80px 55px 72px 80px 70px", gap: 8, padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
-                      {["", "Cửa hàng", "Chủ / SĐT", "Danh mục", "Trạng thái", "Rating", "Hoa hồng", "Ngày tạo", "Nhãn"].map(h => (
+                    <div style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 55px 72px 80px 70px", gap: 8, padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
+                      {["", "Cửa hàng", "Chủ / SĐT", "Trạng thái", "Rating", "Hoa hồng", "Ngày tạo", "Nhãn"].map(h => (
                         <div key={h} style={{ color: "rgba(144,128,176,0.4)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>{h}</div>
                       ))}
                     </div>
@@ -901,20 +896,18 @@ export default function AdminUsersPage() {
                       const ss = SHOP_STATUS_CFG[m.shopStatus]
                       return (
                         <div key={m.id} className="user-row"
-                          style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 80px 55px 72px 80px 70px", gap: 8, padding: "10px 14px", alignItems: "center", borderBottom: idx < shownMerchants.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", transition: "all 0.15s" }}>
+                          style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 55px 72px 80px 70px", gap: 8, padding: "10px 14px", alignItems: "center", borderBottom: idx < shownMerchants.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", transition: "all 0.15s" }}>
                           <div style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,179,71,0.12)", border: "1px solid rgba(255,179,71,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, position: "relative" }}>
-                            {categoryIcon(m.category)}
+                            🏪
                             {m.isOpen && <div style={{ position: "absolute", bottom: -2, right: -2, width: 10, height: 10, borderRadius: "50%", background: "#3ecf6e", border: "1.5px solid #06050a", boxShadow: "0 0 4px #3ecf6e" }} />}
                           </div>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ color: "#f0eaff", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.shopName}</div>
-                            <div style={{ color: "rgba(144,128,176,0.45)", fontSize: 8, marginTop: 1 }}>{m.category}</div>
                           </div>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ color: "#f0eaff", fontSize: 10, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.ownerName}</div>
                             <div style={{ color: "rgba(144,128,176,0.45)", fontSize: 8 }}>{m.phone}</div>
                           </div>
-                          <div style={{ color: "rgba(240,234,255,0.6)", fontSize: 9 }}>{m.category}</div>
                           <div>
                             <span style={{ fontSize: 8, fontWeight: 700, padding: "2px 7px", borderRadius: 5, border: `1px solid ${ss.border}`, background: ss.bg, color: ss.color, whiteSpace: "nowrap" }}>{ss.label}</span>
                           </div>

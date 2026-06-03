@@ -101,7 +101,7 @@ export default function TrackingPage() {
         .select(`
           id, status, created_at, delivery_address, delivery_lat, delivery_lng,
           total_amount, pay_method, driver_id,
-          shops(name, category),
+          shops(name),
           order_items(name, qty)
         `)
         .eq("id", orderId)
