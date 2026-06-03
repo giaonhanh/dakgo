@@ -80,29 +80,10 @@ const TABS = [
 // shopId → list of product category strings
 type ProdCatMap = Record<string, string[]>
 
-// Keywords bổ sung để match theo category của shop (fallback khi sản phẩm chưa có danh mục)
-const SHOP_CAT_KEYWORDS: Record<string, string[]> = {
-  sang:  ["sáng", "bánh mì", "phở", "bún", "cháo", "xôi", "hủ tiếu", "cà phê", "cafe", "dimsum"],
-  trua:  ["trưa", "cơm", "bún", "phở", "mì", "bình dân", "hộp"],
-  toi:   ["tối", "lẩu", "nướng", "hải sản", "bbq", "nhậu", "bia", "tôm", "cua"],
-  nuoc:  ["nước", "uống", "cà phê", "cafe", "trà", "sinh tố", "ép", "trà sữa", "juice", "cocktail"],
-  nhau:  ["nhậu", "nướng", "lẩu", "hải sản", "bia", "mồi", "bbq", "chân gà"],
-  anvat: ["vặt", "chè", "bánh", "kem", "snack", "xiên", "bắp", "tráng miệng", "dessert"],
-}
-
-function shopMatchesTab(shop: { id: string; category: string }, tabKey: string, tabCatKeys: string[], prodCatMap: ProdCatMap): boolean {
+function shopMatchesTab(shopId: string, tabCatKeys: string[], prodCatMap: ProdCatMap): boolean {
   if (tabCatKeys.length === 0) return true
-
-  // Ưu tiên 1: sản phẩm đã gắn danh mục đúng (Buổi sáng/trưa/tối...)
-  const prodCats = prodCatMap[shop.id] ?? []
-  if (prodCats.length > 0) {
-    return prodCats.some(cat => tabCatKeys.some(key => cat.toLowerCase().includes(key)))
-  }
-
-  // Ưu tiên 2: fallback — match theo category của shop (cho cửa hàng chưa set danh mục sản phẩm)
-  const shopCat = shop.category.toLowerCase()
-  const extraKeys = SHOP_CAT_KEYWORDS[tabKey] ?? []
-  return [...tabCatKeys, ...extraKeys].some(key => shopCat.includes(key))
+  const cats = prodCatMap[shopId] ?? []
+  return cats.some(cat => tabCatKeys.some(key => cat.toLowerCase().includes(key)))
 }
 
 export default function NearbyShopsPage() {
@@ -190,14 +171,14 @@ export default function NearbyShopsPage() {
   const currentTab = TABS.find(t => t.key === activeTab) ?? TABS[0]
 
   const filtered = useMemo(
-    () => shops.filter(s => shopMatchesTab(s, currentTab.key, currentTab.catKeys, prodCatMap)),
+    () => shops.filter(s => shopMatchesTab(s.id, currentTab.catKeys, prodCatMap)),
     [shops, currentTab, prodCatMap]
   )
 
   const tabCounts = useMemo(() => {
     const map: Record<string, number> = {}
     for (const tab of TABS) {
-      map[tab.key] = shops.filter(s => shopMatchesTab(s, tab.key, tab.catKeys, prodCatMap)).length
+      map[tab.key] = shops.filter(s => shopMatchesTab(s.id, tab.catKeys, prodCatMap)).length
     }
     return map
   }, [shops, prodCatMap])
