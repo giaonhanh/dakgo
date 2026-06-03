@@ -25,9 +25,14 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Chưa đăng nhập → redirect login (trừ trang login)
+  // Chưa đăng nhập → redirect login, giữ lại URL gốc để quay lại sau khi đăng nhập
   if (!user && !pathname.startsWith("/login")) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const loginUrl = new URL("/login", request.url)
+    // Chỉ giữ redirect cho các trang customer-facing (không giữ /admin, /driver, /merchant)
+    if (!pathname.startsWith("/admin") && !pathname.startsWith("/driver") && !pathname.startsWith("/merchant")) {
+      loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search)
+    }
+    return NextResponse.redirect(loginUrl)
   }
 
   if (user) {

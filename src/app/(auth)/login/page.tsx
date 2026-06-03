@@ -220,8 +220,14 @@ function LoginContent() {
       })
       if (err || !data.user) { setError("Số điện thoại hoặc mật khẩu không đúng"); return }
 
-      // Để middleware server-side đọc profile và redirect đúng dashboard
-      window.location.href = "/"
+      // Nếu có redirect param (vd: chia sẽ link shop) → vào thẳng đó
+      const redirectTo = params.get("redirect")
+      if (redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")) {
+        window.location.href = redirectTo
+      } else {
+        // Để middleware server-side đọc profile và redirect đúng dashboard
+        window.location.href = "/"
+      }
     } finally {
       setLoading(false)
       submitting.current = false
@@ -282,8 +288,11 @@ function LoginContent() {
         return
       }
 
-      const dbRole = json.role ?? "customer"
-      const dest   = dbRole === "driver" ? "/driver" : dbRole === "merchant" ? "/merchant" : "/"
+      const dbRole     = json.role ?? "customer"
+      const redirectTo = params.get("redirect")
+      const dest = redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//") && dbRole === "customer"
+        ? redirectTo
+        : dbRole === "driver" ? "/driver" : dbRole === "merchant" ? "/merchant" : "/"
       setSuccess("Đăng ký thành công! Đang chuyển hướng...")
       redirectTimer.current = setTimeout(() => { window.location.href = dest }, 1200)
     } finally {
