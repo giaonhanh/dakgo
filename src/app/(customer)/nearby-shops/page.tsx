@@ -259,7 +259,7 @@ export default function NearbyShopsPage() {
             <motion.div key={s.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.2) }}>
               <a href={`/shop/${s.id}`} style={{ textDecoration: "none" }}>
                 <div style={{ background: s.isOpen ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "11px 12px", opacity: s.isOpen ? 1 : 0.65 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: tabProds.length > 0 ? 10 : 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 0 }}>
 
                     {/* Logo */}
                     <div style={{ width: 54, height: 54, borderRadius: 13, flexShrink: 0, background: "rgba(255,107,0,0.07)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, position: "relative", overflow: "hidden" }}>
