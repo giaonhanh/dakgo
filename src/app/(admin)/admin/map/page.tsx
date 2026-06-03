@@ -229,9 +229,32 @@ export default function AdminMapPage() {
 
   useEffect(() => {
     loadMapData()
-    const iv = setInterval(loadMapData, 10000)
-    return () => clearInterval(iv)
-  }, [loadMapData])
+
+    // Realtime: lắng nghe driver location + status thay đổi
+    const driverChannel = supabase
+      .channel("admin-map-drivers")
+      .on("postgres_changes", { event: "*", schema: "public", table: "drivers" }, () => {
+        loadMapData()
+      })
+      .subscribe()
+
+    // Realtime: lắng nghe order thay đổi
+    const orderChannel = supabase
+      .channel("admin-map-orders")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        loadMapData()
+      })
+      .subscribe()
+
+    // Polling 5s làm fallback (phòng khi Realtime disconnect)
+    const iv = setInterval(loadMapData, 5000)
+
+    return () => {
+      supabase.removeChannel(driverChannel)
+      supabase.removeChannel(orderChannel)
+      clearInterval(iv)
+    }
+  }, [loadMapData, supabase])
 
   const onlineCount  = onlineDrivers.length
   const busyCount    = onlineDrivers.filter(d => d.status === "busy").length
@@ -260,7 +283,7 @@ export default function AdminMapPage() {
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:8, background:"rgba(62,207,110,0.1)", border:"1px solid rgba(62,207,110,0.2)" }}>
               <span style={{ width:7, height:7, borderRadius:"50%", background:"#3ecf6e", display:"inline-block", animation:"pulse 2s infinite", boxShadow:"0 0 5px #3ecf6e" }} />
-              <span style={{ color:"#3ecf6e", fontSize:10, fontWeight:700 }}>LIVE · cập nhật 5s</span>
+              <span style={{ color:"#3ecf6e", fontSize:10, fontWeight:700 }}>LIVE · Realtime</span>
             </div>
             {(["all","drivers","orders"] as const).map(l => (
               <button key={l} onClick={() => setLayer(l)} style={{ padding:"6px 14px", borderRadius:8, background: layer===l?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)", border: layer===l?"1px solid rgba(255,107,0,0.35)":"1px solid rgba(255,255,255,0.08)", color: layer===l?"#FF8C00":"#6a5a40", fontSize:11, cursor:"pointer", fontFamily:"Lexend", fontWeight: layer===l?700:400 }}>
