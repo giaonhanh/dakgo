@@ -46,10 +46,6 @@ function formatDist(km: number): string {
   return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)} km`
 }
 
-function formatPrice(n: number): string {
-  return n.toLocaleString("vi-VN") + "đ"
-}
-
 function catEmoji(cat: string): string {
   const c = cat.toLowerCase()
   if (c.includes("bún") || c.includes("phở")) return "🍜"
@@ -259,15 +255,10 @@ export default function NearbyShopsPage() {
             <div style={{ color: "#6a5a40", fontSize: 11 }}>Không tìm thấy quán có món "{currentTab.label}"</div>
           </div>
         ) : filtered.map((s, idx) => {
-          // Lấy sản phẩm liên quan đến tab đang chọn để hiển thị trên card
-          const tabProds = currentTab.key !== "all"
-            ? (prodMap[s.id]?.[currentTab.key] ?? [])
-            : Object.values(prodMap[s.id] ?? {}).flat().slice(0, 3)
-
           return (
             <motion.div key={s.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.2) }}>
               <a href={`/shop/${s.id}`} style={{ textDecoration: "none" }}>
-                <div style={{ background: s.isOpen ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "12px 12px", opacity: s.isOpen ? 1 : 0.65 }}>
+                <div style={{ background: s.isOpen ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "11px 12px", opacity: s.isOpen ? 1 : 0.65 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: tabProds.length > 0 ? 10 : 0 }}>
 
                     {/* Logo */}
@@ -296,9 +287,17 @@ export default function NearbyShopsPage() {
                       <div style={{ color: "#6a5a40", fontSize: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 4 }}>{s.address}</div>
 
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        {s.rating > 0 && <span style={{ color: "#FFB347", fontSize: 10 }}>★ {s.rating.toFixed(1)}</span>}
+                        {s.rating > 0 && (
+                          <span style={{ display: "flex", alignItems: "center", gap: 3, background: "rgba(255,179,71,0.1)", border: "1px solid rgba(255,179,71,0.2)", borderRadius: 6, padding: "2px 7px" }}>
+                            <span style={{ color: "#FFB347", fontSize: 10 }}>★</span>
+                            <span style={{ color: "#FFB347", fontSize: 10, fontWeight: 700 }}>{s.rating.toFixed(1)}</span>
+                          </span>
+                        )}
                         {s.distanceKm !== null && (
-                          <span style={{ color: "#4a8ff5", fontSize: 9 }}>📍 {formatDist(s.distanceKm)}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 3, background: "rgba(74,143,245,0.08)", border: "1px solid rgba(74,143,245,0.2)", borderRadius: 6, padding: "2px 7px" }}>
+                            <span style={{ fontSize: 9 }}>📍</span>
+                            <span style={{ color: "#4a8ff5", fontSize: 10, fontWeight: 600 }}>{formatDist(s.distanceKm)}</span>
+                          </span>
                         )}
                       </div>
                     </div>
@@ -308,23 +307,6 @@ export default function NearbyShopsPage() {
                       <div style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg,#FF6B00,#FF8C00)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, boxShadow: "0 2px 8px rgba(255,107,0,0.35)" }}>›</div>
                     </div>
                   </div>
-
-                  {/* Món ăn liên quan đến danh mục đang chọn */}
-                  {tabProds.length > 0 && (
-                    <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {tabProds.slice(0, 3).map((p, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255,107,0,0.07)", border: "1px solid rgba(255,107,0,0.15)", borderRadius: 8, padding: "3px 8px" }}>
-                          <span style={{ color: "#f8f0e0", fontSize: 9, fontWeight: 600 }}>{p.name}</span>
-                          <span style={{ color: "#FF8C00", fontSize: 9, fontWeight: 700 }}>{formatPrice(p.price)}</span>
-                        </div>
-                      ))}
-                      {tabProds.length > 3 && (
-                        <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, padding: "3px 8px" }}>
-                          <span style={{ color: "#6a5a40", fontSize: 9 }}>+{tabProds.length - 3} món</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               </a>
             </motion.div>
