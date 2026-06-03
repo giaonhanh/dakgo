@@ -55,8 +55,10 @@ function ErrandContent() {
   const [delivPkgExtra, setDelivPkgExtra] = useState("6000")
   const [distanceKm,    setDistanceKm]   = useState<number | null>(null)
 
-  const [muaHoEnabled, setMuaHoEnabled] = useState(true)
+  const [muaHoEnabled,  setMuaHoEnabled]  = useState(true)
   const [giaoHoEnabled, setGiaoHoEnabled] = useState(true)
+  const [muaHoMsg,      setMuaHoMsg]      = useState("Dịch vụ mua hộ tạm ngừng phục vụ. Vui lòng thử lại sau.")
+  const [giaoHoMsg,     setGiaoHoMsg]     = useState("Dịch vụ giao hộ tạm ngừng phục vụ. Vui lòng thử lại sau.")
 
   useEffect(() => {
     const supabase = createClient()
@@ -70,10 +72,14 @@ function ErrandContent() {
       if (er?.extra) setErrandExtra(er.extra)
       if (dp?.rows) setDelivPkgRows(dp.rows)
       if (dp?.extra) setDelivPkgExtra(dp.extra)
-      const toggles = toggleRes.data?.value as Record<string, boolean> | null
-      if (toggles) {
-        if (toggles.mua_ho  === false) setMuaHoEnabled(false)
-        if (toggles.giao_ho === false) setGiaoHoEnabled(false)
+      const toggles = toggleRes.data?.value as Record<string, { enabled?: boolean; customerMsg?: string }> | null
+      if (toggles?.mua_ho?.enabled === false) {
+        setMuaHoEnabled(false)
+        if (toggles.mua_ho.customerMsg) setMuaHoMsg(toggles.mua_ho.customerMsg)
+      }
+      if (toggles?.giao_ho?.enabled === false) {
+        setGiaoHoEnabled(false)
+        if (toggles.giao_ho.customerMsg) setGiaoHoMsg(toggles.giao_ho.customerMsg)
       }
     })
   }, [])
@@ -182,7 +188,7 @@ function ErrandContent() {
             {tab === "buy" ? "Mua hộ" : "Giao hộ"} tạm ngừng phục vụ
           </div>
           <div style={{ color:"#6a5a40",fontSize:12,textAlign:"center",lineHeight:1.6 }}>
-            Dịch vụ này hiện không khả dụng.{"\n"}Vui lòng thử lại sau hoặc chọn dịch vụ khác.
+            {tab === "buy" ? muaHoMsg : giaoHoMsg}
           </div>
           <a href="/" style={{ marginTop:8,padding:"12px 28px",borderRadius:14,background:"linear-gradient(135deg,#FF6B00,#FF8C00)",color:"#fff",fontSize:13,fontWeight:700,textDecoration:"none" }}>← Quay lại</a>
         </div>

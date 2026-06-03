@@ -51,8 +51,10 @@ export default function TaxiPage() {
   const [pricingExtra,   setPricingExtra]   = useState("6500")
   const [pricingRows7,   setPricingRows7]   = useState<string[]>(["20000","17000","14000","12000","11000","10000","9500","9000","8500","8000"])
   const [pricingExtra7,  setPricingExtra7]  = useState("7500")
-  const [taxi4Enabled,   setTaxi4Enabled]   = useState(true)
-  const [taxi7Enabled,   setTaxi7Enabled]   = useState(true)
+  const [taxi4Enabled, setTaxi4Enabled] = useState(true)
+  const [taxi7Enabled, setTaxi7Enabled] = useState(true)
+  const [taxi4Msg,     setTaxi4Msg]     = useState("Dịch vụ taxi 4 chỗ tạm ngừng phục vụ.")
+  const [taxi7Msg,     setTaxi7Msg]     = useState("Dịch vụ taxi 7 chỗ tạm ngừng phục vụ.")
 
   useEffect(() => {
     const supabase = createClient()
@@ -66,10 +68,14 @@ export default function TaxiPage() {
       if (tx?.extra)  setPricingExtra(tx.extra)
       if (tx7?.rows)  setPricingRows7(tx7.rows)
       if (tx7?.extra) setPricingExtra7(tx7.extra)
-      const toggles = toggleRes.data?.value as Record<string, boolean> | null
-      if (toggles) {
-        if (toggles.taxi_4cho === false) setTaxi4Enabled(false)
-        if (toggles.taxi_7cho === false) setTaxi7Enabled(false)
+      const toggles = toggleRes.data?.value as Record<string, { enabled?: boolean; customerMsg?: string }> | null
+      if (toggles?.taxi_4cho?.enabled === false) {
+        setTaxi4Enabled(false)
+        if (toggles.taxi_4cho.customerMsg) setTaxi4Msg(toggles.taxi_4cho.customerMsg)
+      }
+      if (toggles?.taxi_7cho?.enabled === false) {
+        setTaxi7Enabled(false)
+        if (toggles.taxi_7cho.customerMsg) setTaxi7Msg(toggles.taxi_7cho.customerMsg)
       }
     })
   }, [])
@@ -190,7 +196,7 @@ export default function TaxiPage() {
                   <div style={{ color:isDisabled?"#6a5a40":carType===key?"#b464ff":"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:2 }}>
                     {c.label}
                   </div>
-                  <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:6 }}>{isDisabled?"Tạm ngừng phục vụ":c.sub}</div>
+                  <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:6 }}>{isDisabled ? (key === "4cho" ? taxi4Msg : taxi7Msg) : c.sub}</div>
                   {!isDisabled && (
                     <div style={{ display:"flex",alignItems:"center",gap:5 }}>
                       <span style={{ color:carType===key?"#b464ff":"#6a5a40",fontSize:9,fontWeight:700 }}>

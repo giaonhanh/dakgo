@@ -8,6 +8,45 @@ type SettingSection = "pricing" | "commission" | "area" | "services" | "features
 type ServiceType    = "food" | "delivery_pkg" | "errand" | "motorbike" | "taxi" | "taxi7"
 
 interface ToggleSetting { key: string; label: string; description: string; value: boolean }
+interface SvcToggle { key: string; label: string; icon: string; color: string; enabled: boolean; reason: string; customerMsg: string }
+
+const SERVICE_PRESETS: Record<string, { label: string; msg: string }[]> = {
+  motorbike: [
+    { label:"Tài xế bận hết",  msg:"Hiện không có tài xế xe ôm khả dụng trong khu vực. Vui lòng thử lại sau ít phút." },
+    { label:"Quá tải đơn",     msg:"Dịch vụ xe ôm đang quá tải, tạm ngưng nhận đơn mới. Xin lỗi vì sự bất tiện." },
+    { label:"Ngoài giờ",       msg:"Dịch vụ xe ôm hoạt động từ 07:00 – 21:00. Vui lòng quay lại trong giờ phục vụ." },
+    { label:"Bảo trì",         msg:"Dịch vụ xe ôm đang bảo trì, sẽ hoạt động trở lại sớm." },
+    { label:"Tạm nghỉ",        msg:"Dịch vụ xe ôm tạm ngừng phục vụ. Xin lỗi vì sự bất tiện." },
+  ],
+  taxi_4cho: [
+    { label:"Tài xế bận hết",  msg:"Toàn bộ tài xế taxi 4 chỗ đang bận. Vui lòng thử lại sau hoặc chọn xe 7 chỗ." },
+    { label:"Quá tải đơn",     msg:"Dịch vụ taxi 4 chỗ đang quá tải, tạm ngưng nhận đơn mới." },
+    { label:"Không có xe",     msg:"Không có xe taxi 4 chỗ khả dụng trong khu vực lúc này." },
+    { label:"Ngoài giờ",       msg:"Dịch vụ taxi 4 chỗ hoạt động từ 07:00 – 21:00." },
+    { label:"Bảo trì",         msg:"Dịch vụ taxi 4 chỗ đang bảo trì, sẽ hoạt động trở lại sớm." },
+  ],
+  taxi_7cho: [
+    { label:"Tài xế bận hết",  msg:"Toàn bộ xe 7 chỗ đang bận. Vui lòng thử lại sau ít phút." },
+    { label:"Quá tải đơn",     msg:"Dịch vụ taxi 7 chỗ đang quá tải, tạm ngưng nhận đơn mới." },
+    { label:"Không có xe",     msg:"Không có xe 7 chỗ khả dụng trong khu vực lúc này." },
+    { label:"Ngoài giờ",       msg:"Dịch vụ taxi 7 chỗ hoạt động từ 07:00 – 21:00." },
+    { label:"Bảo trì",         msg:"Dịch vụ taxi 7 chỗ đang bảo trì, sẽ hoạt động trở lại sớm." },
+  ],
+  mua_ho: [
+    { label:"Tài xế bận hết",  msg:"Tất cả tài xế đang bận, không nhận đơn mua hộ lúc này. Vui lòng thử lại sau." },
+    { label:"Quá tải đơn",     msg:"Dịch vụ mua hộ đang quá tải, tạm ngưng nhận đơn mới." },
+    { label:"Chợ đóng cửa",    msg:"Chợ và siêu thị trong khu vực đã đóng cửa. Vui lòng đặt lại vào sáng sớm." },
+    { label:"Ngoài giờ",       msg:"Dịch vụ mua hộ hoạt động từ 07:00 – 21:00." },
+    { label:"Tạm nghỉ",        msg:"Dịch vụ mua hộ tạm ngừng phục vụ hôm nay. Xin lỗi vì sự bất tiện." },
+  ],
+  giao_ho: [
+    { label:"Tài xế bận hết",  msg:"Tất cả tài xế đang bận, không nhận đơn giao hộ lúc này. Vui lòng thử lại sau." },
+    { label:"Quá tải đơn",     msg:"Dịch vụ giao hộ đang quá tải, tạm ngưng nhận đơn mới." },
+    { label:"Ngoài khu vực",   msg:"Khu vực giao nhận hiện không được hỗ trợ. Vui lòng thử lại sau." },
+    { label:"Ngoài giờ",       msg:"Dịch vụ giao hộ hoạt động từ 07:00 – 21:00." },
+    { label:"Tạm nghỉ",        msg:"Dịch vụ giao hộ tạm ngừng phục vụ hôm nay. Xin lỗi vì sự bất tiện." },
+  ],
+}
 
 export default function AdminSettingsPage() {
   const [activeSection, setActiveSection] = useState<SettingSection>("pricing")
@@ -129,8 +168,12 @@ export default function AdminSettingsPage() {
         setFeatures(prev => prev.map(item => ({ ...item, value: f[item.key] ?? item.value })))
       }
       if (map.service_toggles) {
-        const st = map.service_toggles as Record<string, boolean>
-        setServiceToggles(prev => prev.map(item => ({ ...item, value: st[item.key] ?? item.value })))
+        const st = map.service_toggles as Record<string, { enabled?: boolean; reason?: string; customerMsg?: string }>
+        setServiceToggles(prev => prev.map(item => {
+          const saved = st[item.key]
+          if (!saved) return item
+          return { ...item, enabled: saved.enabled ?? true, reason: saved.reason ?? "", customerMsg: saved.customerMsg ?? "" }
+        }))
       }
       if (map.area)             setAreaSettings(map.area)
       if (map.delivery)         setDeliverySettings(map.delivery)
@@ -171,16 +214,24 @@ export default function AdminSettingsPage() {
   }
 
   /* ── Service Toggles ── */
-  const [serviceToggles, setServiceToggles] = useState<ToggleSetting[]>([
-    { key:"motorbike", label:"Xe ôm",     description:"Cho phép khách đặt xe ôm. Tắt khi không có tài xế xe máy trực tuyến.", value:true },
-    { key:"taxi_4cho", label:"Taxi 4 chỗ", description:"Cho phép khách đặt taxi 4 chỗ. Tắt khi toàn bộ tài xế taxi 4 chỗ bận.", value:true },
-    { key:"taxi_7cho", label:"Taxi 7 chỗ", description:"Cho phép khách đặt taxi 7 chỗ. Tắt khi không có xe 7 chỗ khả dụng.", value:true },
-    { key:"mua_ho",    label:"Mua hộ",    description:"Cho phép khách đặt dịch vụ mua hộ (đi chợ, siêu thị).", value:true },
-    { key:"giao_ho",   label:"Giao hộ",   description:"Cho phép khách đặt dịch vụ giao hộ (giao bưu phẩm).", value:true },
+  const [serviceToggles, setServiceToggles] = useState<SvcToggle[]>([
+    { key:"motorbike", label:"Xe ôm",      icon:"🛵", color:"#4a8ff5", enabled:true, reason:"", customerMsg:"" },
+    { key:"taxi_4cho", label:"Taxi 4 chỗ", icon:"🚕", color:"#FF8C00", enabled:true, reason:"", customerMsg:"" },
+    { key:"taxi_7cho", label:"Taxi 7 chỗ", icon:"🚙", color:"#b464ff", enabled:true, reason:"", customerMsg:"" },
+    { key:"mua_ho",    label:"Mua hộ",     icon:"🛒", color:"#3ecf6e", enabled:true, reason:"", customerMsg:"" },
+    { key:"giao_ho",   label:"Giao hộ",    icon:"📦", color:"#FFB347", enabled:true, reason:"", customerMsg:"" },
   ])
 
   const toggleService = (key: string) =>
-    setServiceToggles(p => p.map(s => s.key === key ? { ...s, value: !s.value } : s))
+    setServiceToggles(p => p.map(s => s.key === key
+      ? s.enabled
+        ? { ...s, enabled: false, reason: "", customerMsg: "" }  // tắt → chờ chọn lý do
+        : { ...s, enabled: true,  reason: "", customerMsg: "" }  // bật → xóa lý do
+      : s
+    ))
+
+  const setServiceReason = (key: string, label: string, msg: string) =>
+    setServiceToggles(p => p.map(s => s.key === key ? { ...s, reason: label, customerMsg: msg } : s))
 
   /* ── Features ── */
   const [features, setFeatures] = useState<ToggleSetting[]>([
@@ -222,7 +273,7 @@ export default function AdminSettingsPage() {
 
       // Persist all app settings to Supabase
       const featuresMap      = Object.fromEntries(features.map(f => [f.key, f.value]))
-      const serviceToggleMap = Object.fromEntries(serviceToggles.map(s => [s.key, s.value]))
+      const serviceToggleMap = Object.fromEntries(serviceToggles.map(s => [s.key, { enabled: s.enabled, reason: s.reason, customerMsg: s.customerMsg }]))
       const upsertRows = [
         { key: "pricing",           value: pricing },
         { key: "commission",        value: commissionSettings },
@@ -629,33 +680,60 @@ export default function AdminSettingsPage() {
           {activeSection === "services" && (
             <div style={{ animation:"fadeUp .3s ease" }}>
               <div style={{ color:"#f0eaff", fontSize:15, fontWeight:700, marginBottom:4 }}>🔌 Bật / Tắt dịch vụ</div>
-              <div style={{ color:"#6a5a40", fontSize:11, marginBottom:20 }}>Tắt dịch vụ khi không có tài xế khả dụng — khách sẽ thấy thông báo tạm ngừng thay vì chờ mãi không có ai nhận</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              <div style={{ color:"#6a5a40", fontSize:11, marginBottom:20 }}>Tắt dịch vụ và chọn lý do — khách sẽ thấy thông báo phù hợp thay vì chờ mãi không có tài xế</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
                 {serviceToggles.map(s => {
-                  const SERVICE_ICON: Record<string,string> = { motorbike:"🛵", taxi_4cho:"🚕", taxi_7cho:"🚙", mua_ho:"🛒", giao_ho:"📦" }
-                  const SERVICE_COLOR: Record<string,string> = { motorbike:"#4a8ff5", taxi_4cho:"#FF8C00", taxi_7cho:"#b464ff", mua_ho:"#3ecf6e", giao_ho:"#FFB347" }
-                  const icon  = SERVICE_ICON[s.key]  ?? "🔧"
-                  const color = SERVICE_COLOR[s.key] ?? "#6a5a40"
+                  const presets = SERVICE_PRESETS[s.key] ?? []
+                  const needReason = !s.enabled && !s.reason
                   return (
-                    <div key={s.key} style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderRadius:14, background: s.value ? "rgba(62,207,110,0.05)" : "rgba(255,64,64,0.05)", border:`1px solid ${s.value ? "rgba(62,207,110,0.2)" : "rgba(255,64,64,0.2)"}`, transition:"all .2s" }}>
-                      <div style={{ width:44, height:44, borderRadius:12, background:`${color}18`, border:`1px solid ${color}30`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>
-                        {icon}
+                    <div key={s.key} style={{ borderRadius:16, border:`1px solid ${s.enabled ? "rgba(62,207,110,0.2)" : needReason ? "rgba(255,179,71,0.4)" : "rgba(255,64,64,0.25)"}`, background: s.enabled ? "rgba(62,207,110,0.04)" : "rgba(255,64,64,0.04)", overflow:"hidden", transition:"all .2s" }}>
+
+                      {/* Header row */}
+                      <div style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px" }}>
+                        <div style={{ width:44, height:44, borderRadius:12, background:`${s.color}18`, border:`1px solid ${s.color}30`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>
+                          {s.icon}
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ color:"#f0eaff", fontSize:13, fontWeight:700, marginBottom:2 }}>{s.label}</div>
+                          <div style={{ color:"#6a5a40", fontSize:10 }}>
+                            {s.enabled ? "Đang phục vụ" : s.reason ? `Lý do: ${s.reason}` : "⚠️ Chưa chọn lý do tắt"}
+                          </div>
+                        </div>
+                        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, flexShrink:0 }}>
+                          <button onClick={() => toggleService(s.key)} style={{ width:52, height:28, borderRadius:14, border:"none", cursor:"pointer", position:"relative", transition:"background .2s", background: s.enabled ? "#3ecf6e" : "rgba(255,255,255,0.1)" }}>
+                            <div style={{ position:"absolute", top:3, left: s.enabled ? 26 : 3, width:22, height:22, borderRadius:11, background:"#fff", transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,0.3)" }} />
+                          </button>
+                          <span style={{ fontSize:9, fontWeight:700, color: s.enabled ? "#3ecf6e" : "#ff4040" }}>
+                            {s.enabled ? "Mở" : "Tắt"}
+                          </span>
+                        </div>
                       </div>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ color:"#f0eaff", fontSize:13, fontWeight:700, marginBottom:2 }}>{s.label}</div>
-                        <div style={{ color:"#6a5a40", fontSize:10, lineHeight:1.4 }}>{s.description}</div>
-                      </div>
-                      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, flexShrink:0 }}>
-                        <button onClick={() => toggleService(s.key)} style={{
-                          width:52, height:28, borderRadius:14, border:"none", cursor:"pointer", position:"relative", transition:"background .2s",
-                          background: s.value ? "#3ecf6e" : "rgba(255,255,255,0.1)",
-                        }}>
-                          <div style={{ position:"absolute", top:3, left: s.value ? 26 : 3, width:22, height:22, borderRadius:11, background:"#fff", transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,0.3)" }} />
-                        </button>
-                        <span style={{ fontSize:9, fontWeight:700, color: s.value ? "#3ecf6e" : "#ff4040" }}>
-                          {s.value ? "Mở" : "Tắt"}
-                        </span>
-                      </div>
+
+                      {/* Preset reason picker — chỉ hiện khi dịch vụ bị tắt */}
+                      {!s.enabled && (
+                        <div style={{ padding:"0 16px 14px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+                          <div style={{ color:"#6a5a40", fontSize:9, fontWeight:600, margin:"10px 0 8px", textTransform:"uppercase", letterSpacing:".05em" }}>
+                            Lý do hiển thị cho khách:
+                          </div>
+                          <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                            {presets.map(p => {
+                              const active = s.reason === p.label
+                              return (
+                                <button key={p.label} onClick={() => setServiceReason(s.key, p.label, p.msg)}
+                                  style={{ padding:"5px 12px", borderRadius:20, border:`1px solid ${active ? "rgba(255,107,0,0.5)" : "rgba(255,255,255,0.1)"}`, background: active ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.04)", color: active ? "#FF8C00" : "#6a5a40", fontSize:10, fontWeight: active ? 700 : 400, cursor:"pointer", fontFamily:"Lexend", transition:"all .15s" }}>
+                                  {active ? "✓ " : ""}{p.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                          {s.reason && (
+                            <div style={{ marginTop:10, padding:"8px 12px", borderRadius:10, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)" }}>
+                              <div style={{ color:"#6a5a40", fontSize:9, marginBottom:3 }}>Khách sẽ thấy:</div>
+                              <div style={{ color:"#b0956a", fontSize:10, lineHeight:1.5 }}>"{s.customerMsg}"</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -663,7 +741,7 @@ export default function AdminSettingsPage() {
               <div style={{ marginTop:16, padding:"12px 14px", borderRadius:12, background:"rgba(255,179,71,0.08)", border:"1px solid rgba(255,179,71,0.2)" }}>
                 <div style={{ color:"#FFB347", fontSize:11, fontWeight:600, marginBottom:4 }}>💡 Lưu ý</div>
                 <div style={{ color:"#6a5a40", fontSize:10, lineHeight:1.6 }}>
-                  Nhấn <b style={{color:"#f0eaff"}}>Lưu cài đặt</b> để áp dụng thay đổi. Trang đặt dịch vụ phía khách sẽ hiện thông báo "Tạm ngừng phục vụ" thay vì form đặt hàng.
+                  Chọn lý do xong → nhấn <b style={{color:"#f0eaff"}}>Lưu cài đặt</b> để áp dụng. Khách sẽ thấy đúng thông báo tương ứng.
                 </div>
               </div>
             </div>
