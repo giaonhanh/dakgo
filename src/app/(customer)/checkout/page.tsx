@@ -1414,7 +1414,7 @@ export default function CheckoutPage() {
           delivery_lng:     deliveryLng,
           note:             driverNote || null,
           payment_method:   payment,
-          voucher_id:       appliedVouchers[0]?.id ?? null,
+          voucher_id:       appliedVouchers[0] ? (dbVouchers.find(v => v.code === appliedVouchers[0].code)?.id ?? null) : null,
           scheduled_at:     scheduledAt,
           payment_code:     payment === "vietqr" ? orderCode : null,
           surcharge,
