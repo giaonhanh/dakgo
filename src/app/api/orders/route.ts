@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     const productIds: string[] = items.map((i: { product_id: string }) => i.product_id)
     const { data: products, error: prodErr } = await supabase
       .from("products")
-      .select("id, price, is_available")
+      .select("id, name, price, is_available")
       .in("id", productIds)
       .eq("shop_id", shop_id)
 
@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
         name:       product.name ?? "",
         price:      product.price,
         qty:        item.quantity,
+        subtotal:   product.price * item.quantity,
         note:       item.note ?? null,
       }
     })
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
     // Tạo order_items
     const { error: itemsErr } = await supabase
       .from("order_items")
-      .insert(orderItems.map((i: { product_id: string; name: string; price: number; qty: number; note: string | null }) => ({
+      .insert(orderItems.map((i: { product_id: string; name: string; price: number; qty: number; subtotal: number; note: string | null }) => ({
         order_id: order.id,
         ...i,
       })))
