@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -197,13 +197,13 @@ export default function CategoryPage() {
             <div style={{ color:"#f8f0e0", fontSize:16, fontWeight:800 }}>
               {meta.icon} {meta.label}
             </div>
-            <div style={{ color:"#6a5a40", fontSize:9, marginTop:1 }}>
+            <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1 }}>
               {loading ? "Đang tải..." : `${items.length} món · Phước An, Krông Pắc`}
             </div>
           </div>
           <div style={{ background:meta.bg, border:`1px solid ${meta.border}`,
             borderRadius:20, padding:"4px 10px",
-            color:meta.color, fontSize:9, fontWeight:700 }}>
+            color:meta.color, fontSize: 11, fontWeight:700 }}>
             {loading ? "..." : `${items.length} món`}
           </div>
         </div>
@@ -223,7 +223,7 @@ export default function CategoryPage() {
           ] as const).map(opt => (
             <button key={opt.key} onClick={() => setSortBy(opt.key)}
               style={{ flexShrink:0, padding:"6px 13px", borderRadius:20, cursor:"pointer",
-                fontFamily:"Lexend", fontSize:9.5, fontWeight:600,
+                fontFamily:"Lexend", fontSize: 11, fontWeight:600,
                 background: sortBy===opt.key ? meta.bg : "rgba(255,255,255,0.05)",
                 border: sortBy===opt.key ? `1px solid ${meta.border}` : "1px solid rgba(255,255,255,0.08)",
                 color: sortBy===opt.key ? meta.color : "#6a5a40",
@@ -277,7 +277,7 @@ export default function CategoryPage() {
                   {item.original_price && item.original_price > item.price && (
                     <div style={{ position:"absolute", top:-5, left:-5,
                       background:"#ff4040", color:"#fff",
-                      fontSize:7, fontWeight:700, padding:"2px 5px", borderRadius:5,
+                      fontSize: 10, fontWeight:700, padding:"2px 5px", borderRadius:5,
                       boxShadow:"0 0 5px rgba(255,64,64,0.3)" }}>
                       -{Math.round((1-item.price/item.original_price)*100)}%
                     </div>
@@ -291,18 +291,18 @@ export default function CategoryPage() {
                     {item.name}
                   </div>
                   <div onClick={() => router.push(`/shop/${item.shop_id}`)}
-                    style={{ color:"#6a5a40", fontSize:9, marginBottom:5, cursor:"pointer" }}>
+                    style={{ color:"#6a5a40", fontSize: 11, marginBottom:5, cursor:"pointer" }}>
                     🏪 {item.shop_name}
                   </div>
                   <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                     <div style={{ display:"flex", alignItems:"center", gap:3 }}>
-                      <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
-                      <span style={{ color:"#b0956a", fontSize:8.5 }}>{item.shop_rating.toFixed(1)}</span>
+                      <span style={{ color:"#FFB347", fontSize: 11 }}>★</span>
+                      <span style={{ color:"#b0956a", fontSize: 11 }}>{item.shop_rating.toFixed(1)}</span>
                     </div>
                     {item.sold_count > 0 && (
                       <>
-                        <span style={{ color:"rgba(255,255,255,0.1)", fontSize:9 }}>·</span>
-                        <span style={{ color:"#3ecf6e", fontSize:8, fontWeight:600 }}>
+                        <span style={{ color:"rgba(255,255,255,0.1)", fontSize: 11 }}>·</span>
+                        <span style={{ color:"#3ecf6e", fontSize: 11, fontWeight:600 }}>
                           🔥 {item.sold_count.toLocaleString("vi-VN")} đã bán
                         </span>
                       </>
@@ -316,7 +316,7 @@ export default function CategoryPage() {
                       backgroundClip:"text", fontSize:13, fontWeight:800,
                     }}>{formatPrice(item.price)}</div>
                     {item.original_price && item.original_price > item.price && (
-                      <div style={{ color:"#4a5040", fontSize:9, textDecoration:"line-through" }}>
+                      <div style={{ color:"#4a5040", fontSize: 11, textDecoration:"line-through" }}>
                         {formatPrice(item.original_price)}
                       </div>
                     )}
@@ -364,12 +364,12 @@ export default function CategoryPage() {
               <div style={{ position:"absolute", top:1, right:6,
                 width:14, height:14, borderRadius:99,
                 background:"#ff4040", color:"#fff",
-                fontSize:7.5, fontWeight:800,
+                fontSize: 10, fontWeight:800,
                 display:"flex", alignItems:"center", justifyContent:"center" }}>
                 {tab.badge > 9 ? "9+" : tab.badge}
               </div>
             )}
-            <span style={{ fontSize:7.5, color:"#6a5a40" }}>{tab.label}</span>
+            <span style={{ fontSize: 10, color:"#6a5a40" }}>{tab.label}</span>
           </a>
         ))}
       </div>

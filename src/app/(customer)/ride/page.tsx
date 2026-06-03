@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -118,7 +118,7 @@ function RideContent() {
             className="w-full rounded-2xl mt-4 p-4"
             style={{ background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.22)" }}
           >
-            <div style={{ color: "rgba(255,215,0,0.65)", fontSize: 9, fontWeight: 700,
+            <div style={{ color: "rgba(255,215,0,0.65)", fontSize: 11, fontWeight: 700,
               marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.8 }}>
               🗺️ Tuyến đường
             </div>
@@ -130,7 +130,7 @@ function RideContent() {
                   {pickup || "Chưa chọn điểm đón"}
                 </span>
                 {pickupCoord && (
-                  <span style={{ color: "#6a5a40", fontSize: 7.5, fontFamily: "monospace", flexShrink: 0 }}>
+                  <span style={{ color: "#6a5a40", fontSize: 10, fontFamily: "monospace", flexShrink: 0 }}>
                     {pickupCoord.lat.toFixed(4)},{pickupCoord.lng.toFixed(4)}
                   </span>
                 )}
@@ -143,7 +143,7 @@ function RideContent() {
                   {dest || "Chưa chọn điểm đến"}
                 </span>
                 {destCoord && (
-                  <span style={{ color: "#6a5a40", fontSize: 7.5, fontFamily: "monospace", flexShrink: 0 }}>
+                  <span style={{ color: "#6a5a40", fontSize: 10, fontFamily: "monospace", flexShrink: 0 }}>
                     {destCoord.lat.toFixed(4)},{destCoord.lng.toFixed(4)}
                   </span>
                 )}
@@ -159,7 +159,7 @@ function RideContent() {
             <span style={{ fontSize: 26 }}>🗺️</span>
             <div>
               <p style={{ color: "#b0956a", fontSize: 11, fontWeight: 600 }}>Chọn điểm đón & điểm đến</p>
-              <p style={{ color: "#6a5a40", fontSize: 9, marginTop: 2 }}>Nhấn 📍 hoặc 🗺️ để chọn trên bản đồ</p>
+              <p style={{ color: "#6a5a40", fontSize: 11, marginTop: 2 }}>Nhấn 📍 hoặc 🗺️ để chọn trên bản đồ</p>
             </div>
           </div>
         )}

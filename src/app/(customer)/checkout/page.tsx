@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 export const dynamic = "force-dynamic"
 
@@ -179,7 +179,7 @@ function VietQRSheet({
           }}>←</button>
           <div style={{ flex: 1 }}>
             <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700 }}>Thanh toán chuyển khoản</div>
-            <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>
+            <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>
               Quét mã QR · Ngân hàng · MoMo
             </div>
           </div>
@@ -236,7 +236,7 @@ function VietQRSheet({
               <span style={{ fontSize: 15 }}>🔒</span>
               <span style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>Thanh toán an toàn qua Giao Nhanh</span>
             </div>
-            <div style={{ color: "#b0956a", fontSize: 9.5, lineHeight: 1.7 }}>
+            <div style={{ color: "#b0956a", fontSize: 11, lineHeight: 1.7 }}>
               • Tiền được giữ bởi <strong style={{ color: "#f8f0e0" }}>tài khoản đại diện Giao Nhanh</strong> — không phải tài khoản cá nhân tài xế.<br />
               • Tài xế chỉ nhận tiền sau khi <strong style={{ color: "#f8f0e0" }}>giao hàng thành công</strong>.<br />
               • Nếu đơn không được giao, <strong style={{ color: "#3ecf6e" }}>hoàn tiền 100%</strong> về nguồn trong vòng 24h.
@@ -248,7 +248,7 @@ function VietQRSheet({
             borderRadius: 14, padding: "12px 14px", marginBottom: 18,
           }}>
             <div style={{
-              color: "rgba(255,215,0,0.5)", fontSize: 8.5, fontWeight: 700,
+              color: "rgba(255,215,0,0.5)", fontSize: 11, fontWeight: 700,
               letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10,
             }}>Thông tin chuyển khoản</div>
             {[
@@ -327,7 +327,7 @@ function VietQRSheet({
             )}
           </button>
           {myBank?.isMomo && (
-            <div style={{ color: "#6a5a40", fontSize: 9, textAlign: "center", marginBottom: 4 }}>
+            <div style={{ color: "#6a5a40", fontSize: 11, textAlign: "center", marginBottom: 4 }}>
               Trong MoMo: nhấn <strong style={{ color: "#b0956a" }}>Quét mã</strong> → scan QR bên trên để thanh toán
             </div>
           )}
@@ -469,13 +469,13 @@ function AddressSheet({
                 <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2, flexWrap: "wrap" }}>
                   <span style={{ color: "#f8f0e0", fontSize: 11.5, fontWeight: 600 }}>{addr.label}</span>
                   {addr.isDefault && (
-                    <span style={{ background: "rgba(62,207,110,0.12)", color: "#3ecf6e", borderRadius: 4, padding: "1px 5px", fontSize: 7, fontWeight: 700 }}>Mặc định</span>
+                    <span style={{ background: "rgba(62,207,110,0.12)", color: "#3ecf6e", borderRadius: 4, padding: "1px 5px", fontSize: 10, fontWeight: 700 }}>Mặc định</span>
                   )}
                   {addr.id === "map" && (
-                    <span style={{ background: "rgba(255,107,0,0.1)", color: "#FF8C00", borderRadius: 4, padding: "1px 5px", fontSize: 7, fontWeight: 700 }}>Tạm thời</span>
+                    <span style={{ background: "rgba(255,107,0,0.1)", color: "#FF8C00", borderRadius: 4, padding: "1px 5px", fontSize: 10, fontWeight: 700 }}>Tạm thời</span>
                   )}
                 </div>
-                <div style={{ color: "#6a5a40", fontSize: 9.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ color: "#6a5a40", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {addr.address}
                 </div>
               </div>
@@ -504,7 +504,7 @@ function AddressSheet({
                 <div style={{ color: "#b464ff", fontSize: 10, fontWeight: 700, marginBottom: 3 }}>
                   Đã dùng {savedAddrs.length}/{tierLimit} địa chỉ lưu (Hạng Bronze)
                 </div>
-                <div style={{ color: "#6a5a40", fontSize: 9, lineHeight: 1.6 }}>
+                <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.6 }}>
                   Địa chỉ mới từ bản đồ sẽ chỉ dùng <strong style={{ color: "#b0956a" }}>tạm thời</strong> cho đơn này.<br />
                   Lên hạng <strong style={{ color: "#b464ff" }}>Silver ✦</strong> để lưu địa chỉ thứ 3.
                 </div>
@@ -563,7 +563,7 @@ function BankDropdown({
           <div style={{ color: bank ? "#f8f0e0" : "#6a5a40", fontSize: 11.5, fontWeight: 700, fontFamily: "Lexend" }}>
             {bank ? bank.name : "Chọn ngân hàng của bạn"}
           </div>
-          <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>Ngân hàng bạn dùng để quét QR</div>
+          <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>Ngân hàng bạn dùng để quét QR</div>
         </div>
         <span style={{ color: "#6a5a40", fontSize: 12, transition: "transform .2s",
           display: "inline-block", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
@@ -585,7 +585,7 @@ function BankDropdown({
               {/* Ví điện tử */}
               <div style={{
                 padding: "6px 12px 4px",
-                color: "#6a5a40", fontSize: 8, fontWeight: 700,
+                color: "#6a5a40", fontSize: 11, fontWeight: 700,
                 textTransform: "uppercase", letterSpacing: 0.7,
                 borderBottom: "1px solid rgba(255,255,255,0.05)",
               }}>💜 Ví điện tử</div>
@@ -595,7 +595,7 @@ function BankDropdown({
               {/* Ngân hàng phổ biến */}
               <div style={{
                 padding: "6px 12px 4px",
-                color: "#6a5a40", fontSize: 8, fontWeight: 700,
+                color: "#6a5a40", fontSize: 11, fontWeight: 700,
                 textTransform: "uppercase", letterSpacing: 0.7,
                 borderBottom: "1px solid rgba(255,255,255,0.05)",
                 borderTop: "1px solid rgba(255,255,255,0.05)",
@@ -606,7 +606,7 @@ function BankDropdown({
               {/* Ngân hàng khác */}
               <div style={{
                 padding: "6px 12px 4px",
-                color: "#6a5a40", fontSize: 8, fontWeight: 700,
+                color: "#6a5a40", fontSize: 11, fontWeight: 700,
                 textTransform: "uppercase", letterSpacing: 0.7,
                 borderBottom: "1px solid rgba(255,255,255,0.05)",
                 borderTop: "1px solid rgba(255,255,255,0.05)",
@@ -706,26 +706,26 @@ function VoucherPickerSheet({
               {v.code}
             </span>
             <span style={{
-              fontSize: 7, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
+              fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
               background: vType === "shop" ? "rgba(74,143,245,0.12)" : "rgba(255,107,0,0.12)",
               color: vType === "shop" ? "#4a8ff5" : "#FF8C00",
             }}>
               {vType === "shop" ? "Quán" : "App"}
             </span>
           </div>
-          <div style={{ color: "#b0956a", fontSize: 9.5, marginTop: 2 }}>{v.title}</div>
-          <div style={{ color: "#3ecf6e", fontSize: 9, marginTop: 1, fontWeight: 700 }}>
+          <div style={{ color: "#b0956a", fontSize: 11, marginTop: 2 }}>{v.title}</div>
+          <div style={{ color: "#3ecf6e", fontSize: 11, marginTop: 1, fontWeight: 700 }}>
             Giảm {disc.toLocaleString("vi-VN")}đ
           </div>
         </div>
         {status === "applied" ? (
           <span style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>✓ Đã áp</span>
         ) : status === "conflict" ? (
-          <span style={{ color: "#6a5a40", fontSize: 9, flexShrink: 0, textAlign: "right", maxWidth: 60, lineHeight: 1.3 }}>Đã có<br/>loại này</span>
+          <span style={{ color: "#6a5a40", fontSize: 11, flexShrink: 0, textAlign: "right", maxWidth: 60, lineHeight: 1.3 }}>Đã có<br/>loại này</span>
         ) : status === "full" ? (
-          <span style={{ color: "#6a5a40", fontSize: 9, flexShrink: 0 }}>Đã đủ</span>
+          <span style={{ color: "#6a5a40", fontSize: 11, flexShrink: 0 }}>Đã đủ</span>
         ) : status === "maxed" ? (
-          <span style={{ color: "#ff4040", fontSize: 9, flexShrink: 0, textAlign: "right", maxWidth: 68, lineHeight: 1.3 }}>Đã dùng<br/>tối đa {v.per_person_limit} lần</span>
+          <span style={{ color: "#ff4040", fontSize: 11, flexShrink: 0, textAlign: "right", maxWidth: 68, lineHeight: 1.3 }}>Đã dùng<br/>tối đa {v.per_person_limit} lần</span>
         ) : (
           <button type="button" onClick={() => { onApply(v.code); onClose() }} style={{
             height: 28, padding: "0 10px", borderRadius: 8, border: "none",
@@ -775,14 +775,14 @@ function VoucherPickerSheet({
           }}>←</button>
           <div style={{ flex: 1 }}>
             <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700 }}>🎟️ Túi Voucher</div>
-            <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>
+            <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>
               Chọn tối đa 1 voucher app + 1 voucher quán
             </div>
           </div>
           {appliedVouchers.length > 0 && (
             <div style={{
               background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.3)",
-              borderRadius: 8, padding: "3px 8px", color: "#3ecf6e", fontSize: 9, fontWeight: 700,
+              borderRadius: 8, padding: "3px 8px", color: "#3ecf6e", fontSize: 11, fontWeight: 700,
             }}>
               Đã áp {appliedVouchers.length}/2
             </div>
@@ -793,7 +793,7 @@ function VoucherPickerSheet({
           {/* App vouchers */}
           <div style={{
             padding: "8px 14px 5px",
-            color: "#6a5a40", fontSize: 8, fontWeight: 700,
+            color: "#6a5a40", fontSize: 11, fontWeight: 700,
             textTransform: "uppercase", letterSpacing: 0.8,
           }}>🏷️ Voucher ứng dụng</div>
           {appVouchers.map(v => <VoucherRow key={v.code} v={v} />)}
@@ -801,7 +801,7 @@ function VoucherPickerSheet({
           {/* Shop vouchers */}
           <div style={{
             padding: "10px 14px 5px",
-            color: "#6a5a40", fontSize: 8, fontWeight: 700,
+            color: "#6a5a40", fontSize: 11, fontWeight: 700,
             textTransform: "uppercase", letterSpacing: 0.8,
             borderTop: "1px solid rgba(255,255,255,0.05)", marginTop: 4,
           }}>🏪 Voucher quán này</div>
@@ -932,7 +932,7 @@ function TimeScheduleSheet({
           }}>←</button>
           <div style={{ flex: 1 }}>
             <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700 }}>Hẹn giờ giao hàng</div>
-            <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>
+            <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>
               Tối đa 1 tiếng · Giúp quán & tài xế chuẩn bị đúng giờ
             </div>
           </div>
@@ -943,7 +943,7 @@ function TimeScheduleSheet({
 
           {/* Quick chips */}
           <div style={{
-            color: "#6a5a40", fontSize: 8.5, fontWeight: 700,
+            color: "#6a5a40", fontSize: 11, fontWeight: 700,
             textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 10,
           }}>Gợi ý nhanh</div>
           <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
@@ -960,7 +960,7 @@ function TimeScheduleSheet({
                   <div style={{ color: isAct ? "#FF8C00" : "#f8f0e0", fontSize: 15, fontWeight: 800 }}>
                     +{mins}p
                   </div>
-                  <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 3 }}>~{sLabel}</div>
+                  <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 3 }}>~{sLabel}</div>
                 </button>
               )
             })}
@@ -969,7 +969,7 @@ function TimeScheduleSheet({
           {/* Divider */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
             <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
-            <span style={{ color: "#6a5a40", fontSize: 9, flexShrink: 0 }}>hoặc chọn thủ công</span>
+            <span style={{ color: "#6a5a40", fontSize: 11, flexShrink: 0 }}>hoặc chọn thủ công</span>
             <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
           </div>
 
@@ -977,7 +977,7 @@ function TimeScheduleSheet({
           <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
               <div style={{
-                color: "#6a5a40", fontSize: 8.5, fontWeight: 700,
+                color: "#6a5a40", fontSize: 11, fontWeight: 700,
                 textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 7,
               }}>Bắt đầu</div>
               <input type="time" value={startTime} min={minStart} max={maxStart}
@@ -994,11 +994,11 @@ function TimeScheduleSheet({
             <div style={{ color: "#6a5a40", fontSize: 20, paddingBottom: 16, flexShrink: 0 }}>→</div>
             <div style={{ flex: 1 }}>
               <div style={{
-                color: "#6a5a40", fontSize: 8.5, fontWeight: 700,
+                color: "#6a5a40", fontSize: 11, fontWeight: 700,
                 textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 7,
               }}>
                 Kết thúc
-                <span style={{ fontSize: 7, fontWeight: 400, marginLeft: 4 }}>(tối đa +1h)</span>
+                <span style={{ fontSize: 10, fontWeight: 400, marginLeft: 4 }}>(tối đa +1h)</span>
               </div>
               <input type="time" value={endTime} min={startTime} max={maxEnd}
                 onChange={e => handleEndChange(e.target.value)}
@@ -1019,7 +1019,7 @@ function TimeScheduleSheet({
             padding: "7px 12px", borderRadius: 9, marginBottom: 14,
             background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
           }}>
-            <span style={{ color: "#6a5a40", fontSize: 9 }}>Khoảng thời gian</span>
+            <span style={{ color: "#6a5a40", fontSize: 11 }}>Khoảng thời gian</span>
             <span style={{
               fontSize: 10.5, fontWeight: 700,
               color: durationM > 60 ? "#ff4040" : durationM < 15 ? "#f5c542" : "#3ecf6e",
@@ -1041,14 +1041,14 @@ function TimeScheduleSheet({
                 <div style={{ color: "#f5c542", fontSize: 10.5, fontWeight: 600 }}>
                   Giờ hẹn sắp đến (~{minsUntil} phút nữa)
                 </div>
-                <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>
+                <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>
                   Tài xế có thể không kịp chuẩn bị đơn
                 </div>
               </div>
               <button type="button" onClick={onOrderNow} style={{
                 height: 28, padding: "0 10px", borderRadius: 7, border: "none",
                 background: "rgba(245,197,66,0.18)", color: "#f5c542",
-                fontSize: 9.5, fontWeight: 700, fontFamily: "Lexend",
+                fontSize: 11, fontWeight: 700, fontFamily: "Lexend",
                 cursor: "pointer", flexShrink: 0,
               }}>Đặt ngay</button>
             </div>
@@ -1068,7 +1068,7 @@ function TimeScheduleSheet({
                   color: c.level === "error" ? "#ff4040" : "#f5c542",
                   fontSize: 10.5, fontWeight: 700, marginBottom: 3,
                 }}>{c.title}</div>
-                <div style={{ color: "#6a5a40", fontSize: 9, lineHeight: 1.5 }}>{c.detail}</div>
+                <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.5 }}>{c.detail}</div>
               </div>
             </div>
           ))}
@@ -1615,12 +1615,12 @@ export default function CheckoutPage() {
             }}>←</a>
             <div style={{ flex: 1 }}>
               <div style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 700 }}>Xác nhận đặt hàng</div>
-              <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>
+              <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>
                 {cartItems.reduce((s, i) => s + i.qty, 0)} món · {fmt(subtotal)}
               </div>
             </div>
             <div style={{
-              fontSize: 8.5, fontWeight: 700, color: "#FF8C00",
+              fontSize: 11, fontWeight: 700, color: "#FF8C00",
               background: "rgba(255,107,0,0.1)", border: "1px solid rgba(255,107,0,0.25)",
               borderRadius: 6, padding: "3px 8px", flexShrink: 0,
             }}>Bước 2/2</div>
@@ -1632,7 +1632,7 @@ export default function CheckoutPage() {
 
           {/* 1. Địa chỉ giao hàng */}
           <div style={{
-            color: "#6a5a40", fontSize: 9, fontWeight: 700,
+            color: "#6a5a40", fontSize: 11, fontWeight: 700,
             textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 7,
           }}>Địa chỉ giao hàng</div>
           <div style={{
@@ -1653,7 +1653,7 @@ export default function CheckoutPage() {
                     {currentAddr.isDefault && (
                       <span style={{
                         background: "rgba(62,207,110,0.12)", color: "#3ecf6e",
-                        borderRadius: 4, padding: "1px 6px", fontSize: 7.5, fontWeight: 700,
+                        borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700,
                       }}>Mặc định</span>
                     )}
                   </div>
@@ -1698,7 +1698,7 @@ export default function CheckoutPage() {
                   <div style={{ color: deliveryNow === opt.now ? "#FF8C00" : "#b0956a", fontSize: 10.5, fontWeight: 600 }}>
                     {opt.label}
                   </div>
-                  <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 1 }}>{opt.sub}</div>
+                  <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>{opt.sub}</div>
                 </div>
               ))}
             </div>
@@ -1722,7 +1722,7 @@ export default function CheckoutPage() {
                           <div style={{ color: "#ff4040", fontSize: 11, fontWeight: 700, marginBottom: 3 }}>
                             App đã đóng cửa hôm nay
                           </div>
-                          <div style={{ color: "#6a5a40", fontSize: 9.5, lineHeight: 1.6 }}>
+                          <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.6 }}>
                             Hoạt động: 7:00 – 21:00 hàng ngày<br />
                             Hẹn giao sớm nhất:{" "}
                             <strong style={{ color: "#b0956a" }}>7:00 sáng ngày mai</strong>
@@ -1743,7 +1743,7 @@ export default function CheckoutPage() {
                           <div style={{ color: "#4a8ff5", fontSize: 11, fontWeight: 700, marginBottom: 3 }}>
                             App chưa mở cửa
                           </div>
-                          <div style={{ color: "#6a5a40", fontSize: 9.5, lineHeight: 1.6 }}>
+                          <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.6 }}>
                             Hoạt động: 7:00 – 21:00 hàng ngày<br />
                             Bạn có thể hẹn giờ{" "}
                             <strong style={{ color: "#b0956a" }}>từ 7:00 sáng hôm nay</strong>
@@ -1772,7 +1772,7 @@ export default function CheckoutPage() {
                                 {scheduledTime.start} – {scheduledTime.end}
                               </span>
                             </div>
-                            <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 2 }}>
+                            <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 2 }}>
                               {(() => {
                                 const [sh, sm] = scheduledTime.start.split(":").map(Number)
                                 const [eh, em] = scheduledTime.end.split(":").map(Number)
@@ -1800,7 +1800,7 @@ export default function CheckoutPage() {
                             <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>{c.icon}</span>
                             <div>
                               <div style={{ color: "#f5c542", fontSize: 10.5, fontWeight: 700, marginBottom: 2 }}>{c.title}</div>
-                              <div style={{ color: "#6a5a40", fontSize: 9, lineHeight: 1.5 }}>{c.detail}</div>
+                              <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.5 }}>{c.detail}</div>
                             </div>
                           </motion.div>
                         ))}
@@ -1954,7 +1954,7 @@ export default function CheckoutPage() {
                 {appliedVouchers.length > 0 && (
                   <span style={{
                     background: "rgba(62,207,110,0.15)", color: "#3ecf6e",
-                    fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
+                    fontSize: 11, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
                   }}>
                     {appliedVouchers.length}/2
                   </span>
@@ -1998,7 +1998,7 @@ export default function CheckoutPage() {
                     <span style={{ fontSize: 12 }}>{v.type === "app" ? "🏷️" : "🏪"}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ color: "#b0956a", fontSize: 10, fontWeight: 700, letterSpacing: 1 }}>{v.code}</span>
-                      <span style={{ color: "#6a5a40", fontSize: 9, marginLeft: 5 }}>· {v.label}</span>
+                      <span style={{ color: "#6a5a40", fontSize: 11, marginLeft: 5 }}>· {v.label}</span>
                     </div>
                     <span style={{
                       color: v.type === "app" ? "#FF8C00" : "#4a8ff5",
@@ -2013,7 +2013,7 @@ export default function CheckoutPage() {
                   </div>
                 ))}
                 {appliedVouchers.length < 2 && (
-                  <div style={{ color: "#6a5a40", fontSize: 9, textAlign: "center", paddingTop: 2 }}>
+                  <div style={{ color: "#6a5a40", fontSize: 11, textAlign: "center", paddingTop: 2 }}>
                     Còn thể thêm 1 voucher {appliedVouchers[0]?.type === "app" ? "quán 🏪" : "ứng dụng 🏷️"}
                   </div>
                 )}
@@ -2092,7 +2092,7 @@ export default function CheckoutPage() {
               <span style={{ fontSize: 18 }}>🎁</span>
               <div style={{ flex: 1 }}>
                 <div style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>Mã giới thiệu đã đăng ký</div>
-                <div style={{ color: "#6a5a40", fontSize: 9.5, marginTop: 1 }}>
+                <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>
                   10.000đ xu sẽ vào ví sau khi đơn hoàn thành
                 </div>
               </div>
@@ -2116,7 +2116,7 @@ export default function CheckoutPage() {
                   <span style={{ fontSize: 14 }}>🍽️</span>
                   <div>
                     <div style={{ color: "#b0956a", fontSize: 10.5 }}>{item.name}</div>
-                    <div style={{ color: "#6a5a40", fontSize: 8.5 }}>
+                    <div style={{ color: "#6a5a40", fontSize: 11 }}>
                       ×{item.qty}{item.note ? ` · ${item.note}` : ""}
                     </div>
                   </div>

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -61,7 +61,7 @@ export default function WalletPage() {
               display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>←</a>
             <div style={{ flex:1 }}>
               <div style={{ color:"#f8f0e0", fontSize:15, fontWeight:700 }}>💼 Ví của tôi</div>
-              <div style={{ color:"#6a5a40", fontSize:9, marginTop:1 }}>Xu thanh toán · Điểm tích lũy</div>
+              <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1 }}>Xu thanh toán · Điểm tích lũy</div>
             </div>
           </div>
         </div>
@@ -84,7 +84,7 @@ export default function WalletPage() {
               animation:"shimmer 4s infinite" }} />
 
             <div style={{ position:"relative", zIndex:1 }}>
-              <div style={{ color:"rgba(180,100,255,0.55)", fontSize:9, fontWeight:700,
+              <div style={{ color:"rgba(180,100,255,0.55)", fontSize: 11, fontWeight:700,
                 textTransform:"uppercase", letterSpacing:0.8, marginBottom:8 }}>
                 💳 Xu Giao Nhanh
               </div>
@@ -96,7 +96,7 @@ export default function WalletPage() {
                 </span>
                 <span style={{ color:"#b464ff", fontSize:17, fontWeight:600 }}>xu</span>
               </div>
-              <div style={{ color:"rgba(180,100,255,0.4)", fontSize:9, marginBottom:14 }}>
+              <div style={{ color:"rgba(180,100,255,0.4)", fontSize: 11, marginBottom:14 }}>
                 = {balance.toLocaleString("vi-VN")}đ · dùng thanh toán đơn hàng
               </div>
 
@@ -104,18 +104,18 @@ export default function WalletPage() {
                 <div onClick={e => { e.stopPropagation(); router.push("/wallet/xu") }}
                   style={{ height:32, padding:"0 14px", borderRadius:8,
                     background:"rgba(180,100,255,0.18)", border:"1px solid rgba(180,100,255,0.35)",
-                    color:"#b464ff", fontSize:9, fontWeight:700,
+                    color:"#b464ff", fontSize: 11, fontWeight:700,
                     display:"flex", alignItems:"center", cursor:"pointer" }}>
                   ➕ Nạp xu
                 </div>
                 <div onClick={e => { e.stopPropagation(); router.push("/wallet/xu") }}
                   style={{ height:32, padding:"0 14px", borderRadius:8,
                     background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)",
-                    color:"rgba(180,100,255,0.6)", fontSize:9, fontWeight:700,
+                    color:"rgba(180,100,255,0.6)", fontSize: 11, fontWeight:700,
                     display:"flex", alignItems:"center", cursor:"pointer" }}>
                   🏦 Rút xu
                 </div>
-                <span style={{ marginLeft:"auto", color:"rgba(180,100,255,0.45)", fontSize:9 }}>
+                <span style={{ marginLeft:"auto", color:"rgba(180,100,255,0.45)", fontSize: 11 }}>
                   Xem lịch sử →
                 </span>
               </div>
@@ -137,7 +137,7 @@ export default function WalletPage() {
               animation:"shimmer 4.5s infinite" }} />
 
             <div style={{ position:"relative", zIndex:1 }}>
-              <div style={{ color:"rgba(245,197,66,0.6)", fontSize:9, fontWeight:700,
+              <div style={{ color:"rgba(245,197,66,0.6)", fontSize: 11, fontWeight:700,
                 textTransform:"uppercase", letterSpacing:0.8, marginBottom:8 }}>
                 ⭐ Điểm Tích Lũy
               </div>
@@ -149,7 +149,7 @@ export default function WalletPage() {
                 </span>
                 <span style={{ color:"#F5C542", fontSize:17, fontWeight:600 }}>điểm</span>
               </div>
-              <div style={{ color:"rgba(245,197,66,0.4)", fontSize:9, marginBottom:14 }}>
+              <div style={{ color:"rgba(245,197,66,0.4)", fontSize: 11, marginBottom:14 }}>
                 dùng xét hạng thành viên · đổi xu & voucher
               </div>
 
@@ -157,11 +157,11 @@ export default function WalletPage() {
                 <span style={{ fontSize:18 }}>{CUR_TIER.icon}</span>
                 <span style={{ color:"#F5C542", fontSize:10, fontWeight:700 }}>{CUR_TIER.name} Member</span>
                 {NXT_TIER && (
-                  <span style={{ color:"rgba(245,197,66,0.4)", fontSize:8.5, marginLeft:2 }}>
+                  <span style={{ color:"rgba(245,197,66,0.4)", fontSize: 11, marginLeft:2 }}>
                     · còn {(NXT_TIER.min - userEarned).toLocaleString()} điểm → {NXT_TIER.name}
                   </span>
                 )}
-                <span style={{ marginLeft:"auto", color:"rgba(245,197,66,0.45)", fontSize:9 }}>
+                <span style={{ marginLeft:"auto", color:"rgba(245,197,66,0.45)", fontSize: 11 }}>
                   Đổi điểm →
                 </span>
               </div>
@@ -177,7 +177,7 @@ export default function WalletPage() {
           {/* Hướng dẫn */}
           <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.05)",
             borderRadius:16, padding:"14px" }}>
-            <div style={{ color:"#b0956a", fontSize:9.5, fontWeight:600, marginBottom:12 }}>
+            <div style={{ color:"#b0956a", fontSize: 11, fontWeight:600, marginBottom:12 }}>
               📖 Xu và Điểm khác nhau thế nào?
             </div>
             {[
@@ -195,7 +195,7 @@ export default function WalletPage() {
                 <span style={{ fontSize:18, flexShrink:0 }}>{item.icon}</span>
                 <div>
                   <div style={{ color:item.color, fontSize:10, fontWeight:600, marginBottom:2 }}>{item.title}</div>
-                  <div style={{ color:"#6a5a40", fontSize:8.5, lineHeight:1.5 }}>{item.desc}</div>
+                  <div style={{ color:"#6a5a40", fontSize: 11, lineHeight:1.5 }}>{item.desc}</div>
                 </div>
               </div>
             ))}
@@ -219,7 +219,7 @@ export default function WalletPage() {
               padding:"5px 11px", borderRadius:18,
               background:tab.active?"rgba(255,107,0,0.12)":"transparent" }}>
               <span style={{ fontSize:19 }}>{tab.icon}</span>
-              <span style={{ fontSize:7.5, color:"#6a5a40" }}>{tab.label}</span>
+              <span style={{ fontSize: 10, color:"#6a5a40" }}>{tab.label}</span>
             </a>
           ))}
         </div>

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -156,14 +156,14 @@ export default function TaxiPage() {
               justifyContent:"center",fontSize:18,cursor:"pointer",flexShrink:0 }}>←</button>
           <div style={{ flex:1 }}>
             <div style={{ color:"#f8f0e0",fontSize:16,fontWeight:800 }}>🚕 Đặt taxi</div>
-            <div style={{ color:"#6a5a40",fontSize:9,marginTop:1 }}>Thoải mái · An toàn · Điều hoà mát lạnh</div>
+            <div style={{ color:"#6a5a40",fontSize: 11,marginTop:1 }}>Thoải mái · An toàn · Điều hoà mát lạnh</div>
           </div>
           <div style={{ display:"flex",alignItems:"center",gap:5,
             background:"rgba(180,100,255,0.1)",border:"1px solid rgba(180,100,255,0.25)",
             borderRadius:20,padding:"4px 10px" }}>
             <div style={{ width:6,height:6,borderRadius:"50%",background:"#b464ff",
               animation:"txPulse 2s infinite" }} />
-            <span style={{ color:"#b464ff",fontSize:9,fontWeight:700 }}>6 xe online</span>
+            <span style={{ color:"#b464ff",fontSize: 11,fontWeight:700 }}>6 xe online</span>
           </div>
         </div>
       </div>
@@ -186,23 +186,23 @@ export default function TaxiPage() {
                     boxShadow:carType===key&&!isDisabled?"0 4px 20px rgba(180,100,255,0.15)":"none",
                     fontFamily:"Lexend",position:"relative",overflow:"hidden",opacity:isDisabled?0.5:1 }}>
                   {isDisabled && (
-                    <div style={{ position:"absolute",top:6,right:6,background:"rgba(255,64,64,0.15)",border:"1px solid rgba(255,64,64,0.3)",borderRadius:6,padding:"2px 6px",fontSize:8,fontWeight:700,color:"#ff4040" }}>Tạm đóng</div>
+                    <div style={{ position:"absolute",top:6,right:6,background:"rgba(255,64,64,0.15)",border:"1px solid rgba(255,64,64,0.3)",borderRadius:6,padding:"2px 6px",fontSize: 11,fontWeight:700,color:"#ff4040" }}>Tạm đóng</div>
                   )}
                   {!isDisabled && carType===key && (
                     <div style={{ position:"absolute",top:8,right:8,width:16,height:16,borderRadius:"50%",
-                      background:"#b464ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9 }}>✓</div>
+                      background:"#b464ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize: 11 }}>✓</div>
                   )}
                   <div style={{ fontSize:28,marginBottom:6 }}>{c.emoji}</div>
                   <div style={{ color:isDisabled?"#6a5a40":carType===key?"#b464ff":"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:2 }}>
                     {c.label}
                   </div>
-                  <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:6 }}>{isDisabled ? (key === "4cho" ? taxi4Msg : taxi7Msg) : c.sub}</div>
+                  <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:6 }}>{isDisabled ? (key === "4cho" ? taxi4Msg : taxi7Msg) : c.sub}</div>
                   {!isDisabled && (
                     <div style={{ display:"flex",alignItems:"center",gap:5 }}>
-                      <span style={{ color:carType===key?"#b464ff":"#6a5a40",fontSize:9,fontWeight:700 }}>
+                      <span style={{ color:carType===key?"#b464ff":"#6a5a40",fontSize: 11,fontWeight:700 }}>
                         Từ {formatPrice(key === "7cho" ? calcFeeFromRows(1, pricingRows7, pricingExtra7) : calcFeeFromRows(1, pricingRows, pricingExtra))}
                       </span>
-                      <span style={{ color:"#4a3a28",fontSize:8 }}>· {c.seats} chỗ</span>
+                      <span style={{ color:"#4a3a28",fontSize: 11 }}>· {c.seats} chỗ</span>
                     </div>
                   )}
                 </motion.button>
@@ -217,7 +217,7 @@ export default function TaxiPage() {
             boxShadow:"0 8px 40px rgba(180,100,255,0.08)" }}>
             <div style={{ padding:"14px 16px 8px",display:"flex",justifyContent:"space-between",alignItems:"flex-start" }}>
               <div>
-                <div style={{ color:"rgba(180,100,255,0.7)",fontSize:9,fontWeight:700,letterSpacing:.8,marginBottom:4 }}>
+                <div style={{ color:"rgba(180,100,255,0.7)",fontSize: 11,fontWeight:700,letterSpacing:.8,marginBottom:4 }}>
                   {car.emoji} {car.label.toUpperCase()}
                 </div>
                 <div style={{ color:"#f8f0e0",fontSize:13,fontWeight:700,lineHeight:1.4 }}>
@@ -229,7 +229,7 @@ export default function TaxiPage() {
                   </span>
                 </div>
                 {dest && (
-                  <div style={{ color:"#6a5a40",fontSize:9,marginTop:4 }}>
+                  <div style={{ color:"#6a5a40",fontSize: 11,marginTop:4 }}>
                     ~{estimatedKm}km · {Math.round(estimatedKm * 2 + 8)}–{Math.round(estimatedKm * 3 + 12)} phút
                   </div>
                 )}
@@ -240,8 +240,8 @@ export default function TaxiPage() {
               {[[`${formatPrice(carType === "7cho" ? calcFeeFromRows(1, pricingRows7, pricingExtra7) : calcFeeFromRows(1, pricingRows, pricingExtra))}`, "Giá mở cửa"],["Theo km","Mỗi km tiếp"],["~5 phút","Thời gian đến"]].map(([val,lab],i) => (
                 <div key={i} style={{ flex:1,padding:"8px 0",textAlign:"center",
                   borderLeft:i>0?"1px solid rgba(180,100,255,0.08)":"none" }}>
-                  <div style={{ color:"#b464ff",fontSize:9.5,fontWeight:700 }}>{val}</div>
-                  <div style={{ color:"#6a5a40",fontSize:8,marginTop:2 }}>{lab}</div>
+                  <div style={{ color:"#b464ff",fontSize: 11,fontWeight:700 }}>{val}</div>
+                  <div style={{ color:"#6a5a40",fontSize: 11,marginTop:2 }}>{lab}</div>
                 </div>
               ))}
             </div>
@@ -252,7 +252,7 @@ export default function TaxiPage() {
             <motion.div initial={{ opacity:0,y:8 }} animate={{ opacity:1,y:0 }}
               style={{ borderRadius:14,padding:14,marginBottom:12,
                 background:"rgba(180,100,255,0.05)",border:"1px solid rgba(180,100,255,0.2)" }}>
-              <div style={{ color:"rgba(180,100,255,0.7)",fontSize:8.5,fontWeight:700,letterSpacing:.8,marginBottom:8 }}>
+              <div style={{ color:"rgba(180,100,255,0.7)",fontSize: 11,fontWeight:700,letterSpacing:.8,marginBottom:8 }}>
                 🗺️ TUYẾN ĐƯỜNG
               </div>
               <div style={{ display:"flex",flexDirection:"column",gap:7 }}>
@@ -311,15 +311,15 @@ export default function TaxiPage() {
                   borderRadius:14,padding:14,marginBottom:12 }}>
                 <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                   <div>
-                    <div style={{ color:"#6a5a40",fontSize:9,marginBottom:2 }}>Ước tính cước</div>
+                    <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:2 }}>Ước tính cước</div>
                     <div style={{ color:"#b464ff",fontSize:22,fontWeight:900,lineHeight:1 }}>
                       {formatPrice(estimatedPrice)}
                     </div>
                   </div>
                   <div style={{ textAlign:"right" }}>
-                    <div style={{ color:"#6a5a40",fontSize:9,marginBottom:2 }}>Khoảng cách</div>
+                    <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:2 }}>Khoảng cách</div>
                     <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>{estimatedKm} km</div>
-                    <div style={{ color:"#6a5a40",fontSize:8.5,marginTop:2 }}>
+                    <div style={{ color:"#6a5a40",fontSize: 11,marginTop:2 }}>
                       {Math.round(estimatedKm * 2 + 8)}–{Math.round(estimatedKm * 3 + 12)} phút
                     </div>
                   </div>
@@ -332,7 +332,7 @@ export default function TaxiPage() {
           <div style={{ display:"flex",gap:8 }}>
             {["❄️ Điều hoà","🔒 Tài xế xác minh","💬 Chat app"].map((t,i) => (
               <div key={i} style={{ flex:1,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",
-                borderRadius:10,padding:"7px 4px",textAlign:"center",color:"#6a5a40",fontSize:7.5,lineHeight:1.5 }}>
+                borderRadius:10,padding:"7px 4px",textAlign:"center",color:"#6a5a40",fontSize: 10,lineHeight:1.5 }}>
                 {t}
               </div>
             ))}

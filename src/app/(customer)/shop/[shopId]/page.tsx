@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
+import Image from "next/image"
 import { useCartStore } from "@/store/cartStore"
 import { createClient } from "@/lib/supabase/client"
 
@@ -147,8 +148,9 @@ function ProductSheet({
           <div style={{ width:"100%", height:220, background:"rgba(255,255,255,0.04)",
             overflow:"hidden", position:"relative" }}>
             {product.imageUrl ? (
-              <img src={product.imageUrl} alt={product.name}
-                style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+              <Image src={product.imageUrl} alt={product.name} fill
+                sizes="(max-width: 600px) 100vw, 50vw"
+                style={{ objectFit:"cover" }} />
             ) : (
               <div style={{ width:"100%", height:"100%", display:"flex",
                 alignItems:"center", justifyContent:"center", fontSize:72, opacity:.3 }}>
@@ -194,9 +196,9 @@ function ProductSheet({
               <div style={{ marginBottom:18 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
                   <span style={{ background:"rgba(74,143,245,0.12)", border:"1px solid rgba(74,143,245,0.3)",
-                    color:"#4a8ff5", fontSize:8.5, fontWeight:700, padding:"2px 8px", borderRadius:5,
+                    color:"#4a8ff5", fontSize: 11, fontWeight:700, padding:"2px 8px", borderRadius:5,
                     letterSpacing:".4px", textTransform:"uppercase" }}>📐 Size</span>
-                  <span style={{ color:"#ff4040", fontSize:9 }}>* Bắt buộc</span>
+                  <span style={{ color:"#ff4040", fontSize: 11 }}>* Bắt buộc</span>
                 </div>
                 <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
                   {product.sizes.map(s => {
@@ -209,7 +211,7 @@ function ProductSheet({
                           transition:"all .15s", textAlign:"center" }}>
                         <div style={{ color: active ? "#4a8ff5" : "#b0956a",
                           fontSize:11, fontWeight: active ? 700 : 400 }}>{s.label}</div>
-                        <div style={{ color: active ? "#4a8ff5" : "#6a5a40", fontSize:9, marginTop:2 }}>
+                        <div style={{ color: active ? "#4a8ff5" : "#6a5a40", fontSize: 11, marginTop:2 }}>
                           {(s.priceDiff ?? 0) === 0
                             ? `${product.price.toLocaleString("vi-VN")}đ`
                             : `${(s.priceDiff ?? 0) > 0 ? "+" : ""}${(s.priceDiff ?? 0).toLocaleString("vi-VN")}đ`}
@@ -226,9 +228,9 @@ function ProductSheet({
               <div style={{ marginBottom:18 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
                   <span style={{ background:"rgba(62,207,110,0.1)", border:"1px solid rgba(62,207,110,0.25)",
-                    color:"#3ecf6e", fontSize:8.5, fontWeight:700, padding:"2px 8px", borderRadius:5,
+                    color:"#3ecf6e", fontSize: 11, fontWeight:700, padding:"2px 8px", borderRadius:5,
                     letterSpacing:".4px", textTransform:"uppercase" }}>🫙 Topping</span>
-                  <span style={{ color:"#6a5a40", fontSize:8.5 }}>(tuỳ chọn)</span>
+                  <span style={{ color:"#6a5a40", fontSize: 11 }}>(tuỳ chọn)</span>
                 </div>
                 <div style={{ background:"rgba(255,255,255,0.02)",
                   border:"1px solid rgba(255,255,255,0.07)", borderRadius:12, overflow:"hidden" }}>
@@ -263,7 +265,7 @@ function ProductSheet({
             {/* Qty stepper */}
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
               marginBottom:18 }}>
-              <div style={{ color:"rgba(176,149,106,0.7)", fontSize:9.5, fontWeight:700,
+              <div style={{ color:"rgba(176,149,106,0.7)", fontSize: 11, fontWeight:700,
                 letterSpacing:".4px", textTransform:"uppercase" }}>Số lượng</div>
               <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                 <button onClick={() => onQtyChange(Math.max(1, qty - 1))}
@@ -286,7 +288,7 @@ function ProductSheet({
 
             {/* Ghi chú */}
             <div style={{ marginBottom:12 }}>
-              <div style={{ color:"rgba(176,149,106,0.7)", fontSize:9.5, fontWeight:700,
+              <div style={{ color:"rgba(176,149,106,0.7)", fontSize: 11, fontWeight:700,
                 letterSpacing:".4px", textTransform:"uppercase", marginBottom:8 }}>
                 Ghi chú
               </div>
@@ -354,21 +356,21 @@ function ProductCard({
           display:"flex", alignItems:"center", justifyContent:"center",
           fontSize:36 }}>
           {product.imageUrl
-            ? <img src={product.imageUrl} alt={product.name}
-                style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+            ? <Image src={product.imageUrl} alt={product.name} fill
+                sizes="80px" style={{ objectFit:"cover" }} />
             : "🍽️"}
         </div>
         {discount && (
           <div style={{ position:"absolute", top:-4, left:-4,
             background:"#ff4040", color:"#fff",
             borderRadius:6, padding:"1px 6px",
-            fontSize:8, fontWeight:800 }}>
+            fontSize: 11, fontWeight:800 }}>
             -{discount}%
           </div>
         )}
         {product.badge && (
           <div style={{ position:"absolute", bottom:-4, right:-4,
-            borderRadius:6, padding:"2px 7px", fontSize:7.5, fontWeight:800,
+            borderRadius:6, padding:"2px 7px", fontSize: 10, fontWeight:800,
             ...(product.badge === "hot"
               ? { background:"linear-gradient(90deg,#ff4040,#ff6b00)", color:"#fff" }
               : product.badge === "bigsale"
@@ -383,7 +385,7 @@ function ProductCard({
           <div style={{ position:"absolute", bottom:-4, right:-4,
             background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
             color:"#fff", borderRadius:6, padding:"1px 6px",
-            fontSize:7, fontWeight:700 }}>
+            fontSize: 10, fontWeight:700 }}>
             🔥 Hot
           </div>
         )}
@@ -397,7 +399,7 @@ function ProductCard({
           WebkitLineClamp:2, WebkitBoxOrient:"vertical" } as React.CSSProperties}>
           {product.name}
         </div>
-        <div style={{ color:"#6a5a40", fontSize:9.5, lineHeight:1.5,
+        <div style={{ color:"#6a5a40", fontSize: 11, lineHeight:1.5,
           marginBottom:6,
           overflow:"hidden", display:"-webkit-box",
           WebkitLineClamp:2, WebkitBoxOrient:"vertical" } as React.CSSProperties}>
@@ -414,12 +416,12 @@ function ProductCard({
               {fmt(product.price)}
             </span>
             {product.origPrice && (
-              <span style={{ color:"#6a5a40", fontSize:9,
+              <span style={{ color:"#6a5a40", fontSize: 11,
                 textDecoration:"line-through", marginLeft:5 }}>
                 {fmt(product.origPrice)}
               </span>
             )}
-            <div style={{ color:"#6a5a40", fontSize:8.5, marginTop:1 }}>
+            <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1 }}>
               Đã bán {product.sold.toLocaleString("vi-VN")}
             </div>
           </div>
@@ -754,7 +756,7 @@ export default function ShopPage() {
                     overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                     {shop?.name ?? ""}
                   </div>
-                  <div style={{ color:"#6a5a40", fontSize:8.5 }}>{shop?.description ?? ""}</div>
+                  <div style={{ color:"#6a5a40", fontSize: 11 }}>{shop?.description ?? ""}</div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -884,7 +886,7 @@ export default function ShopPage() {
                 <div style={{ width:6, height:6, borderRadius:"50%",
                   background: shop.is_open ? "#3ecf6e" : "#ff4040",
                   animation:"shopPulse 1.5s infinite" }} />
-                <span style={{ color: shop.is_open ? "#3ecf6e" : "#ff4040", fontSize:9.5, fontWeight:600 }}>
+                <span style={{ color: shop.is_open ? "#3ecf6e" : "#ff4040", fontSize: 11, fontWeight:600 }}>
                   {shop.is_open ? "Đang mở cửa" : "Đã đóng cửa"}
                 </span>
               </div>
@@ -908,8 +910,8 @@ export default function ShopPage() {
                     display:"flex", alignItems:"center", justifyContent:"center", fontSize:34,
                     boxShadow:"0 0 0 1px rgba(255,107,0,0.25),0 4px 20px rgba(0,0,0,0.6)" }}>
                     {shop.avatar_url
-                      ? <img src={shop.avatar_url} alt={shop.name}
-                          style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                      ? <Image src={shop.avatar_url} alt={shop.name} fill
+                          sizes="80px" style={{ objectFit:"cover" }} />
                       : "🏪"}
                   </div>
                   {/* Corner badge */}
@@ -921,7 +923,7 @@ export default function ShopPage() {
                         : "linear-gradient(135deg,#3ecf6e,#27ae60)",
                       borderRadius:7, padding:"2px 6px",
                       border:"2px solid #080806",
-                      fontSize:7, fontWeight:700, color:"#fff",
+                      fontSize: 10, fontWeight:700, color:"#fff",
                       whiteSpace:"nowrap",
                     }}>
                       {shop.shop_type === "delivery" ? "🛒 Mua hộ" : "🤝 Đối tác"}
@@ -938,7 +940,7 @@ export default function ShopPage() {
                   </div>
                   {/* Mô tả quán */}
                   {shop.description && (
-                    <span style={{ color:"#6a5a40", fontSize:9.5, lineHeight:1.5,
+                    <span style={{ color:"#6a5a40", fontSize: 11, lineHeight:1.5,
                       overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
                       maxWidth:180, display:"block" }}>
                       {shop.description}
@@ -964,7 +966,7 @@ export default function ShopPage() {
                     borderRadius:10, padding:"8px 4px" }}>
                     <div style={{ fontSize:15, marginBottom:2 }}>{s.icon}</div>
                     <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:700, lineHeight:1.2 }}>{s.val}</div>
-                    <div style={{ color:"#6a5a40", fontSize:7.5 }}>{s.sub}</div>
+                    <div style={{ color:"#6a5a40", fontSize: 10 }}>{s.sub}</div>
                   </div>
                 ))}
               </div>
@@ -998,14 +1000,14 @@ export default function ShopPage() {
                         {discountText}
                       </div>
                       {combo.minOrder > 0 && (
-                        <div style={{ color:"#6a5a40", fontSize:8, marginBottom:8 }}>
+                        <div style={{ color:"#6a5a40", fontSize: 11, marginBottom:8 }}>
                           Đơn tối thiểu {fmt(combo.minOrder)}
                         </div>
                       )}
                       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                         <span style={{ fontFamily:"'Courier New',monospace", background:"rgba(255,107,0,0.1)",
                           border:"1px dashed rgba(255,107,0,0.3)", borderRadius:5,
-                          padding:"2px 7px", color:"#FF8C00", fontSize:9, fontWeight:700 }}>
+                          padding:"2px 7px", color:"#FF8C00", fontSize: 11, fontWeight:700 }}>
                           {combo.code}
                         </span>
                         <button
@@ -1015,12 +1017,12 @@ export default function ShopPage() {
                           }}
                           style={{ height:26, padding:"0 10px", borderRadius:8, border:"none",
                             background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
-                            color:"#fff", fontSize:9, fontWeight:700,
+                            color:"#fff", fontSize: 11, fontWeight:700,
                             cursor:"pointer", fontFamily:"Lexend", flexShrink:0 }}>
                           Lấy mã
                         </button>
                       </div>
-                      <div style={{ color:"#6a5a40", fontSize:7.5, marginTop:6 }}>
+                      <div style={{ color:"#6a5a40", fontSize: 10, marginTop:6 }}>
                         HSD: {new Date(combo.endAt).toLocaleDateString("vi-VN")}
                       </div>
                     </div>
@@ -1052,7 +1054,7 @@ export default function ShopPage() {
                         fontSize:10, fontWeight: active ? 600 : 400,
                         cursor:"pointer", fontFamily:"Lexend", transition:"all .2s" }}>
                       <span>{cat.label}</span>
-                      <span style={{ color:"#6a5a40", fontSize:8.5 }}>({cnt})</span>
+                      <span style={{ color:"#6a5a40", fontSize: 11 }}>({cnt})</span>
                     </button>
                   )
                 })}
@@ -1076,7 +1078,7 @@ export default function ShopPage() {
                       <div style={{ display:"flex", alignItems:"center", gap:8, padding:"16px 0 4px" }}>
                         <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700 }}>{cat.label}</div>
                         <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.06)" }} />
-                        <span style={{ color:"#6a5a40", fontSize:9 }}>{items.length} món</span>
+                        <span style={{ color:"#6a5a40", fontSize: 11 }}>{items.length} món</span>
                       </div>
                       {items.map(product => (
                         <ProductCard key={product.id} product={product} onAdd={handleAdd} badgeRef={cartBadgeRef} />
@@ -1097,7 +1099,7 @@ export default function ShopPage() {
                       <div style={{ display:"flex", alignItems:"center", gap:8, padding:"16px 0 4px" }}>
                         <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700 }}>{cat?.label ?? ""}</div>
                         <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.06)" }} />
-                        <span style={{ color:"#6a5a40", fontSize:9 }}>{items.length} món</span>
+                        <span style={{ color:"#6a5a40", fontSize: 11 }}>{items.length} món</span>
                       </div>
                       {items.map(product => (
                         <ProductCard key={product.id} product={product} onAdd={handleAdd} badgeRef={cartBadgeRef} />
@@ -1145,7 +1147,7 @@ export default function ShopPage() {
                       background:"#fff", color:"#FF6B00",
                       borderRadius:"50%", width:16, height:16,
                       display:"flex", alignItems:"center", justifyContent:"center",
-                      fontSize:9, fontWeight:800 }}>
+                      fontSize: 11, fontWeight:800 }}>
                       {totalItems}
                     </div>
                   </div>
@@ -1155,7 +1157,7 @@ export default function ShopPage() {
                     <div style={{ color:"#fff", fontSize:12, fontWeight:700 }}>
                       Xem giỏ hàng
                     </div>
-                    <div style={{ color:"rgba(255,255,255,0.75)", fontSize:9.5 }}>
+                    <div style={{ color:"rgba(255,255,255,0.75)", fontSize: 11 }}>
                       {totalItems} món · {fmt(totalPrice)}
                     </div>
                   </div>
@@ -1195,12 +1197,12 @@ export default function ShopPage() {
                     background:"#ff4040", color:"#fff",
                     borderRadius:"50%", width:15, height:15,
                     display:"flex", alignItems:"center", justifyContent:"center",
-                    fontSize:8, fontWeight:800 }}>
+                    fontSize: 11, fontWeight:800 }}>
                     {tab.badge}
                   </span>
                 )}
               </span>
-              <span style={{ fontSize:7.5, color:"#6a5a40" }}>{tab.label}</span>
+              <span style={{ fontSize: 10, color:"#6a5a40" }}>{tab.label}</span>
             </button>
           ))}
         </div>

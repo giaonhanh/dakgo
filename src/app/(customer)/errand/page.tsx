@@ -202,7 +202,7 @@ function ErrandContent() {
             <a href="/" style={{ width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",color:"#f8f0e0",fontSize:16 }}>←</a>
             <div style={{ flex:1 }}>
               <div style={{ color:"#f8f0e0",fontSize:16,fontWeight:800 }}>Đặt dịch vụ</div>
-              <div style={{ color:"#6a5a40",fontSize:9 }}>Mua hộ · Giao hộ tại Krông Pắc</div>
+              <div style={{ color:"#6a5a40",fontSize: 11 }}>Mua hộ · Giao hộ tại Krông Pắc</div>
             </div>
           </div>
           <div style={{ display:"flex",background:"rgba(255,255,255,0.05)",borderRadius:12,padding:3,gap:3 }}>
@@ -222,11 +222,11 @@ function ErrandContent() {
 
           {/* Address */}
           <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,marginBottom:10 }}>
-            <div style={{ color:"#6a5a40",fontSize:9,marginBottom:10,fontWeight:600 }}>ĐỊA CHỈ</div>
+            <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:10,fontWeight:600 }}>ĐỊA CHỈ</div>
             <div style={{ display:"flex",gap:10,alignItems:"flex-start",marginBottom:10 }}>
               <div style={{ width:8,height:8,borderRadius:"50%",background:"#FF6B00",marginTop:6,flexShrink:0,boxShadow:"0 0 8px #FF6B00" }} />
               <div style={{ flex:1 }}>
-                <div style={{ color:"#6a5a40",fontSize:9,marginBottom:4 }}>{tab==="buy"?"Đến cửa hàng / chợ":"Lấy hàng tại"}</div>
+                <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:4 }}>{tab==="buy"?"Đến cửa hàng / chợ":"Lấy hàng tại"}</div>
                 <input value={pickup} onChange={e=>setPickup(e.target.value)} placeholder={tab==="buy"?"VD: Chợ Phước An...":"Địa chỉ lấy hàng..."} style={{ width:"100%",background:"none",border:"none",color:"#f8f0e0",fontSize:11.5,padding:0 }} />
               </div>
               <button onClick={() => setMapMode("pickup")}
@@ -240,7 +240,7 @@ function ErrandContent() {
             <div style={{ display:"flex",gap:10,alignItems:"flex-start" }}>
               <div style={{ width:8,height:8,borderRadius:2,background:"#3ecf6e",marginTop:6,flexShrink:0,boxShadow:"0 0 8px #3ecf6e" }} />
               <div style={{ flex:1 }}>
-                <div style={{ color:"#6a5a40",fontSize:9,marginBottom:4 }}>Giao đến</div>
+                <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:4 }}>Giao đến</div>
                 <input value={delivery} onChange={e=>setDelivery(e.target.value)} placeholder="Địa chỉ nhận hàng của bạn..." style={{ width:"100%",background:"none",border:"none",color:"#f8f0e0",fontSize:11.5,padding:0 }} />
               </div>
               <button onClick={() => setMapMode("delivery")}
@@ -262,7 +262,7 @@ function ErrandContent() {
                   </div>
                   {items.map((item, idx) => (
                     <div key={item.id} style={{ display:"flex",gap:7,marginBottom:8,alignItems:"center" }}>
-                      <div style={{ width:20,height:20,borderRadius:6,background:"rgba(255,107,0,0.1)",display:"flex",alignItems:"center",justifyContent:"center",color:"#6a5a40",fontSize:9,flexShrink:0 }}>{idx+1}</div>
+                      <div style={{ width:20,height:20,borderRadius:6,background:"rgba(255,107,0,0.1)",display:"flex",alignItems:"center",justifyContent:"center",color:"#6a5a40",fontSize: 11,flexShrink:0 }}>{idx+1}</div>
                       <input value={item.name} onChange={e=>updateItem(item.id,"name",e.target.value)} placeholder="Tên món / sản phẩm" style={{ flex:2,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"6px 10px",color:"#f8f0e0",fontSize:10 }} />
                       <input value={item.price} onChange={e=>updateItem(item.id,"price",e.target.value)} placeholder="~giá" style={{ width:68,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"6px 8px",color:"#FF8C00",fontSize:10 }} />
                       <div style={{ display:"flex",alignItems:"center",gap:3,flexShrink:0 }}>
@@ -290,11 +290,11 @@ function ErrandContent() {
                 <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,marginBottom:10,display:"flex",gap:12,alignItems:"center" }}>
                   <div style={{ width:56,height:56,borderRadius:12,background:"rgba(255,255,255,0.04)",border:"1px dashed rgba(255,255,255,0.15)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2 }}>
                     <span style={{ fontSize:20 }}>📷</span>
-                    <span style={{ color:"#6a5a40",fontSize:7 }}>Ảnh</span>
+                    <span style={{ color:"#6a5a40",fontSize: 10 }}>Ảnh</span>
                   </div>
                   <div>
                     <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:3 }}>Chụp ảnh gói hàng</div>
-                    <div style={{ color:"#6a5a40",fontSize:9,lineHeight:1.5 }}>Giúp tài xế nhận dạng hàng dễ hơn</div>
+                    <div style={{ color:"#6a5a40",fontSize: 11,lineHeight:1.5 }}>Giúp tài xế nhận dạng hàng dễ hơn</div>
                   </div>
                 </div>
                 <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,marginBottom:10 }}>
@@ -325,7 +325,7 @@ function ErrandContent() {
               <span style={{ color:"#f8f0e0",fontSize:12,fontWeight:700 }}>Tổng ước tính</span>
               <span style={{ background:"linear-gradient(90deg,#FF6B00,#FFB347)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontSize:14,fontWeight:800 }}>{fmt(tab==="buy"?estimatedBudget+serviceFee:serviceFee)}</span>
             </div>
-            <div style={{ color:"#6a5a40",fontSize:8.5,marginTop:6 }}>* Thanh toán thực tế dựa trên chi phí phát sinh thực tế</div>
+            <div style={{ color:"#6a5a40",fontSize: 11,marginTop:6 }}>* Thanh toán thực tế dựa trên chi phí phát sinh thực tế</div>
           </div>
         </div>
 

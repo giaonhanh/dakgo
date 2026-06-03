@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
@@ -224,7 +224,7 @@ export default function NearbyShopsPage() {
                 <span style={{ fontSize: 13 }}>{tab.emoji}</span>
                 <span>{tab.label}</span>
                 {!loading && (
-                  <span style={{ background: on ? "rgba(255,107,0,0.2)" : "rgba(255,255,255,0.08)", borderRadius: 10, padding: "1px 5px", fontSize: 9 }}>
+                  <span style={{ background: on ? "rgba(255,107,0,0.2)" : "rgba(255,255,255,0.08)", borderRadius: 10, padding: "1px 5px", fontSize: 11 }}>
                     {count}
                   </span>
                 )}
@@ -269,7 +269,7 @@ export default function NearbyShopsPage() {
                       }
                       {!s.isOpen && (
                         <div style={{ position: "absolute", inset: 0, background: "rgba(8,8,6,0.65)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <span style={{ color: "#ff6060", fontSize: 8, fontWeight: 800, background: "rgba(255,64,64,0.18)", padding: "2px 5px", borderRadius: 4, border: "1px solid rgba(255,64,64,0.3)" }}>Đóng</span>
+                          <span style={{ color: "#ff6060", fontSize: 11, fontWeight: 800, background: "rgba(255,64,64,0.18)", padding: "2px 5px", borderRadius: 4, border: "1px solid rgba(255,64,64,0.3)" }}>Đóng</span>
                         </div>
                       )}
                     </div>
@@ -280,11 +280,11 @@ export default function NearbyShopsPage() {
                         <div style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, minWidth: 0 }}>{s.name}</div>
                         <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 3, background: s.isOpen ? "rgba(62,207,110,0.12)" : "rgba(255,64,64,0.1)", border: `1px solid ${s.isOpen ? "rgba(62,207,110,0.3)" : "rgba(255,64,64,0.25)"}`, borderRadius: 5, padding: "1px 6px" }}>
                           <div style={{ width: 5, height: 5, borderRadius: "50%", background: s.isOpen ? "#3ecf6e" : "#ff6060", boxShadow: s.isOpen ? "0 0 4px #3ecf6e" : "none" }} />
-                          <span style={{ color: s.isOpen ? "#3ecf6e" : "#ff6060", fontSize: 9, fontWeight: 700 }}>{s.isOpen ? "Mở" : "Đóng"}</span>
+                          <span style={{ color: s.isOpen ? "#3ecf6e" : "#ff6060", fontSize: 11, fontWeight: 700 }}>{s.isOpen ? "Mở" : "Đóng"}</span>
                         </div>
                       </div>
 
-                      <div style={{ color: "#6a5a40", fontSize: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 4 }}>{s.address}</div>
+                      <div style={{ color: "#6a5a40", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 4 }}>{s.address}</div>
 
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         {s.rating > 0 && (
@@ -295,7 +295,7 @@ export default function NearbyShopsPage() {
                         )}
                         {s.distanceKm !== null && (
                           <span style={{ display: "flex", alignItems: "center", gap: 3, background: "rgba(74,143,245,0.08)", border: "1px solid rgba(74,143,245,0.2)", borderRadius: 6, padding: "2px 7px" }}>
-                            <span style={{ fontSize: 9 }}>📍</span>
+                            <span style={{ fontSize: 11 }}>📍</span>
                             <span style={{ color: "#4a8ff5", fontSize: 10, fontWeight: 600 }}>{formatDist(s.distanceKm)}</span>
                           </span>
                         )}

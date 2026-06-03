@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -103,7 +103,7 @@ export default function BestsellersPage() {
               <div style={{ color: "#6a5a40", fontSize: 10, marginTop: 2 }}>{b.shopName}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>
                 <span style={{ background: "linear-gradient(135deg,#FF6B00,#FFB347)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", fontSize: 13, fontWeight: 700 }}>{fmt(b.price)}</span>
-                <span style={{ background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.2)", borderRadius: 5, padding: "1px 7px", color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>🔥 {b.sold.toLocaleString("vi-VN")} đã bán</span>
+                <span style={{ background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.2)", borderRadius: 5, padding: "1px 7px", color: "#3ecf6e", fontSize: 11, fontWeight: 600 }}>🔥 {b.sold.toLocaleString("vi-VN")} đã bán</span>
               </div>
             </div>
 
@@ -112,7 +112,7 @@ export default function BestsellersPage() {
               <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
                 <div style={{ height: "100%", borderRadius: 2, background: b.rank===1?"linear-gradient(90deg,#FFD700,#FFB347)":b.rank===2?"linear-gradient(90deg,#C0C0C0,#a0a0a0)":b.rank===3?"linear-gradient(90deg,#CD7F32,#a05a1a)":"linear-gradient(90deg,#FF6B00,#FF8C00)", width: `${Math.round(b.sold / maxSold * 100)}%`, transition: "width .6s ease" }} />
               </div>
-              <div style={{ color: "#6a5a40", fontSize: 7.5, marginTop: 3, textAlign: "right" }}>{Math.round(b.sold / maxSold * 100)}% max</div>
+              <div style={{ color: "#6a5a40", fontSize: 10, marginTop: 3, textAlign: "right" }}>{Math.round(b.sold / maxSold * 100)}% max</div>
             </div>
           </motion.div>
         ))}

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -129,7 +129,7 @@ export default function NotificationsPage() {
             <div style={{ flex: 1 }}>
               <div style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 700 }}>Thông báo</div>
               {unreadCount > 0 && (
-                <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>
+                <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>
                   {unreadCount} chưa đọc
                 </div>
               )}
@@ -137,7 +137,7 @@ export default function NotificationsPage() {
             <div style={{ display: "flex", gap: 6 }}>
               {notifs.length > 0 && (
                 <button onClick={markAllRead}
-                  style={{ cursor: "pointer", color: "#FF8C00", fontSize: 9, fontWeight: 700,
+                  style={{ cursor: "pointer", color: "#FF8C00", fontSize: 11, fontWeight: 700,
                     fontFamily: "Lexend", padding: "6px 10px", borderRadius: 8,
                     background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.2)",
                     whiteSpace: "nowrap" }}>
@@ -159,13 +159,13 @@ export default function NotificationsPage() {
                     background: on ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.04)",
                     outline: `${on ? 1.5 : 1}px solid ${on ? "rgba(255,107,0,0.4)" : "rgba(255,255,255,0.08)"}`,
                     color: on ? "#FF8C00" : "#6a5a40",
-                    fontSize: 9.5, fontWeight: on ? 600 : 400,
+                    fontSize: 11, fontWeight: on ? 600 : 400,
                     cursor: "pointer", fontFamily: "Lexend", transition: "all .2s" }}>
                   <span>{t.icon}</span>
                   <span>{t.label}</span>
                   {cnt > 0 && (
                     <span style={{ background: "#FF6B00", color: "#fff",
-                      borderRadius: 10, padding: "0 5px", fontSize: 8, fontWeight: 700 }}>
+                      borderRadius: 10, padding: "0 5px", fontSize: 11, fontWeight: 700 }}>
                       {cnt}
                     </span>
                   )}
@@ -217,13 +217,13 @@ export default function NotificationsPage() {
                           marginBottom: 3, lineHeight: 1.3 }}>
                           {n.title}
                         </div>
-                        <div style={{ color: "#6a5a40", fontSize: 9.5, lineHeight: 1.5, marginBottom: 5 }}>
+                        <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.5, marginBottom: 5 }}>
                           {n.body}
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ color: "#6a5a40", fontSize: 8.5 }}>{n.time}</span>
+                          <span style={{ color: "#6a5a40", fontSize: 11 }}>{n.time}</span>
                           <div style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,0.1)" }} />
-                          <span style={{ fontSize: 7.5, fontWeight: 600, padding: "1px 6px", borderRadius: 5,
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 5,
                             background: n.type === "order" ? "rgba(255,107,0,0.1)" :
                                         n.type === "promo" ? "rgba(255,179,71,0.1)" :
                                         n.type === "driver" ? "rgba(62,207,110,0.1)" : "rgba(74,143,245,0.1)",
@@ -251,7 +251,7 @@ export default function NotificationsPage() {
           )}
 
           {unreadCount === 0 && notifs.length > 0 && (
-            <div style={{ textAlign: "center", padding: "12px 0", color: "#6a5a40", fontSize: 9 }}>
+            <div style={{ textAlign: "center", padding: "12px 0", color: "#6a5a40", fontSize: 11 }}>
               ✓ Bạn đã đọc tất cả thông báo
             </div>
           )}
@@ -276,7 +276,7 @@ export default function NotificationsPage() {
                 background: tab.active ? "rgba(255,107,0,0.12)" : "transparent",
                 position: "relative", transition: "all .2s" }}>
               <span style={{ fontSize: 19 }}>{tab.icon}</span>
-              <span style={{ fontSize: 7.5, color: "#6a5a40" }}>{tab.label}</span>
+              <span style={{ fontSize: 10, color: "#6a5a40" }}>{tab.label}</span>
             </a>
           ))}
         </div>

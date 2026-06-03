@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -122,7 +122,7 @@ export default function XuPage() {
 
                 {!showQR ? (
                   <>
-                    <div style={{ color:"rgba(180,100,255,0.55)", fontSize:9.5, marginBottom:8 }}>Chọn số xu</div>
+                    <div style={{ color:"rgba(180,100,255,0.55)", fontSize: 11, marginBottom:8 }}>Chọn số xu</div>
                     <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:7, marginBottom:12 }}>
                       {TOPUP_AMOUNTS.map(v => (
                         <div key={v} onClick={() => { setTopupAmount(v); setCustomAmount("") }}
@@ -136,13 +136,13 @@ export default function XuPage() {
                         </div>
                       ))}
                     </div>
-                    <div style={{ color:"rgba(180,100,255,0.55)", fontSize:9.5, marginBottom:5 }}>Hoặc nhập số xu khác</div>
+                    <div style={{ color:"rgba(180,100,255,0.55)", fontSize: 11, marginBottom:5 }}>Hoặc nhập số xu khác</div>
                     <FInput label="" value={customAmount} onChange={setCustomAmount}
                       placeholder="VD: 150000" icon="💳" type="number" suffix="xu" />
                     <div style={{ background:"rgba(180,100,255,0.06)", border:"1px solid rgba(180,100,255,0.15)",
                       borderRadius:10, padding:"9px 12px", marginBottom:14, display:"flex", alignItems:"center", gap:8 }}>
                       <span style={{ fontSize:14 }}>💡</span>
-                      <div style={{ color:"#6a5a40", fontSize:8.5, lineHeight:1.5 }}>
+                      <div style={{ color:"#6a5a40", fontSize: 11, lineHeight:1.5 }}>
                         1 xu = 1đ · Thanh toán ngay khi đặt hàng<br />
                         Tối thiểu 10.000 xu · Cộng tự động sau khi quét QR
                       </div>
@@ -181,7 +181,7 @@ export default function XuPage() {
                           ;(e.target as HTMLImageElement).parentNode?.appendChild(p)
                         }} />
                     </div>
-                    <div style={{ color:"#6a5a40", fontSize:9, lineHeight:1.7, marginBottom:12 }}>
+                    <div style={{ color:"#6a5a40", fontSize: 11, lineHeight:1.7, marginBottom:12 }}>
                       Ngân hàng BIDV · TK: 1234567890<br />
                       Nội dung: <strong style={{ color:"#b464ff" }}>NAP XU GIAONHANH</strong>
                     </div>
@@ -190,7 +190,7 @@ export default function XuPage() {
                       display:"flex", alignItems:"center", gap:7, justifyContent:"center" }}>
                       <div style={{ width:6, height:6, borderRadius:"50%", background:"#b464ff",
                         boxShadow:"0 0 6px #b464ff" }} />
-                      <span style={{ color:"#b464ff", fontSize:9 }}>Đang chờ xác nhận thanh toán...</span>
+                      <span style={{ color:"#b464ff", fontSize: 11 }}>Đang chờ xác nhận thanh toán...</span>
                     </div>
                     <button onClick={() => setShowQR(false)}
                       style={{ background:"none", border:"none", cursor:"pointer", color:"#6a5a40", fontSize:10, fontFamily:"Lexend" }}>
@@ -227,14 +227,14 @@ export default function XuPage() {
                 <div>
                   <span style={{ color:"#6a5a40", fontSize:10 }}>Xu Giao Nhanh có thể rút</span>
                   {bonusBalance > 0 && (
-                    <div style={{ color:"rgba(62,207,110,0.6)", fontSize:8.5, marginTop:2 }}>
+                    <div style={{ color:"rgba(62,207,110,0.6)", fontSize: 11, marginTop:2 }}>
                       Xu thưởng {fmt(bonusBalance)}xu — không rút được
                     </div>
                   )}
                 </div>
                 <div style={{ textAlign:"right" }}>
                   <span style={{ color:"#b464ff", fontSize:14, fontWeight:700 }}>{fmt(balance)} xu</span>
-                  <div style={{ color:"rgba(180,100,255,0.45)", fontSize:9 }}>= {fmt(balance)}đ</div>
+                  <div style={{ color:"rgba(180,100,255,0.45)", fontSize: 11 }}>= {fmt(balance)}đ</div>
                 </div>
               </div>
               <FInput label="Số tài khoản ngân hàng" value={withdrawBank}
@@ -243,7 +243,7 @@ export default function XuPage() {
                 onChange={setWithdrawAmount} placeholder="VD: 100000" icon="💳" type="number" suffix="xu" />
               <div style={{ background:"rgba(245,197,66,0.06)", border:"1px solid rgba(245,197,66,0.18)",
                 borderRadius:9, padding:"8px 11px", marginBottom:14,
-                color:"rgba(245,197,66,0.6)", fontSize:8.5, lineHeight:1.6 }}>
+                color:"rgba(245,197,66,0.6)", fontSize: 11, lineHeight:1.6 }}>
                 ⚠️ Phí rút: 0đ · 1 xu = 1đ · Xử lý 1–3 ngày làm việc
               </div>
               <button onClick={() => {
@@ -279,13 +279,13 @@ export default function XuPage() {
               display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>←</a>
             <div style={{ flex:1 }}>
               <div style={{ color:"#f8f0e0", fontSize:15, fontWeight:700 }}>💳 Ví Xu</div>
-              <div style={{ color:"#6a5a40", fontSize:9, marginTop:1 }}>1 xu = 1đ · thanh toán đơn hàng</div>
+              <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1 }}>1 xu = 1đ · thanh toán đơn hàng</div>
             </div>
             <div style={{ display:"flex", alignItems:"center", gap:5,
               background:"rgba(180,100,255,0.08)", border:"1px solid rgba(180,100,255,0.2)",
               borderRadius:8, padding:"4px 10px" }}>
               <div style={{ width:5, height:5, borderRadius:"50%", background:"#b464ff", boxShadow:"0 0 4px #b464ff" }} />
-              <span style={{ color:"#b464ff", fontSize:9, fontWeight:600 }}>Đã xác thực</span>
+              <span style={{ color:"#b464ff", fontSize: 11, fontWeight:600 }}>Đã xác thực</span>
             </div>
           </div>
         </div>
@@ -323,7 +323,7 @@ export default function XuPage() {
                 borderRadius:10, padding:"8px 12px", marginBottom:6, position:"relative", zIndex:1 }}>
                 <div>
                   <div style={{ color:"#3ecf6e", fontSize:10, fontWeight:700 }}>🎁 Xu thưởng (referral)</div>
-                  <div style={{ color:"rgba(62,207,110,0.55)", fontSize:8.5, marginTop:2 }}>
+                  <div style={{ color:"rgba(62,207,110,0.55)", fontSize: 11, marginTop:2 }}>
                     Chỉ dùng để thanh toán — không rút được
                   </div>
                 </div>
@@ -369,7 +369,7 @@ export default function XuPage() {
               display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>💡</div>
             <div style={{ flex:1 }}>
               <div style={{ color:"#b464ff", fontSize:11, fontWeight:600 }}>Cách tích xu</div>
-              <div style={{ color:"#6a5a40", fontSize:8.5, marginTop:2, lineHeight:1.5 }}>
+              <div style={{ color:"#6a5a40", fontSize: 11, marginTop:2, lineHeight:1.5 }}>
                 Nạp VietQR · Admin cộng · Hoàn đơn · Mini game · Đổi từ điểm tích lũy
               </div>
             </div>
@@ -397,7 +397,7 @@ export default function XuPage() {
                   background: filterType===f.v ? "rgba(180,100,255,0.12)" : "rgba(255,255,255,0.04)",
                   border: `1px solid ${filterType===f.v ? "rgba(180,100,255,0.35)" : "rgba(255,255,255,0.07)"}`,
                   color: filterType===f.v ? "#b464ff" : "#6a5a40",
-                  fontSize:9, fontWeight: filterType===f.v ? 600 : 400, transition:"all .15s" }}>
+                  fontSize: 11, fontWeight: filterType===f.v ? 600 : 400, transition:"all .15s" }}>
                 {f.l}
               </div>
             ))}
@@ -423,13 +423,13 @@ export default function XuPage() {
                         {tx.label}
                       </div>
                       <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:2 }}>
-                        <span style={{ color:"#6a5a40", fontSize:8 }}>{tx.time}</span>
-                        <span style={{ fontSize:7.5, fontWeight:600, padding:"1px 5px", borderRadius:4,
+                        <span style={{ color:"#6a5a40", fontSize: 11 }}>{tx.time}</span>
+                        <span style={{ fontSize: 10, fontWeight:600, padding:"1px 5px", borderRadius:4,
                           background:cfg.bg, color:cfg.color }}>
                           {cfg.label}
                         </span>
                       </div>
-                      <div style={{ color:"#6a5a40", fontSize:7.5, marginTop:1 }}>
+                      <div style={{ color:"#6a5a40", fontSize: 10, marginTop:1 }}>
                         Số dư: {tx.balance.toLocaleString("vi-VN")} xu
                       </div>
                     </div>
@@ -437,7 +437,7 @@ export default function XuPage() {
                       <div style={{ color: tx.amount > 0 ? "#3ecf6e" : "#ff6060", fontSize:11, fontWeight:700 }}>
                         {tx.amount > 0 ? "+" : "-"}{Math.abs(tx.amount).toLocaleString("vi-VN")}
                       </div>
-                      <div style={{ color:"rgba(180,100,255,0.5)", fontSize:8 }}>xu</div>
+                      <div style={{ color:"rgba(180,100,255,0.5)", fontSize: 11 }}>xu</div>
                     </div>
                   </motion.div>
                 )
@@ -463,7 +463,7 @@ export default function XuPage() {
               padding:"5px 11px", borderRadius:18,
               background: tab.active ? "rgba(255,107,0,0.12)" : "transparent" }}>
               <span style={{ fontSize:19 }}>{tab.icon}</span>
-              <span style={{ fontSize:7.5, color:"#6a5a40" }}>{tab.label}</span>
+              <span style={{ fontSize: 10, color:"#6a5a40" }}>{tab.label}</span>
             </a>
           ))}
         </div>
@@ -479,7 +479,7 @@ function FInput({ label, value, onChange, placeholder, icon, type="text", suffix
   const [f, setF] = useState(false)
   return (
     <div style={{ marginBottom:10 }}>
-      {label && <label style={{ color:"rgba(180,100,255,0.55)", fontSize:9.5, display:"block", marginBottom:4 }}>{label}</label>}
+      {label && <label style={{ color:"rgba(180,100,255,0.55)", fontSize: 11, display:"block", marginBottom:4 }}>{label}</label>}
       <div style={{ display:"flex", alignItems:"center", gap:8,
         background:"rgba(255,255,255,0.04)",
         border: `1px solid ${f ? "rgba(180,100,255,0.5)" : "rgba(255,255,255,0.08)"}`,

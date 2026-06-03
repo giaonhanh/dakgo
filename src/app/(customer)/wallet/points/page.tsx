@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -120,7 +120,7 @@ export default function PointsPage() {
               <div style={{ color:"#f8f0e0", fontSize:14, fontWeight:700, marginBottom:4 }}>
                 🔄 Đổi điểm thành xu
               </div>
-              <div style={{ color:"#6a5a40", fontSize:9, marginBottom:14 }}>
+              <div style={{ color:"#6a5a40", fontSize: 11, marginBottom:14 }}>
                 Tỷ lệ: {REDEEM_RATE} điểm = 1.000 xu · Bạn có{" "}
                 <span style={{ color:"#F5C542", fontWeight:700 }}>{userEarned.toLocaleString()} điểm</span>
               </div>
@@ -135,7 +135,7 @@ export default function PointsPage() {
                       color: redeemInput===String(v) ? "#F5C542" : "#b0956a",
                       fontSize:10, fontWeight: redeemInput===String(v) ? 700 : 400, transition:"all .15s" }}>
                     <span>{v.toLocaleString()} điểm</span>
-                    <span style={{ fontSize:8, opacity:0.6, marginTop:1 }}>→ {(v*10).toLocaleString()} xu</span>
+                    <span style={{ fontSize: 11, opacity:0.6, marginTop:1 }}>→ {(v*10).toLocaleString()} xu</span>
                   </div>
                 ))}
               </div>
@@ -149,13 +149,13 @@ export default function PointsPage() {
                   borderRadius:10, padding:"10px 13px", marginBottom:14,
                   display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <div>
-                    <div style={{ color:"#6a5a40", fontSize:9 }}>Bạn nhận được</div>
+                    <div style={{ color:"#6a5a40", fontSize: 11 }}>Bạn nhận được</div>
                     <div style={{ color:"#b464ff", fontSize:14, fontWeight:700, marginTop:1 }}>
                       {((parseInt(redeemInput)||0)*10).toLocaleString()} xu
                     </div>
                   </div>
                   <div style={{ textAlign:"right" }}>
-                    <div style={{ color:"#6a5a40", fontSize:9 }}>Điểm còn lại</div>
+                    <div style={{ color:"#6a5a40", fontSize: 11 }}>Điểm còn lại</div>
                     <div style={{ color:"#F5C542", fontSize:13, fontWeight:700, marginTop:1 }}>
                       {(userEarned - (parseInt(redeemInput)||0)).toLocaleString()} điểm
                     </div>
@@ -195,7 +195,7 @@ export default function PointsPage() {
               display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>←</a>
             <div style={{ flex:1 }}>
               <div style={{ color:"#f8f0e0", fontSize:15, fontWeight:700 }}>⭐ Điểm Tích Lũy</div>
-              <div style={{ color:"#6a5a40", fontSize:9, marginTop:1 }}>Tích từ đơn hàng · Đổi xu & voucher</div>
+              <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1 }}>Tích từ đơn hàng · Đổi xu & voucher</div>
             </div>
           </div>
         </div>
@@ -230,11 +230,11 @@ export default function PointsPage() {
             </div>
             <div style={{ display:"flex", gap:6, position:"relative", zIndex:1 }}>
               <div style={{ background:CUR_TIER.bg, border:`1px solid ${CUR_TIER.color}55`,
-                borderRadius:7, padding:"3px 9px", color:CUR_TIER.color, fontSize:9, fontWeight:600 }}>
+                borderRadius:7, padding:"3px 9px", color:CUR_TIER.color, fontSize: 11, fontWeight:600 }}>
                 {CUR_TIER.icon} {CUR_TIER.name} Member
               </div>
               <div style={{ background:"rgba(255,255,255,0.07)", borderRadius:7, padding:"3px 9px",
-                color:"rgba(255,255,255,0.35)", fontSize:9 }}>
+                color:"rgba(255,255,255,0.35)", fontSize: 11 }}>
                 {REDEEM_RATE} điểm = 1.000 xu
               </div>
             </div>
@@ -268,7 +268,7 @@ export default function PointsPage() {
                       fontSize:isCurrent?9.5:8, fontWeight:isCurrent?700:400, marginTop:4, textAlign:"center" }}>
                       {tier.name}
                     </div>
-                    {isCurrent && <div style={{ color:"rgba(255,255,255,0.3)", fontSize:7, marginTop:1 }}>← bạn</div>}
+                    {isCurrent && <div style={{ color:"rgba(255,255,255,0.3)", fontSize: 10, marginTop:1 }}>← bạn</div>}
                   </div>
                 )
               })}
@@ -278,10 +278,10 @@ export default function PointsPage() {
             {NXT_TIER && (
               <div style={{ marginBottom:12 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
-                  <span style={{ color:CUR_TIER.color, fontSize:8.5, fontWeight:600 }}>
+                  <span style={{ color:CUR_TIER.color, fontSize: 11, fontWeight:600 }}>
                     {CUR_TIER.icon} {CUR_TIER.name} · {userEarned.toLocaleString("vi-VN")} điểm
                   </span>
-                  <span style={{ color:NXT_TIER.color, fontSize:8.5 }}>
+                  <span style={{ color:NXT_TIER.color, fontSize: 11 }}>
                     {NXT_TIER.icon} {NXT_TIER.name} · {NXT_TIER.min.toLocaleString("vi-VN")} điểm
                   </span>
                 </div>
@@ -290,7 +290,7 @@ export default function PointsPage() {
                     transition={{ duration:1.2, ease:"easeOut" }}
                     style={{ height:"100%", background:`linear-gradient(90deg,${CUR_TIER.color},${NXT_TIER.color})`, borderRadius:4 }} />
                 </div>
-                <div style={{ color:"#6a5a40", fontSize:8.5, marginTop:5, textAlign:"center" }}>
+                <div style={{ color:"#6a5a40", fontSize: 11, marginTop:5, textAlign:"center" }}>
                   Tích thêm {(NXT_TIER.min - userEarned).toLocaleString("vi-VN")} điểm để lên hạng {NXT_TIER.name} {NXT_TIER.icon}
                 </div>
               </div>
@@ -298,20 +298,20 @@ export default function PointsPage() {
 
             {/* Quyền lợi */}
             <div style={{ background:CUR_TIER.bg, border:`1px solid ${CUR_TIER.color}35`, borderRadius:11, padding:"10px 12px" }}>
-              <div style={{ color:CUR_TIER.color, fontSize:9, fontWeight:700, marginBottom:7 }}>
+              <div style={{ color:CUR_TIER.color, fontSize: 11, fontWeight:700, marginBottom:7 }}>
                 {CUR_TIER.icon} Quyền lợi hạng {CUR_TIER.name}
               </div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"4px 8px", marginBottom:NXT_TIER?8:0 }}>
                 {CUR_TIER.benefits.map(b => (
-                  <div key={b} style={{ color:"rgba(255,255,255,0.65)", fontSize:8.5 }}>✓ {b}</div>
+                  <div key={b} style={{ color:"rgba(255,255,255,0.65)", fontSize: 11 }}>✓ {b}</div>
                 ))}
               </div>
               {NXT_TIER && (
                 <div style={{ paddingTop:7, borderTop:`1px solid ${CUR_TIER.color}22` }}>
-                  <div style={{ color:"rgba(255,255,255,0.3)", fontSize:8, marginBottom:3 }}>
+                  <div style={{ color:"rgba(255,255,255,0.3)", fontSize: 11, marginBottom:3 }}>
                     🔓 Mở khóa ở hạng {NXT_TIER.name}:
                   </div>
-                  <div style={{ color:"rgba(255,255,255,0.35)", fontSize:8 }}>
+                  <div style={{ color:"rgba(255,255,255,0.35)", fontSize: 11 }}>
                     {NXT_TIER.benefits.join(" · ")}
                   </div>
                 </div>
@@ -333,18 +333,18 @@ export default function PointsPage() {
                 display:"flex", alignItems:"center", justifyContent:"center", fontSize:21, flexShrink:0 }}>💸</div>
               <div style={{ flex:1 }}>
                 <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginBottom:2 }}>Đổi điểm thành xu</div>
-                <div style={{ color:"#6a5a40", fontSize:8.5 }}>
+                <div style={{ color:"#6a5a40", fontSize: 11 }}>
                   {REDEEM_RATE} điểm = 1.000 xu · dùng thanh toán ngay
                 </div>
               </div>
               <div style={{ background:"linear-gradient(90deg,#F5C542,#FFB347)", borderRadius:8,
-                padding:"5px 11px", color:"#1a1200", fontSize:9, fontWeight:800, flexShrink:0 }}>
+                padding:"5px 11px", color:"#1a1200", fontSize: 11, fontWeight:800, flexShrink:0 }}>
                 Đổi →
               </div>
             </div>
 
             {/* Đổi điểm → voucher */}
-            <div style={{ color:"#b0956a", fontSize:9, fontWeight:600, marginBottom:8 }}>🎫 Đổi điểm lấy voucher</div>
+            <div style={{ color:"#b0956a", fontSize: 11, fontWeight:600, marginBottom:8 }}>🎫 Đổi điểm lấy voucher</div>
             <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
               {REWARD_VOUCHERS.map(rv => {
                 const canRedeem = userEarned >= rv.pointCost
@@ -361,10 +361,10 @@ export default function PointsPage() {
                       <div style={{ color: canRedeem ? "#f8f0e0" : "#6a5a40", fontSize:10, fontWeight:500,
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{rv.title}</div>
                       <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:2 }}>
-                        <span style={{ color:"#F5C542", fontSize:8.5, fontWeight:600 }}>
+                        <span style={{ color:"#F5C542", fontSize: 11, fontWeight:600 }}>
                           {rv.pointCost.toLocaleString()} điểm
                         </span>
-                        <span style={{ color:"#6a5a40", fontSize:7.5 }}>Hạng tối thiểu: {rv.minTier}</span>
+                        <span style={{ color:"#6a5a40", fontSize: 10 }}>Hạng tối thiểu: {rv.minTier}</span>
                       </div>
                     </div>
                     <button onClick={() => {
@@ -372,7 +372,7 @@ export default function PointsPage() {
                       fireToast(`Đã đổi voucher "${rv.title}" thành công!`)
                     }} style={{ height:30, padding:"0 12px", borderRadius:8, border:"none",
                       cursor: canRedeem ? "pointer" : "not-allowed", fontFamily:"Lexend",
-                      fontSize:9, fontWeight:700, flexShrink:0,
+                      fontSize: 11, fontWeight:700, flexShrink:0,
                       background: canRedeem ? "linear-gradient(90deg,#FF6B00,#FF8C00)" : "rgba(255,255,255,0.06)",
                       color: canRedeem ? "#fff" : "#3a2c1c",
                       boxShadow: canRedeem ? "0 2px 8px rgba(255,107,0,0.3)" : "none" }}>
@@ -404,7 +404,7 @@ export default function PointsPage() {
                   background: filterType===f.v ? "rgba(245,197,66,0.1)" : "rgba(255,255,255,0.04)",
                   border: `1px solid ${filterType===f.v ? "rgba(245,197,66,0.35)" : "rgba(255,255,255,0.07)"}`,
                   color: filterType===f.v ? "#F5C542" : "#6a5a40",
-                  fontSize:9, fontWeight: filterType===f.v ? 600 : 400, transition:"all .15s" }}>
+                  fontSize: 11, fontWeight: filterType===f.v ? 600 : 400, transition:"all .15s" }}>
                 {f.l}
               </div>
             ))}
@@ -431,13 +431,13 @@ export default function PointsPage() {
                         {tx.label}
                       </div>
                       <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:2 }}>
-                        <span style={{ color:"#6a5a40", fontSize:8 }}>{tx.time}</span>
-                        <span style={{ fontSize:7.5, fontWeight:600, padding:"1px 5px", borderRadius:4,
+                        <span style={{ color:"#6a5a40", fontSize: 11 }}>{tx.time}</span>
+                        <span style={{ fontSize: 10, fontWeight:600, padding:"1px 5px", borderRadius:4,
                           background:cfg.bg, color:cfg.color }}>
                           {cfg.label}
                         </span>
                       </div>
-                      <div style={{ color:"#6a5a40", fontSize:7.5, marginTop:1 }}>
+                      <div style={{ color:"#6a5a40", fontSize: 10, marginTop:1 }}>
                         {tx.label}
                       </div>
                     </div>
@@ -445,7 +445,7 @@ export default function PointsPage() {
                       <div style={{ color: tx.points > 0 ? "#F5C542" : "#b464ff", fontSize:11, fontWeight:700 }}>
                         {tx.points > 0 ? "+" : ""}{tx.points.toLocaleString("vi-VN")}
                       </div>
-                      <div style={{ color:"rgba(245,197,66,0.45)", fontSize:8 }}>điểm</div>
+                      <div style={{ color:"rgba(245,197,66,0.45)", fontSize: 11 }}>điểm</div>
                     </div>
                   </motion.div>
                 )
@@ -471,7 +471,7 @@ export default function PointsPage() {
               padding:"5px 11px", borderRadius:18,
               background: tab.active ? "rgba(255,107,0,0.12)" : "transparent" }}>
               <span style={{ fontSize:19 }}>{tab.icon}</span>
-              <span style={{ fontSize:7.5, color:"#6a5a40" }}>{tab.label}</span>
+              <span style={{ fontSize: 10, color:"#6a5a40" }}>{tab.label}</span>
             </a>
           ))}
         </div>
@@ -487,7 +487,7 @@ function GInput({ label, value, onChange, placeholder, icon, type="text" }: {
   const [f, setF] = useState(false)
   return (
     <div style={{ marginBottom:12 }}>
-      {label && <label style={{ color:"rgba(245,197,66,0.55)", fontSize:9.5, display:"block", marginBottom:4 }}>{label}</label>}
+      {label && <label style={{ color:"rgba(245,197,66,0.55)", fontSize: 11, display:"block", marginBottom:4 }}>{label}</label>}
       <div style={{ display:"flex", alignItems:"center", gap:8,
         background:"rgba(255,255,255,0.04)",
         border: `1px solid ${f ? "rgba(245,197,66,0.5)" : "rgba(255,255,255,0.08)"}`,

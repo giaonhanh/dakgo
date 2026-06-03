@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -147,10 +147,10 @@ export default function MuaHoPage() {
             </button>
             <div style={{ flex:1 }}>
               <div style={{ color:"#f8f0e0",fontSize:16,fontWeight:800 }}>🛍️ Mua hộ</div>
-              <div style={{ color:"#6a5a40",fontSize:9,marginTop:1 }}>Tài xế đi chợ / cửa hàng mua cho bạn</div>
+              <div style={{ color:"#6a5a40",fontSize: 11,marginTop:1 }}>Tài xế đi chợ / cửa hàng mua cho bạn</div>
             </div>
             <div style={{ background:"rgba(62,207,110,0.12)",border:"1px solid rgba(62,207,110,0.25)",
-              borderRadius:8,padding:"3px 10px",color:"#3ecf6e",fontSize:9,fontWeight:700 }}>HOT 🔥</div>
+              borderRadius:8,padding:"3px 10px",color:"#3ecf6e",fontSize: 11,fontWeight:700 }}>HOT 🔥</div>
           </div>
         </div>
 
@@ -161,20 +161,20 @@ export default function MuaHoPage() {
           <div style={{ display:"flex",gap:8,marginBottom:12,padding:"10px 12px",
             background:"rgba(62,207,110,0.05)",border:"1px solid rgba(62,207,110,0.12)",borderRadius:12 }}>
             {["🏪 Chọn nơi mua","🛒 Liệt kê đồ","🛵 Tài xế mua & giao"].map((s,i) => (
-              <div key={i} style={{ flex:1,textAlign:"center",color:"#6a5a40",fontSize:8.5,lineHeight:1.5 }}>{s}</div>
+              <div key={i} style={{ flex:1,textAlign:"center",color:"#6a5a40",fontSize: 11,lineHeight:1.5 }}>{s}</div>
             ))}
           </div>
 
           {/* Địa chỉ */}
           <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
             borderRadius:14,padding:14,marginBottom:10 }}>
-            <div style={{ color:"#6a5a40",fontSize:9,marginBottom:10,fontWeight:600,letterSpacing:.5 }}>ĐỊA CHỈ</div>
+            <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:10,fontWeight:600,letterSpacing:.5 }}>ĐỊA CHỈ</div>
 
             <div style={{ display:"flex",gap:10,alignItems:"flex-start",marginBottom:10 }}>
               <div style={{ width:8,height:8,borderRadius:"50%",background:"#3ecf6e",marginTop:6,
                 flexShrink:0,boxShadow:"0 0 8px #3ecf6e" }} />
               <div style={{ flex:1 }}>
-                <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:3 }}>Đến mua tại (chợ / cửa hàng)</div>
+                <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:3 }}>Đến mua tại (chợ / cửa hàng)</div>
                 <input value={pickup} onChange={e=>setPickup(e.target.value)}
                   placeholder="VD: Chợ Phước An, Siêu thị Go!..."
                   style={{ width:"100%",background:"none",border:"none",color:"#f8f0e0",fontSize:11.5,padding:0 }} />
@@ -191,7 +191,7 @@ export default function MuaHoPage() {
               <div style={{ width:8,height:8,borderRadius:2,background:"#FF6B00",marginTop:6,
                 flexShrink:0,boxShadow:"0 0 8px #FF6B00" }} />
               <div style={{ flex:1 }}>
-                <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:3 }}>Giao đến nhà bạn</div>
+                <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:3 }}>Giao đến nhà bạn</div>
                 <input value={delivery} onChange={e=>setDelivery(e.target.value)}
                   placeholder="Địa chỉ nhận hàng..."
                   style={{ width:"100%",background:"none",border:"none",color:"#f8f0e0",fontSize:11.5,padding:0 }} />
@@ -218,7 +218,7 @@ export default function MuaHoPage() {
                 style={{ display:"flex",gap:6,marginBottom:8,alignItems:"center" }}>
                 <div style={{ width:20,height:20,borderRadius:6,background:"rgba(62,207,110,0.1)",
                   display:"flex",alignItems:"center",justifyContent:"center",
-                  color:"#3ecf6e",fontSize:9,flexShrink:0,fontWeight:700 }}>{idx+1}</div>
+                  color:"#3ecf6e",fontSize: 11,flexShrink:0,fontWeight:700 }}>{idx+1}</div>
                 <input value={item.name} onChange={e=>updateItem(item.id,"name",e.target.value)}
                   placeholder="Tên món / sản phẩm"
                   style={{ flex:2,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
@@ -278,7 +278,7 @@ export default function MuaHoPage() {
                 {fmt(estimatedBudget + serviceFee)}
               </span>
             </div>
-            <div style={{ color:"#6a5a40",fontSize:8.5,marginTop:6 }}>
+            <div style={{ color:"#6a5a40",fontSize: 11,marginTop:6 }}>
               * Thanh toán thực tế theo hoá đơn mua hàng thực + phí dịch vụ
             </div>
           </div>

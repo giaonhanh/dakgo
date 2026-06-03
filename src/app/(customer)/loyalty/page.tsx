@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -90,7 +90,7 @@ export default function LoyaltyPage() {
             <a href="/profile" style={{ width: 32, height: 32, borderRadius: 9, textDecoration: "none", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>←</a>
             <div style={{ flex: 1 }}>
               <div style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 700 }}>Điểm Thưởng</div>
-              <div style={{ color: "#6a5a40", fontSize: 9 }}>Tích điểm · Lên hạng · Đổi quà</div>
+              <div style={{ color: "#6a5a40", fontSize: 11 }}>Tích điểm · Lên hạng · Đổi quà</div>
             </div>
           </div>
         </div>
@@ -116,7 +116,7 @@ export default function LoyaltyPage() {
                       {tierCfg.icon}
                     </div>
                     <div>
-                      <div style={{ color: "#6a5a40", fontSize: 9, marginBottom: 2 }}>Hạng thành viên</div>
+                      <div style={{ color: "#6a5a40", fontSize: 11, marginBottom: 2 }}>Hạng thành viên</div>
                       <div style={{ color: tierCfg.color, fontSize: 20, fontWeight: 800, lineHeight: 1 }}>{tierCfg.label}</div>
                     </div>
                     <div style={{ marginLeft: "auto", background: `${tierCfg.color}15`, border: `1px solid ${tierCfg.color}40`, borderRadius: 8, padding: "4px 10px", color: tierCfg.color, fontSize: 10, fontWeight: 700 }}>
@@ -139,22 +139,22 @@ export default function LoyaltyPage() {
                           style={{ height: "100%", borderRadius: 3, background: `linear-gradient(90deg,${tierCfg.color},${tierCfg.color}cc)` }} />
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ color: "#6a5a40", fontSize: 8 }}>{tierCfg.label} · {tierCfg.min.toLocaleString()} điểm</span>
-                        <span style={{ color: tierCfg.color, fontSize: 8, fontWeight: 600 }}>
+                        <span style={{ color: "#6a5a40", fontSize: 11 }}>{tierCfg.label} · {tierCfg.min.toLocaleString()} điểm</span>
+                        <span style={{ color: tierCfg.color, fontSize: 11, fontWeight: 600 }}>
                           Còn {pointsToNext.toLocaleString()} điểm → {tierCfg.nextTier && TIER_CFG[tierCfg.nextTier].label} {tierCfg.nextTier && TIER_CFG[tierCfg.nextTier].icon}
                         </span>
                       </div>
                     </>
                   )}
                   {!tierCfg.nextTier && (
-                    <div style={{ color: tierCfg.color, fontSize: 9, fontWeight: 600 }}>💎 Bạn đang ở hạng cao nhất!</div>
+                    <div style={{ color: tierCfg.color, fontSize: 11, fontWeight: 600 }}>💎 Bạn đang ở hạng cao nhất!</div>
                   )}
                 </div>
               </div>
 
               {/* Cách tích điểm */}
               <div style={{ background: "rgba(255,107,0,0.06)", border: "1px solid rgba(255,107,0,0.15)", borderRadius: 14, padding: "11px 14px", marginBottom: 14 }}>
-                <div style={{ color: "#FF8C00", fontSize: 9, fontWeight: 700, marginBottom: 8 }}>💡 Cách tích điểm</div>
+                <div style={{ color: "#FF8C00", fontSize: 11, fontWeight: 700, marginBottom: 8 }}>💡 Cách tích điểm</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                   {[
                     { icon: "🍜", text: "Đặt đồ ăn thành công: +1 điểm / 10.000đ" },
@@ -163,7 +163,7 @@ export default function LoyaltyPage() {
                   ].map(b => (
                     <div key={b.text} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontSize: 13 }}>{b.icon}</span>
-                      <span style={{ color: "#b0956a", fontSize: 9 }}>{b.text}</span>
+                      <span style={{ color: "#b0956a", fontSize: 11 }}>{b.text}</span>
                     </div>
                   ))}
                 </div>
@@ -196,7 +196,7 @@ export default function LoyaltyPage() {
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ color: "#f8f0e0", fontSize: 10.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tx.reason}</div>
-                              <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 2 }}>{fmtTime(tx.created_at)}</div>
+                              <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 2 }}>{fmtTime(tx.created_at)}</div>
                             </div>
                             <div style={{ color: tx.points > 0 ? "#b464ff" : "#ff4040", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
                               {tx.points > 0 ? "+" : ""}{tx.points.toLocaleString()}
@@ -220,13 +220,13 @@ export default function LoyaltyPage() {
                               <span style={{ fontSize: 22 }}>{cfg.icon}</span>
                               <div>
                                 <div style={{ color: isCurrentTier ? cfg.color : "#b0956a", fontSize: 12, fontWeight: 700 }}>{cfg.label}</div>
-                                <div style={{ color: "#6a5a40", fontSize: 8 }}>{cfg.min.toLocaleString()} – {cfg.max.toLocaleString()} điểm</div>
+                                <div style={{ color: "#6a5a40", fontSize: 11 }}>{cfg.min.toLocaleString()} – {cfg.max.toLocaleString()} điểm</div>
                               </div>
                               {isCurrentTier && (
-                                <div style={{ marginLeft: "auto", background: `${cfg.color}20`, border: `1px solid ${cfg.color}40`, borderRadius: 6, padding: "2px 8px", color: cfg.color, fontSize: 8, fontWeight: 700 }}>Hạng hiện tại</div>
+                                <div style={{ marginLeft: "auto", background: `${cfg.color}20`, border: `1px solid ${cfg.color}40`, borderRadius: 6, padding: "2px 8px", color: cfg.color, fontSize: 11, fontWeight: 700 }}>Hạng hiện tại</div>
                               )}
                             </div>
-                            <div style={{ color: "#b0956a", fontSize: 9 }}>
+                            <div style={{ color: "#b0956a", fontSize: 11 }}>
                               {t === "bronze"   && "Tích điểm cơ bản · Nhận thông báo ưu đãi"}
                               {t === "silver"   && "Tích điểm x1.2 · Quà sinh nhật · Ưu tiên hỗ trợ"}
                               {t === "gold"     && "Tích điểm x1.5 · Quà đặc biệt · Ưu tiên ghép đơn"}

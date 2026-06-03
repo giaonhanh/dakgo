@@ -32,7 +32,7 @@ function Field({ label, icon, type = "text", placeholder, value, onChange, focus
 }) {
   return (
     <div style={{ marginBottom: 10 }}>
-      <label style={{ color: "rgba(176,149,106,0.55)", fontSize: 9.5, display: "block", marginBottom: 4 }}>{label}</label>
+      <label style={{ color: "rgba(176,149,106,0.55)", fontSize: 11, display: "block", marginBottom: 4 }}>{label}</label>
       <div style={{
         display: "flex", alignItems: "center", gap: 8,
         background: "rgba(255,255,255,0.04)",
@@ -88,10 +88,10 @@ function CTABtn({ label, onClick, loading }: { label: string; onClick?: () => vo
 function FooterLink({ q, a, onClick }: { q: string; a: string; onClick: () => void }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <span style={{ color: "rgba(106,90,64,0.6)", fontSize: 9.5 }}>{q}</span>
+      <span style={{ color: "rgba(106,90,64,0.6)", fontSize: 11 }}>{q}</span>
       <button onClick={onClick} style={{
         background: "none", border: "none", cursor: "pointer",
-        color: "#FF8C00", fontSize: 9.5, fontWeight: 600, fontFamily: "Lexend",
+        color: "#FF8C00", fontSize: 11, fontWeight: 600, fontFamily: "Lexend",
       }}>{a}</button>
     </div>
   )
@@ -107,7 +107,7 @@ function UploadBox({ label }: { label: string }) {
       display: "flex", alignItems: "center", gap: 7,
     }}>
       <span style={{ fontSize: 14 }}>📎</span>
-      <span style={{ color: "rgba(176,149,106,0.4)", fontSize: 8.5 }}>{label}</span>
+      <span style={{ color: "rgba(176,149,106,0.4)", fontSize: 11 }}>{label}</span>
     </div>
   )
 }
@@ -118,7 +118,7 @@ function ChipGroup({ label, options, value, onChange }: {
 }) {
   return (
     <div style={{ marginBottom: 10 }}>
-      <label style={{ color: "rgba(176,149,106,0.55)", fontSize: 9.5, display: "block", marginBottom: 5 }}>{label}</label>
+      <label style={{ color: "rgba(176,149,106,0.55)", fontSize: 11, display: "block", marginBottom: 5 }}>{label}</label>
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
         {options.map(o => (
           <div key={o} onClick={() => onChange(o)} style={{
@@ -126,7 +126,7 @@ function ChipGroup({ label, options, value, onChange }: {
             background: value === o ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.04)",
             border: `1px solid ${value === o ? "rgba(255,107,0,0.4)" : "rgba(255,255,255,0.08)"}`,
             color: value === o ? "#FF8C00" : "rgba(176,149,106,0.6)",
-            fontSize: 9, fontWeight: value === o ? 600 : 400,
+            fontSize: 11, fontWeight: value === o ? 600 : 400,
             transition: "all 0.15s",
           }}>{o}</div>
         ))}
@@ -140,7 +140,7 @@ function Divider({ label, color }: { label: string; color: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 7, margin: "12px 0 9px" }}>
       <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.06)" }} />
-      <span style={{ color, fontSize: 8.5, fontWeight: 600, whiteSpace: "nowrap" }}>{label}</span>
+      <span style={{ color, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>{label}</span>
       <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.06)" }} />
     </div>
   )
@@ -458,7 +458,7 @@ function LoginContent() {
                       <div style={{ textAlign: "right", marginBottom: 13 }}>
                         <button style={{
                           background: "none", border: "none", cursor: "pointer",
-                          color: "rgba(255,140,0,.55)", fontSize: 9.5, fontFamily: "Lexend",
+                          color: "rgba(255,140,0,.55)", fontSize: 11, fontFamily: "Lexend",
                         }}>Quên mật khẩu?</button>
                       </div>
                       <CTABtn label="🚀 Đăng nhập" onClick={handleLogin} loading={loading} />
@@ -491,7 +491,7 @@ function LoginContent() {
                               display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
                             }}>{r.icon}</div>
                             <div style={{ color: r.color, fontSize: 10, fontWeight: 700, textAlign: "center" }}>{r.label}</div>
-                            <div style={{ color: "rgba(176,149,106,.45)", fontSize: 7.5, textAlign: "center", lineHeight: 1.4 }}>{r.sub}</div>
+                            <div style={{ color: "rgba(176,149,106,.45)", fontSize: 10, textAlign: "center", lineHeight: 1.4 }}>{r.sub}</div>
                           </div>
                         ))}
                       </div>
@@ -514,7 +514,7 @@ function LoginContent() {
                         <span style={{ fontSize: 20 }}>{selectedRole.icon}</span>
                         <div style={{ flex: 1 }}>
                           <div style={{ color: selectedRole.color, fontSize: 11, fontWeight: 700 }}>{selectedRole.label}</div>
-                          <div style={{ color: "rgba(176,149,106,.45)", fontSize: 8, marginTop: 1 }}>{selectedRole.sub}</div>
+                          <div style={{ color: "rgba(176,149,106,.45)", fontSize: 11, marginTop: 1 }}>{selectedRole.sub}</div>
                         </div>
                         <button onClick={() => setRegStep("role")} style={{
                           background: "none", border: "1px solid rgba(255,255,255,.07)",
@@ -588,7 +588,7 @@ function LoginContent() {
                           display: "flex", gap: 7, alignItems: "flex-start",
                         }}>
                           <span style={{ fontSize: 13 }}>⏳</span>
-                          <div style={{ color: "rgba(245,197,66,.65)", fontSize: 8.5, lineHeight: 1.6 }}>
+                          <div style={{ color: "rgba(245,197,66,.65)", fontSize: 11, lineHeight: 1.6 }}>
                             Tài khoản sẽ được <strong style={{ color: "#f5c542" }}>Admin xét duyệt trong 24h</strong>.
                             Bạn nhận thông báo qua SMS khi được phê duyệt.
                           </div>
@@ -618,7 +618,7 @@ function LoginContent() {
                   style={{ width: "100%", paddingBottom: 24 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                     <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.07)" }} />
-                    <span style={{ color: "rgba(106,90,64,.5)", fontSize: 9.5 }}>hoặc đăng nhập với</span>
+                    <span style={{ color: "rgba(106,90,64,.5)", fontSize: 11 }}>hoặc đăng nhập với</span>
                     <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.07)" }} />
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>

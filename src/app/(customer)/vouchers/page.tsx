@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -71,11 +71,11 @@ function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () =
             </div>
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:2, flexWrap:"wrap" }}>
-                <span style={{ fontSize:7.5, fontWeight:700, padding:"1px 6px", borderRadius:4, background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}` }}>
+                <span style={{ fontSize: 10, fontWeight:700, padding:"1px 6px", borderRadius:4, background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}` }}>
                   {cfg.label}
                 </span>
                 {v.shopName && (
-                  <span style={{ fontSize:7.5, color:"#6a5a40", background:"rgba(255,255,255,0.04)", padding:"1px 6px", borderRadius:4, border:"1px solid rgba(255,255,255,0.07)" }}>
+                  <span style={{ fontSize: 10, color:"#6a5a40", background:"rgba(255,255,255,0.04)", padding:"1px 6px", borderRadius:4, border:"1px solid rgba(255,255,255,0.07)" }}>
                     {v.shopName}
                   </span>
                 )}
@@ -83,7 +83,7 @@ function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () =
               <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700, marginBottom:3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                 {v.title}
               </div>
-              <div style={{ color:"#6a5a40", fontSize:8.5, marginBottom:6, lineHeight:1.5 }}>
+              <div style={{ color:"#6a5a40", fontSize: 11, marginBottom:6, lineHeight:1.5 }}>
                 Đơn tối thiểu {fmt(v.minOrder)}
                 {v.maxDiscount && ` · Giảm tối đa ${fmt(v.maxDiscount)}`}
                 {v.perUserLimit && ` · Mỗi người tối đa ${v.perUserLimit} lần`}
@@ -98,11 +98,11 @@ function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () =
                   </button>
                 </div>
                 <div style={{ textAlign:"right" }}>
-                  <div style={{ fontSize:8, color:countdown.urgent?"#ff4040":countdown.expired?"#6a5a40":"#6a5a40", fontWeight:countdown.urgent?700:400 }}>
+                  <div style={{ fontSize: 11, color:countdown.urgent?"#ff4040":countdown.expired?"#6a5a40":"#6a5a40", fontWeight:countdown.urgent?700:400 }}>
                     {countdown.text}
                   </div>
                   {totalLeft !== null && !countdown.expired && (
-                    <div style={{ fontSize:7.5, color: totalLeft<=5?"#ff4040":"#6a5a40", fontWeight: totalLeft<=5?700:400 }}>
+                    <div style={{ fontSize: 10, color: totalLeft<=5?"#ff4040":"#6a5a40", fontWeight: totalLeft<=5?700:400 }}>
                       Còn {totalLeft} lượt
                     </div>
                   )}
@@ -114,19 +114,19 @@ function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () =
           {/* Footer */}
           <div style={{ marginTop:10, paddingTop:8, borderTop:"1px solid rgba(255,255,255,0.05)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
             {v.used ? (
-              <span style={{ color:"#6a5a40", fontSize:9 }}>✓ Đã sử dụng</span>
+              <span style={{ color:"#6a5a40", fontSize: 11 }}>✓ Đã sử dụng</span>
             ) : countdown.expired ? (
-              <span style={{ color:"#ff4040", fontSize:9 }}>✗ Đã hết hạn</span>
+              <span style={{ color:"#ff4040", fontSize: 11 }}>✗ Đã hết hạn</span>
             ) : (totalLeft !== null && totalLeft <= 0) ? (
-              <span style={{ color:"#ff4040", fontSize:9 }}>✗ Đã hết lượt</span>
+              <span style={{ color:"#ff4040", fontSize: 11 }}>✗ Đã hết lượt</span>
             ) : (
               <button onClick={onSave} style={{ background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:4, padding:0, fontFamily:"Lexend" }}>
                 <span style={{ fontSize:12 }}>{v.saved ? "💾" : "🔖"}</span>
-                <span style={{ fontSize:9, color:v.saved?"#FF8C00":"#6a5a40" }}>{v.saved ? "Đã lưu" : "Lưu mã"}</span>
+                <span style={{ fontSize: 11, color:v.saved?"#FF8C00":"#6a5a40" }}>{v.saved ? "Đã lưu" : "Lưu mã"}</span>
               </button>
             )}
             {!disabled && (
-              <button onClick={onUseNow} style={{ background:"linear-gradient(90deg,#FF6B00,#FF8C00)", borderRadius:8, padding:"5px 14px", color:"#fff", fontSize:9, fontWeight:700, boxShadow:"0 2px 8px rgba(255,107,0,0.3)", border:"none", cursor:"pointer", fontFamily:"Lexend" }}>
+              <button onClick={onUseNow} style={{ background:"linear-gradient(90deg,#FF6B00,#FF8C00)", borderRadius:8, padding:"5px 14px", color:"#fff", fontSize: 11, fontWeight:700, boxShadow:"0 2px 8px rgba(255,107,0,0.3)", border:"none", cursor:"pointer", fontFamily:"Lexend" }}>
                 Dùng ngay →
               </button>
             )}
@@ -295,7 +295,7 @@ export default function VouchersPage() {
             <a href="/" style={{ width:32, height:32, borderRadius:9, textDecoration:"none", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>←</a>
             <div style={{ flex:1 }}>
               <div style={{ color:"#f8f0e0", fontSize:15, fontWeight:700 }}>Kho Voucher</div>
-              <div style={{ color:"#6a5a40", fontSize:9 }}>
+              <div style={{ color:"#6a5a40", fontSize: 11 }}>
                 {loading ? "Đang tải..." : `${activeCount} mã đang có hiệu lực`}
               </div>
             </div>
@@ -317,7 +317,7 @@ export default function VouchersPage() {
           {/* Filter chips */}
           <div style={{ display:"flex", gap:5, overflowX:"auto", scrollbarWidth:"none", paddingBottom:12 } as React.CSSProperties}>
             {FILTERS.map(f => (
-              <div key={f.v} onClick={() => setFilter(f.v)} style={{ padding:"4px 12px", borderRadius:20, cursor:"pointer", flexShrink:0, background:filter===f.v?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)", border:`1px solid ${filter===f.v?"rgba(255,107,0,0.35)":"rgba(255,255,255,0.07)"}`, color:filter===f.v?"#FF8C00":"#6a5a40", fontSize:9, fontWeight:filter===f.v?700:400, transition:"all .15s" }}>
+              <div key={f.v} onClick={() => setFilter(f.v)} style={{ padding:"4px 12px", borderRadius:20, cursor:"pointer", flexShrink:0, background:filter===f.v?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)", border:`1px solid ${filter===f.v?"rgba(255,107,0,0.35)":"rgba(255,255,255,0.07)"}`, color:filter===f.v?"#FF8C00":"#6a5a40", fontSize: 11, fontWeight:filter===f.v?700:400, transition:"all .15s" }}>
                 {f.l}
               </div>
             ))}
@@ -336,7 +336,7 @@ export default function VouchersPage() {
             ].map(s => (
               <div key={s.label} style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:12, padding:"9px 10px", textAlign:"center" }}>
                 <div style={{ color:s.color, fontSize:20, fontWeight:800 }}>{loading ? "—" : s.value}</div>
-                <div style={{ color:"#6a5a40", fontSize:8, marginTop:1 }}>{s.label}</div>
+                <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1 }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -372,7 +372,7 @@ export default function VouchersPage() {
           ].map(tab => (
             <a key={tab.href} href={tab.href} style={{ textDecoration:"none", display:"flex", flexDirection:"column", alignItems:"center", gap:2, padding:"5px 11px", borderRadius:18, background:tab.active?"rgba(255,107,0,0.12)":"transparent" }}>
               <span style={{ fontSize:19 }}>{tab.icon}</span>
-              <span style={{ fontSize:7.5, color:"#6a5a40" }}>{tab.label}</span>
+              <span style={{ fontSize: 10, color:"#6a5a40" }}>{tab.label}</span>
             </a>
           ))}
         </div>

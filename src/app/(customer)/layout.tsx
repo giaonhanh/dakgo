@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
@@ -108,7 +108,7 @@ function GpsPermissionModal({ onAllow, onDeny }: { onAllow: () => void; onDeny: 
         Không, tôi tự nhập địa chỉ
       </button>
 
-      <div style={{ color: 'rgba(106,90,64,0.5)', fontSize: 9.5, marginTop: 16, textAlign: 'center' }}>
+      <div style={{ color: 'rgba(106,90,64,0.5)', fontSize: 11, marginTop: 16, textAlign: 'center' }}>
         Vị trí chỉ dùng cho mục đích giao hàng · Không lưu trữ lâu dài
       </div>
     </div>

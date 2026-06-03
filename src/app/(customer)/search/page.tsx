@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -513,7 +513,7 @@ function SearchContent() {
               }}
             >
               <span style={{ fontSize: 20 }}>{tab.icon}</span>
-              <span style={{ fontSize: 9, fontWeight: 600, color: "#6a5a40" }}>{tab.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#6a5a40" }}>{tab.label}</span>
             </button>
           ))}
         </div>
@@ -622,7 +622,7 @@ function ProductCard({ product, onClick }: { product: ProductResult; onClick: ()
           <div style={{
             position: "absolute", top: -4, right: -4,
             background: "#ff4040", borderRadius: 6,
-            fontSize: 9, fontWeight: 700, color: "#fff",
+            fontSize: 11, fontWeight: 700, color: "#fff",
             padding: "2px 5px",
           }}>-{discount}%</div>
         )}

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -115,7 +115,7 @@ export default function PromoItemsPage() {
                 ? <img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 : <span>🍽️</span>
               }
-              <div style={{ position: "absolute", top: 6, left: 6, background: "#ff4040", color: "#fff", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 5 }}>-{p.disc}%</div>
+              <div style={{ position: "absolute", top: 6, left: 6, background: "#ff4040", color: "#fff", fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 5 }}>-{p.disc}%</div>
             </div>
             {/* Info */}
             <div style={{ flex: 1, padding: "11px 12px" }}>

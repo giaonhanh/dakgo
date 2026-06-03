@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -190,8 +190,8 @@ export default function CartPage() {
                               {/* Giá gốc */}
                               <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
                                 borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Giá gốc</span>
-                                <span style={{ fontSize: 9.5, color: "#b0956a", fontWeight: 600 }}>
+                                <span style={{ fontSize: 11, color: "#6a5a40" }}>Giá gốc</span>
+                                <span style={{ fontSize: 11, color: "#b0956a", fontWeight: 600 }}>
                                   {formatPrice(item.breakdown.basePrice)}
                                 </span>
                               </div>
@@ -200,12 +200,12 @@ export default function CartPage() {
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
                                   padding: "5px 9px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                                   <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                    <span style={{ fontSize: 9, color: "#6a5a40" }}>📐 Size</span>
-                                    <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700,
+                                    <span style={{ fontSize: 11, color: "#6a5a40" }}>📐 Size</span>
+                                    <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 11, fontWeight: 700,
                                       background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.25)",
                                       color: "#4a8ff5" }}>{item.breakdown.sizeLabel}</span>
                                   </div>
-                                  <span style={{ fontSize: 9.5, color: "#4a8ff5", fontWeight: 600 }}>
+                                  <span style={{ fontSize: 11, color: "#4a8ff5", fontWeight: 600 }}>
                                     {item.breakdown.sizeDiff ? `+${formatPrice(item.breakdown.sizeDiff)}` : "Miễn phí"}
                                   </span>
                                 </div>
@@ -216,12 +216,12 @@ export default function CartPage() {
                                   padding: "5px 9px",
                                   borderBottom: ti < (item.breakdown!.toppings!.length - 1) ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
                                   <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                    <span style={{ fontSize: 9, color: "#6a5a40" }}>🫙 Topping</span>
-                                    <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600,
+                                    <span style={{ fontSize: 11, color: "#6a5a40" }}>🫙 Topping</span>
+                                    <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 11, fontWeight: 600,
                                       background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.2)",
                                       color: "#3ecf6e" }}>{t.name}</span>
                                   </div>
-                                  <span style={{ fontSize: 9.5, color: "#3ecf6e", fontWeight: 600 }}>
+                                  <span style={{ fontSize: 11, color: "#3ecf6e", fontWeight: 600 }}>
                                     {t.price > 0 ? `+${formatPrice(t.price)}` : "Miễn phí"}
                                   </span>
                                 </div>
@@ -233,7 +233,7 @@ export default function CartPage() {
                           <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                             {/* Thành tiền/món */}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-                              <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Thành tiền / món</span>
+                              <span style={{ fontSize: 11, color: "#6a5a40" }}>Thành tiền / món</span>
                               <span style={{ fontSize: 11, fontWeight: 600, color: "#b0956a" }}>
                                 {formatPrice(item.price)}
                               </span>
@@ -241,7 +241,7 @@ export default function CartPage() {
 
                             {/* Số lượng + controls inline */}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-                              <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Số lượng</span>
+                              <span style={{ fontSize: 11, color: "#6a5a40" }}>Số lượng</span>
                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                 <button type="button" onClick={() => updateQty(item.id, item.qty - 1)}
                                   style={{ width: 28, height: 28, borderRadius: 7, border: "none",
@@ -427,7 +427,7 @@ export default function CartPage() {
                   filter: tab.active ? "drop-shadow(0 0 4px rgba(255,107,0,0.6))" : "none",
                 }}>{tab.icon}</span>
                 <span style={{
-                  fontSize: 9, fontWeight: tab.active ? 700 : 400,
+                  fontSize: 11, fontWeight: tab.active ? 700 : 400,
                   color: tab.active ? "#FF8C00" : "#6a5a40",
                   letterSpacing: 0.2, position: "relative",
                 }}>{tab.label}</span>
@@ -463,7 +463,7 @@ function Section({ children, style }: { children: React.ReactNode; style?: React
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p style={{
-      margin: "12px 2px 6px", fontSize: 9.5, fontWeight: 700,
+      margin: "12px 2px 6px", fontSize: 11, fontWeight: 700,
       textTransform: "uppercase", letterSpacing: 0.7, color: "#6a5a40",
     }}>
       {children}

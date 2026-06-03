@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 // src/app/(customer)/tracking/[orderId]/page.tsx
 
@@ -398,7 +398,7 @@ export default function TrackingPage() {
               fontSize:14,textDecoration:"none",color:"#f8f0e0" }}>←</a>
             <div style={{ flex:1 }}>
               <div style={{ color:"#f8f0e0",fontSize:15,fontWeight:700 }}>Theo dõi đơn hàng</div>
-              <div style={{ color:"#6a5a40",fontSize:9,marginTop:1 }}>
+              <div style={{ color:"#6a5a40",fontSize: 11,marginTop:1 }}>
                 #{orderData.id.slice(0,8).toUpperCase()} · {orderData.shopEmoji} {orderData.shopName}
               </div>
             </div>
@@ -408,7 +408,7 @@ export default function TrackingPage() {
                 borderRadius:20,padding:"4px 10px" }}>
                 <div style={{ width:6,height:6,borderRadius:"50%",
                   background:"#FF6B00",animation:"trPulse 1.5s infinite" }} />
-                <span style={{ color:"#FF8C00",fontSize:9,fontWeight:700 }}>LIVE</span>
+                <span style={{ color:"#FF8C00",fontSize: 11,fontWeight:700 }}>LIVE</span>
               </div>
             )}
           </div>
@@ -430,7 +430,7 @@ export default function TrackingPage() {
               style={{ position:"absolute",bottom:10,right:10,zIndex:20,
                 background:"rgba(8,8,6,0.88)",backdropFilter:"blur(8px)",
                 border:"1px solid rgba(255,255,255,0.12)",borderRadius:9,padding:"5px 9px",
-                color:"#b0956a",fontSize:9.5,fontWeight:600,fontFamily:"Lexend",cursor:"pointer" }}>
+                color:"#b0956a",fontSize: 11,fontWeight:600,fontFamily:"Lexend",cursor:"pointer" }}>
               {mapExpanded ? "⬆ Thu nhỏ" : "⬇ Mở rộng"}
             </button>
 
@@ -442,7 +442,7 @@ export default function TrackingPage() {
                 <span style={{ color:"#FF8C00",fontSize:18,fontWeight:800,fontVariantNumeric:"tabular-nums" }}>
                   {min}:{sec.toString().padStart(2,"0")}
                 </span>
-                <span style={{ color:"#6a5a40",fontSize:9 }}>còn lại</span>
+                <span style={{ color:"#6a5a40",fontSize: 11 }}>còn lại</span>
               </div>
             )}
           </div>
@@ -477,12 +477,12 @@ export default function TrackingPage() {
                         {step.label}
                         {current && !isDelivered && (
                           <span style={{ marginLeft:7,background:"rgba(255,107,0,0.12)",
-                            color:"#FF8C00",fontSize:7.5,fontWeight:700,padding:"1px 6px",borderRadius:4 }}>
+                            color:"#FF8C00",fontSize: 10,fontWeight:700,padding:"1px 6px",borderRadius:4 }}>
                             ĐANG XỬ LÝ
                           </span>
                         )}
                       </div>
-                      <div style={{ color:"#6a5a40",fontSize:9 }}>{step.desc}</div>
+                      <div style={{ color:"#6a5a40",fontSize: 11 }}>{step.desc}</div>
                     </div>
                   </div>
                 )
@@ -496,7 +496,7 @@ export default function TrackingPage() {
                   style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
                     borderRadius:14,padding:"12px 14px",marginBottom:10 }}>
                   <div>
-                    <div style={{ color:"#6a5a40",fontSize:8,fontWeight:700,
+                    <div style={{ color:"#6a5a40",fontSize: 11,fontWeight:700,
                       textTransform:"uppercase",letterSpacing:0.5,marginBottom:8 }}>
                       🛵 Tài xế của bạn
                     </div>
@@ -511,7 +511,7 @@ export default function TrackingPage() {
                         </div>
                         <div style={{ display:"flex",gap:6,alignItems:"center",marginTop:3 }}>
                           {driverData.plate && (
-                            <span style={{ color:"#3ecf6e",fontSize:9,fontWeight:700,
+                            <span style={{ color:"#3ecf6e",fontSize: 11,fontWeight:700,
                               background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.2)",
                               padding:"1px 7px",borderRadius:5 }}>{driverData.plate}</span>
                           )}
@@ -543,7 +543,7 @@ export default function TrackingPage() {
                         <a href={`tel:${driverData.phone}`}
                           style={{ padding:"4px 12px",borderRadius:7,
                             background:"rgba(62,207,110,0.12)",border:"1px solid rgba(62,207,110,0.3)",
-                            color:"#3ecf6e",fontSize:9.5,fontWeight:700,textDecoration:"none" }}>
+                            color:"#3ecf6e",fontSize: 11,fontWeight:700,textDecoration:"none" }}>
                           Gọi ngay
                         </a>
                       </div>
@@ -573,28 +573,28 @@ export default function TrackingPage() {
                           background:"rgba(62,207,110,0.12)",border:"1px solid rgba(62,207,110,0.3)",
                           borderRadius:6,padding:"2px 8px" }}>
                         <div style={{ width:5,height:5,borderRadius:"50%",background:"#3ecf6e" }} />
-                        <span style={{ color:"#3ecf6e",fontSize:8.5,fontWeight:700 }}>Đã thanh toán</span>
+                        <span style={{ color:"#3ecf6e",fontSize: 11,fontWeight:700 }}>Đã thanh toán</span>
                       </motion.div>
                     ) : (
                       <motion.div key="pending"
                         style={{ display:"flex",alignItems:"center",gap:4,
                           background:"rgba(255,107,0,0.08)",border:"1px solid rgba(255,107,0,0.18)",
                           borderRadius:6,padding:"2px 8px" }}>
-                        <span style={{ color:"#b0956a",fontSize:8.5,fontWeight:500 }}>💵 Tiền mặt</span>
+                        <span style={{ color:"#b0956a",fontSize: 11,fontWeight:500 }}>💵 Tiền mặt</span>
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
               </div>
               {orderData.items.map((item, i) => (
-                <div key={i} style={{ color:"#6a5a40",fontSize:9.5,padding:"3px 0" }}>
+                <div key={i} style={{ color:"#6a5a40",fontSize: 11,padding:"3px 0" }}>
                   {item.emoji} {item.name}
                 </div>
               ))}
               <div style={{ marginTop:9,paddingTop:9,borderTop:"1px solid rgba(255,255,255,0.06)",
                 display:"flex",gap:7,alignItems:"center" }}>
                 <span style={{ fontSize:12 }}>📍</span>
-                <div style={{ color:"#6a5a40",fontSize:9.5,flex:1 }}>{orderData.destAddr}</div>
+                <div style={{ color:"#6a5a40",fontSize: 11,flex:1 }}>{orderData.destAddr}</div>
               </div>
             </div>
 
@@ -658,7 +658,7 @@ export default function TrackingPage() {
               <span style={{ fontSize:18,filter:tab.active?"drop-shadow(0 0 4px rgba(255,107,0,0.6))":"none" }}>
                 {tab.icon}
               </span>
-              <span style={{ fontSize:7.5,color:tab.active?"#FF8C00":"#6a5a40",fontWeight:tab.active?600:400 }}>
+              <span style={{ fontSize: 10,color:tab.active?"#FF8C00":"#6a5a40",fontWeight:tab.active?600:400 }}>
                 {tab.label}
               </span>
               {tab.active && (

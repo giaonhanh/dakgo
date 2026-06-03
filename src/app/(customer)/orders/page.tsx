@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -121,14 +121,14 @@ function StatusBadge({ status }: { status: Status }) {
         <div style={{ width: 6, height: 6, borderRadius: "50%",
           background: c.c, animation: "oPulse 1.5s infinite" }} />
       )}
-      <span style={{ color: c.c, fontSize: 9.5, fontWeight: 600 }}>{c.label}</span>
+      <span style={{ color: c.c, fontSize: 11, fontWeight: 600 }}>{c.label}</span>
     </div>
   )
 }
 
 function SLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ color: "#6a5a40", fontSize: 8.5, fontWeight: 600,
+    <div style={{ color: "#6a5a40", fontSize: 11, fontWeight: 600,
       textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
       {children}
     </div>
@@ -144,8 +144,8 @@ function InfoBox({ rows }: { rows: { icon: string; key: string; val: string }[] 
           borderBottom: i < rows.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
           <span style={{ fontSize: 12, flexShrink: 0 }}>{r.icon}</span>
           <div>
-            <div style={{ color: "#6a5a40", fontSize: 8 }}>{r.key}</div>
-            <div style={{ color: "#b0956a", fontSize: 9.5, marginTop: 1 }}>{r.val}</div>
+            <div style={{ color: "#6a5a40", fontSize: 11 }}>{r.key}</div>
+            <div style={{ color: "#b0956a", fontSize: 11, marginTop: 1 }}>{r.val}</div>
           </div>
         </div>
       ))}
@@ -640,14 +640,14 @@ export default function OrdersPage() {
                       <div style={{ color: willRefundWallet ? "#3ecf6e" : "#b0956a", fontSize: 10, fontWeight: 600 }}>
                         {willRefundWallet ? "Sẽ hoàn tiền về ví GiaoNhanh" : "Thanh toán tiền mặt — không hoàn tiền"}
                       </div>
-                      <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 2 }}>
+                      <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 2 }}>
                         {willRefundWallet
                           ? "Đơn huỷ trước khi quán xác nhận · Hoàn 100% về ví"
                           : "Đơn tiền mặt huỷ trước khi quán xác nhận không được hoàn"}
                       </div>
                     </div>
                   </div>
-                  <div style={{ color: "#b0956a", fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 9 }}>Lý do hủy</div>
+                  <div style={{ color: "#b0956a", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 9 }}>Lý do hủy</div>
                   {CANCEL_REASONS.map(r => (
                     <div key={r} onClick={() => setCancelRsn(r)}
                       style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 11px", borderRadius: 10, marginBottom: 6, cursor: "pointer",
@@ -681,7 +681,7 @@ export default function OrdersPage() {
                         ? "⏰ Đã quá 30 giây kể từ khi đặt đơn"
                         : `⚠️ Quán đã xác nhận đơn #${showCancel?.slice(0,8).toUpperCase()}`}
                     </div>
-                    <div style={{ color: "#6a5a40", fontSize: 9.5, lineHeight: 1.6 }}>
+                    <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.6 }}>
                       {cancelOrder?.status === "pending"
                         ? "Chỉ được hủy trong 30 giây đầu tiên. Liên hệ admin nếu cần hỗ trợ."
                         : "Sau khi quán xác nhận, chỉ quản trị viên mới có quyền hủy đơn."}
@@ -691,7 +691,7 @@ export default function OrdersPage() {
                     borderRadius: 10, padding: "9px 12px", marginBottom: 16,
                     display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 14 }}>ℹ️</span>
-                    <div style={{ color: "#6a5a40", fontSize: 9, lineHeight: 1.6 }}>
+                    <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.6 }}>
                       {willRefundWallet
                         ? "Nếu admin chấp thuận huỷ, tiền sẽ được hoàn về ví GiaoNhanh."
                         : "Đơn tiền mặt: nếu admin chấp thuận huỷ, chưa có giao dịch phát sinh."}
@@ -705,7 +705,7 @@ export default function OrdersPage() {
                       boxShadow: "0 4px 16px rgba(74,143,245,0.35)" }}>
                     📞 Gọi quản trị viên hỗ trợ
                   </a>
-                  <div style={{ textAlign: "center", color: "#6a5a40", fontSize: 8.5, marginTop: 8 }}>
+                  <div style={{ textAlign: "center", color: "#6a5a40", fontSize: 11, marginTop: 8 }}>
                     Hotline: {ADMIN_PHONE} · Hỗ trợ 7:00 – 22:00
                   </div>
                   <button onClick={() => { setShowCancel(null); setCancelRsn("") }}
@@ -739,7 +739,7 @@ export default function OrdersPage() {
                 fontSize: 14, color: "#f8f0e0", cursor: "pointer" }}>←</button>
             <div style={{ flex: 1 }}>
               <div style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 700 }}>Đơn hàng của tôi</div>
-              <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>
+              <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>
                 {loading ? "Đang tải..." : `${todayOrders.length} đơn hôm nay${historyOrders.length > 0 ? ` · ${historyOrders.length} trong lịch sử` : ""}`}
               </div>
             </div>
@@ -762,7 +762,7 @@ export default function OrdersPage() {
                   {cnt > 0 && (
                     <span style={{ background: on ? "#FF6B00" : "rgba(255,255,255,0.1)",
                       color: on ? "#fff" : "#6a5a40",
-                      borderRadius: 10, padding: "0 5px", fontSize: 8.5, fontWeight: 700 }}>{cnt}</span>
+                      borderRadius: 10, padding: "0 5px", fontSize: 11, fontWeight: 700 }}>{cnt}</span>
                   )}
                 </button>
               )
@@ -822,7 +822,7 @@ export default function OrdersPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
                           background: svc.chipBg, border: `1px solid ${svc.chipBd}`, borderRadius: 6, padding: "2px 7px" }}>
                           <span style={{ fontSize: 11 }}>{svc.emoji}</span>
-                          <span style={{ color: svc.color, fontSize: 8.5, fontWeight: 700 }}>{svc.label}</span>
+                          <span style={{ color: svc.color, fontSize: 11, fontWeight: 700 }}>{svc.label}</span>
                         </div>
                         <div style={{ flex: 1, color: "#f8f0e0", fontSize: 11.5, fontWeight: 700,
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -833,13 +833,13 @@ export default function OrdersPage() {
 
                       {/* Row 2: Mã đơn · Ngày giờ · Số món  Tổng › */}
                       <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
-                        <span style={{ color: "#6a5a40", fontSize: 8.5, fontWeight: 600 }}>
+                        <span style={{ color: "#6a5a40", fontSize: 11, fontWeight: 600 }}>
                           #{order.id.slice(0,8).toUpperCase()}
                         </span>
-                        <span style={{ color: "rgba(255,255,255,0.12)", margin: "0 5px", fontSize: 8 }}>·</span>
-                        <span style={{ color: "#6a5a40", fontSize: 8.5 }}>{order.createdAt}</span>
-                        <span style={{ color: "rgba(255,255,255,0.12)", margin: "0 5px", fontSize: 8 }}>·</span>
-                        <span style={{ color: "#6a5a40", fontSize: 8.5 }}>{order.items.length} món</span>
+                        <span style={{ color: "rgba(255,255,255,0.12)", margin: "0 5px", fontSize: 11 }}>·</span>
+                        <span style={{ color: "#6a5a40", fontSize: 11 }}>{order.createdAt}</span>
+                        <span style={{ color: "rgba(255,255,255,0.12)", margin: "0 5px", fontSize: 11 }}>·</span>
+                        <span style={{ color: "#6a5a40", fontSize: 11 }}>{order.items.length} món</span>
                         <div style={{ flex: 1 }} />
                         <span style={{ background: "linear-gradient(135deg,#FF6B00,#FFB347)",
                           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
@@ -860,7 +860,7 @@ export default function OrdersPage() {
                       {/* Địa chỉ */}
                       <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginBottom: 7 }}>
                         <span style={{ fontSize: 12, flexShrink: 0, marginTop: 1 }}>📍</span>
-                        <span style={{ color: "#b0956a", fontSize: 9.5, lineHeight: 1.45, flex: 1 }}>
+                        <span style={{ color: "#b0956a", fontSize: 11, lineHeight: 1.45, flex: 1 }}>
                           {order.address || "Chưa có địa chỉ"}
                         </span>
                       </div>
@@ -872,7 +872,7 @@ export default function OrdersPage() {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <span style={{ color: "#f8f0e0", fontSize: 10, fontWeight: 600 }}>{order.driver.name}</span>
                             {order.driver.plate && (
-                              <span style={{ color: "#6a5a40", fontSize: 9, marginLeft: 5 }}>{order.driver.plate}</span>
+                              <span style={{ color: "#6a5a40", fontSize: 11, marginLeft: 5 }}>{order.driver.plate}</span>
                             )}
                           </div>
                           {order.driver.phone && (
@@ -892,7 +892,7 @@ export default function OrdersPage() {
                       ) : !isCancelled && !isCompleted ? (
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                           <span style={{ fontSize: 11 }}>⏳</span>
-                          <span style={{ color: "#6a5a40", fontSize: 9 }}>Đang tìm tài xế...</span>
+                          <span style={{ color: "#6a5a40", fontSize: 11 }}>Đang tìm tài xế...</span>
                         </div>
                       ) : null}
 
@@ -902,7 +902,7 @@ export default function OrdersPage() {
                           padding: "5px 9px", background: "rgba(255,64,64,0.05)",
                           border: "1px solid rgba(255,64,64,0.15)", borderRadius: 7 }}>
                           <span style={{ fontSize: 11 }}>⚠️</span>
-                          <span style={{ color: "#ff6060", fontSize: 8.5 }}>Lý do: {order.cancelReason}</span>
+                          <span style={{ color: "#ff6060", fontSize: 11 }}>Lý do: {order.cancelReason}</span>
                         </div>
                       )}
                     </div>
@@ -921,7 +921,7 @@ export default function OrdersPage() {
                                 <span style={{ fontSize: 18 }}>👨‍🍳</span>
                                 <div>
                                   <div style={{ color: "#4a8ff5", fontSize: 10, fontWeight: 600 }}>Cửa hàng đang chuẩn bị</div>
-                                  <div style={{ color: "rgba(74,143,245,0.55)", fontSize: 8.5, marginTop: 1 }}>Dự kiến xong sau 10–15 phút</div>
+                                  <div style={{ color: "rgba(74,143,245,0.55)", fontSize: 11, marginTop: 1 }}>Dự kiến xong sau 10–15 phút</div>
                                 </div>
                               </div>
                             )}
@@ -946,9 +946,9 @@ export default function OrdersPage() {
                                       <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
                                         background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.3)",
                                         display: "flex", alignItems: "center", justifyContent: "center",
-                                        color: "#FF8C00", fontSize: 9, fontWeight: 800 }}>{i + 1}</span>
+                                        color: "#FF8C00", fontSize: 11, fontWeight: 800 }}>{i + 1}</span>
                                       <span style={{ color: "#f8f0e0", fontSize: 11.5, fontWeight: 700, flex: 1 }}>{parsed.base}</span>
-                                      <span style={{ color: "#6a5a40", fontSize: 9 }}>×{item.qty}</span>
+                                      <span style={{ color: "#6a5a40", fontSize: 11 }}>×{item.qty}</span>
                                     </div>
                                     {/* Bảng giá */}
                                     {hasOpts && (
@@ -958,21 +958,21 @@ export default function OrdersPage() {
                                           <>
                                             <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
                                               borderBottom: (displaySize || (bd?.toppings?.length ?? 0) > 0) ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                              <span style={{ color: "#6a5a40", fontSize: 9 }}>Giá gốc</span>
-                                              <span style={{ color: "#b0956a", fontSize: 9, fontWeight: 600 }}>{formatPrice(bd!.basePrice)}</span>
+                                              <span style={{ color: "#6a5a40", fontSize: 11 }}>Giá gốc</span>
+                                              <span style={{ color: "#b0956a", fontSize: 11, fontWeight: 600 }}>{formatPrice(bd!.basePrice)}</span>
                                             </div>
                                             {displaySize && (bd?.sizeDiff ?? 0) > 0 && (
                                               <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
                                                 borderBottom: (bd?.toppings?.length ?? 0) > 0 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                                <span style={{ color: "#4a8ff5", fontSize: 9 }}>▸ {displaySize}</span>
-                                                <span style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 600 }}>+{formatPrice(bd!.sizeDiff!)}</span>
+                                                <span style={{ color: "#4a8ff5", fontSize: 11 }}>▸ {displaySize}</span>
+                                                <span style={{ color: "#4a8ff5", fontSize: 11, fontWeight: 600 }}>+{formatPrice(bd!.sizeDiff!)}</span>
                                               </div>
                                             )}
                                             {bd?.toppings?.map((tp, ti) => (
                                               <div key={ti} style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
                                                 borderBottom: ti < (bd?.toppings?.length ?? 0) - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                                <span style={{ color: "#3ecf6e", fontSize: 9 }}>+ {tp.name}</span>
-                                                <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>+{formatPrice(tp.price)}</span>
+                                                <span style={{ color: "#3ecf6e", fontSize: 11 }}>+ {tp.name}</span>
+                                                <span style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 600 }}>+{formatPrice(tp.price)}</span>
                                               </div>
                                             ))}
                                           </>
@@ -981,15 +981,15 @@ export default function OrdersPage() {
                                             {displaySize && (
                                               <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
                                                 borderBottom: parsed.toppings.length > 0 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                                <span style={{ color: "#4a8ff5", fontSize: 9 }}>▸ {displaySize}</span>
-                                                <span style={{ color: "#6a5a40", fontSize: 8 }}>đã tính</span>
+                                                <span style={{ color: "#4a8ff5", fontSize: 11 }}>▸ {displaySize}</span>
+                                                <span style={{ color: "#6a5a40", fontSize: 11 }}>đã tính</span>
                                               </div>
                                             )}
                                             {parsed.toppings.map((t, ti) => (
                                               <div key={ti} style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
                                                 borderBottom: ti < parsed.toppings.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                                                <span style={{ color: "#3ecf6e", fontSize: 9 }}>+ {t}</span>
-                                                <span style={{ color: "#6a5a40", fontSize: 8 }}>đã tính</span>
+                                                <span style={{ color: "#3ecf6e", fontSize: 11 }}>+ {t}</span>
+                                                <span style={{ color: "#6a5a40", fontSize: 11 }}>đã tính</span>
                                               </div>
                                             ))}
                                           </>
@@ -998,7 +998,7 @@ export default function OrdersPage() {
                                     )}
                                     {/* Thành tiền */}
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                      <span style={{ color: "#b0956a", fontSize: 9.5 }}>
+                                      <span style={{ color: "#b0956a", fontSize: 11 }}>
                                         Thành tiền{item.qty > 1 ? ` (×${item.qty})` : ""}
                                       </span>
                                       <span style={{ color: "#FF8C00", fontSize: 12, fontWeight: 800 }}>
@@ -1009,7 +1009,7 @@ export default function OrdersPage() {
                                     {item.note && (
                                       <div style={{ marginTop: 6, padding: "5px 9px", borderRadius: 7,
                                         background: "rgba(245,197,66,0.08)", border: "1px solid rgba(245,197,66,0.2)",
-                                        color: "#f5c542", fontSize: 9, display: "flex", gap: 5, alignItems: "flex-start" }}>
+                                        color: "#f5c542", fontSize: 11, display: "flex", gap: 5, alignItems: "flex-start" }}>
                                         <span style={{ flexShrink: 0, fontWeight: 700 }}>📝</span>
                                         <span>{item.note}</span>
                                       </div>
@@ -1021,7 +1021,7 @@ export default function OrdersPage() {
                                 <div style={{ padding: "7px 12px", borderTop: "1px solid rgba(255,255,255,0.04)",
                                   background: "rgba(245,197,66,0.04)", display: "flex", gap: 6, alignItems: "flex-start" }}>
                                   <span style={{ fontSize: 11, flexShrink: 0 }}>📝</span>
-                                  <span style={{ color: "#b0956a", fontSize: 9 }}>{order.note}</span>
+                                  <span style={{ color: "#b0956a", fontSize: 11 }}>{order.note}</span>
                                 </div>
                               )}
                             </div>
@@ -1050,8 +1050,8 @@ export default function OrdersPage() {
                                     ].filter((r): r is { label: string; val: number; c: string } => r !== null)
                                      .map((r, ri) => (
                                       <div key={ri} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
-                                        <span style={{ color: "#6a5a40", fontSize: 9 }}>{r.label}</span>
-                                        <span style={{ color: r.c, fontSize: 9 }}>{r.val < 0 ? "−" : ""}{formatPrice(Math.abs(r.val))}</span>
+                                        <span style={{ color: "#6a5a40", fontSize: 11 }}>{r.label}</span>
+                                        <span style={{ color: r.c, fontSize: 11 }}>{r.val < 0 ? "−" : ""}{formatPrice(Math.abs(r.val))}</span>
                                       </div>
                                     ))}
                                     <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "6px 0" }} />
@@ -1063,8 +1063,8 @@ export default function OrdersPage() {
                                     </div>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
                                       padding: "6px 0", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                                      <span style={{ color: "#6a5a40", fontSize: 9 }}>{order.payMethod}</span>
-                                      <span style={{ color: statusColor, fontSize: 9.5, fontWeight: 600 }}>{statusText}</span>
+                                      <span style={{ color: "#6a5a40", fontSize: 11 }}>{order.payMethod}</span>
+                                      <span style={{ color: statusColor, fontSize: 11, fontWeight: 600 }}>{statusText}</span>
                                     </div>
                                   </div>
                                 </>
@@ -1101,7 +1101,7 @@ export default function OrdersPage() {
                                 {/* Tài xế */}
                                 {order.driverId && (
                                   <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                                    <div style={{ color: "#b0956a", fontSize: 9, fontWeight: 600,
+                                    <div style={{ color: "#b0956a", fontSize: 11, fontWeight: 600,
                                       textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 7 }}>🛵 Tài xế giao hàng</div>
                                     <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
                                       {[1,2,3,4,5].map(n => (
@@ -1114,7 +1114,7 @@ export default function OrdersPage() {
                                     <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 7 }}>
                                       {["Giao nhanh","Thân thiện","Đúng giờ","Cẩn thận","Biết đường"].map(chip => (
                                         <div key={chip} onClick={() => setDriverReviewTxt(p => p.includes(chip) ? p.replace(`, ${chip}`,"").replace(chip,"").trim() : p ? `${p}, ${chip}` : chip)}
-                                          style={{ padding: "3px 9px", borderRadius: 8, cursor: "pointer", fontSize: 8.5,
+                                          style={{ padding: "3px 9px", borderRadius: 8, cursor: "pointer", fontSize: 11,
                                             background: driverReviewTxt.includes(chip) ? "rgba(74,143,245,0.12)" : "rgba(255,255,255,0.04)",
                                             border: `1px solid ${driverReviewTxt.includes(chip) ? "rgba(74,143,245,0.4)" : "rgba(255,255,255,0.08)"}`,
                                             color: driverReviewTxt.includes(chip) ? "#4a8ff5" : "#6a5a40" }}>{chip}</div>
@@ -1127,7 +1127,7 @@ export default function OrdersPage() {
                                         style={{ width:"100%", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)",
                                           borderRadius:9, padding:"7px 9px 14px", color:"#f8f0e0", fontSize:10, fontFamily:"Lexend",
                                           outline:"none", resize:"none", boxSizing:"border-box" }} />
-                                      <span style={{ position:"absolute", bottom:5, right:8, color:"#6a5a40", fontSize:7.5, pointerEvents:"none" }}>
+                                      <span style={{ position:"absolute", bottom:5, right:8, color:"#6a5a40", fontSize: 10, pointerEvents:"none" }}>
                                         {driverReviewTxt.length}/200
                                       </span>
                                     </div>
@@ -1136,7 +1136,7 @@ export default function OrdersPage() {
                                 {/* Quán ăn */}
                                 {order.serviceType === "food" && (
                                   <div style={{ marginBottom: 12 }}>
-                                    <div style={{ color: "#b0956a", fontSize: 9, fontWeight: 600,
+                                    <div style={{ color: "#b0956a", fontSize: 11, fontWeight: 600,
                                       textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 7 }}>🍽️ Chất lượng quán</div>
                                     <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
                                       {[1,2,3,4,5].map(n => (
@@ -1149,7 +1149,7 @@ export default function OrdersPage() {
                                     <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 7 }}>
                                       {["Món ngon","Đúng mô tả","Đóng gói đẹp","Sạch sẽ","Phục vụ tốt"].map(chip => (
                                         <div key={chip} onClick={() => setShopReviewTxt(p => p.includes(chip) ? p.replace(`, ${chip}`,"").replace(chip,"").trim() : p ? `${p}, ${chip}` : chip)}
-                                          style={{ padding: "3px 9px", borderRadius: 8, cursor: "pointer", fontSize: 8.5,
+                                          style={{ padding: "3px 9px", borderRadius: 8, cursor: "pointer", fontSize: 11,
                                             background: shopReviewTxt.includes(chip) ? "rgba(62,207,110,0.1)" : "rgba(255,255,255,0.04)",
                                             border: `1px solid ${shopReviewTxt.includes(chip) ? "rgba(62,207,110,0.35)" : "rgba(255,255,255,0.08)"}`,
                                             color: shopReviewTxt.includes(chip) ? "#3ecf6e" : "#6a5a40" }}>{chip}</div>
@@ -1162,7 +1162,7 @@ export default function OrdersPage() {
                                         style={{ width:"100%", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)",
                                           borderRadius:9, padding:"7px 9px 14px", color:"#f8f0e0", fontSize:10, fontFamily:"Lexend",
                                           outline:"none", resize:"none", boxSizing:"border-box" }} />
-                                      <span style={{ position:"absolute", bottom:5, right:8, color:"#6a5a40", fontSize:7.5, pointerEvents:"none" }}>
+                                      <span style={{ position:"absolute", bottom:5, right:8, color:"#6a5a40", fontSize: 10, pointerEvents:"none" }}>
                                         {shopReviewTxt.length}/200
                                       </span>
                                     </div>
@@ -1199,7 +1199,7 @@ export default function OrdersPage() {
                                 padding:"7px 10px", background:"rgba(255,179,71,0.06)",
                                 border:"1px solid rgba(255,179,71,0.15)", borderRadius:9 }}>
                                 {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize:12, opacity: s <= order.rating! ? 1 : 0.2 }}>⭐</span>)}
-                                <span style={{ color:"#b0956a", fontSize:8.5, marginLeft:5 }}>Bạn đã đánh giá đơn này</span>
+                                <span style={{ color:"#b0956a", fontSize: 11, marginLeft:5 }}>Bạn đã đánh giá đơn này</span>
                               </div>
                             )}
 
@@ -1274,7 +1274,7 @@ export default function OrdersPage() {
                 display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
                 <div style={{ color: "#b0956a", fontSize: 10, fontWeight: 600 }}>🕐 Lịch sử đơn hàng</div>
-                <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 2 }}>
+                <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 2 }}>
                   {historyOrders.length} đơn hàng từ các ngày trước
                 </div>
               </div>
@@ -1299,7 +1299,7 @@ export default function OrdersPage() {
               <span style={{ fontSize: 19, filter: tab.active ? "drop-shadow(0 0 4px rgba(255,107,0,0.6))" : "none" }}>
                 {tab.icon}
               </span>
-              <span style={{ fontSize: 7.5, color: tab.active ? "#FF8C00" : "#6a5a40", fontWeight: tab.active ? 600 : 400 }}>
+              <span style={{ fontSize: 10, color: tab.active ? "#FF8C00" : "#6a5a40", fontWeight: tab.active ? 600 : 400 }}>
                 {tab.label}
               </span>
               {tab.active && (

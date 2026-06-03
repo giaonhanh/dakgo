@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 // src/app/(customer)/review/[orderId]/page.tsx
 
@@ -71,7 +71,7 @@ function TagChip({ label, on, onClick }: { label:string; on:boolean; onClick:()=
         background:on?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
         border:`1px solid ${on?"rgba(255,107,0,0.4)":"rgba(255,255,255,0.08)"}`,
         color:on?"#FF8C00":"#6a5a40",
-        fontSize:9.5,fontWeight:on?600:400,
+        fontSize: 11,fontWeight:on?600:400,
         transition:"all .15s" }}>
       {label}
     </div>
@@ -271,7 +271,7 @@ export default function ReviewPage() {
               display:"flex",alignItems:"center",justifyContent:"center",fontSize:14 }}>←</a>
             <div style={{ flex:1 }}>
               <div style={{ color:"#f8f0e0",fontSize:15,fontWeight:700 }}>Đánh giá đơn hàng</div>
-              <div style={{ color:"#6a5a40",fontSize:9,marginTop:1 }}>
+              <div style={{ color:"#6a5a40",fontSize: 11,marginTop:1 }}>
                 #{orderId?.slice(0,8).toUpperCase()}
               </div>
             </div>
@@ -294,10 +294,10 @@ export default function ReviewPage() {
               </div>
               <div style={{ flex:1 }}>
                 <div style={{ color:"#f8f0e0",fontSize:11.5,fontWeight:600 }}>{order.shopName}</div>
-                <div style={{ color:"#6a5a40",fontSize:8.5,marginTop:2 }}>
+                <div style={{ color:"#6a5a40",fontSize: 11,marginTop:2 }}>
                   {order.items.join(" · ")}
                 </div>
-                <div style={{ color:"#6a5a40",fontSize:8,marginTop:2 }}>
+                <div style={{ color:"#6a5a40",fontSize: 11,marginTop:2 }}>
                   {order.createdAt} · {order.total.toLocaleString("vi-VN")}đ
                 </div>
               </div>
@@ -310,7 +310,7 @@ export default function ReviewPage() {
             {foodStar > 0 && (
               <motion.div initial={{opacity:0,y:6}} animate={{opacity:1,y:0}}
                 style={{ marginTop:12 }}>
-                <div style={{ color:"#6a5a40",fontSize:9,marginBottom:7 }}>
+                <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:7 }}>
                   Bạn thích điều gì? (chọn nhiều)
                 </div>
                 <div style={{ display:"flex",gap:5,flexWrap:"wrap" }}>
@@ -339,7 +339,7 @@ export default function ReviewPage() {
                   <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:600 }}>
                     {order.driver.name}
                   </div>
-                  <div style={{ color:"#6a5a40",fontSize:8.5,marginTop:1 }}>
+                  <div style={{ color:"#6a5a40",fontSize: 11,marginTop:1 }}>
                     {order.driver.plate} · ⭐ {order.driver.rating}
                   </div>
                 </div>
@@ -370,7 +370,7 @@ export default function ReviewPage() {
                 padding:"10px 12px",color:"#f8f0e0",fontSize:11.5,
                 fontFamily:"Lexend",outline:"none",resize:"none",
                 lineHeight:1.6 }} />
-            <div style={{ textAlign:"right",color:"#6a5a40",fontSize:8,marginTop:4 }}>
+            <div style={{ textAlign:"right",color:"#6a5a40",fontSize: 11,marginTop:4 }}>
               {comment.length}/300
             </div>
           </SCard>
@@ -401,13 +401,13 @@ export default function ReviewPage() {
                     display:"flex",flexDirection:"column",
                     alignItems:"center",justifyContent:"center",gap:4 }}>
                   <span style={{ fontSize:20 }}>📷</span>
-                  <span style={{ color:"#6a5a40",fontSize:7.5 }}>Thêm ảnh</span>
+                  <span style={{ color:"#6a5a40",fontSize: 10 }}>Thêm ảnh</span>
                 </div>
               )}
             </div>
             <input ref={fileRef} type="file" accept="image/*" multiple
               onChange={handlePhoto} style={{ display:"none" }} />
-            <div style={{ color:"#6a5a40",fontSize:8,marginTop:7 }}>
+            <div style={{ color:"#6a5a40",fontSize: 11,marginTop:7 }}>
               Tối đa 3 ảnh · Ảnh thực tế giúp khách khác tham khảo tốt hơn
             </div>
           </SCard>
@@ -421,14 +421,14 @@ export default function ReviewPage() {
                     background:tip===v?"rgba(255,107,0,0.12)":"rgba(255,255,255,0.04)",
                     border:`1px solid ${tip===v?"rgba(255,107,0,0.4)":"rgba(255,255,255,0.08)"}`,
                     color:tip===v?"#FF8C00":"#6a5a40",
-                    fontSize:9.5,fontWeight:tip===v?600:400,
+                    fontSize: 11,fontWeight:tip===v?600:400,
                     transition:"all .15s" }}>
                   {fmt(v)}
                 </div>
               ))}
             </div>
             {tip > 0 && (
-              <div style={{ marginTop:8,color:"#3ecf6e",fontSize:9.5 }}>
+              <div style={{ marginTop:8,color:"#3ecf6e",fontSize: 11 }}>
                 🎉 Tài xế sẽ nhận được {fmt(tip)} — cảm ơn bạn đã hào phóng!
               </div>
             )}

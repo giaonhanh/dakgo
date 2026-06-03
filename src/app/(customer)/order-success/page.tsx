@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 // src/app/(customer)/order-success/page.tsx
 
@@ -43,7 +43,7 @@ function ETABar({ etaMin }: { etaMin: number }) {
   return (
     <div style={{ background:"rgba(255,107,0,0.07)",border:"1px solid rgba(255,107,0,0.2)",borderRadius:13,padding:"12px 14px" }}>
       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
-        <div style={{ color:"#6a5a40",fontSize:9.5 }}>⏱️ Thời gian giao dự kiến</div>
+        <div style={{ color:"#6a5a40",fontSize: 11 }}>⏱️ Thời gian giao dự kiến</div>
         <div style={{ color:"#FF8C00",fontSize:18,fontWeight:800,fontVariantNumeric:"tabular-nums" }}>
           {min.toString().padStart(2,"0")}:{sec.toString().padStart(2,"0")}
         </div>
@@ -53,8 +53,8 @@ function ETABar({ etaMin }: { etaMin: number }) {
           animate={{ width:`${pct}%` }} transition={{ duration:1,ease:"linear" }} />
       </div>
       <div style={{ display:"flex",justifyContent:"space-between",marginTop:5 }}>
-        <span style={{ color:"#6a5a40",fontSize:8 }}>Đặt hàng</span>
-        <span style={{ color:"#6a5a40",fontSize:8 }}>Đã giao</span>
+        <span style={{ color:"#6a5a40",fontSize: 11 }}>Đặt hàng</span>
+        <span style={{ color:"#6a5a40",fontSize: 11 }}>Đã giao</span>
       </div>
     </div>
   )
@@ -188,7 +188,7 @@ function OrderSuccessContent() {
               <div style={{ display:"inline-flex",alignItems:"center",gap:8,
                 background:"rgba(255,107,0,0.08)",border:"1px solid rgba(255,107,0,0.25)",
                 borderRadius:10,padding:"6px 16px" }}>
-                <span style={{ color:"#6a5a40",fontSize:9 }}>Mã đơn</span>
+                <span style={{ color:"#6a5a40",fontSize: 11 }}>Mã đơn</span>
                 <span style={{ color:"#FF8C00",fontSize:14,fontWeight:800,letterSpacing:1 }}>
                   #{orderData.id.slice(0,8).toUpperCase()}
                 </span>
@@ -213,9 +213,9 @@ function OrderSuccessContent() {
                   background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.2)",
                   display:"flex",alignItems:"center",justifyContent:"center",fontSize:22 }}>🛵</div>
                 <div style={{ flex:1 }}>
-                  <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:2 }}>Tài xế của bạn</div>
+                  <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:2 }}>Tài xế của bạn</div>
                   <div style={{ color:"#f8f0e0",fontSize:12,fontWeight:700 }}>{orderData.driver.name}</div>
-                  <div style={{ color:"#6a5a40",fontSize:9,marginTop:1 }}>
+                  <div style={{ color:"#6a5a40",fontSize: 11,marginTop:1 }}>
                     ⭐ {orderData.driver.rating} · {orderData.driver.plate}
                   </div>
                 </div>
@@ -238,7 +238,7 @@ function OrderSuccessContent() {
             <div style={{ display:"flex",gap:9,alignItems:"flex-start" }}>
               <span style={{ fontSize:16,marginTop:1 }}>📍</span>
               <div>
-                <div style={{ color:"#6a5a40",fontSize:8.5,marginBottom:3 }}>Địa chỉ giao hàng</div>
+                <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:3 }}>Địa chỉ giao hàng</div>
                 <div style={{ color:"#b0956a",fontSize:11 }}>{orderData.address}</div>
               </div>
             </div>
@@ -308,7 +308,7 @@ function OrderSuccessContent() {
               border:"1px solid rgba(255,255,255,0.1)",
               display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,cursor:"pointer" }}>
               <span style={{ fontSize:20 }}>🏠</span>
-              <span style={{ color:"#6a5a40",fontSize:8 }}>Trang chủ</span>
+              <span style={{ color:"#6a5a40",fontSize: 11 }}>Trang chủ</span>
             </div>
           </a>
         </div>

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
@@ -42,7 +42,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 6px" }}>
       <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
-      <span style={{ color: "#6a5a40", fontSize: 8.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, whiteSpace: "nowrap" }}>
+      <span style={{ color: "#6a5a40", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, whiteSpace: "nowrap" }}>
         {children}
       </span>
       <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
@@ -59,7 +59,7 @@ function SettingRow({ icon, label, sub, right, onClick, danger }: {
       <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
       <div style={{ flex: 1 }}>
         <div style={{ color: danger ? "#ff6060" : "#f8f0e0", fontSize: 11.5, fontWeight: 500 }}>{label}</div>
-        {sub && <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>{sub}</div>}
+        {sub && <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>{sub}</div>}
       </div>
       {right !== undefined ? right : onClick ? <span style={{ color: "#6a5a40", fontSize: 13 }}>›</span> : null}
     </div>
@@ -81,7 +81,7 @@ function InputField({ label, value, onChange, type = "text", placeholder, icon }
   const [focus, setFocus] = useState(false)
   return (
     <div style={{ marginBottom: 10 }}>
-      <label style={{ color: "rgba(176,149,106,0.6)", fontSize: 9.5, display: "block", marginBottom: 4 }}>{label}</label>
+      <label style={{ color: "rgba(176,149,106,0.6)", fontSize: 11, display: "block", marginBottom: 4 }}>{label}</label>
       <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${focus ? "rgba(255,107,0,0.55)" : "rgba(255,255,255,0.08)"}`, borderRadius: 12, padding: "0 12px", height: 44, transition: "all .2s", boxShadow: focus ? "0 0 0 3px rgba(255,107,0,0.09)" : "none" }}>
         {icon && <span style={{ fontSize: 15 }}>{icon}</span>}
         <input type={type} value={value} placeholder={placeholder} onChange={e => onChange(e.target.value)} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#f8f0e0", fontSize: 12, fontFamily: "Lexend" }} />
@@ -253,7 +253,7 @@ export default function ProfilePage() {
               <div style={{ height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2, marginBottom: 16, overflow: "hidden" }}>
                 <motion.div animate={{ width: `${pwStepPct[pwStep]}%` }} transition={{ duration: 0.3 }} style={{ height: "100%", borderRadius: 2, background: "linear-gradient(90deg,#FF6B00,#FF8C00)" }} />
               </div>
-              <div style={{ color: "#b0956a", fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+              <div style={{ color: "#b0956a", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
                 Bước {pwStepNum[pwStep]}/3 · {pwStepLabel[pwStep]}
               </div>
               <AnimatePresence mode="wait">
@@ -266,7 +266,7 @@ export default function ProfilePage() {
                           <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: newPw.length >= i*4 ? i===1?"#ff4040":i===2?"#f5c542":"#3ecf6e" : "rgba(255,255,255,0.07)", transition: "background .2s" }} />
                         ))}
                       </div>
-                      <div style={{ color: "#6a5a40", fontSize: 8, marginTop: 4 }}>{newPw.length < 4 ? "Yếu" : newPw.length < 8 ? "Trung bình" : "Mạnh"}</div>
+                      <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 4 }}>{newPw.length < 4 ? "Yếu" : newPw.length < 8 ? "Trung bình" : "Mạnh"}</div>
                     </div>
                   )}
                 </motion.div>
@@ -320,7 +320,7 @@ export default function ProfilePage() {
                   <span style={{ fontSize: 16, flexShrink: 0 }}>🚫</span>
                   <div>
                     <div style={{ color: "#ff6060", fontSize: 11, fontWeight: 700, marginBottom: 3 }}>Đang có {activeOrderCount} đơn hàng đang xử lý</div>
-                    <div style={{ color: "#6a5a40", fontSize: 9, lineHeight: 1.5 }}>Vui lòng chờ đơn hoàn thành hoặc hủy đơn trước khi xóa tài khoản.</div>
+                    <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.5 }}>Vui lòng chờ đơn hoàn thành hoặc hủy đơn trước khi xóa tài khoản.</div>
                   </div>
                 </div>
               )}
@@ -331,7 +331,7 @@ export default function ProfilePage() {
                   <span style={{ fontSize: 16, flexShrink: 0 }}>🪙</span>
                   <div>
                     <div style={{ color: "#FFB347", fontSize: 11, fontWeight: 700, marginBottom: 3 }}>Còn {walletXu.toLocaleString("vi-VN")}đ xu trong ví</div>
-                    <div style={{ color: "#6a5a40", fontSize: 9, lineHeight: 1.5 }}>Xu sẽ <strong style={{ color: "#ff6060" }}>không được hoàn trả</strong> khi xóa tài khoản. Vui lòng dùng hết xu trước khi thực hiện.</div>
+                    <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.5 }}>Xu sẽ <strong style={{ color: "#ff6060" }}>không được hoàn trả</strong> khi xóa tài khoản. Vui lòng dùng hết xu trước khi thực hiện.</div>
                   </div>
                 </div>
               )}
@@ -405,7 +405,7 @@ export default function ProfilePage() {
               ].map((s, i) => (
                 <div key={i} style={{ textAlign: "center" }}>
                   <div style={{ color: "#f8f0e0", fontSize: 13, fontWeight: 700 }}>{s.val}</div>
-                  <div style={{ color: "#6a5a40", fontSize: 8, marginTop: 1 }}>{s.label}</div>
+                  <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -418,16 +418,16 @@ export default function ProfilePage() {
             <div style={{ position: "absolute", top: 0, left: "-100%", width: "50%", height: "100%", background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)", animation: "shimmer 4s infinite" }} />
             <div style={{ position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <div style={{ color: "rgba(180,100,255,0.55)", fontSize: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 4 }}>💳 Xu Giao Nhanh</div>
+                <div style={{ color: "rgba(180,100,255,0.55)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 4 }}>💳 Xu Giao Nhanh</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 3 }}>
                   <span style={{ fontSize: 24, fontWeight: 800, lineHeight: 1, background: "linear-gradient(135deg,#b464ff,#d484ff,#e8a4ff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" } as React.CSSProperties}>
                     {walletXu.toLocaleString("vi-VN")}
                   </span>
                   <span style={{ color: "#b464ff", fontSize: 12, fontWeight: 600 }}>xu</span>
                 </div>
-                <div style={{ color: "rgba(180,100,255,0.4)", fontSize: 8 }}>Nạp VietQR · rút · dùng thanh toán đơn hàng</div>
+                <div style={{ color: "rgba(180,100,255,0.4)", fontSize: 11 }}>Nạp VietQR · rút · dùng thanh toán đơn hàng</div>
               </div>
-              <button onClick={e => { e.stopPropagation(); router.push("/wallet/xu") }} style={{ padding: "5px 11px", borderRadius: 7, cursor: "pointer", flexShrink: 0, background: "rgba(180,100,255,0.14)", border: "1px solid rgba(180,100,255,0.3)", color: "#b464ff", fontSize: 8.5, fontWeight: 700, fontFamily: "Lexend" }}>Chi tiết →</button>
+              <button onClick={e => { e.stopPropagation(); router.push("/wallet/xu") }} style={{ padding: "5px 11px", borderRadius: 7, cursor: "pointer", flexShrink: 0, background: "rgba(180,100,255,0.14)", border: "1px solid rgba(180,100,255,0.3)", color: "#b464ff", fontSize: 11, fontWeight: 700, fontFamily: "Lexend" }}>Chi tiết →</button>
             </div>
           </motion.div>
 
@@ -439,31 +439,31 @@ export default function ProfilePage() {
             <div style={{ position: "relative", zIndex: 1 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
-                  <div style={{ color: "rgba(245,197,66,0.6)", fontSize: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 4 }}>⭐ Điểm Tích Lũy</div>
+                  <div style={{ color: "rgba(245,197,66,0.6)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 4 }}>⭐ Điểm Tích Lũy</div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 3 }}>
                     <span style={{ fontSize: 24, fontWeight: 800, lineHeight: 1, background: "linear-gradient(135deg,#F5C542,#FFB347,#FF8C00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" } as React.CSSProperties}>
                       {points.toLocaleString("vi-VN")}
                     </span>
                     <span style={{ color: "#F5C542", fontSize: 12, fontWeight: 600 }}>điểm</span>
                   </div>
-                  <div style={{ color: "rgba(245,197,66,0.4)", fontSize: 8 }}>Tích từ đơn hàng · đổi xu & voucher</div>
+                  <div style={{ color: "rgba(245,197,66,0.4)", fontSize: 11 }}>Tích từ đơn hàng · đổi xu & voucher</div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                  <button onClick={e => { e.stopPropagation(); router.push("/wallet/points") }} style={{ padding: "5px 11px", borderRadius: 7, cursor: "pointer", background: "rgba(245,197,66,0.12)", border: "1px solid rgba(245,197,66,0.28)", color: "#F5C542", fontSize: 8.5, fontWeight: 700, fontFamily: "Lexend" }}>Chi tiết →</button>
+                  <button onClick={e => { e.stopPropagation(); router.push("/wallet/points") }} style={{ padding: "5px 11px", borderRadius: 7, cursor: "pointer", background: "rgba(245,197,66,0.12)", border: "1px solid rgba(245,197,66,0.28)", color: "#F5C542", fontSize: 11, fontWeight: 700, fontFamily: "Lexend" }}>Chi tiết →</button>
                   <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <span style={{ fontSize: 13 }}>{tierCfg.icon}</span>
-                    <span style={{ color: "#F5C542", fontSize: 8.5, fontWeight: 700 }}>{tierCfg.label} Member</span>
+                    <span style={{ color: "#F5C542", fontSize: 11, fontWeight: 700 }}>{tierCfg.label} Member</span>
                   </div>
                 </div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 7 }}>{points.toLocaleString()} điểm</span>
-                <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 7 }}>{nextTier} · {nextPts.toLocaleString()}</span>
+                <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 10 }}>{points.toLocaleString()} điểm</span>
+                <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 10 }}>{nextTier} · {nextPts.toLocaleString()}</span>
               </div>
               <div style={{ height: 4, background: "rgba(255,255,255,0.07)", borderRadius: 2, overflow: "hidden" }}>
                 <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1.2, ease: "easeOut" }} style={{ height: "100%", background: "linear-gradient(90deg,#F5C542,#FFB347)", borderRadius: 2 }} />
               </div>
-              <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 7, marginTop: 4 }}>
+              <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, marginTop: 4 }}>
                 Tích thêm <strong style={{ color: "#F5C542" }}>{Math.max(0, nextPts - points).toLocaleString()} điểm</strong> để lên {nextTier}
               </div>
             </div>
@@ -490,7 +490,7 @@ export default function ProfilePage() {
           <SectionLabel>Bảo mật</SectionLabel>
           <div style={CARD_STYLE}>
             <SettingRow icon="🔒" label="Đổi mật khẩu" sub="Cập nhật mật khẩu định kỳ để bảo mật" onClick={() => { setShowPw(true); setPwStep("current") }} />
-            <SettingRow icon="🛡️" label="Xác thực 2 bước" sub="Chưa bật" right={<span style={{ background: "rgba(245,197,66,0.1)", border: "1px solid rgba(245,197,66,0.25)", borderRadius: 5, padding: "2px 7px", color: "#f5c542", fontSize: 8, fontWeight: 600 }}>Sắp có</span>} />
+            <SettingRow icon="🛡️" label="Xác thực 2 bước" sub="Chưa bật" right={<span style={{ background: "rgba(245,197,66,0.1)", border: "1px solid rgba(245,197,66,0.25)", borderRadius: 5, padding: "2px 7px", color: "#f5c542", fontSize: 11, fontWeight: 600 }}>Sắp có</span>} />
           </div>
 
           {/* Thông báo */}
@@ -539,7 +539,7 @@ export default function ProfilePage() {
           ] as const).map(tab => (
             <button key={tab.href} onClick={() => router.push(tab.href)} style={{ background: tab.active ? "rgba(255,107,0,0.12)" : "transparent", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "5px 11px", borderRadius: 18, transform: tab.active ? "translateY(-2px)" : "translateY(0)", transition: "all .2s", position: "relative", fontFamily: "Lexend" }}>
               <span style={{ fontSize: 19, filter: tab.active ? "drop-shadow(0 0 4px rgba(255,107,0,0.6))" : "none" }}>{tab.icon}</span>
-              <span style={{ fontSize: 7.5, color: tab.active ? "#FF8C00" : "#6a5a40", fontWeight: tab.active ? 600 : 400 }}>{tab.label}</span>
+              <span style={{ fontSize: 10, color: tab.active ? "#FF8C00" : "#6a5a40", fontWeight: tab.active ? 600 : 400 }}>{tab.label}</span>
               {tab.active && <div style={{ position: "absolute", bottom: -2, width: 28, height: 3, borderRadius: 2, background: "radial-gradient(ellipse,rgba(255,107,0,0.9) 0%,transparent 70%)", filter: "blur(1px)" }} />}
             </button>
           ))}

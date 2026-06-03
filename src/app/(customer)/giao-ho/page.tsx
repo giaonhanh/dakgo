@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
@@ -228,7 +228,7 @@ export default function GiaoHoPage() {
     padding: "10px 12px", color: "#f8f0e0", fontSize: 12,
     fontFamily: "Lexend", outline: "none",
   }
-  const labelStyle: React.CSSProperties = { color: "#6a5a40", fontSize: 9, marginBottom: 5, fontWeight: 600 }
+  const labelStyle: React.CSSProperties = { color: "#6a5a40", fontSize: 11, marginBottom: 5, fontWeight: 600 }
 
   return (
     <>
@@ -263,7 +263,7 @@ export default function GiaoHoPage() {
                 justifyContent:"center",fontSize:18,cursor:"pointer",flexShrink:0 }}>←</button>
             <div style={{ flex:1 }}>
               <div style={{ color:"#f8f0e0",fontSize:16,fontWeight:800 }}>📦 Giao hộ</div>
-              <div style={{ color:"#6a5a40",fontSize:9,marginTop:1 }}>Tài xế lấy và giao hàng nhanh cho bạn</div>
+              <div style={{ color:"#6a5a40",fontSize: 11,marginTop:1 }}>Tài xế lấy và giao hàng nhanh cho bạn</div>
             </div>
           </div>
         </div>
@@ -279,7 +279,7 @@ export default function GiaoHoPage() {
               {!senderEditable && (senderName || senderPhone) && (
                 <button onClick={() => setSenderEditable(true)}
                   style={{ background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.3)",
-                    borderRadius:8,padding:"3px 10px",color:"#FF8C00",fontSize:9,fontWeight:600,
+                    borderRadius:8,padding:"3px 10px",color:"#FF8C00",fontSize: 11,fontWeight:600,
                     cursor:"pointer",fontFamily:"Lexend" }}>Đổi</button>
               )}
             </div>
@@ -312,7 +312,7 @@ export default function GiaoHoPage() {
               {!pickupEditable && pickup && !pickupLoading && (
                 <button onClick={() => setPickupEditable(true)}
                   style={{ background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.3)",
-                    borderRadius:8,padding:"3px 10px",color:"#FF8C00",fontSize:9,fontWeight:600,
+                    borderRadius:8,padding:"3px 10px",color:"#FF8C00",fontSize: 11,fontWeight:600,
                     cursor:"pointer",fontFamily:"Lexend" }}>Đổi</button>
               )}
             </div>
@@ -380,11 +380,11 @@ export default function GiaoHoPage() {
                     border:`1px solid ${weight===w.key?"rgba(255,107,0,0.35)":"rgba(255,255,255,0.07)"}`,
                     fontFamily:"Lexend" }}>
                   <div style={{ fontSize:20,marginBottom:4 }}>{w.emoji}</div>
-                  <div style={{ color:weight===w.key?"#FF8C00":"#6a5a40",fontSize:9,fontWeight:weight===w.key?700:400 }}>
+                  <div style={{ color:weight===w.key?"#FF8C00":"#6a5a40",fontSize: 11,fontWeight:weight===w.key?700:400 }}>
                     {w.label}
                   </div>
                   {w.key !== "nhe" && (
-                    <div style={{ color:weight===w.key?"#FFB347":"#4a3a28",fontSize:8,marginTop:2,fontWeight:600 }}>
+                    <div style={{ color:weight===w.key?"#FFB347":"#4a3a28",fontSize: 11,marginTop:2,fontWeight:600 }}>
                       +{fmt(w.key==="vua" ? weightMidFee : weightHeavyFee)}
                     </div>
                   )}
@@ -411,7 +411,7 @@ export default function GiaoHoPage() {
               <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:700 }}>📷 Ảnh gói hàng *</div>
               {!photoPreview && (
                 <span style={{ background:"rgba(255,107,0,0.12)",border:"1px solid rgba(255,107,0,0.3)",
-                  borderRadius:6,padding:"2px 8px",color:"#FF8C00",fontSize:8,fontWeight:600 }}>Bắt buộc</span>
+                  borderRadius:6,padding:"2px 8px",color:"#FF8C00",fontSize: 11,fontWeight:600 }}>Bắt buộc</span>
               )}
             </div>
 
@@ -428,7 +428,7 @@ export default function GiaoHoPage() {
                     cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center" }}>✕</button>
                 <div style={{ position:"absolute",bottom:8,left:8,
                   background:"rgba(62,207,110,0.85)",borderRadius:6,padding:"3px 8px",
-                  color:"#fff",fontSize:9,fontWeight:600 }}>✓ Đã chụp ảnh</div>
+                  color:"#fff",fontSize: 11,fontWeight:600 }}>✓ Đã chụp ảnh</div>
               </div>
             ) : (
               <motion.button whileTap={{ scale:0.97 }} onClick={() => photoRef.current?.click()}
@@ -438,7 +438,7 @@ export default function GiaoHoPage() {
                   display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6 }}>
                 <span style={{ fontSize:32 }}>📷</span>
                 <span style={{ color:"#FF8C00",fontSize:10,fontWeight:600 }}>Chụp / chọn ảnh gói hàng</span>
-                <span style={{ color:"#6a5a40",fontSize:8.5 }}>Giúp tài xế nhận dạng chính xác</span>
+                <span style={{ color:"#6a5a40",fontSize: 11 }}>Giúp tài xế nhận dạng chính xác</span>
               </motion.button>
             )}
           </div>
@@ -458,7 +458,7 @@ export default function GiaoHoPage() {
             borderRadius:14,padding:14 }}>
             <div style={{ color:"#FF8C00",fontSize:10,fontWeight:700,marginBottom:10 }}>💰 Chi phí dự kiến</div>
             {distanceKm === null ? (
-              <div style={{ color:"#6a5a40",fontSize:9,textAlign:"center",padding:"6px 0" }}>
+              <div style={{ color:"#6a5a40",fontSize: 11,textAlign:"center",padding:"6px 0" }}>
                 📍 Chọn địa chỉ lấy & giao trên bản đồ để tính phí chính xác
               </div>
             ) : (

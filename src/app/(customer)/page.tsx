@@ -22,6 +22,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { useCartStore } from "@/store/cartStore"
 import { useLocationStore } from "@/store/locationStore"
 import { createClient } from "@/lib/supabase/client"
@@ -92,7 +93,7 @@ function SectionHeader({ title, more, href }: { title:string; more?:string; href
       padding:"0 16px", marginBottom:8 }}>
       <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:600 }}>{title}</div>
       {more && (
-        <a href={href ?? "#"} style={{ color:"#FF8C00", fontSize:9.5,
+        <a href={href ?? "#"} style={{ color:"#FF8C00", fontSize: 11,
           textDecoration:"none", fontWeight:500 }}>{more}</a>
       )}
     </div>
@@ -518,7 +519,7 @@ export default function HomePage() {
                 ))}
               </div>
               <div>
-                <div style={{ color:"#6a5a40", fontSize:9 }}>Vị trí của bạn</div>
+                <div style={{ color:"#6a5a40", fontSize: 11 }}>Vị trí của bạn</div>
                 <div onClick={() => router.push("/addresses")}
                   style={{ color:"#f8f0e0", fontSize:12, fontWeight:600, cursor:"pointer",
                     display:"flex", alignItems:"center", gap:4 }}>
@@ -541,7 +542,7 @@ export default function HomePage() {
                     width:14, height:14, borderRadius:"50%",
                     background:"#ff4040", border:"1.5px solid #080806",
                     display:"flex", alignItems:"center", justifyContent:"center",
-                    color:"#fff", fontSize:7, fontWeight:700,
+                    color:"#fff", fontSize: 10, fontWeight:700,
                     boxShadow:"0 0 4px #ff4040", animation:"pulse 1.5s infinite" }}>
                     {notifCount > 9 ? "9+" : notifCount}
                   </div>
@@ -580,7 +581,7 @@ export default function HomePage() {
               borderRadius:10, padding:"7px 11px",
             }}>
               <span style={{ fontSize:14 }}>🤖</span>
-              <div style={{ color:"#b464ff", fontSize:9, lineHeight:1.4, flex:1 }}>
+              <div style={{ color:"#b464ff", fontSize: 11, lineHeight:1.4, flex:1 }}>
                 <strong style={{ color:"#c87aff" }}>Gợi ý AI:</strong>{" "}
                 {weatherTip ?? aiTip()}
               </div>
@@ -629,7 +630,7 @@ export default function HomePage() {
                       <div style={{ width:6, height:6, borderRadius:"50%",
                         background:"#3ecf6e", boxShadow:"0 0 5px #3ecf6e",
                         animation:"pulse 1.5s infinite" }} />
-                      <span style={{ color:"#3ecf6e", fontSize:9, fontWeight:600 }}>
+                      <span style={{ color:"#3ecf6e", fontSize: 11, fontWeight:600 }}>
                         {liveOrders.length} đơn đang xử lý
                       </span>
                     </div>
@@ -696,14 +697,14 @@ export default function HomePage() {
                                 <div style={{ width:6, height:6, borderRadius:"50%",
                                   background:statusColor, boxShadow:`0 0 5px ${statusColor}`,
                                   animation:"pulse 1.5s infinite" }} />
-                                <span style={{ color:statusColor, fontSize:9, fontWeight:600 }}>
+                                <span style={{ color:statusColor, fontSize: 11, fontWeight:600 }}>
                                   {statusLabel}
                                 </span>
                               </div>
                               <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginTop:2 }}>
                                 {shopName} · #{order.id.slice(0,8).toUpperCase()}
                               </div>
-                              <div style={{ color:"rgba(255,255,255,0.35)", fontSize:8.5, marginTop:1 }}>
+                              <div style={{ color:"rgba(255,255,255,0.35)", fontSize: 11, marginTop:1 }}>
                                 Nhấn để theo dõi đơn hàng
                               </div>
                             </div>
@@ -711,7 +712,7 @@ export default function HomePage() {
                               background:`${statusColor}1a`,
                               border:`1px solid ${statusColor}44`,
                               borderRadius:8, padding:"4px 9px",
-                              color:statusColor, fontSize:9, fontWeight:600,
+                              color:statusColor, fontSize: 11, fontWeight:600,
                               position:"relative", zIndex:1, flexShrink:0,
                             }}>Xem →</div>
                           </div>
@@ -793,8 +794,8 @@ export default function HomePage() {
                 cursor:"pointer", background:"#0d1a2d" }}
                 onClick={() => { const b = adminBanners[adminBannerIdx]; if (b?.link_url) router.push(b.link_url) }}>
                 {adminBanners[adminBannerIdx]?.image_url ? (
-                  <img src={adminBanners[adminBannerIdx].image_url!} alt={adminBanners[adminBannerIdx].title}
-                    style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                  <Image src={adminBanners[adminBannerIdx].image_url!} alt={adminBanners[adminBannerIdx].title}
+                    fill sizes="100vw" style={{ objectFit:"cover" }} />
                 ) : (
                   <div style={{ width:"100%", height:"100%",
                     background:"linear-gradient(135deg,#0d1a2d,#1a2d40)",
@@ -841,18 +842,18 @@ export default function HomePage() {
                   <div style={{ display:"inline-block",
                     background:"linear-gradient(135deg,#3ecf6e,#27ae60)",
                     borderRadius:8, padding:"2px 9px", marginBottom:5,
-                    color:"#000", fontSize:8, fontWeight:700, letterSpacing:.4 }}>
+                    color:"#000", fontSize: 11, fontWeight:700, letterSpacing:.4 }}>
                     🎁 MỜI BẠN BÈ
                   </div>
                   <div style={{ color:"#fff", fontSize:13, fontWeight:700, lineHeight:1.3, maxWidth:"62%", wordBreak:"break-word" }}>
                     Mời bạn bè, nhận 5.000 XU!
                   </div>
-                  <div style={{ color:"rgba(255,255,255,0.45)", fontSize:9, marginTop:3 }}>
+                  <div style={{ color:"rgba(255,255,255,0.45)", fontSize: 11, marginTop:3 }}>
                     Cả hai nhận 5.000 xu · Đơn đầu từ 50.000đ
                   </div>
                   <div style={{ display:"inline-block", marginTop:6,
                     background:"rgba(62,207,110,0.15)", border:"1px solid rgba(62,207,110,0.35)",
-                    borderRadius:6, padding:"3px 9px", color:"#3ecf6e", fontSize:8.5, fontWeight:600 }}>
+                    borderRadius:6, padding:"3px 9px", color:"#3ecf6e", fontSize: 11, fontWeight:600 }}>
                     Chia sẻ ngay →
                   </div>
                 </div>
@@ -896,7 +897,7 @@ export default function HomePage() {
                     fontSize:20, color:s.ic }}>
                     {s.icon}
                   </div>
-                  <span style={{ color:"#b0956a", fontSize:8.5, textAlign:"center",
+                  <span style={{ color:"#b0956a", fontSize: 11, textAlign:"center",
                     fontWeight:500, lineHeight:1.3 }}>{s.label}</span>
                 </div>
               </a>
@@ -974,15 +975,15 @@ export default function HomePage() {
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ color: isShop ? "#4a8ff5" : "#FF8C00", fontSize:12, fontWeight:700 }}>{valueLabel}</div>
-                        <div style={{ color:"#b0956a", fontSize:8, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.title}</div>
+                        <div style={{ color:"#b0956a", fontSize: 11, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.title}</div>
                       </div>
                     </div>
                     {/* Min spend progress bar */}
                     {v.min_order && v.min_order > 0 && (
                       <div style={{ marginBottom:6 }}>
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
-                          <span style={{ fontSize:7.5, color:"#6a5a40" }}>Đặt từ</span>
-                          <span style={{ fontSize:7.5, color: isShop ? "#4a8ff5" : "#FF8C00", fontWeight:700 }}>
+                          <span style={{ fontSize: 10, color:"#6a5a40" }}>Đặt từ</span>
+                          <span style={{ fontSize: 10, color: isShop ? "#4a8ff5" : "#FF8C00", fontWeight:700 }}>
                             {v.min_order.toLocaleString("vi-VN")}đ
                           </span>
                         </div>
@@ -993,7 +994,7 @@ export default function HomePage() {
                       </div>
                     )}
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                      <div style={{ fontSize:7.5, color: urgent ? "#ff4040" : "rgba(255,107,0,0.45)", fontWeight: urgent ? 700 : 400 }}>
+                      <div style={{ fontSize: 10, color: urgent ? "#ff4040" : "rgba(255,107,0,0.45)", fontWeight: urgent ? 700 : 400 }}>
                         {urgent ? "⏰ " : ""}{expiryLabel}
                       </div>
                       <button type="button"
@@ -1002,7 +1003,7 @@ export default function HomePage() {
                         )}
                         style={{
                           height:20, padding:"0 7px", borderRadius:6, border:"none",
-                          cursor:"pointer", fontSize:8, fontWeight:700, fontFamily:"Lexend",
+                          cursor:"pointer", fontSize: 11, fontWeight:700, fontFamily:"Lexend",
                           background: saved ? "rgba(62,207,110,0.15)" : "rgba(255,107,0,0.15)",
                           color: saved ? "#3ecf6e" : "#FF8C00", transition:"all .2s",
                         }}>
@@ -1046,7 +1047,7 @@ export default function HomePage() {
                   {m.icon}
                 </div>
                 <div style={{
-                  fontSize:9.5, fontWeight:600, color:"#b0956a",
+                  fontSize: 11, fontWeight:600, color:"#b0956a",
                   textAlign:"center", whiteSpace:"nowrap",
                 }}>
                   {m.label}
@@ -1079,7 +1080,7 @@ export default function HomePage() {
                     {p.sold_count > 0 && (
                       <div style={{ position:"absolute", top:5, left:5,
                         background:"#ff4040", color:"#fff",
-                        fontSize:7, fontWeight:700, padding:"2px 5px", borderRadius:5 }}>
+                        fontSize: 10, fontWeight:700, padding:"2px 5px", borderRadius:5 }}>
                         HOT
                       </div>
                     )}
@@ -1087,14 +1088,14 @@ export default function HomePage() {
                   <div style={{ padding:"7px 9px 8px" }}>
                     <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600,
                       whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
-                    <div style={{ color:"#6a5a40", fontSize:8, marginTop:1,
+                    <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
                       whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
                     <div style={{ background:"linear-gradient(135deg,#FF6B00,#FFB347)",
                       WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
                       backgroundClip:"text", fontSize:11, fontWeight:700, marginTop:3 }}>{fmt(p.price)}</div>
                     <div style={{ display:"flex", alignItems:"center",
                       justifyContent:"space-between", marginTop:4 }}>
-                      <span style={{ color:"#6a5a40", fontSize:7.5 }}>🔥 {p.sold_count} đã bán</span>
+                      <span style={{ color:"#6a5a40", fontSize: 10 }}>🔥 {p.sold_count} đã bán</span>
                       <button
                         onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:p.id, name:p.name, price:p.price, shop:shopName, shopId:p.shop_id }) }}
                         style={{ width:22, height:22, borderRadius:7,
@@ -1127,7 +1128,7 @@ export default function HomePage() {
                         display:"flex", alignItems:"center", justifyContent:"center",
                         fontSize:36, position:"relative" }}>
                         {s.logo_url
-                          ? <img src={s.logo_url} alt={s.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                          ? <Image src={s.logo_url} alt={s.name} fill sizes="64px" style={{ objectFit:"cover" }} />
                           : "🏪"}
                         <button onClick={e => { e.preventDefault(); e.stopPropagation(); toggleFavorite(s.id) }}
                           style={{ position:"absolute", top:5, right:5, width:24, height:24, borderRadius:7,
@@ -1140,9 +1141,9 @@ export default function HomePage() {
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</div>
                         <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:3 }}>
                           {s.is_open
-                            ? <span style={{ color:"#3ecf6e", fontSize:8 }}>🟢 Mở cửa</span>
-                            : <span style={{ color:"#ff6060", fontSize:8 }}>🔴 Đóng cửa</span>}
-                          <span style={{ color:"#6a5a40", fontSize:8 }}>· ★ {s.rating_avg?.toFixed(1) ?? "Mới"}</span>
+                            ? <span style={{ color:"#3ecf6e", fontSize: 11 }}>🟢 Mở cửa</span>
+                            : <span style={{ color:"#ff6060", fontSize: 11 }}>🔴 Đóng cửa</span>}
+                          <span style={{ color:"#6a5a40", fontSize: 11 }}>· ★ {s.rating_avg?.toFixed(1) ?? "Mới"}</span>
                         </div>
                       </div>
                     </div>
@@ -1187,7 +1188,7 @@ export default function HomePage() {
                       background:"rgba(255,107,0,0.07)", border:"1px solid rgba(255,255,255,0.08)",
                       display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, overflow:"hidden" }}>
                       {s.logo_url
-                        ? <img src={s.logo_url} alt={s.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                        ? <Image src={s.logo_url} alt={s.name} fill sizes="56px" style={{ objectFit:"cover" }} />
                         : "🏪"}
                       {/* Closed overlay */}
                       {!s.is_open && (
@@ -1214,8 +1215,8 @@ export default function HomePage() {
                           <div style={{ display:"flex", alignItems:"center", gap:3,
                             background:"rgba(255,179,71,0.1)", border:"1px solid rgba(255,179,71,0.25)",
                             borderRadius:6, padding:"2px 7px" }}>
-                            <span style={{ color:"#FFB347", fontSize:9 }}>★</span>
-                            <span style={{ color:"#FFB347", fontSize:9, fontWeight:700 }}>{rating}</span>
+                            <span style={{ color:"#FFB347", fontSize: 11 }}>★</span>
+                            <span style={{ color:"#FFB347", fontSize: 11, fontWeight:700 }}>{rating}</span>
                           </div>
                         )}
                         {/* Distance */}
@@ -1223,8 +1224,8 @@ export default function HomePage() {
                           <div style={{ display:"flex", alignItems:"center", gap:3,
                             background:"rgba(74,143,245,0.08)", border:"1px solid rgba(74,143,245,0.2)",
                             borderRadius:6, padding:"2px 7px" }}>
-                            <span style={{ fontSize:8 }}>📍</span>
-                            <span style={{ color:"#4a8ff5", fontSize:9, fontWeight:600 }}>{distLabel}</span>
+                            <span style={{ fontSize: 11 }}>📍</span>
+                            <span style={{ color:"#4a8ff5", fontSize: 11, fontWeight:600 }}>{distLabel}</span>
                           </div>
                         )}
                         {/* Open/closed */}
@@ -1234,13 +1235,13 @@ export default function HomePage() {
                             borderRadius:6, padding:"2px 7px" }}>
                             <div style={{ width:5, height:5, borderRadius:"50%", background:"#3ecf6e",
                               animation:"pulse 1.5s infinite" }} />
-                            <span style={{ color:"#3ecf6e", fontSize:8, fontWeight:600 }}>Đang mở</span>
+                            <span style={{ color:"#3ecf6e", fontSize: 11, fontWeight:600 }}>Đang mở</span>
                           </div>
                         ) : (
                           <div style={{ display:"flex", alignItems:"center", gap:3,
                             background:"rgba(255,64,64,0.07)", border:"1px solid rgba(255,64,64,0.18)",
                             borderRadius:6, padding:"2px 7px" }}>
-                            <span style={{ color:"#ff6060", fontSize:8 }}>Đóng cửa</span>
+                            <span style={{ color:"#ff6060", fontSize: 11 }}>Đóng cửa</span>
                           </div>
                         )}
                       </div>
@@ -1279,7 +1280,7 @@ export default function HomePage() {
                         border:"1px solid rgba(62,207,110,0.15)",
                         borderRadius:13, overflow:"hidden" }}>
                       {p.image_url ? (
-                        <img src={p.image_url} alt={p.name} style={{ width:110, height:78, objectFit:"cover" }} />
+                        <Image src={p.image_url} alt={p.name} width={110} height={78} style={{ objectFit:"cover", display:"block" }} />
                       ) : (
                         <div style={{ width:110, height:78,
                           background:"linear-gradient(135deg,rgba(62,207,110,0.07),rgba(62,207,110,0.03))",
@@ -1288,7 +1289,7 @@ export default function HomePage() {
                           🍽️
                           <div style={{ position:"absolute", top:5, left:5,
                             background:"rgba(62,207,110,0.85)", color:"#000",
-                            fontSize:7, fontWeight:700, padding:"2px 5px", borderRadius:5 }}>MỚI</div>
+                            fontSize: 10, fontWeight:700, padding:"2px 5px", borderRadius:5 }}>MỚI</div>
                         </div>
                       )}
                       <div style={{ padding:"7px 8px 8px" }}>
@@ -1298,7 +1299,7 @@ export default function HomePage() {
                           WebkitBoxOrient:"vertical", overflow:"hidden" }}>
                           {p.name}
                         </div>
-                        <div style={{ color:"#6a5a40", fontSize:8.5, marginBottom:4,
+                        <div style={{ color:"#6a5a40", fontSize: 11, marginBottom:4,
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                           {shopName}
                         </div>
@@ -1341,14 +1342,14 @@ export default function HomePage() {
                       <div style={{ padding:"7px 9px 8px" }}>
                         <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600,
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
-                        <div style={{ color:"#6a5a40", fontSize:8, marginTop:1,
+                        <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
                         <div style={{ background:"linear-gradient(135deg,#FF6B00,#FFB347)",
                           WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
                           backgroundClip:"text", fontSize:11, fontWeight:700, marginTop:3 }}>{fmt(p.price)}</div>
                         <div style={{ display:"flex", alignItems:"center",
                           justifyContent:"space-between", marginTop:4 }}>
-                          <span style={{ color:"#6a5a40", fontSize:7.5 }}>🔥 {p.sold_count} đã bán</span>
+                          <span style={{ color:"#6a5a40", fontSize: 10 }}>🔥 {p.sold_count} đã bán</span>
                           <button
                             onClick={e => { e.preventDefault(); e.stopPropagation();
                               handleAdd(e.currentTarget as HTMLElement,
@@ -1382,8 +1383,7 @@ export default function HomePage() {
                       border:"1px solid rgba(255,107,0,0.12)",
                       borderRadius:13, overflow:"hidden" }}>
                     {p.image_url ? (
-                      <img src={p.image_url} alt={p.name}
-                        style={{ width:110, height:78, objectFit:"cover" }} />
+                      <Image src={p.image_url} alt={p.name} width={110} height={78} style={{ objectFit:"cover", display:"block" }} />
                     ) : (
                       <div style={{ width:110, height:78,
                         background:"linear-gradient(135deg,rgba(255,107,0,0.07),rgba(255,179,71,0.04))",
@@ -1397,7 +1397,7 @@ export default function HomePage() {
                         WebkitBoxOrient:"vertical", overflow:"hidden" }}>
                         {p.name}
                       </div>
-                      <div style={{ color:"#6a5a40", fontSize:8.5, marginBottom:4,
+                      <div style={{ color:"#6a5a40", fontSize: 11, marginBottom:4,
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                         {p.shop_name}
                       </div>
@@ -1433,7 +1433,7 @@ export default function HomePage() {
                       justifyContent:"center", fontSize:34, position:"relative",
                       background:"rgba(255,255,255,0.02)", overflow:"hidden" }}>
                       {b.image_url
-                        ? <img src={b.image_url} alt={b.name} style={{ width:"100%", height:"100%", objectFit:"cover", position:"absolute", inset:0 }} />
+                        ? <Image src={b.image_url} alt={b.name} fill sizes="130px" style={{ objectFit:"cover" }} />
                         : <>
                             <div style={{ position:"absolute", inset:0,
                               background:"radial-gradient(circle at 50% 60%,rgba(255,107,0,0.09) 0%,transparent 65%)" }} />
@@ -1450,11 +1450,11 @@ export default function HomePage() {
                       </div>
                     </div>
                     <div style={{ padding:"7px 9px 8px" }}>
-                      <div style={{ color:"#f8f0e0", fontSize:9.5, fontWeight:600,
+                      <div style={{ color:"#f8f0e0", fontSize: 11, fontWeight:600,
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{b.name}</div>
-                      <div style={{ color:"#6a5a40", fontSize:8, marginTop:1,
+                      <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
-                      <div style={{ color:"#3ecf6e", fontSize:7.5, fontWeight:600, marginTop:3 }}>
+                      <div style={{ color:"#3ecf6e", fontSize: 10, fontWeight:600, marginTop:3 }}>
                         🔥 {b.sold_count.toLocaleString("vi-VN")} đã bán
                       </div>
                       <div style={{ display:"flex", justifyContent:"space-between",
@@ -1510,11 +1510,11 @@ export default function HomePage() {
                     <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:7 }}>
                       <span style={{ fontSize:20 }}>🛒</span>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ color:"#f8f0e0", fontSize:9.5, fontWeight:600,
+                        <div style={{ color:"#f8f0e0", fontSize: 11, fontWeight:600,
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                           {firstItem}
                         </div>
-                        <div style={{ color:"#6a5a40", fontSize:8, marginTop:1,
+                        <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                           {shopName}
                         </div>
@@ -1524,7 +1524,7 @@ export default function HomePage() {
                       <div className="reorder-btn" style={{
                         width:"100%", height:28, borderRadius:8, border:"1px solid rgba(255,107,0,0.25)",
                         background:"rgba(255,107,0,0.08)",
-                        color:"#FF8C00", fontSize:8.5, fontWeight:600,
+                        color:"#FF8C00", fontSize: 11, fontWeight:600,
                         cursor:"pointer", fontFamily:"Lexend",
                         display:"flex", alignItems:"center", justifyContent:"center", gap:4,
                         transition:"background .15s",
@@ -1582,7 +1582,7 @@ export default function HomePage() {
                   {tab.icon}
                 </span>
                 <span style={{
-                  fontSize:7.5,
+                  fontSize: 10,
                   color: activeTab===tab.key ? "#FF8C00" : "#6a5a40",
                   fontWeight: activeTab===tab.key ? 600 : 400,
                 }}>
@@ -1595,7 +1595,7 @@ export default function HomePage() {
                     width:14, height:14, borderRadius:"50%",
                     background:"#ff4040", border:"1.5px solid #080806",
                     display:"flex", alignItems:"center", justifyContent:"center",
-                    color:"#fff", fontSize:7, fontWeight:700,
+                    color:"#fff", fontSize: 10, fontWeight:700,
                     animation:"cartBounce .4s ease",
                   }}>{cartCount}</div>
                 )}

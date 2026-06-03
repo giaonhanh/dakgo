@@ -49,7 +49,7 @@ function LabelBadge({ label }: { label: string }) {
       borderRadius: 7, padding: "2px 8px", flexShrink: 0,
     }}>
       <span style={{ fontSize: 11 }}>{cfg.icon}</span>
-      <span style={{ color: cfg.color, fontSize: 9, fontWeight: 600 }}>{label}</span>
+      <span style={{ color: cfg.color, fontSize: 11, fontWeight: 600 }}>{label}</span>
     </div>
   )
 }
@@ -61,7 +61,7 @@ function FormInput({ label, value, onChange, placeholder, icon, type = "text" }:
   const [focus, setFocus] = useState(false)
   return (
     <div style={{ marginBottom: 10 }}>
-      <label style={{ color: "rgba(176,149,106,0.6)", fontSize: 9.5, display: "block", marginBottom: 4 }}>
+      <label style={{ color: "rgba(176,149,106,0.6)", fontSize: 11, display: "block", marginBottom: 4 }}>
         {label}
       </label>
       <div style={{
@@ -341,7 +341,7 @@ export default function AddressesPage() {
                 <div style={{ color: "#ff6060", fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
                   Xóa địa chỉ này?
                 </div>
-                <div style={{ color: "#6a5a40", fontSize: 9.5 }}>
+                <div style={{ color: "#6a5a40", fontSize: 11 }}>
                   {addresses.find(a => a.id === showDelete)?.address}
                 </div>
               </div>
@@ -438,7 +438,7 @@ export default function AddressesPage() {
 
                 {/* Label type */}
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ color: "rgba(176,149,106,0.6)", fontSize: 9.5, marginBottom: 7 }}>
+                  <div style={{ color: "rgba(176,149,106,0.6)", fontSize: 11, marginBottom: 7 }}>
                     Loại địa chỉ
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
@@ -487,7 +487,7 @@ export default function AddressesPage() {
 
                 {/* Address search */}
                 <div style={{ marginBottom: 12, position: "relative" }}>
-                  <div style={{ color: "rgba(176,149,106,0.6)", fontSize: 9.5, marginBottom: 5 }}>Địa chỉ</div>
+                  <div style={{ color: "rgba(176,149,106,0.6)", fontSize: 11, marginBottom: 5 }}>Địa chỉ</div>
                   <div style={{ position: "relative" }}>
                     <div style={{
                       display: "flex", alignItems: "center", gap: 8,
@@ -542,7 +542,7 @@ export default function AddressesPage() {
                                 <div style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600, lineHeight: 1.4 }}>
                                   {s.name}
                                 </div>
-                                <div style={{ color: "#6a5a40", fontSize: 9.5, lineHeight: 1.5, marginTop: 2 }}>
+                                <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.5, marginTop: 2 }}>
                                   {s.fullAddr}
                                 </div>
                               </div>
@@ -560,14 +560,14 @@ export default function AddressesPage() {
                       borderRadius: 9, display: "flex", alignItems: "center", gap: 7,
                     }}>
                       <span style={{ fontSize: 12, flexShrink: 0 }}>📍</span>
-                      <span style={{ color: "#b0956a", fontSize: 9, lineHeight: 1.4 }}>{formAddress}</span>
+                      <span style={{ color: "#b0956a", fontSize: 11, lineHeight: 1.4 }}>{formAddress}</span>
                     </div>
                   )}
                 </div>
 
                 {/* Map picker button */}
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{ color: "rgba(176,149,106,0.6)", fontSize: 9.5, marginBottom: 6 }}>
+                  <div style={{ color: "rgba(176,149,106,0.6)", fontSize: 11, marginBottom: 6 }}>
                     Chọn trên bản đồ
                   </div>
                   <motion.button
@@ -583,7 +583,7 @@ export default function AddressesPage() {
                     <span style={{ fontSize: 20 }}>🗺️</span>
                     <div style={{ textAlign: "left" }}>
                       <div style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 700 }}>Mở bản đồ đầy đủ</div>
-                      <div style={{ color: "#6a5a40", fontSize: 8.5 }}>
+                      <div style={{ color: "#6a5a40", fontSize: 11 }}>
                         {formLat !== 12.683
                           ? `${formLat.toFixed(4)}, ${formLng.toFixed(4)}`
                           : "Kéo ghim vàng để chọn vị trí chính xác"}
@@ -604,7 +604,7 @@ export default function AddressesPage() {
                       border: "1px solid rgba(255,255,255,0.06)",
                       borderRadius: 9, padding: "6px 10px",
                     }}>
-                      <div style={{ color: "#6a5a40", fontSize: 8 }}>{c.label}</div>
+                      <div style={{ color: "#6a5a40", fontSize: 11 }}>{c.label}</div>
                       <div style={{ color: "#b0956a", fontSize: 10, fontWeight: 600, fontFamily: "monospace", marginTop: 1 }}>
                         {c.val}
                       </div>
@@ -621,7 +621,7 @@ export default function AddressesPage() {
                 }}>
                   <div>
                     <div style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 500 }}>Đặt làm địa chỉ mặc định</div>
-                    <div style={{ color: "#6a5a40", fontSize: 8.5, marginTop: 1 }}>Tự động điền khi đặt hàng</div>
+                    <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>Tự động điền khi đặt hàng</div>
                   </div>
                   <div
                     onClick={() => setFormDefault(!formDefault)}
@@ -696,7 +696,7 @@ export default function AddressesPage() {
             >←</button>
             <div style={{ flex: 1 }}>
               <div style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 700 }}>Địa chỉ lưu</div>
-              <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 1 }}>
+              <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>
                 {addresses.length} địa chỉ đã lưu
               </div>
             </div>
@@ -788,7 +788,7 @@ export default function AddressesPage() {
                         borderRadius: 6, padding: "2px 8px", flexShrink: 0,
                       }}>
                         <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#3ecf6e", boxShadow: "0 0 4px #3ecf6e" }} />
-                        <span style={{ color: "#3ecf6e", fontSize: 8.5, fontWeight: 600 }}>Mặc định</span>
+                        <span style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 600 }}>Mặc định</span>
                       </div>
                     )}
                     <div style={{ flex: 1 }} />
@@ -831,8 +831,8 @@ export default function AddressesPage() {
                         borderRadius: 7, padding: "4px 9px",
                         display: "flex", alignItems: "center", gap: 5,
                       }}>
-                        <span style={{ color: "#6a5a40", fontSize: 8 }}>{c.k}</span>
-                        <span style={{ color: "#b0956a", fontSize: 8.5, fontFamily: "monospace", fontWeight: 600 }}>{c.v}</span>
+                        <span style={{ color: "#6a5a40", fontSize: 11 }}>{c.k}</span>
+                        <span style={{ color: "#b0956a", fontSize: 11, fontFamily: "monospace", fontWeight: 600 }}>{c.v}</span>
                       </div>
                     ))}
                   </div>
@@ -845,7 +845,7 @@ export default function AddressesPage() {
                         width: "100%", height: 32, borderRadius: 9,
                         border: "1px solid rgba(255,107,0,0.2)",
                         background: "rgba(255,107,0,0.06)",
-                        color: "#FF8C00", fontSize: 9.5, fontWeight: 600,
+                        color: "#FF8C00", fontSize: 11, fontWeight: 600,
                         fontFamily: "'Lexend', sans-serif", cursor: "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                       }}
@@ -861,7 +861,7 @@ export default function AddressesPage() {
               background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
               borderRadius: 12, padding: "10px 13px", marginBottom: 6,
             }}>
-              <p style={{ margin: 0, color: "#6a5a40", fontSize: 8.5, lineHeight: 1.6 }}>
+              <p style={{ margin: 0, color: "#6a5a40", fontSize: 11, lineHeight: 1.6 }}>
                 💡 Địa chỉ mặc định sẽ tự động điền khi bạn đặt hàng. Bạn có thể lưu tối đa 5 địa chỉ.
               </p>
             </div>
@@ -905,7 +905,7 @@ export default function AddressesPage() {
                 {tab.icon}
               </span>
               <span style={{
-                fontSize: 9, fontWeight: tab.active ? 700 : 400,
+                fontSize: 11, fontWeight: tab.active ? 700 : 400,
                 color: tab.active ? "#FF8C00" : "#6a5a40",
                 position: "relative",
               }}>
