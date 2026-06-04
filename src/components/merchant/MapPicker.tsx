@@ -13,7 +13,6 @@ interface MapPickerProps {
 
 const DEFAULT_LAT = 12.5833   // Phước An, Krông Pắc
 const DEFAULT_LNG = 108.4833
-const TILE_KEY    = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY
 
 export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }: MapPickerProps) {
   const mapDivRef  = useRef<HTMLDivElement>(null)
@@ -66,18 +65,11 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
         zoomControl: true,
       })
 
-      // VietMap nếu có key, fallback OSM
-      if (TILE_KEY) {
-        L.tileLayer(
-          `https://maps.vietmap.vn/api/maps/light/{z}/{x}/{y}@2x.png?apikey=${TILE_KEY}`,
-          { maxZoom: 20, attribution: "© VietMap" },
-        ).addTo(map)
-      } else {
-        L.tileLayer(
-          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          { maxZoom: 19, attribution: "© OpenStreetMap contributors" },
-        ).addTo(map)
-      }
+      // CartoDB dark tiles — không cần API key, luôn hoạt động
+      L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        { maxZoom: 19, attribution: "© OpenStreetMap | © CartoDB", subdomains: "abcd" },
+      ).addTo(map)
 
       const marker = L.marker([lat, lng], { draggable: true }).addTo(map)
 
