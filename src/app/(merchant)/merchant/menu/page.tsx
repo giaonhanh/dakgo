@@ -60,7 +60,14 @@ const blankProduct = (): Product => ({
 // (no hardcoded sample data — loaded from Supabase)
 
 // ── CSV Import types ───────────────────────────────────────────────────────
-interface ImportRow { name: string; description: string; price: number; promoPrice: number | null; category: string; badge: Product["badge"]; isAvailable: boolean; sizes: SizeOpt[]; toppings: Topping[] }
+interface ImportRow {
+  name: string; description: string; price: number; promoPrice: number | null
+  categories: string[]   // tags — danh mục trang chủ (có thể nhiều)
+  menuGroup: string      // category — nhóm menu nội bộ
+  badge: Product["badge"]; isAvailable: boolean
+  startHour: string; endHour: string  // "" = cả ngày
+  sizes: SizeOpt[]; toppings: Topping[]
+}
 
 const APP_CATEGORIES = ["Buổi sáng", "Buổi trưa", "Buổi tối", "Nước uống", "Món nhậu", "Ăn vặt"]
 
@@ -331,44 +338,54 @@ export default function MerchantMenuPage() {
   }
 
   const parseRawRow = (cols: string[]): ImportRow | null => {
-    // Thứ tự cột mới: [0]Danh mục [1]Tên món [2]Mô tả [3]Giá bán [4]Giá KM [5]Badge [6]Đang bán
-    // Backward compat: nếu cột 0 trông như tên món (không có giá ở cột 3) → dùng thứ tự cũ
-    const col0 = cols[0]?.trim() ?? ""
-    const col1 = cols[1]?.trim() ?? ""
-    const priceAt3 = parseInt((cols[3] ?? "").replace(/\D/g, ""))
-    const priceAt2 = parseInt((cols[2] ?? "").replace(/\D/g, ""))
-    const isNewFormat = !isNaN(priceAt3) && priceAt3 > 0
+    // FORMAT MỚI (12 cột): [0]DanhMục [1]NhómMenu [2]TênMón [3]MôTả [4]Giá [5]GiáKM [6]Badge [7]ĐangBán [8]GiờTừ [9]GiờĐến [10]Sizes [11]Toppings
+    // FORMAT CŨ (9 cột):   [0]DanhMục [1]TênMón [2]MôTả [3]Giá [4]GiáKM [5]Badge [6]ĐangBán [7]Sizes [8]Toppings
+    const priceAt4 = parseInt(String(cols[4] ?? "").replace(/\D/g, ""))
+    const priceAt3 = parseInt(String(cols[3] ?? "").replace(/\D/g, ""))
+    const isNewFmt = !isNaN(priceAt4) && priceAt4 > 0
 
-    let name: string, category: string, description: string, priceRaw: string, promoRaw: string, badgeRaw: string, availRaw: string
-    if (isNewFormat) {
-      // Thứ tự mới: Danh mục | Tên | Mô tả | Giá | Giá KM | Badge | Đang bán
-      category    = col0
-      name        = col1
-      description = cols[2]?.trim() ?? ""
-      priceRaw    = cols[3] ?? ""
-      promoRaw    = cols[4] ?? ""
-      badgeRaw    = (cols[5] ?? "").toLowerCase().trim()
-      availRaw    = (cols[6] ?? "").toLowerCase().trim()
+    let name: string, categoriesRaw: string, menuGroup: string, description: string
+    let priceRaw: string, promoRaw: string, badgeRaw: string, availRaw: string
+    let startHour: string, endHour: string
+    let sizesRaw: string, toppingsRaw: string
+
+    if (isNewFmt) {
+      categoriesRaw = cols[0]?.trim() ?? ""
+      menuGroup     = cols[1]?.trim() ?? ""
+      name          = cols[2]?.trim() ?? ""
+      description   = cols[3]?.trim() ?? ""
+      priceRaw      = String(cols[4] ?? "")
+      promoRaw      = String(cols[5] ?? "")
+      badgeRaw      = (cols[6] ?? "").toString().toLowerCase().trim()
+      availRaw      = (cols[7] ?? "").toString().toLowerCase().trim()
+      startHour     = cols[8]?.toString().trim() ?? ""
+      endHour       = cols[9]?.toString().trim() ?? ""
+      sizesRaw      = cols[10]?.toString().trim() ?? ""
+      toppingsRaw   = cols[11]?.toString().trim() ?? ""
     } else {
-      // Thứ tự cũ (backward compat): Tên | Mô tả | Giá | Giá KM | Danh mục | Badge
-      name        = col0
-      description = col1
-      priceRaw    = cols[2] ?? ""
-      promoRaw    = cols[3] ?? ""
-      category    = cols[4]?.trim() ?? ""
-      badgeRaw    = (cols[5] ?? "").toLowerCase().trim()
-      availRaw    = (cols[6] ?? "").toLowerCase().trim()
-      void priceAt3
+      // Format cũ 9 cột — backward compat
+      categoriesRaw = cols[0]?.trim() ?? ""
+      menuGroup     = ""
+      name          = cols[1]?.trim() ?? ""
+      description   = cols[2]?.trim() ?? ""
+      priceRaw      = String(cols[3] ?? "")
+      promoRaw      = String(cols[4] ?? "")
+      badgeRaw      = (cols[5] ?? "").toString().toLowerCase().trim()
+      availRaw      = (cols[6] ?? "").toString().toLowerCase().trim()
+      startHour     = ""; endHour = ""
+      sizesRaw      = cols[7]?.toString().trim() ?? ""
+      toppingsRaw   = cols[8]?.toString().trim() ?? ""
+      void priceAt4
     }
 
     if (!name) return null
-    const price     = parseInt(priceRaw.replace(/\D/g, "")) || (isNewFormat ? 0 : priceAt2) || 0
-    const promoPrice = promoRaw ? (parseInt(String(promoRaw).replace(/\D/g, "")) || null) : null
+    const price      = parseInt(priceRaw.replace(/\D/g, "")) || (isNewFmt ? 0 : priceAt3) || 0
+    const promoPrice = promoRaw ? (parseInt(promoRaw.replace(/\D/g, "")) || null) : null
     const badge: Product["badge"] = badgeRaw === "hot" ? "hot" : badgeRaw === "bigsale" ? "bigsale" : badgeRaw === "bestseller" ? "bestseller" : badgeRaw === "new" ? "new" : null
-    const isAvailable = availRaw === "" || ["có","co","yes","1","true"].includes(availRaw)
-    const sizes    = parseSizes(   isNewFormat ? (cols[7] ?? "") : (cols[6] ?? ""))
-    const toppings = parseToppings(isNewFormat ? (cols[8] ?? "") : (cols[7] ?? ""))
-    return { name, description, price, promoPrice, category, badge, isAvailable, sizes, toppings }
+    const isAvailable = availRaw === "" || ["có","co","yes","1","true","có"].includes(availRaw)
+    // Danh mục: tách và lọc chỉ lấy giá trị hợp lệ
+    const categories = categoriesRaw.split(",").map(s => s.trim()).filter(s => APP_CATEGORIES.includes(s))
+    return { name, description, price, promoPrice, categories, menuGroup, badge, isAvailable, startHour, endHour, sizes: parseSizes(sizesRaw), toppings: parseToppings(toppingsRaw) }
   }
 
   const onCSVFile = (file: File) => {
@@ -413,12 +430,18 @@ export default function MerchantMenuPage() {
     const saved: Product[] = []
     for (let i = 0; i < importRows.length; i++) {
       const r = importRows[i]
-      const category = r.category || null
+      const menuGroup   = r.menuGroup || null   // category = nhóm menu nội bộ
+      const tags        = r.categories.length > 0 ? r.categories : null
+      const allDay      = !r.startHour
+      const startHour   = r.startHour || null
+      const endHour     = r.endHour || null
       const { data, error } = await supabase.from("products").insert({
         shop_id: shopId, name: r.name, description: r.description || null,
         price: r.price, original_price: r.promoPrice || null,
-        category, is_available: r.isAvailable, sold_count: 0,
+        category: menuGroup, tags,
+        badge: r.badge, is_available: r.isAvailable, sold_count: 0,
         sort_order: products.length + saved.length,
+        all_day: allDay, start_hour: startHour, end_hour: endHour,
         sizes: r.sizes.length > 0 ? r.sizes : null,
         toppings: r.toppings.length > 0 ? r.toppings : null,
       }).select("id").single()
@@ -428,11 +451,12 @@ export default function MerchantMenuPage() {
           name: r.name, description: r.description ?? "", price: r.price,
           promoEnabled: !!r.promoPrice && r.promoPrice < r.price,
           promoPrice: r.promoPrice, badge: r.badge,
-          categories: category ? [category] : [], menuGroupId: category ?? "",
+          categories: r.categories, menuGroupId: menuGroup ?? "",
+          allDay, startHour: r.startHour || "06:00", endHour: r.endHour || "22:00",
           sortOrder: products.length + saved.length,
         })
-        if (category && !groups.find(g => g.id === category)) {
-          setGroups(gs => [...gs, { id: category, name: category, allDay: true, startHour: "06:00", endHour: "22:00", sortOrder: gs.length }])
+        if (menuGroup && !groups.find(g => g.id === menuGroup)) {
+          setGroups(gs => [...gs, { id: menuGroup, name: menuGroup, allDay: true, startHour: "06:00", endHour: "22:00", sortOrder: gs.length }])
         }
       }
     }
@@ -958,46 +982,72 @@ export default function MerchantMenuPage() {
                 </div>
               ) : importRows && (
                 <>
-                  {/* Format hint */}
-                  <div style={{margin:"10px 18px 0",background:"rgba(74,143,245,0.06)",border:"1px solid rgba(74,143,245,0.18)",borderRadius:10,padding:"8px 12px",flexShrink:0}}>
-                    <div style={{color:"#4a8ff5",fontSize:9,fontWeight:700,marginBottom:3}}>📋 Định dạng cột CSV</div>
-                    <div style={{color:"rgba(74,143,245,0.7)",fontSize:8,lineHeight:1.6}}>
-                      <strong>Tên món</strong> · Mô tả · Giá bán · Giá KM (tuỳ chọn) · Danh mục · Badge (hot/bigsale/bestseller)
+                  {/* Summary bar */}
+                  <div style={{margin:"10px 18px 0",background:"rgba(62,207,110,0.06)",border:"1px solid rgba(62,207,110,0.18)",borderRadius:10,padding:"8px 12px",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <div>
+                      <div style={{color:"#3ecf6e",fontSize:10,fontWeight:700}}>✅ Đọc được {importRows.length} sản phẩm</div>
+                      <div style={{color:"#6a5a40",fontSize:8,marginTop:2}}>
+                        Kiểm tra thông tin bên dưới trước khi lưu
+                      </div>
                     </div>
                     <a href="/template_nhap_menu_giao_nhanh.xlsx" download
-                      style={{marginTop:5,display:"inline-block",color:"#4a8ff5",fontSize:8,fontWeight:700,fontFamily:"Lexend",textDecoration:"underline"}}>
-                      Tải file mẫu
+                      style={{color:"#4a8ff5",fontSize:8,fontWeight:700,fontFamily:"Lexend",textDecoration:"underline",flexShrink:0}}>
+                      📄 Tải file mẫu
                     </a>
                   </div>
 
-                  {/* Preview table */}
-                  <div style={{flex:1,overflowY:"auto",padding:"10px 18px"}}>
-                    {/* Table header */}
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 80px 80px 80px",gap:6,padding:"6px 8px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:6}}>
-                      {["Tên món","Giá","KM","Danh mục"].map(h => (
-                        <div key={h} style={{color:"rgba(255,255,255,0.3)",fontSize:7.5,fontWeight:700,textTransform:"uppercase"}}>{h}</div>
-                      ))}
-                    </div>
-                    {importRows.map((r, i) => (
-                      <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 80px 80px 80px",gap:6,padding:"7px 8px",borderBottom:"1px solid rgba(255,255,255,0.04)",alignItems:"center"}}>
-                        <div>
-                          <div style={{color:"#f8f0e0",fontSize:10,fontWeight:600}}>{r.name}</div>
-                          {r.description && <div style={{color:"#6a5a40",fontSize:8,marginTop:1}}>{r.description}</div>}
-                          {r.badge && (
-                            <span style={{
-                              background:r.badge==="hot"?"rgba(255,64,64,0.15)":r.badge==="bigsale"?"rgba(255,215,0,0.12)":r.badge==="new"?"rgba(74,143,245,0.15)":"rgba(62,207,110,0.12)",
-                              borderRadius:4,padding:"1px 5px",fontSize:7,fontWeight:700,
-                              color:r.badge==="hot"?"#ff4040":r.badge==="bigsale"?"#FFD700":r.badge==="new"?"#4a8ff5":"#3ecf6e",
-                              marginTop:2,display:"inline-block"}}>
-                              {r.badge==="hot"?"🔥 HOT":r.badge==="bigsale"?"💸 BIG SALE":r.badge==="new"?"✨ MỚI CÓ":"📈 BÁN CHẠY"}
-                            </span>
-                          )}
+                  {/* Preview list */}
+                  <div style={{flex:1,overflowY:"auto",padding:"8px 14px"}}>
+                    {importRows.map((r, i) => {
+                      const badgeCfg = r.badge ? BADGE_LIST.find(b => b.key === r.badge) : null
+                      return (
+                        <div key={i} style={{
+                          background: i%2===0 ? "rgba(255,255,255,0.03)" : "transparent",
+                          border:"1px solid rgba(255,255,255,0.05)",
+                          borderRadius:10, padding:"9px 10px", marginBottom:5,
+                        }}>
+                          {/* Row 1: Tên + Giá */}
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:4}}>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+                                <span style={{color:"#f8f0e0",fontSize:11,fontWeight:700}}>{r.name}</span>
+                                {badgeCfg && (
+                                  <span style={{background:badgeCfg.bg,border:`1px solid ${badgeCfg.border}`,borderRadius:4,padding:"1px 5px",fontSize:7,fontWeight:700,color:badgeCfg.color,flexShrink:0}}>
+                                    {badgeCfg.label}
+                                  </span>
+                                )}
+                                {!r.isAvailable && (
+                                  <span style={{background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"1px 5px",fontSize:7,fontWeight:700,color:"#ff4040",flexShrink:0}}>ẨN</span>
+                                )}
+                              </div>
+                              {r.description && <div style={{color:"#6a5a40",fontSize:8,marginTop:2,lineHeight:1.4}}>{r.description}</div>}
+                            </div>
+                            <div style={{textAlign:"right",flexShrink:0}}>
+                              <div style={{color:"#FF8C00",fontSize:11,fontWeight:800}}>{r.price.toLocaleString("vi-VN")}đ</div>
+                              {r.promoPrice && <div style={{color:"#ff4040",fontSize:9,fontWeight:600,textDecoration:"line-through"}}>{r.promoPrice.toLocaleString("vi-VN")}đ</div>}
+                            </div>
+                          </div>
+                          {/* Row 2: Tags + Nhóm + Giờ */}
+                          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                            {r.categories.map(cat => (
+                              <span key={cat} style={{background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.2)",borderRadius:4,padding:"1px 6px",fontSize:7.5,fontWeight:600,color:"#FF8C00"}}>{cat}</span>
+                            ))}
+                            {r.menuGroup && (
+                              <span style={{background:"rgba(180,100,255,0.1)",border:"1px solid rgba(180,100,255,0.25)",borderRadius:4,padding:"1px 6px",fontSize:7.5,fontWeight:600,color:"#b464ff"}}>📁 {r.menuGroup}</span>
+                            )}
+                            {r.startHour && r.endHour && (
+                              <span style={{background:"rgba(74,143,245,0.1)",border:"1px solid rgba(74,143,245,0.2)",borderRadius:4,padding:"1px 6px",fontSize:7.5,fontWeight:600,color:"#4a8ff5"}}>🕐 {r.startHour}–{r.endHour}</span>
+                            )}
+                            {r.sizes.length > 0 && (
+                              <span style={{background:"rgba(62,207,110,0.08)",border:"1px solid rgba(62,207,110,0.2)",borderRadius:4,padding:"1px 6px",fontSize:7.5,color:"#3ecf6e"}}>📏 {r.sizes.length} size</span>
+                            )}
+                            {r.toppings.length > 0 && (
+                              <span style={{background:"rgba(62,207,110,0.08)",border:"1px solid rgba(62,207,110,0.2)",borderRadius:4,padding:"1px 6px",fontSize:7.5,color:"#3ecf6e"}}>🧂 {r.toppings.length} topping</span>
+                            )}
+                          </div>
                         </div>
-                        <div style={{color:"#FF8C00",fontSize:10,fontWeight:700}}>{r.price.toLocaleString("vi-VN")}đ</div>
-                        <div style={{color:r.promoPrice?"#ff4040":"rgba(255,255,255,0.2)",fontSize:10}}>{r.promoPrice ? r.promoPrice.toLocaleString("vi-VN")+"đ" : "—"}</div>
-                        <div style={{color:"#6a5a40",fontSize:9}}>{r.category || "—"}</div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
 
                   <div style={{padding:"12px 18px 28px",flexShrink:0,borderTop:"1px solid rgba(255,255,255,0.06)",display:"flex",gap:8}}>
