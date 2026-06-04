@@ -342,12 +342,12 @@ function LoginContent() {
               style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
               <div style={{
                 width: 88, height: 88, borderRadius: 24,
-                background: "#CC5500",
+                background: "#FF681A",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 position: "relative", overflow: "hidden",
                 boxShadow: "0 0 0 4px rgba(255,255,255,0.25), 0 8px 32px rgba(0,0,0,0.4)",
               }}>
-                <Image src="/icon-512.png" alt="Giao Nhanh" width={88} height={88} style={{ borderRadius: 24, objectFit: "contain" }} priority />
+                <Image src="/icon-512.png" alt="Giao Nhanh" width={72} height={72} style={{ objectFit: "contain" }} priority />
                 <div style={{
                   position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
                   background: "linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent)",
@@ -389,12 +389,12 @@ function LoginContent() {
                 transition={{ delay: .1, type: "spring", damping: 12 }}
                 style={{
                   width: 56, height: 56, borderRadius: 16,
-                  background: "#CC5500",
+                  background: "#FF681A",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   marginBottom: 10, position: "relative", overflow: "hidden",
                   boxShadow: "0 0 0 3px rgba(255,255,255,0.3), 0 6px 20px rgba(0,0,0,0.4)",
                 }}>
-                <Image src="/icon-512.png" alt="Giao Nhanh" width={56} height={56} style={{ borderRadius: 16, objectFit: "contain" }} />
+                <Image src="/icon-512.png" alt="Giao Nhanh" width={44} height={44} style={{ objectFit: "contain" }} />
                 <div style={{
                   position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
                   background: "linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent)",
