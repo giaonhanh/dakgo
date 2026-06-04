@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import AdminShell from "@/components/admin/AdminShell"
+import * as XLSX from "xlsx"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,6 +73,7 @@ interface MerchantRow {
   ratingAvg: number | null; totalReviews: number
   commissionRate: number; isNegotiated: boolean; createdDate: string
   shopType: "partner" | "delivery" | null
+  address: string
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -151,6 +153,69 @@ export default function AdminUsersPage() {
   const [cuShopType,      setCuShopType]      = useState<"partner" | "delivery">("partner")
   const [cuSaving,        setCuSaving]        = useState(false)
   const [cuError,         setCuError]         = useState("")
+
+  // ── Import Menu states ──
+  interface ImportMenuItem { category: string; name: string; description: string; price: number; promoPrice: number | null; badge: "hot"|"bigsale"|"bestseller"|"new"|null; isAvailable: boolean }
+  const [showImport,       setShowImport]       = useState(false)
+  const [importShopSearch, setImportShopSearch] = useState("")
+  const [importShopId,     setImportShopId]     = useState<string | null>(null)
+  const [importShopName,   setImportShopName]   = useState("")
+  const [importItems,      setImportItems]       = useState<ImportMenuItem[] | null>(null)
+  const [importError,      setImportError]       = useState("")
+  const [importSaving,     setImportSaving]      = useState(false)
+  const [importEditIdx,    setImportEditIdx]     = useState<number | null>(null)
+  const importFileRef = useRef<HTMLInputElement>(null)
+
+  const parseImportRow = (cols: string[]): ImportMenuItem | null => {
+    const col0 = cols[0]?.trim() ?? "", col1 = cols[1]?.trim() ?? ""
+    const p3 = parseInt((cols[3] ?? "").replace(/\D/g, ""))
+    const isNew = !isNaN(p3) && p3 > 0
+    let name: string, category: string, description: string, pRaw: string, pmRaw: string, bRaw: string, aRaw: string
+    if (isNew) {
+      category = col0; name = col1; description = cols[2]?.trim() ?? ""; pRaw = cols[3] ?? ""; pmRaw = cols[4] ?? ""; bRaw = (cols[5] ?? "").toLowerCase().trim(); aRaw = (cols[6] ?? "").toLowerCase().trim()
+    } else {
+      name = col0; description = col1; pRaw = cols[2] ?? ""; pmRaw = cols[3] ?? ""; category = cols[4]?.trim() ?? ""; bRaw = (cols[5] ?? "").toLowerCase().trim(); aRaw = (cols[6] ?? "").toLowerCase().trim()
+    }
+    if (!name) return null
+    const price = parseInt(pRaw.replace(/\D/g, "")) || 0
+    const promoPrice = pmRaw ? (parseInt(String(pmRaw).replace(/\D/g, "")) || null) : null
+    const badge = bRaw === "hot" ? "hot" : bRaw === "bigsale" ? "bigsale" : bRaw === "bestseller" ? "bestseller" : bRaw === "new" ? "new" : null
+    const isAvailable = aRaw === "" || ["có","co","yes","1","true"].includes(aRaw)
+    return { category, name, description, price, promoPrice, badge: badge as ImportMenuItem["badge"], isAvailable }
+  }
+
+  const onImportFile = (file: File) => {
+    setImportError(""); setImportItems(null)
+    const isXlsx = /\.(xlsx|xls)$/i.test(file.name)
+    const parse = (buf: ArrayBuffer | string) => {
+      try {
+        const wb = isXlsx ? XLSX.read(new Uint8Array(buf as ArrayBuffer), { type: "array" }) : XLSX.read(buf as string, { type: "string" })
+        const raw = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" }) as string[][]
+        const isHdr = raw[0] && /tên|name|món|danh|category/i.test(String(raw[0][0]) + String(raw[0][1]))
+        const items: ImportMenuItem[] = []
+        for (let i = isHdr ? 1 : 0; i < raw.length; i++) { const r = parseImportRow(raw[i].map(c => String(c ?? ""))); if (r) items.push(r) }
+        if (items.length === 0) { setImportError("File trống hoặc sai định dạng"); return }
+        setImportItems(items)
+      } catch { setImportError("Không đọc được file. Vui lòng dùng file mẫu.") }
+    }
+    if (isXlsx) { const r = new FileReader(); r.onload = e => parse(e.target?.result as ArrayBuffer); r.readAsArrayBuffer(file) }
+    else { const r = new FileReader(); r.onload = e => parse(e.target?.result as string); r.readAsText(file, "utf-8") }
+  }
+
+  const saveImportMenu = async () => {
+    if (!importItems || !importShopId) return
+    setImportSaving(true)
+    const sb = createClient()
+    const { data: ex } = await sb.from("products").select("sort_order").eq("shop_id", importShopId).order("sort_order", { ascending: false }).limit(1)
+    let nextOrder = (((ex?.[0] as { sort_order?: number } | undefined)?.sort_order) ?? -1) + 1
+    let saved = 0
+    for (const item of importItems) {
+      const { error } = await sb.from("products").insert({ shop_id: importShopId, name: item.name, description: item.description || null, price: item.price, original_price: item.promoPrice || null, category: item.category || null, is_available: item.isAvailable, sold_count: 0, sort_order: nextOrder++ })
+      if (!error) saved++
+    }
+    setImportSaving(false); setShowImport(false); setImportItems(null); setImportShopId(null); setImportShopSearch(""); setImportShopName("")
+    fire(`✅ Đã lưu ${saved}/${importItems.length} món vào "${importShopName}"`)
+  }
 
   const handleCreateUser = async () => {
     if (!cuEmail.trim() || !cuPassword.trim() || !cuName.trim()) {
@@ -320,7 +385,7 @@ export default function AdminUsersPage() {
     const supabase = createClient()
     const { data: rows, error: shopErr } = await supabase
       .from("shops")
-      .select("id, owner_id, name, status, is_open, rating_avg, total_reviews, commission_rate, is_negotiated_commission, created_at, shop_type")
+      .select("id, owner_id, name, address, status, is_open, rating_avg, total_reviews, commission_rate, is_negotiated_commission, created_at, shop_type")
       .order("created_at", { ascending: false })
     if (shopErr) console.error("[loadMerchants] shops query error:", shopErr)
     if (!rows || rows.length === 0) { setMerchantsLoading(false); setMerchantsLoaded(true); return }
@@ -342,6 +407,7 @@ export default function AdminUsersPage() {
         isNegotiated: r.is_negotiated_commission ?? false,
         createdDate: new Date(r.created_at).toLocaleDateString("vi-VN"),
         shopType: (r.shop_type as "partner" | "delivery" | null) ?? null,
+        address: r.address ?? "",
       }
     }))
     setMerchantsLoading(false)
@@ -622,10 +688,18 @@ export default function AdminUsersPage() {
         pageTitle="👤 Tài khoản"
         pageSubtitle="Khách hàng · Tài xế · Cửa hàng"
         actions={
-          <button onClick={() => setShowCreateUser(true)}
-            style={{ height: 34, padding: "0 14px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "Lexend", fontSize: 11, fontWeight: 700, background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff" }}>
-            + Tạo tài khoản
-          </button>
+          <div style={{ display: "flex", gap: 7 }}>
+            {activeTab === "merchants" && (
+              <button onClick={() => { setShowImport(true); setImportItems(null); setImportShopId(null); setImportShopSearch(""); setImportShopName(""); setImportError("") }}
+                style={{ height: 34, padding: "0 12px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "Lexend", fontSize: 11, fontWeight: 700, background: "linear-gradient(90deg,#4a8ff5,#6ba5ff)", color: "#fff", display: "flex", alignItems: "center", gap: 5 }}>
+                📥 Import Menu
+              </button>
+            )}
+            <button onClick={() => setShowCreateUser(true)}
+              style={{ height: 34, padding: "0 14px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "Lexend", fontSize: 11, fontWeight: 700, background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff" }}>
+              + Tạo tài khoản
+            </button>
+          </div>
         }
       >
         <div style={{ flex: 1, overflowY: "auto", padding: 16, height: "100%" }}>
@@ -1284,6 +1358,195 @@ export default function AdminUsersPage() {
                 </button>
               </div>
             </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── IMPORT MENU SHEET ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showImport && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => { if (!importSaving) { setShowImport(false); setImportItems(null) } }}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 200, backdropFilter: "blur(6px)" }} />
+
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 201, maxHeight: "92dvh",
+                background: "#0e0b1a", borderTop: "1px solid rgba(74,143,245,0.3)",
+                borderRadius: "20px 20px 0 0", display: "flex", flexDirection: "column", fontFamily: "Lexend, sans-serif" }}>
+
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 18px 12px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📥</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800 }}>Import Menu cho quán</div>
+                  <div style={{ color: "rgba(144,128,176,0.6)", fontSize: 10, marginTop: 1 }}>Chọn quán → tải file Excel → xem lại → lưu</div>
+                </div>
+                <button onClick={() => { setShowImport(false); setImportItems(null) }}
+                  style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "none", color: "#6a5a40", fontSize: 18, cursor: "pointer" }}>×</button>
+              </div>
+
+              <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+
+                {/* STEP 1: Chọn quán */}
+                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(74,143,245,0.18)", borderRadius: 14, padding: "13px 14px" }}>
+                  <div style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, marginBottom: 8, textTransform: "uppercase" }}>① Chọn cửa hàng</div>
+                  <div style={{ position: "relative" }}>
+                    <input value={importShopSearch}
+                      onChange={e => { setImportShopSearch(e.target.value); setImportShopId(null); setImportShopName("") }}
+                      placeholder="Tìm theo tên quán hoặc số điện thoại..."
+                      style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: `1px solid ${importShopId ? "rgba(62,207,110,0.5)" : "rgba(255,255,255,0.12)"}`, borderRadius: 10, padding: "10px 12px", color: "#f0eaff", fontSize: 12, boxSizing: "border-box" as const }} />
+                    {importShopId && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "#3ecf6e", fontSize: 14 }}>✓</span>}
+                  </div>
+                  {/* Results dropdown */}
+                  {importShopSearch.length >= 2 && !importShopId && (() => {
+                    const q = importShopSearch.toLowerCase()
+                    const results = merchants
+                      .filter(m => m.shopName.toLowerCase().includes(q) || m.phone.includes(q))
+                      .slice(0, 6)
+                    return results.length > 0 ? (
+                      <div style={{ marginTop: 6, background: "rgba(10,8,20,0.98)", border: "1px solid rgba(74,143,245,0.2)", borderRadius: 10, overflow: "hidden" }}>
+                        {results.map((m, i) => (
+                          <div key={m.id}
+                            onClick={() => { setImportShopId(m.id); setImportShopName(m.shopName); setImportShopSearch(m.shopName) }}
+                            style={{ padding: "9px 12px", cursor: "pointer", borderTop: i > 0 ? "1px solid rgba(255,255,255,0.04)" : "none", display: "flex", alignItems: "center", gap: 9 }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(74,143,245,0.08)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                            <span style={{ fontSize: 16 }}>🏪</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ color: "#f0eaff", fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.shopName}</div>
+                              <div style={{ color: "#6a5a40", fontSize: 9 }}>{m.phone} · {m.address.split(",")[0]}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <div style={{ marginTop: 6, color: "#6a5a40", fontSize: 10, padding: "6px 12px" }}>Không tìm thấy quán phù hợp</div>
+                  })()}
+                  {importShopId && (
+                    <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, background: "rgba(62,207,110,0.07)", border: "1px solid rgba(62,207,110,0.2)", borderRadius: 9, padding: "7px 11px" }}>
+                      <span>🏪</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>{importShopName}</div>
+                      </div>
+                      <button onClick={() => { setImportShopId(null); setImportShopSearch(""); setImportShopName("") }}
+                        style={{ background: "none", border: "none", color: "#6a5a40", fontSize: 14, cursor: "pointer" }}>✕</button>
+                    </div>
+                  )}
+                </div>
+
+                {/* STEP 2: Upload file */}
+                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(74,143,245,0.18)", borderRadius: 14, padding: "13px 14px" }}>
+                  <div style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, marginBottom: 10, textTransform: "uppercase" }}>② Upload file Excel / CSV</div>
+                  <input ref={importFileRef} type="file" accept=".xlsx,.xls,.csv"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) onImportFile(f); e.target.value = "" }}
+                    style={{ display: "none" }} />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => importFileRef.current?.click()}
+                      style={{ flex: 1, height: 40, borderRadius: 10, border: "1px dashed rgba(74,143,245,0.4)", background: "rgba(74,143,245,0.06)", color: "#4a8ff5", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                      📎 Chọn file .xlsx / .csv
+                    </button>
+                    <button onClick={() => {
+                      const headers = ["Danh mục","Tên món *","Mô tả / Nguyên liệu","Giá bán * (đ)","Giá KM (đ)","Badge","Đang bán"]
+                      const samples = [["Cơm","Cơm sườn bì chả","Cơm + sườn + bì + chả",40000,"","bestseller","CÓ"],["Đồ uống","Trà đá","Trà mát lạnh",5000,"","","CÓ"]]
+                      const ws = XLSX.utils.aoa_to_sheet([headers,...samples])
+                      ws["!cols"] = [{wch:16},{wch:26},{wch:36},{wch:14},{wch:12},{wch:12},{wch:11}]
+                      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Danh sách món")
+                      XLSX.writeFile(wb, "template_menu_giaonhanh.xlsx")
+                    }} style={{ height: 40, padding: "0 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#6a5a40", fontSize: 10, cursor: "pointer" }}>
+                      ↓ File mẫu
+                    </button>
+                  </div>
+                  {importError && <div style={{ marginTop: 8, color: "#ff4040", fontSize: 10, background: "rgba(255,64,64,0.08)", border: "1px solid rgba(255,64,64,0.2)", borderRadius: 8, padding: "6px 10px" }}>⚠️ {importError}</div>}
+                </div>
+
+                {/* STEP 3: Preview + Edit */}
+                {importItems && importItems.length > 0 && (
+                  <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(74,143,245,0.18)", borderRadius: 14, padding: "13px 14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      <div style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", flex: 1 }}>③ Xem lại danh sách</div>
+                      <div style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 700 }}>{importItems.length} món · {[...new Set(importItems.map(r => r.category).filter(Boolean))].length} nhóm</div>
+                    </div>
+                    {/* Table header */}
+                    <div style={{ display: "grid", gridTemplateColumns: "22px 1.4fr 1fr 70px 55px 55px 30px", gap: 4, padding: "5px 8px", background: "rgba(74,143,245,0.08)", borderRadius: 7, marginBottom: 4 }}>
+                      {["#","Tên món","Nhóm","Giá bán","Giá KM","Badge",""].map(h => (
+                        <div key={h} style={{ color: "#4a8ff5", fontSize: 8, fontWeight: 700 }}>{h}</div>
+                      ))}
+                    </div>
+                    <div style={{ maxHeight: 260, overflowY: "auto" }}>
+                      {importItems.map((item, idx) => (
+                        <div key={idx}>
+                          {importEditIdx === idx ? (
+                            <div style={{ background: "rgba(74,143,245,0.06)", border: "1px solid rgba(74,143,245,0.25)", borderRadius: 9, padding: "10px", marginBottom: 4 }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+                                {([["Tên món","name"],["Nhóm","category"],["Mô tả","description"]] as [string,keyof ImportMenuItem][]).map(([lbl, key]) => (
+                                  <div key={key} style={{ gridColumn: key === "description" ? "1/-1" : undefined }}>
+                                    <div style={{ color: "#6a5a40", fontSize: 8, marginBottom: 2 }}>{lbl}</div>
+                                    <input value={String(item[key] ?? "")} onChange={e => setImportItems(p => p?.map((r,i) => i===idx ? {...r,[key]:e.target.value} : r) ?? null)}
+                                      style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 8px", color: "#f0eaff", fontSize: 10, boxSizing: "border-box" as const }} />
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
+                                {([["Giá bán","price"],["Giá KM","promoPrice"]] as [string,keyof ImportMenuItem][]).map(([lbl, key]) => (
+                                  <div key={key}>
+                                    <div style={{ color: "#6a5a40", fontSize: 8, marginBottom: 2 }}>{lbl}</div>
+                                    <input type="number" value={String(item[key] ?? "")} onChange={e => setImportItems(p => p?.map((r,i) => i===idx ? {...r,[key]:parseInt(e.target.value)||null} : r) ?? null)}
+                                      style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 8px", color: "#FF8C00", fontSize: 10, boxSizing: "border-box" as const }} />
+                                  </div>
+                                ))}
+                                <div>
+                                  <div style={{ color: "#6a5a40", fontSize: 8, marginBottom: 2 }}>Đang bán</div>
+                                  <button onClick={() => setImportItems(p => p?.map((r,i) => i===idx ? {...r,isAvailable:!r.isAvailable} : r) ?? null)}
+                                    style={{ width: "100%", height: 28, borderRadius: 7, border: "none", cursor: "pointer", fontSize: 10, fontWeight: 700, background: item.isAvailable ? "rgba(62,207,110,0.15)" : "rgba(255,64,64,0.1)", color: item.isAvailable ? "#3ecf6e" : "#ff4040" }}>
+                                    {item.isAvailable ? "CÓ ✓" : "KHÔNG"}
+                                  </button>
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <button onClick={() => setImportEditIdx(null)}
+                                  style={{ flex: 1, height: 30, borderRadius: 8, border: "none", background: "rgba(62,207,110,0.12)", color: "#3ecf6e", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>✓ Xong</button>
+                                <button onClick={() => { setImportItems(p => p?.filter((_,i) => i!==idx) ?? null); setImportEditIdx(null) }}
+                                  style={{ height: 30, padding: "0 10px", borderRadius: 8, border: "none", background: "rgba(255,64,64,0.1)", color: "#ff4040", fontSize: 10, cursor: "pointer" }}>🗑</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ display: "grid", gridTemplateColumns: "22px 1.4fr 1fr 70px 55px 55px 30px", gap: 4, padding: "5px 8px", borderRadius: 7, alignItems: "center",
+                              background: idx % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent", marginBottom: 2 }}>
+                              <span style={{ color: "#6a5a40", fontSize: 9 }}>{idx+1}</span>
+                              <span style={{ color: "#f0eaff", fontSize: 10, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
+                              <span style={{ color: "#6a5a40", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.category || "—"}</span>
+                              <span style={{ color: "#FF8C00", fontSize: 10, fontWeight: 700 }}>{item.price.toLocaleString("vi-VN")}đ</span>
+                              <span style={{ color: "#3ecf6e", fontSize: 9 }}>{item.promoPrice ? item.promoPrice.toLocaleString("vi-VN")+"đ" : "—"}</span>
+                              <span style={{ color: item.badge ? "#FFB347" : "#6a5a40", fontSize: 8, fontWeight: item.badge ? 700 : 400 }}>{item.badge ?? "—"}</span>
+                              <button onClick={() => setImportEditIdx(idx)}
+                                style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "rgba(255,107,0,0.08)", color: "#FF8C00", fontSize: 11, cursor: "pointer" }}>✏️</button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div style={{ padding: "12px 18px calc(env(safe-area-inset-bottom,0px) + 12px)", borderTop: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 9, flexShrink: 0, background: "#0e0b1a" }}>
+                <button onClick={() => { setShowImport(false); setImportItems(null) }}
+                  style={{ height: 44, padding: "0 16px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#6a5a40", fontSize: 12, cursor: "pointer" }}>
+                  Thoát
+                </button>
+                <button onClick={saveImportMenu}
+                  disabled={!importShopId || !importItems || importItems.length === 0 || importSaving}
+                  style={{ flex: 1, height: 44, borderRadius: 12, border: "none",
+                    cursor: (!importShopId || !importItems || importSaving) ? "not-allowed" : "pointer",
+                    background: (!importShopId || !importItems) ? "rgba(74,143,245,0.15)" : "linear-gradient(90deg,#4a8ff5,#6ba5ff)",
+                    color: (!importShopId || !importItems) ? "rgba(74,143,245,0.4)" : "#fff",
+                    fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                  {importSaving ? "⏳ Đang lưu..." : `💾 Lưu ${importItems?.length ?? 0} món vào "${importShopName || "quán"}"`}
+                </button>
+              </div>
             </motion.div>
           </>
         )}
