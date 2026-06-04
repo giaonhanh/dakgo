@@ -982,8 +982,12 @@ export default function MerchantMenuPage() {
                           <div style={{color:"#f8f0e0",fontSize:10,fontWeight:600}}>{r.name}</div>
                           {r.description && <div style={{color:"#6a5a40",fontSize:8,marginTop:1}}>{r.description}</div>}
                           {r.badge && (
-                            <span style={{background:r.badge==="hot"?"rgba(255,64,64,0.15)":r.badge==="bigsale"?"rgba(255,215,0,0.12)":"rgba(62,207,110,0.12)",borderRadius:4,padding:"1px 5px",fontSize:7,fontWeight:700,color:r.badge==="hot"?"#ff4040":r.badge==="bigsale"?"#FFD700":"#3ecf6e",marginTop:2,display:"inline-block"}}>
-                              {r.badge==="hot"?"🔥 HOT":r.badge==="bigsale"?"💸 BIG SALE":"📈 BÁN CHẠY"}
+                            <span style={{
+                              background:r.badge==="hot"?"rgba(255,64,64,0.15)":r.badge==="bigsale"?"rgba(255,215,0,0.12)":r.badge==="new"?"rgba(74,143,245,0.15)":"rgba(62,207,110,0.12)",
+                              borderRadius:4,padding:"1px 5px",fontSize:7,fontWeight:700,
+                              color:r.badge==="hot"?"#ff4040":r.badge==="bigsale"?"#FFD700":r.badge==="new"?"#4a8ff5":"#3ecf6e",
+                              marginTop:2,display:"inline-block"}}>
+                              {r.badge==="hot"?"🔥 HOT":r.badge==="bigsale"?"💸 BIG SALE":r.badge==="new"?"✨ MỚI CÓ":"📈 BÁN CHẠY"}
                             </span>
                           )}
                         </div>
@@ -1170,20 +1174,28 @@ export default function MerchantMenuPage() {
                 {/* ─ Badge / Ghim ─ */}
                 <div style={{marginBottom:14}}>
                   <FLabel>Ghim / Badge nổi bật</FLabel>
-                  <div style={{display:"flex",gap:6}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
                     {BADGE_LIST.map(b => {
                       const on = pModal.badge === b.key
                       return (
                         <button key={b.key} onClick={() => setPModal(m => m ? {...m,badge:on?null:b.key} : m)}
-                          style={{flex:1,height:36,borderRadius:9,
+                          style={{height:38,borderRadius:9,
                             background:on?b.bg:"rgba(255,255,255,0.04)",
                             border:`1px solid ${on?b.border:"rgba(255,255,255,0.07)"}`,
-                            color:on?b.color:"#6a5a40",fontSize:9,fontWeight:on?700:400,cursor:"pointer",fontFamily:"Lexend"}}>
+                            color:on?b.color:"#6a5a40",fontSize:10,fontWeight:on?700:400,cursor:"pointer",fontFamily:"Lexend",
+                            display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
                           {b.label}
+                          {on && <span style={{fontSize:8,opacity:0.7}}>✓</span>}
                         </button>
                       )
                     })}
                   </div>
+                  {pModal.badge && (
+                    <button onClick={() => setPModal(m => m ? {...m,badge:null} : m)}
+                      style={{marginTop:6,width:"100%",height:28,borderRadius:7,background:"transparent",border:"1px solid rgba(255,255,255,0.06)",color:"#6a5a40",fontSize:9,cursor:"pointer",fontFamily:"Lexend"}}>
+                      Bỏ badge
+                    </button>
+                  )}
                 </div>
 
                 {/* ─ Size ─ */}

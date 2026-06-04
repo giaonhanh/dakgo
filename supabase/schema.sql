@@ -207,7 +207,7 @@ CREATE TABLE products (
   image_url      TEXT,
   category       TEXT,                          -- nhóm menu nội bộ (= menuGroupId)
   tags           TEXT[]      DEFAULT ARRAY[]::TEXT[],  -- danh mục trang chủ
-  badge          TEXT        CHECK (badge IN ('hot', 'bigsale', 'bestseller')),
+  badge          TEXT        CHECK (badge IN ('hot', 'bigsale', 'bestseller', 'new')),
   toppings       JSONB       DEFAULT '[]'::jsonb,
   sizes          JSONB       DEFAULT '[]'::jsonb,
   all_day        BOOLEAN     NOT NULL DEFAULT true,

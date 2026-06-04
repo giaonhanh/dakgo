@@ -21,7 +21,7 @@ interface Product {
   imageUrl:  string | null
   sold:      number
   hot?:      boolean
-  badge?:    "hot" | "bigsale" | "bestseller" | null
+  badge?:    "hot" | "bigsale" | "bestseller" | "new" | null
   toppings:  Topping[]
   sizes:     SizeOpt[]
   allDay?:    boolean
@@ -393,9 +393,12 @@ function ProductCard({
               ? { background:"linear-gradient(90deg,#ff4040,#ff6b00)", color:"#fff" }
               : product.badge === "bigsale"
               ? { background:"linear-gradient(90deg,#FFD700,#FF8C00)", color:"#fff" }
+              : product.badge === "new"
+              ? { background:"linear-gradient(90deg,#4a8ff5,#2ECC71)", color:"#fff" }
               : { background:"linear-gradient(90deg,#3ecf6e,#2ea855)", color:"#fff" }) }}>
             {product.badge === "hot" ? "🔥 HOT"
               : product.badge === "bigsale" ? "💸 SALE"
+              : product.badge === "new" ? "✨ MỚI"
               : "📈 BÁN CHẠY"}
           </div>
         )}
