@@ -29,7 +29,7 @@ import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ─────────────────────────────────────────────────
 type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null }
-type ProductRow = { id: string; name: string; price: number; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string } | { name: string }[] | null }
+type ProductRow = { id: string; name: string; price: number; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string } | { name: string }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null }
 
@@ -41,7 +41,7 @@ function distKm(lat1: number, lng1: number, lat2: number, lng2: number) {
 type LiveOrderRow = { id: string; status: string; shops: { name: string } | { name: string }[] | null; _href?: string; _type?: "food" | "ride" | "errand" }
 type RecoRow    = { id: string; name: string; price: number; original_price: number | null; image_url: string | null; sold_count: number; shop_id: string; shop_name: string; order_count: number }
 type BannerRow  = { id: string; title: string; subtitle: string | null; image_url: string | null; link_url: string | null; sort_order: number }
-type NewMenuRow = { id: string; name: string; price: number; image_url: string | null; shop_id: string; created_at: string; shops: { name: string } | null }
+type NewMenuRow = { id: string; name: string; price: number; image_url: string | null; shop_id: string; created_at: string; shops: { name: string } | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 
 const MEAL_TIMES = [
   { icon:"☀️",  label:"Buổi sáng",  value:"buoi-sang"  },
@@ -65,6 +65,16 @@ function getDefaultMealTime() {
 
 
 // ─── Helpers ────────────────────────────────────────────────
+function isProductInTime(p: { all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }): boolean {
+  if (p.all_day !== false) return true
+  const now = new Date()
+  const cur = now.getHours() * 60 + now.getMinutes()
+  const [sh, sm] = (p.start_hour ?? "00:00").split(":").map(Number)
+  const [eh, em] = (p.end_hour   ?? "23:59").split(":").map(Number)
+  const start = sh * 60 + sm, end = eh * 60 + em
+  return start <= end ? cur >= start && cur < end : cur >= start || cur < end
+}
+
 const fmt  = (n: number) => n.toLocaleString("vi-VN") + "đ"
 const RANK_ICON = ["🥇","🥈","🥉"]
 
@@ -238,26 +248,25 @@ export default function HomePage() {
         .limit(10)
       setNearbyShops((shopData ?? []) as ShopRow[])
 
-      // Best sellers — chỉ lấy sản phẩm đã bán được ít nhất 1 lần
+      // Best sellers — chỉ lấy sản phẩm đã bán được ít nhất 1 lần, trong khung giờ bán
       const { data: bsData } = await supabase
         .from("products")
-        .select("id,name,price,sold_count,shop_id,shops(name)")
+        .select("id,name,price,sold_count,shop_id,shops(name),all_day,start_hour,end_hour")
         .eq("is_available", true)
         .gt("sold_count", 0)
         .order("sold_count", { ascending: false })
-        .limit(8)
-      setBestSellers((bsData ?? []) as ProductRow[])
+        .limit(20)
+      setBestSellers(((bsData ?? []) as ProductRow[]).filter(isProductInTime).slice(0, 8))
 
       // Promos (products with discount — original_price higher than price)
-      // Dùng sold_count > 0 như proxy cho "có khuyến mãi" nếu chưa có cột discount
       const { data: promoData } = await supabase
         .from("products")
-        .select("id,name,price,sold_count,shops(name)")
+        .select("id,name,price,sold_count,shops(name),all_day,start_hour,end_hour")
         .eq("is_available", true)
         .gt("sold_count", 0)
         .order("sold_count", { ascending: false })
-        .limit(6)
-      setPromos((promoData ?? []) as ProductRow[])
+        .limit(15)
+      setPromos(((promoData ?? []) as ProductRow[]).filter(isProductInTime).slice(0, 6))
 
       // Admin banners
       const { data: bannerData } = await supabase
@@ -268,14 +277,14 @@ export default function HomePage() {
         .limit(5)
       setAdminBanners((bannerData ?? []) as BannerRow[])
 
-      // Vừa lên menu — sản phẩm mới nhất
+      // Vừa lên menu — sản phẩm mới nhất, trong khung giờ bán
       const { data: newMenuData } = await supabase
         .from("products")
-        .select("id,name,price,image_url,shop_id,shops(name),created_at")
+        .select("id,name,price,image_url,shop_id,shops(name),created_at,all_day,start_hour,end_hour")
         .eq("is_available", true)
         .order("created_at", { ascending: false })
-        .limit(10)
-      setNewMenuItems((newMenuData ?? []) as unknown as NewMenuRow[])
+        .limit(25)
+      setNewMenuItems(((newMenuData ?? []) as unknown as NewMenuRow[]).filter(isProductInTime).slice(0, 10))
 
       // Reorders (last 5 delivered orders for this user)
       const { data: orderData } = await supabase
@@ -304,12 +313,12 @@ export default function HomePage() {
         if (shopIds.length > 0) {
           const { data: recFallback } = await supabase
             .from("products")
-            .select("id, name, price, original_price, image_url, sold_count, shop_id, shops(name)")
+            .select("id, name, price, original_price, image_url, sold_count, shop_id, shops(name), all_day, start_hour, end_hour")
             .in("shop_id", shopIds)
             .eq("is_available", true)
             .order("sold_count", { ascending: false })
-            .limit(10)
-          setRecos((recFallback ?? []).map(p => {
+            .limit(20)
+          setRecos((recFallback ?? []).filter(isProductInTime).slice(0, 10).map(p => {
             const sn = Array.isArray(p.shops) ? (p.shops[0] as { name: string })?.name : (p.shops as { name: string } | null)?.name
             return { id: p.id, name: p.name, price: p.price, original_price: p.original_price,
               image_url: p.image_url, sold_count: p.sold_count, shop_id: p.shop_id,
