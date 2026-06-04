@@ -28,6 +28,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Thiếu thông tin bắt buộc" }, { status: 400 })
     }
 
+    // Kiểm tra shop còn mở không
+    const { data: shop } = await supabase
+      .from("shops")
+      .select("id, is_open, status")
+      .eq("id", shop_id)
+      .single()
+
+    if (!shop || shop.status !== "approved") {
+      return NextResponse.json({ error: "Cửa hàng không hợp lệ" }, { status: 400 })
+    }
+    if (!shop.is_open) {
+      return NextResponse.json({ error: "Cửa hàng hiện đang đóng cửa" }, { status: 400 })
+    }
+
     // Lấy giá sản phẩm từ DB (không tin giá từ client)
     const productIds: string[] = items.map((i: { product_id: string }) => i.product_id)
     const { data: products, error: prodErr } = await supabase

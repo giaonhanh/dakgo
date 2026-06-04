@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createClient as createAdmin } from "@supabase/supabase-js"
+import { sendPushToUser } from "@/lib/webpush"
+
+function adminDb() {
+  return createAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -9,30 +18,104 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 })
 
     const { reason } = await req.json()
+    const db = adminDb()
 
-    // Kiểm tra đơn còn có thể hủy không (chỉ pending/accepted)
-    const { data: order } = await supabase
+    // Lấy đơn hàng kèm thông tin xu đã dùng
+    const { data: order } = await db
       .from("orders")
-      .select("id, status, customer_id")
+      .select("id, status, customer_id, shop_id, driver_id, xu_used, xu_bonus_used, total_amount")
       .eq("id", id)
       .single()
 
     if (!order) return NextResponse.json({ error: "Không tìm thấy đơn" }, { status: 404 })
 
+    if (order.customer_id !== user.id) {
+      return NextResponse.json({ error: "Không có quyền hủy đơn này" }, { status: 403 })
+    }
+
     if (!["pending", "accepted"].includes(order.status)) {
       return NextResponse.json({ error: "Đơn hàng không thể hủy ở trạng thái này" }, { status: 400 })
     }
 
-    const { error } = await supabase
+    // Hủy đơn — set cancelled_by để blacklist trigger hoạt động
+    const { error } = await db
       .from("orders")
       .update({
         status:        "cancelled",
         cancelled_at:  new Date().toISOString(),
         cancel_reason: reason ?? "Khách hủy",
+        cancelled_by:  user.id,
       })
       .eq("id", id)
 
     if (error) return NextResponse.json({ error: "Hủy đơn thất bại" }, { status: 500 })
+
+    // Hoàn xu nếu đơn đã trừ xu
+    const xuUsed      = Number(order.xu_used      ?? 0)
+    const xuBonusUsed = Number(order.xu_bonus_used ?? 0)
+
+    if (xuUsed > 0 || xuBonusUsed > 0) {
+      try {
+        const { data: wallet } = await db
+          .from("wallets")
+          .select("id, balance, bonus_balance")
+          .eq("user_id", order.customer_id)
+          .eq("type", "customer")
+          .single()
+
+        if (wallet) {
+          const newBal   = (wallet.balance       ?? 0) + xuUsed
+          const newBonus = (wallet.bonus_balance  ?? 0) + xuBonusUsed
+          await db.from("wallets").update({
+            balance:       newBal,
+            bonus_balance: newBonus,
+            updated_at:    new Date().toISOString(),
+          }).eq("id", wallet.id)
+
+          const txRows = []
+          if (xuUsed > 0)
+            txRows.push({ wallet_id: wallet.id, type: "refund", amount: xuUsed,      balance_after: newBal,   ref_type: "order", ref_id: id, note: "Hoàn xu do hủy đơn" })
+          if (xuBonusUsed > 0)
+            txRows.push({ wallet_id: wallet.id, type: "refund", amount: xuBonusUsed, balance_after: newBonus, ref_type: "order", ref_id: id, note: "Hoàn xu thưởng do hủy đơn" })
+          if (txRows.length) await db.from("transactions").insert(txRows)
+        }
+      } catch { /* không block hủy đơn */ }
+    }
+
+    // Notify merchant
+    try {
+      const { data: shop } = await db.from("shops").select("owner_id").eq("id", order.shop_id).single()
+      if (shop?.owner_id) {
+        await db.from("notifications").insert({
+          user_id: shop.owner_id, type: "order",
+          title: "❌ Khách đã hủy đơn",
+          body:  `Đơn ${order.total_amount.toLocaleString("vi-VN")}đ vừa bị hủy${reason ? `: ${reason}` : ""}`,
+          data:  { order_id: id, url: "/merchant" },
+        })
+        await sendPushToUser(shop.owner_id, {
+          title: "❌ Khách đã hủy đơn",
+          body:  `Đơn ${order.total_amount.toLocaleString("vi-VN")}đ vừa bị hủy`,
+          url:   "/merchant", tag: `cancel-${id}`,
+        })
+      }
+    } catch { /* không block */ }
+
+    // Notify tài xế (nếu đã gán)
+    if (order.driver_id) {
+      try {
+        await db.from("notifications").insert({
+          user_id: order.driver_id, type: "order",
+          title: "❌ Đơn hàng bị hủy",
+          body:  "Khách vừa hủy đơn hàng đã được giao cho bạn",
+          data:  { order_id: id, url: "/driver" },
+        })
+        await sendPushToUser(order.driver_id, {
+          title: "❌ Đơn hàng bị hủy",
+          body:  "Khách vừa hủy đơn hàng đã được giao cho bạn",
+          url:   "/driver", tag: `cancel-${id}`,
+        })
+      } catch { /* không block */ }
+    }
 
     return NextResponse.json({ success: true })
   } catch {

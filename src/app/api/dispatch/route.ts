@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { sendPushToUser } from "@/lib/webpush"
 
 function adminDb() {
   return createSupabaseClient(
@@ -36,6 +37,13 @@ export async function POST(req: NextRequest) {
 
     const admin = adminDb()
 
+    // Lấy thông tin đơn để notify tài xế
+    const { data: order } = await admin
+      .from("orders")
+      .select("total_amount, delivery_address")
+      .eq("id", order_id)
+      .single()
+
     // Tìm tài xế online gần nhất (trong vòng 5km)
     const { data: driverId, error: rpcErr } = await admin.rpc("find_nearest_driver", {
       order_lat,
@@ -54,6 +62,25 @@ export async function POST(req: NextRequest) {
       .eq("id", order_id)
 
     if (updateErr) return NextResponse.json({ error: "Gán tài xế thất bại" }, { status: 500 })
+
+    // Notify tài xế có đơn mới
+    if (order) {
+      try {
+        await admin.from("notifications").insert({
+          user_id: driverId, type: "order",
+          title: "🛵 Đơn hàng mới!",
+          body:  `${order.total_amount.toLocaleString("vi-VN")}đ · ${order.delivery_address}`,
+          data:  { order_id, url: `/driver/navigate/${order_id}` },
+        })
+        await sendPushToUser(driverId, {
+          title: "🛵 Đơn hàng mới!",
+          body:  `${order.total_amount.toLocaleString("vi-VN")}đ · Bấm để xem chi tiết`,
+          url:   `/driver/navigate/${order_id}`,
+          tag:   `order-${order_id}`,
+          sound: "driver",
+        })
+      } catch { /* không block */ }
+    }
 
     return NextResponse.json({ driverId })
   } catch {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdmin } from "@supabase/supabase-js"
+import { sendPushToUser } from "@/lib/webpush"
 
 function adminDb() {
   return createAdmin(
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     // Lấy tọa độ đơn hàng — xác minh đơn thuộc về user
     const { data: order } = await db
       .from("orders")
-      .select("id, delivery_lat, delivery_lng, driver_id, status, customer_id")
+      .select("id, delivery_lat, delivery_lng, driver_id, status, customer_id, total_amount, delivery_address")
       .eq("id", order_id)
       .eq("customer_id", user.id)
       .single()
@@ -45,14 +46,30 @@ export async function POST(req: NextRequest) {
     })
 
     if (!driverId) {
-      // Không có tài xế — driver tự nhận từ dashboard, không phải lỗi
       return NextResponse.json({ dispatched: false, reason: "no_driver_nearby" })
     }
 
     // Gán tài xế
     await db.from("orders")
-      .update({ driver_id: driverId })
+      .update({ driver_id: driverId, accepted_at: new Date().toISOString() })
       .eq("id", order_id)
+
+    // Notify tài xế có đơn mới
+    try {
+      await db.from("notifications").insert({
+        user_id: driverId, type: "order",
+        title: "🛵 Đơn hàng mới!",
+        body:  `${order.total_amount.toLocaleString("vi-VN")}đ · ${order.delivery_address}`,
+        data:  { order_id, url: `/driver/navigate/${order_id}` },
+      })
+      await sendPushToUser(driverId, {
+        title: "🛵 Đơn hàng mới!",
+        body:  `${order.total_amount.toLocaleString("vi-VN")}đ · Bấm để xem chi tiết`,
+        url:   `/driver/navigate/${order_id}`,
+        tag:   `order-${order_id}`,
+        sound: "driver",
+      })
+    } catch { /* không block dispatch */ }
 
     return NextResponse.json({ dispatched: true, driverId })
   } catch {

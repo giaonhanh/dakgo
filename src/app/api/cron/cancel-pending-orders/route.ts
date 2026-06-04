@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { sendPushToUser } from "@/lib/webpush"
 
 function adminDb() {
   return createClient(
@@ -10,7 +11,6 @@ function adminDb() {
 
 const PENDING_TIMEOUT_MINUTES = 15
 
-// Chạy mỗi 5 phút — hủy đơn VietQR/MoMo chưa thanh toán quá 15 phút
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("authorization")
   if (process.env.NODE_ENV === "production" && secret !== `Bearer ${process.env.CRON_SECRET ?? ""}`) {
@@ -20,10 +20,10 @@ export async function GET(req: NextRequest) {
   const db = adminDb()
   const cutoff = new Date(Date.now() - PENDING_TIMEOUT_MINUTES * 60 * 1000).toISOString()
 
-  // Tìm đơn chưa thanh toán quá hạn
+  // Lấy đơn quá hạn kèm thông tin xu
   const { data: expiredOrders, error } = await db
     .from("orders")
-    .select("id, customer_id, total_amount, pay_method")
+    .select("id, customer_id, shop_id, total_amount, pay_method, xu_used, xu_bonus_used")
     .eq("status", "pending")
     .eq("payment_status", "pending")
     .neq("pay_method", "cash")
@@ -55,6 +55,40 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: cancelErr.message }, { status: 500 })
   }
 
+  // Hoàn xu cho từng đơn có trừ xu
+  for (const order of expiredOrders) {
+    const xuUsed      = Number(order.xu_used      ?? 0)
+    const xuBonusUsed = Number(order.xu_bonus_used ?? 0)
+
+    if (xuUsed > 0 || xuBonusUsed > 0) {
+      try {
+        const { data: wallet } = await db
+          .from("wallets")
+          .select("id, balance, bonus_balance")
+          .eq("user_id", order.customer_id)
+          .eq("type", "customer")
+          .single()
+
+        if (wallet) {
+          const newBal   = (wallet.balance      ?? 0) + xuUsed
+          const newBonus = (wallet.bonus_balance ?? 0) + xuBonusUsed
+          await db.from("wallets").update({
+            balance:       newBal,
+            bonus_balance: newBonus,
+            updated_at:    new Date().toISOString(),
+          }).eq("id", wallet.id)
+
+          const txRows = []
+          if (xuUsed > 0)
+            txRows.push({ wallet_id: wallet.id, type: "refund", amount: xuUsed,      balance_after: newBal,   ref_type: "order", ref_id: order.id, note: "Hoàn xu do hủy đơn tự động" })
+          if (xuBonusUsed > 0)
+            txRows.push({ wallet_id: wallet.id, type: "refund", amount: xuBonusUsed, balance_after: newBonus, ref_type: "order", ref_id: order.id, note: "Hoàn xu thưởng do hủy đơn tự động" })
+          if (txRows.length) await db.from("transactions").insert(txRows)
+        }
+      } catch { /* không block vòng lặp */ }
+    }
+  }
+
   // Thông báo cho khách hàng
   try {
     const notifRows = expiredOrders.map(o => ({
@@ -65,6 +99,15 @@ export async function GET(req: NextRequest) {
       data:    { cancelled: true },
     }))
     await db.from("notifications").insert(notifRows)
+
+    // Push notify từng khách
+    for (const o of expiredOrders) {
+      sendPushToUser(o.customer_id, {
+        title: "Đơn hàng đã bị hủy",
+        body:  `Đơn ${o.total_amount.toLocaleString("vi-VN")}đ đã hết thời gian thanh toán`,
+        url:   "/orders", tag: `cancel-${o.id}`,
+      }).catch(() => {})
+    }
   } catch { /* không ảnh hưởng kết quả chính */ }
 
   console.log(`[cancel-pending-orders] Cancelled ${ids.length} expired orders`)
