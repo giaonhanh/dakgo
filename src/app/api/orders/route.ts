@@ -165,7 +165,8 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (orderErr || !order) {
-      return NextResponse.json({ error: "Không thể tạo đơn hàng" }, { status: 500 })
+      console.error("[orders] insert error:", orderErr?.code, orderErr?.message, orderErr?.details)
+      return NextResponse.json({ error: "Không thể tạo đơn hàng", detail: orderErr?.message }, { status: 500 })
     }
 
     // Tạo order_items
