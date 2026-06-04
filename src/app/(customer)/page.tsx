@@ -38,7 +38,7 @@ function distKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
 }
-type LiveOrderRow = { id: string; status: string; shops: { name: string } | { name: string }[] | null; _href?: string }
+type LiveOrderRow = { id: string; status: string; shops: { name: string } | { name: string }[] | null; _href?: string; _type?: "food" | "ride" | "errand" }
 type RecoRow    = { id: string; name: string; price: number; original_price: number | null; image_url: string | null; sold_count: number; shop_id: string; shop_name: string; order_count: number }
 type BannerRow  = { id: string; title: string; subtitle: string | null; image_url: string | null; link_url: string | null; sort_order: number }
 type NewMenuRow = { id: string; name: string; price: number; image_url: string | null; shop_id: string; created_at: string; shops: { name: string } | null }
@@ -206,12 +206,14 @@ export default function HomePage() {
         status: r.status === "searching" ? "pending" : r.status,
         shops: { name: r.vehicle_type === "motorbike" ? "🛵 Xe ôm" : "🚕 Taxi" },
         _href: "/orders",
+        _type: "ride" as const,
       }))
       const errandsMapped = (liveErrands ?? []).map(e => ({
         id: e.id,
         status: e.status === "pending" ? "pending" : e.status,
         shops: { name: e.type === "buy_for_me" ? "🛒 Mua hộ" : "📦 Giao hộ" },
         _href: "/orders",
+        _type: "errand" as const,
       }))
 
       setLiveOrders([...(liveFood ?? []), ...ridesMapped, ...errandsMapped] as LiveOrderRow[])
@@ -692,11 +694,20 @@ export default function HomePage() {
                   }}>
                     {liveOrders.map(order => {
                       const shopName = (order.shops as {name:string}|null)?.name ?? "Quán đang chuẩn bị"
-                      const statusLabel =
-                        order.status === "pending"    ? "Chờ quán xác nhận" :
-                        order.status === "accepted" || order.status === "preparing" ? "Đã xác nhận · Đang làm" :
-                        order.status === "ready"      ? "Đang tìm tài xế" :
-                        order.status === "delivering" ? "Đang giao hàng" : "Đang xử lý"
+                      const isRide   = order._type === "ride"
+                      const isErrand = order._type === "errand"
+                      const statusLabel = isRide
+                        ? (order.status === "pending" ? "Đang tìm tài xế..." :
+                           order.status === "accepted" ? "Tài xế đang đến" :
+                           order.status === "delivering" ? "Đang trên đường" : "Đang xử lý")
+                        : isErrand
+                        ? (order.status === "pending" ? "Đang tìm tài xế..." :
+                           order.status === "accepted" ? "Tài xế đang xử lý" :
+                           order.status === "delivering" ? "Đang giao" : "Đang xử lý")
+                        : (order.status === "pending"    ? "Chờ quán xác nhận" :
+                           order.status === "accepted" || order.status === "preparing" ? "Đã xác nhận · Đang làm" :
+                           order.status === "ready"      ? "Đang tìm tài xế" :
+                           order.status === "delivering" ? "Đang giao hàng" : "Đang xử lý")
                       const statusColor =
                         order.status === "delivering" ? "#FF8C00" :
                         order.status === "ready"      ? "#FFB347" : "#3ecf6e"

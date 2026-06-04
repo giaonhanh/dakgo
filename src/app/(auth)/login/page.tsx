@@ -341,6 +341,7 @@ function LoginContent() {
               style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
               <div style={{
                 width: 88, height: 88, borderRadius: 24,
+                background: "#F5821E",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 position: "relative", overflow: "hidden", animation: "goldGlow 2s ease-in-out infinite",
               }}>
@@ -387,6 +388,7 @@ function LoginContent() {
                 transition={{ delay: .1, type: "spring", damping: 12 }}
                 style={{
                   width: 56, height: 56, borderRadius: 16,
+                  background: "#F5821E",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   marginBottom: 10, position: "relative", overflow: "hidden",
                   boxShadow: "0 0 20px rgba(255,107,0,.4),0 6px 16px rgba(0,0,0,.4)",

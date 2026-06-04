@@ -36,6 +36,8 @@ interface Order {
   senderName?: string; senderPhone?: string
   recipientName?: string; recipientPhone?: string
   packagePhotoUrl?: string; pickupAddress?: string
+  customerName?: string; customerPhone?: string
+  distanceKm?: number
 }
 
 // ─── UI Config (không phải data) ────────────────────────
@@ -184,10 +186,12 @@ export default function OrdersPage() {
       if (!user) { setLoading(false); return }
       setUserId(user.id)
 
-      // Kiểm tra cancel_locked
+      // Profile: cancel_locked + tên + SĐT để hiện trong chi tiết rides
       const { data: prof } = await supabase
-        .from("profiles").select("cancel_locked").eq("id", user.id).single()
+        .from("profiles").select("cancel_locked, full_name, phone").eq("id", user.id).single()
       if (prof?.cancel_locked) setCancelLocked(true)
+      const myName  = prof?.full_name ?? ""
+      const myPhone = prof?.phone     ?? ""
 
       const { data: rows, error: ordersErr } = await supabase
         .from("orders")
@@ -344,7 +348,7 @@ export default function OrdersPage() {
       // ── Fetch rides (xe ôm / taxi) ─────────────────────────
       const { data: rideRows } = await supabase
         .from("rides")
-        .select("id, vehicle_type, status, pickup_address, dropoff_address, estimated_fare, payment_method, note, created_at, driver_id")
+        .select("id, vehicle_type, status, pickup_address, dropoff_address, estimated_fare, distance_km, payment_method, note, created_at, driver_id")
         .eq("customer_id", user.id)
         .order("created_at", { ascending: false })
         .limit(30)
@@ -360,12 +364,7 @@ export default function OrdersPage() {
           shopColor:   shopColor(idx + 200),
           driverId:    r.driver_id ?? null,
           status:      r.status === "searching" ? "pending" : mapStatus(r.status ?? "pending"),
-          items: [{
-            emoji: isMoto ? "🛵" : "🚕",
-            name:  `${(r.pickup_address ?? "").split(",")[0]} → ${(r.dropoff_address ?? "").split(",")[0]}`,
-            qty:   1,
-            price: r.estimated_fare ?? 0,
-          }],
+          items:        [],
           subtotal:     r.estimated_fare ?? 0,
           deliveryFee:  0,
           discount:     0,
@@ -378,6 +377,9 @@ export default function OrdersPage() {
           payMethodRaw: r.payment_method ?? "cash",
           paymentStatus:"pending",
           xuUsed:       0,
+          customerName:  myName,
+          customerPhone: myPhone,
+          distanceKm:    r.distance_km ?? undefined,
         }
       })
 
@@ -837,7 +839,10 @@ export default function OrdersPage() {
                         <span style={{ color: "rgba(255,255,255,0.12)", margin: "0 5px", fontSize: 11 }}>·</span>
                         <span style={{ color: "#6a5a40", fontSize: 11 }}>{order.createdAt}</span>
                         <span style={{ color: "rgba(255,255,255,0.12)", margin: "0 5px", fontSize: 11 }}>·</span>
-                        <span style={{ color: "#6a5a40", fontSize: 11 }}>{order.items.length} món</span>
+                        {(order.serviceType === "ride_motorbike" || order.serviceType === "ride_car")
+                          ? <span style={{ color: "#6a5a40", fontSize: 11 }}>{order.distanceKm ? `~${order.distanceKm}km` : "Chuyến xe"}</span>
+                          : <span style={{ color: "#6a5a40", fontSize: 11 }}>{order.items.length} món</span>
+                        }
                         <div style={{ flex: 1 }} />
                         <span style={{ background: "linear-gradient(135deg,#FF6B00,#FFB347)",
                           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
@@ -855,11 +860,16 @@ export default function OrdersPage() {
                     <div style={{ padding: "9px 13px 10px",
                       borderTop: "1px solid rgba(255,255,255,0.05)" }}>
 
-                      {/* Địa chỉ */}
+                      {/* Địa chỉ / Điểm trả khách */}
                       <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginBottom: 7 }}>
-                        <span style={{ fontSize: 12, flexShrink: 0, marginTop: 1 }}>📍</span>
+                        <span style={{ fontSize: 12, flexShrink: 0, marginTop: 1 }}>
+                          {(order.serviceType === "ride_motorbike" || order.serviceType === "ride_car") ? "🚩" : "📍"}
+                        </span>
                         <span style={{ color: "#b0956a", fontSize: 11, lineHeight: 1.45, flex: 1 }}>
-                          {order.address || "Chưa có địa chỉ"}
+                          {(order.serviceType === "ride_motorbike" || order.serviceType === "ride_car")
+                            ? `${order.pickupAddress?.split(",")[0] ?? "—"} → ${order.address?.split(",")[0] ?? "—"}`
+                            : (order.address || "Chưa có địa chỉ")
+                          }
                         </span>
                       </div>
 
@@ -924,8 +934,53 @@ export default function OrdersPage() {
                               </div>
                             )}
 
-                            {/* ── 1. Chi tiết món ── */}
-                            <SLabel>Chi tiết món</SLabel>
+                            {/* ── 1a. Chi tiết chuyến xe (rides) ── */}
+                            {(order.serviceType === "ride_motorbike" || order.serviceType === "ride_car") && (
+                              <>
+                                <SLabel>Chi tiết chuyến xe</SLabel>
+                                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
+                                  borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+                                  <div style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                                      <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>🟢</span>
+                                      <div>
+                                        <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 2 }}>Điểm đón</div>
+                                        <div style={{ color: "#f8f0e0", fontSize: 11.5, fontWeight: 600 }}>{order.pickupAddress || "—"}</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div style={{ padding: "10px 12px" }}>
+                                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                                      <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>📍</span>
+                                      <div>
+                                        <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 2 }}>Điểm trả khách</div>
+                                        <div style={{ color: "#f8f0e0", fontSize: 11.5, fontWeight: 600 }}>{order.address || "—"}</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {order.distanceKm && (
+                                    <div style={{ padding: "8px 12px", borderTop: "1px solid rgba(255,255,255,0.05)",
+                                      display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                      <span style={{ color: "#6a5a40", fontSize: 11 }}>Khoảng cách ước tính</span>
+                                      <span style={{ color: "#FFB347", fontSize: 11, fontWeight: 700 }}>~{order.distanceKm} km</span>
+                                    </div>
+                                  )}
+                                </div>
+                                {/* Thông tin người đặt */}
+                                <SLabel>Thông tin người đặt</SLabel>
+                                <InfoBox rows={[
+                                  ...(order.customerName  ? [{ icon: "👤", key: "Họ tên",       val: order.customerName }] : []),
+                                  ...(order.customerPhone ? [{ icon: "📞", key: "Số điện thoại", val: order.customerPhone }] : []),
+                                  ...(order.driver        ? [{ icon: "🛵", key: "Tài xế",        val: `${order.driver.name}${order.driver.plate ? " · " + order.driver.plate : ""}` }] : []),
+                                  ...(order.driver?.phone ? [{ icon: "📞", key: "SĐT tài xế",    val: order.driver.phone }] : []),
+                                  ...(order.note          ? [{ icon: "📝", key: "Ghi chú",       val: order.note }] : []),
+                                ]} />
+                              </>
+                            )}
+
+                            {/* ── 1b. Chi tiết món (food / errand) ── */}
+                            {order.serviceType !== "ride_motorbike" && order.serviceType !== "ride_car" && (
+                            <><SLabel>Chi tiết món</SLabel>
                             <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
                               borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
                               {order.items.map((item, i) => {
@@ -1023,6 +1078,8 @@ export default function OrdersPage() {
                                 </div>
                               )}
                             </div>
+                            </>
+                            )}
 
                             {/* ── 2. Thông tin thanh toán ── */}
                             {(() => {
@@ -1041,7 +1098,7 @@ export default function OrdersPage() {
                                   <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
                                     borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
                                     {[
-                                      { label: "Tiền món",       val: order.subtotal,   c: "#b0956a" },
+                                      { label: (order.serviceType === "ride_motorbike" || order.serviceType === "ride_car") ? "Cước phí xe" : "Tiền món", val: order.subtotal, c: "#b0956a" },
                                       order.deliveryFee > 0 ? { label: "Phí giao hàng", val: order.deliveryFee, c: "#b0956a" } : null,
                                       order.discount > 0    ? { label: "Voucher giảm",  val: -order.discount,   c: "#3ecf6e" } : null,
                                       xuUsed > 0            ? { label: "🪙 Xu đã dùng", val: -xuUsed,           c: "#FFB347" } : null,
@@ -1069,8 +1126,9 @@ export default function OrdersPage() {
                               )
                             })()}
 
-                            {/* ── 3. Thông tin giao hàng ── */}
-                            <SLabel>Thông tin giao hàng</SLabel>
+                            {/* ── 3. Thông tin giao hàng (food / errand only) ── */}
+                            {order.serviceType !== "ride_motorbike" && order.serviceType !== "ride_car" && (
+                            <><SLabel>Thông tin giao hàng</SLabel>
                             <InfoBox rows={[
                               ...(order.pickupAddress ? [{ icon: "📤", key: "Lấy tại",     val: order.pickupAddress }] : []),
                               { icon: "📍", key: order.serviceType === "food" ? "Địa chỉ giao" : "Giao đến", val: order.address },
@@ -1080,6 +1138,7 @@ export default function OrdersPage() {
                               ...(order.driver?.phone ? [{ icon: "📞", key: "SĐT tài xế",   val: order.driver.phone }] : []),
                               ...(order.note          ? [{ icon: "📝", key: "Ghi chú đơn",  val: order.note }] : []),
                             ]} />
+                            </> )}
 
                             {order.packagePhotoUrl && (
                               <>
