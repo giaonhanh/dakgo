@@ -74,7 +74,15 @@ export async function POST(req: NextRequest) {
     })
 
     const total    = orderItems.reduce((s: number, i: { subtotal: number }) => s + i.subtotal, 0)
-    const ship_fee = (clientDeliveryFee ?? 15000) + (surcharge ?? 0)
+    // Fallback: đọc giá km đầu tiên từ app_settings nếu client không gửi fee
+    let fallbackShipFee = 15000
+    if (clientDeliveryFee == null) {
+      const { data: pRow } = await supabase.from("app_settings").select("value").eq("key","pricing").maybeSingle()
+      const rows = (pRow?.value as Record<string, { rows?: string[] }> | null)?.food?.rows
+      const firstKm = parseInt(rows?.[0] ?? "0")
+      if (firstKm > 0) fallbackShipFee = firstKm
+    }
+    const ship_fee = (clientDeliveryFee ?? fallbackShipFee) + (surcharge ?? 0)
 
     // Validate voucher server-side
     let discount_amount = 0
