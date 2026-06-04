@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
         title: "Đơn hàng đã bị hủy",
         body:  `Đơn ${o.total_amount.toLocaleString("vi-VN")}đ đã hết thời gian thanh toán`,
         url:   "/orders", tag: `cancel-${o.id}`,
-      }).catch(() => {})
+      }).catch(e => console.error(`[cron] push failed for ${o.customer_id}:`, e))
     }
   } catch { /* không ảnh hưởng kết quả chính */ }
 

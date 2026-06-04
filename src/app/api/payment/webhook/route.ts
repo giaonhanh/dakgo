@@ -26,13 +26,19 @@ export async function POST(req: NextRequest) {
     // Tìm đơn hàng theo payment_code
     const { data: order } = await supabase
       .from("orders")
-      .select("id, customer_id, shop_id, driver_id, total_amount, ship_fee")
+      .select("id, customer_id, shop_id, driver_id, total_amount, ship_fee, payment_status")
       .eq("payment_code", data.orderCode)
       .single()
 
     if (!order) {
       // Thử tìm trong bảng wallet top-up requests
       await handleWalletTopup(supabase, data.orderCode, data.amount)
+      return NextResponse.json({ code: "00" })
+    }
+
+    // Idempotency: đã xử lý rồi thì bỏ qua (tránh cộng ví 2 lần)
+    if (order.payment_status === "paid") {
+      console.log(`[Webhook] Duplicate webhook for orderCode ${data.orderCode}, skipping`)
       return NextResponse.json({ code: "00" })
     }
 
@@ -92,11 +98,13 @@ export async function POST(req: NextRequest) {
     } catch { /* không block */ }
 
     // Realtime broadcast → badge "Đã thanh toán" cho khách + tài xế
-    await supabase.channel(`order-${order.id}`).send({
-      type:    "broadcast",
-      event:   "payment_status",
-      payload: { status: "paid", orderId: order.id },
-    })
+    try {
+      await supabase.channel(`order-${order.id}`).send({
+        type:    "broadcast",
+        event:   "payment_status",
+        payload: { status: "paid", orderId: order.id },
+      })
+    } catch (e) { console.warn("[Webhook] broadcast error (non-blocking):", e) }
 
     console.log(`[Webhook] ✅ Đơn #${data.orderCode} · ${data.amount.toLocaleString("vi-VN")}đ`)
     return NextResponse.json({ code: "00" })

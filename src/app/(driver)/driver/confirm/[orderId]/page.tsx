@@ -338,10 +338,13 @@ export default function DriverConfirmPage() {
     async function load() {
       if (!orderId) return
 
+      const { data: { user } } = await supabase.auth.getUser()
+
       const { data: o } = await supabase
         .from("orders")
         .select("id, customer_id, delivery_address, ship_fee, total_amount, shops(commission_rate)")
         .eq("id", orderId)
+        .eq("driver_id", user?.id ?? "")
         .single()
 
       if (o) {
@@ -364,7 +367,6 @@ export default function DriverConfirmPage() {
       }
 
       // Today stats
-      const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const todayStart = new Date(); todayStart.setHours(0,0,0,0)
         const { data: delivered } = await supabase

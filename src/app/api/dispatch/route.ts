@@ -13,8 +13,9 @@ function adminDb() {
 export async function POST(req: NextRequest) {
   try {
     // Internal call từ order creation hoặc cron — dùng CRON_SECRET header
+    const cronSecret     = process.env.CRON_SECRET
     const internalSecret = req.headers.get("x-internal-secret")
-    const isInternal = !!internalSecret && internalSecret === process.env.CRON_SECRET
+    const isInternal     = !!cronSecret && !!internalSecret && internalSecret === cronSecret
 
     if (!isInternal) {
       // Fallback: yêu cầu admin auth

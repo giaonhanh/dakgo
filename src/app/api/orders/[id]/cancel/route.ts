@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Lấy đơn hàng kèm thông tin xu đã dùng
     const { data: order } = await db
       .from("orders")
-      .select("id, status, customer_id, shop_id, driver_id, xu_used, xu_bonus_used, total_amount")
+      .select("id, status, customer_id, shop_id, driver_id, xu_used, xu_bonus_used, total_amount, payment_status, pay_method")
       .eq("id", id)
       .single()
 
@@ -80,6 +80,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           if (txRows.length) await db.from("transactions").insert(txRows)
         }
       } catch { /* không block hủy đơn */ }
+    }
+
+    // Tạo yêu cầu hoàn tiền nếu đã thanh toán VietQR/online
+    if (order.payment_status === "paid" && order.pay_method !== "cash") {
+      try {
+        await db.from("payment_refunds").insert({
+          order_id:   id,
+          amount:     order.total_amount,
+          reason:     reason ?? "Khách hủy đơn",
+          status:     "pending",
+        })
+        // Notify admin để xử lý hoàn tiền thủ công
+        const { data: adminProfiles } = await db
+          .from("profiles").select("id").eq("role", "admin")
+        if (adminProfiles?.length) {
+          await db.from("notifications").insert(
+            adminProfiles.map((a: { id: string }) => ({
+              user_id: a.id, type: "system",
+              title: "⚠️ Cần hoàn tiền",
+              body:  `Đơn #${id.slice(0, 8).toUpperCase()} đã hủy sau khi thanh toán ${order.total_amount.toLocaleString("vi-VN")}đ`,
+              data:  { order_id: id, url: "/admin/refunds" },
+            }))
+          )
+        }
+      } catch (e) { console.error("[cancel] payment_refund insert error:", e) }
     }
 
     // Notify merchant

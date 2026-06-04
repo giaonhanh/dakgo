@@ -27,6 +27,10 @@ export async function POST(req: NextRequest) {
     if (!shop_id || !items?.length || !delivery_address || delivery_lat == null || delivery_lng == null) {
       return NextResponse.json({ error: "Thiếu thông tin bắt buộc" }, { status: 400 })
     }
+    const addrTrimmed = String(delivery_address).trim()
+    if (addrTrimmed.length < 5) {
+      return NextResponse.json({ error: "Địa chỉ giao hàng không hợp lệ" }, { status: 400 })
+    }
 
     // Kiểm tra shop còn mở không
     const { data: shop } = await supabase
@@ -98,7 +102,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Voucher không áp dụng cho cửa hàng này" }, { status: 400 })
       }
       if (total < (voucher.min_order ?? 0)) {
-        return NextResponse.json({ error: `Đơn tối thiểu ${voucher.min_order?.toLocaleString("vi-VN")}đ để dùng voucher này` }, { status: 400 })
+        return NextResponse.json({ error: `Đơn tối thiểu ${(voucher.min_order ?? 0).toLocaleString("vi-VN")}đ để dùng voucher này` }, { status: 400 })
       }
       if (voucher.usage_limit != null && (voucher.used_count ?? 0) >= voucher.usage_limit) {
         return NextResponse.json({ error: "Voucher đã hết lượt sử dụng" }, { status: 400 })
@@ -124,7 +128,8 @@ export async function POST(req: NextRequest) {
       } else if (voucher.discount_type === "fixed") {
         discount_amount = Math.min(voucher.discount_value, total)
       } else if (voucher.discount_type === "freeship") {
-        discount_amount = ship_fee
+        const raw = ship_fee
+        discount_amount = voucher.max_discount != null ? Math.min(raw, voucher.max_discount) : raw
       }
 
       validatedVoucherId = voucher.id

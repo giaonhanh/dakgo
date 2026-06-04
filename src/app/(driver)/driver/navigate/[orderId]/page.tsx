@@ -355,11 +355,26 @@ export default function DriverNavigatePage() {
   }
 
   useEffect(() => {
-    // GPS
+    // GPS watchPosition — cập nhật liên tục + broadcast lên Realtime
+    let watchId: number | null = null
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => { setDriverLat(pos.coords.latitude); setDriverLng(pos.coords.longitude) },
-        () => {}
+      watchId = navigator.geolocation.watchPosition(
+        pos => {
+          const lat = pos.coords.latitude
+          const lng = pos.coords.longitude
+          setDriverLat(lat)
+          setDriverLng(lng)
+          // Broadcast vị trí tài xế để tracking page cập nhật realtime
+          if (orderId) {
+            supabase.channel(`driver-location:${orderId}`).send({
+              type: "broadcast",
+              event: "location",
+              payload: { lat, lng, orderId },
+            }).catch(() => {})
+          }
+        },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 },
       )
     }
 
@@ -380,7 +395,7 @@ export default function DriverNavigatePage() {
       if (!o) return
 
       const [{ data: shop }, { data: customer }] = await Promise.all([
-        supabase.from("shops").select("name, address, commission_rate").eq("id", o.shop_id).single(),
+        supabase.from("shops").select("name, address, commission_rate, lat, lng").eq("id", o.shop_id).single(),
         supabase.from("profiles").select("full_name").eq("id", o.customer_id).single(),
       ])
 
@@ -392,8 +407,8 @@ export default function DriverNavigatePage() {
         fullId:   o.id,
         shopName: shop?.name ?? "Cửa hàng",
         shopAddr: shop?.address ?? "—",
-        shopLat:  DEFAULT_LAT,
-        shopLng:  DEFAULT_LNG,
+        shopLat:  (shop as { lat?: number } | null)?.lat  ?? DEFAULT_LAT,
+        shopLng:  (shop as { lng?: number } | null)?.lng  ?? DEFAULT_LNG,
         custName: customer?.full_name ?? "Khách hàng",
         custAddr: o.delivery_address ?? "—",
         custNote: o.note ?? "",
@@ -408,6 +423,10 @@ export default function DriverNavigatePage() {
       })
     }
     load()
+
+    return () => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
 
