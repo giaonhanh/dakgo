@@ -328,7 +328,7 @@ export default function MerchantMenuPage() {
 
   const parseCSV = (text: string): ImportRow[] => {
     const lines = text.trim().split(/\r?\n/)
-    const start = lines[0]?.toLowerCase().match(/tên|name|món/) ? 1 : 0
+    const start = lines[0]?.toLowerCase().match(/tên|name|món|danh mục|nhóm/) ? 1 : 0
     const rows: ImportRow[] = []
     for (let i = start; i < lines.length; i++) {
       const r = parseRawRow(splitCSVLine(lines[i]))
@@ -342,7 +342,8 @@ export default function MerchantMenuPage() {
     // FORMAT CŨ (9 cột):   [0]DanhMục [1]TênMón [2]MôTả [3]Giá [4]GiáKM [5]Badge [6]ĐangBán [7]Sizes [8]Toppings
     const priceAt4 = parseInt(String(cols[4] ?? "").replace(/\D/g, ""))
     const priceAt3 = parseInt(String(cols[3] ?? "").replace(/\D/g, ""))
-    const isNewFmt = !isNaN(priceAt4) && priceAt4 > 0
+    // Format mới (12 cột): có ≥10 cột HOẶC giá ở cột 4 và cột 3 không phải số
+    const isNewFmt = cols.length >= 10 || (!isNaN(priceAt4) && priceAt4 > 0 && isNaN(priceAt3))
 
     let name: string, categoriesRaw: string, menuGroup: string, description: string
     let priceRaw: string, promoRaw: string, badgeRaw: string, availRaw: string
@@ -399,7 +400,7 @@ export default function MerchantMenuPage() {
           const wb = XLSX.read(data, { type: "array" })
           const ws = wb.Sheets[wb.SheetNames[0]]
           const raw = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "" }) as string[][]
-          const isHeader = raw[0] && /tên|name|món/i.test(String(raw[0][0]))
+          const isHeader = raw[0] && raw[0].some(cell => /tên|name|món|danh mục|nhóm/i.test(String(cell)))
           const rows: ImportRow[] = []
           for (let i = isHeader ? 1 : 0; i < raw.length; i++) {
             const r = parseRawRow(raw[i].map(c => String(c ?? "")))
