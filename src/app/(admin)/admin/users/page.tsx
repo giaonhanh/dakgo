@@ -90,7 +90,7 @@ export default function AdminUsersPage() {
   const [activeTab, setActiveTab] = useState<MainTab>("customers")
 
   // ── Commission config từ app_settings ──
-  const [commCfg, setCommCfg] = useState({ minRate: 5, maxRate: 35, driverShare: 80 })
+  const [commCfg, setCommCfg] = useState({ defaultRate: 10, minRate: 5, maxRate: 35, driverShare: 80 })
 
   // ── Customers ──
   const [users,         setUsers]         = useState<AppUser[]>([])
@@ -299,10 +299,11 @@ export default function AdminUsersPage() {
     supabase.from("app_settings").select("value").eq("key", "commission").maybeSingle()
       .then(({ data }) => {
         if (!data) return
-        const v = data.value as { minRate?: string; maxRate?: string; driverSharePercent?: string }
+        const v = data.value as { defaultRate?: string; minRate?: string; maxRate?: string; driverSharePercent?: string }
         setCommCfg({
-          minRate:     v.minRate     != null ? parseFloat(v.minRate)             : 5,
-          maxRate:     v.maxRate     != null ? parseFloat(v.maxRate)             : 35,
+          defaultRate: v.defaultRate != null ? parseFloat(v.defaultRate) : 10,
+          minRate:     v.minRate     != null ? parseFloat(v.minRate)     : 5,
+          maxRate:     v.maxRate     != null ? parseFloat(v.maxRate)     : 35,
           driverShare: v.driverSharePercent != null ? parseFloat(v.driverSharePercent) : 80,
         })
       })
@@ -456,8 +457,8 @@ export default function AdminUsersPage() {
         isOpen: r.is_open ?? false,
         ratingAvg: r.rating_avg ?? null,
         totalReviews: r.total_reviews ?? 0,
-        commissionRate: r.commission_rate ?? 15,
-        isNegotiated: r.is_negotiated_commission ?? false,
+        commissionRate: r.commission_rate ?? commCfg.defaultRate,
+        isNegotiated: r.commission_rate != null && r.commission_rate !== commCfg.defaultRate,
         createdDate: new Date(r.created_at).toLocaleDateString("vi-VN"),
         shopType: (r.shop_type as "partner" | "delivery" | null) ?? null,
         address: r.address ?? "",
@@ -610,12 +611,13 @@ export default function AdminUsersPage() {
     if (rate > commCfg.maxRate) { fire(`❌ Hoa hồng tối đa là ${commCfg.maxRate}%`, false); return }
     setMerchantSaving(true)
     const supabase = createClient()
-    const { error } = await supabase.from("shops").update({ commission_rate: rate, is_negotiated_commission: true }).eq("id", id)
+    const isNegotiated = rate !== commCfg.defaultRate
+    const { error } = await supabase.from("shops").update({ commission_rate: rate, is_negotiated_commission: isNegotiated }).eq("id", id)
     setMerchantSaving(false)
     if (error) { fire("❌ Lỗi cập nhật hoa hồng", false); return }
-    setMerchants(ms => ms.map(m => m.id === id ? { ...m, commissionRate: rate, isNegotiated: true } : m))
+    setMerchants(ms => ms.map(m => m.id === id ? { ...m, commissionRate: rate, isNegotiated } : m))
     setMerchantInline(null)
-    fire(`✅ Hoa hồng thoả thuận ${rate}% đã lưu`)
+    fire(isNegotiated ? `✅ Hoa hồng thoả thuận ${rate}% đã lưu` : `✅ Đặt về hoa hồng mặc định ${rate}%`)
   }
 
   const saveShopType = async (shopType: "partner" | "delivery") => {
@@ -702,9 +704,9 @@ export default function AdminUsersPage() {
     )
     return (
       <span onClick={e => { e.stopPropagation(); setInline({ id, value: rate.toString() }) }}
-        title={isNegotiated ? "Hoa hồng thoả thuận — click để chỉnh" : "Hoa hồng mặc định — click để chỉnh"}
+        title={isNegotiated ? `Thoả thuận ${rate}% — click để chỉnh` : `Mặc định ${rate}% — click để chỉnh`}
         style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: bg, border: `1px solid ${bd}`, color: c, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, transition: "all .15s", userSelect: "none" }}>
-        {rate}% <span style={{ fontSize: 8 }}>✏️</span>
+        {isNegotiated ? `Thoả thuận ${rate}%` : `${rate}%`} <span style={{ fontSize: 8 }}>✏️</span>
       </span>
     )
   }
@@ -1043,7 +1045,6 @@ export default function AdminUsersPage() {
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                             <CommCell id={m.id} rate={m.commissionRate} isNegotiated={m.isNegotiated} inline={merchantInline} setInline={setMerchantInline} onSave={saveMerchantCommission} saving={merchantSaving} />
-                            {m.isNegotiated && <span style={{ fontSize: 7, color: "#f5c542", opacity: 0.8 }}>thoả thuận</span>}
                           </div>
                           <div style={{ color: "rgba(144,128,176,0.45)", fontSize: 9 }}>{m.createdDate}</div>
                           {/* Nhãn loại cửa hàng + nút sửa */}
