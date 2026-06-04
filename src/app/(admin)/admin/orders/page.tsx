@@ -341,8 +341,17 @@ export default function AdminOrdersPage() {
     const reDMap  = Object.fromEntries((reDrvProfs ?? []).map(p => [p.id, p.full_name ?? "Tài xế"]))
     const reDPMap = Object.fromEntries((reDrvProfs ?? []).map(p => [p.id, p.phone ?? ""]))
 
+    const rideStatusMap: Record<string, OrderStatus> = {
+      searching: "pending", accepted: "accepted", arrived: "accepted",
+      in_progress: "delivering", completed: "delivered", cancelled: "cancelled",
+    }
+    const errandStatusMap: Record<string, OrderStatus> = {
+      pending: "pending", accepted: "accepted", shopping: "preparing",
+      delivering: "delivering", delivered: "delivered", cancelled: "cancelled",
+    }
+
     const rideOrders: Order[] = (rideRows ?? []).map(r => ({
-      id: r.id, status: (r.status ?? "pending") as OrderStatus,
+      id: r.id, status: rideStatusMap[r.status ?? ""] ?? "pending",
       total_amount: r.estimated_fare ?? 0, ship_fee: 0,
       delivery_address: r.dropoff_address ?? "",
       created_at: r.created_at, pay_method: r.payment_method ?? "cash",
@@ -357,7 +366,7 @@ export default function AdminOrdersPage() {
     }))
 
     const errandOrders: Order[] = (errandRows ?? []).map(e => ({
-      id: e.id, status: (e.status ?? "pending") as OrderStatus,
+      id: e.id, status: errandStatusMap[e.status ?? ""] ?? "pending",
       total_amount: e.service_fee ?? 0, ship_fee: 0,
       delivery_address: e.delivery_address ?? "",
       created_at: e.created_at, pay_method: e.payment_method ?? "cash",
