@@ -161,7 +161,7 @@ export default function AdminSettingsPage() {
       const { data } = await supabase.from("app_settings").select("key, value")
       if (!data) return
       const map = Object.fromEntries(data.map(r => [r.key, r.value]))
-      if (map.pricing)          setPricing(map.pricing)
+      if (map.pricing)          setPricing(prev => ({ ...prev, ...(map.pricing as typeof prev) }))
       if (map.commission)       setCommissionSettings(map.commission)
       if (map.features) {
         const f = map.features as Record<string, boolean>
