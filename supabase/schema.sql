@@ -224,6 +224,9 @@ CREATE POLICY "products_select_available" ON products FOR SELECT USING (true);
 CREATE POLICY "products_shop_manage"      ON products FOR ALL
   USING (auth.uid() = (SELECT owner_id FROM shops WHERE id = shop_id));
 CREATE POLICY "products_admin_all"        ON products FOR ALL
+  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+CREATE POLICY "products_admin_all"        ON products FOR ALL
   USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
 -- Indexes

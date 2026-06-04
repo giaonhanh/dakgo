@@ -245,6 +245,7 @@ export default function AdminUsersPage() {
     const { data: ex } = await sb.from("products").select("sort_order").eq("shop_id", importShopId).order("sort_order", { ascending: false }).limit(1)
     let nextOrder = (((ex?.[0] as { sort_order?: number } | undefined)?.sort_order) ?? -1) + 1
     let saved = 0
+    let firstErr = ""
     for (const item of importItems) {
       const allDay = !item.startHour && !item.endHour
       const { error } = await sb.from("products").insert({
@@ -256,9 +257,17 @@ export default function AdminUsersPage() {
         sold_count: 0, sort_order: nextOrder++,
       })
       if (!error) saved++
+      else if (!firstErr) firstErr = error.message
     }
-    setImportSaving(false); setShowImport(false); setImportItems(null); setImportShopId(null); setImportShopSearch(""); setImportShopName("")
-    fire(`✅ Đã lưu ${saved}/${importItems.length} món vào "${importShopName}"`)
+    setImportSaving(false)
+    if (saved === 0) {
+      setImportError(`❌ Không lưu được: ${firstErr || "Kiểm tra quyền RLS hoặc tên cột"}`)
+      return
+    }
+    setShowImport(false); setImportItems(null); setImportShopId(null); setImportShopSearch(""); setImportShopName("")
+    fire(saved === importItems.length
+      ? `✅ Đã lưu ${saved} món vào "${importShopName}"`
+      : `⚠️ Lưu ${saved}/${importItems.length} món — ${firstErr}`)
   }
 
   const handleCreateUser = async () => {
