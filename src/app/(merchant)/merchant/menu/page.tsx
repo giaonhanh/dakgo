@@ -60,7 +60,29 @@ const blankProduct = (): Product => ({
 // (no hardcoded sample data — loaded from Supabase)
 
 // ── CSV Import types ───────────────────────────────────────────────────────
-interface ImportRow { name: string; description: string; price: number; promoPrice: number | null; category: string; badge: Product["badge"]; isAvailable: boolean }
+interface ImportRow { name: string; description: string; price: number; promoPrice: number | null; category: string; badge: Product["badge"]; isAvailable: boolean; sizes: SizeOpt[]; toppings: Topping[] }
+
+const APP_CATEGORIES = ["Buổi sáng", "Buổi trưa", "Buổi tối", "Nước uống", "Món nhậu", "Ăn vặt"]
+
+// Parse "Nhỏ:25000|Vừa:30000|Lớn:35000" → SizeOpt[]
+function parseSizes(raw: string): SizeOpt[] {
+  if (!raw.trim()) return []
+  return raw.split("|").map(s => s.trim()).filter(Boolean).map((s, i) => {
+    const [label, priceStr] = s.split(":").map(x => x.trim())
+    const price = parseInt((priceStr ?? "").replace(/\D/g, "")) || 0
+    return { id: `s${i}`, label: label || s, priceDiff: 0, _absPrice: price }
+  }).map((s, _, arr) => ({ ...s, priceDiff: s._absPrice - (arr[0]?._absPrice ?? 0) }))
+    .map(({ _absPrice: _p, ...rest }) => rest) as SizeOpt[]
+}
+
+// Parse "Trân châu:5000|Thạch:5000" → Topping[]
+function parseToppings(raw: string): Topping[] {
+  if (!raw.trim()) return []
+  return raw.split("|").map(s => s.trim()).filter(Boolean).map((s, i) => {
+    const [name, priceStr] = s.split(":").map(x => x.trim())
+    return { id: `t${i}`, name: name || s, price: parseInt((priceStr ?? "").replace(/\D/g, "")) || 0 }
+  })
+}
 
 // ── Drag-and-drop product card ─────────────────────────────────────────────
 interface ProductCardProps {
@@ -343,8 +365,10 @@ export default function MerchantMenuPage() {
     const price     = parseInt(priceRaw.replace(/\D/g, "")) || (isNewFormat ? 0 : priceAt2) || 0
     const promoPrice = promoRaw ? (parseInt(String(promoRaw).replace(/\D/g, "")) || null) : null
     const badge: Product["badge"] = badgeRaw === "hot" ? "hot" : badgeRaw === "bigsale" ? "bigsale" : badgeRaw === "bestseller" ? "bestseller" : badgeRaw === "new" ? "new" : null
-    const isAvailable = availRaw === "" || availRaw === "có" || availRaw === "co" || availRaw === "yes" || availRaw === "1" || availRaw === "true"
-    return { name, description, price, promoPrice, category, badge, isAvailable }
+    const isAvailable = availRaw === "" || ["có","co","yes","1","true"].includes(availRaw)
+    const sizes    = parseSizes(   isNewFormat ? (cols[7] ?? "") : (cols[6] ?? ""))
+    const toppings = parseToppings(isNewFormat ? (cols[8] ?? "") : (cols[7] ?? ""))
+    return { name, description, price, promoPrice, category, badge, isAvailable, sizes, toppings }
   }
 
   const onCSVFile = (file: File) => {
@@ -395,6 +419,8 @@ export default function MerchantMenuPage() {
         price: r.price, original_price: r.promoPrice || null,
         category, is_available: r.isAvailable, sold_count: 0,
         sort_order: products.length + saved.length,
+        sizes: r.sizes.length > 0 ? r.sizes : null,
+        toppings: r.toppings.length > 0 ? r.toppings : null,
       }).select("id").single()
       if (!error && data) {
         saved.push({
@@ -417,165 +443,157 @@ export default function MerchantMenuPage() {
   }
 
   const downloadTemplate = () => {
-    // ── Cột: Danh mục | Tên món | Mô tả | Giá bán | Giá KM | Badge | Đang bán ──
+    // ── 9 cột: Danh mục | Tên món | Mô tả | Giá bán | Giá KM | Badge | Đang bán | Sizes | Toppings ──
     const headers = [
-      "Danh mục",
+      "Danh mục *",
       "Tên món *",
       "Mô tả / Nguyên liệu",
       "Giá bán * (đ)",
       "Giá KM (đ)",
       "Badge",
       "Đang bán",
+      "Sizes (Tên:Giá | Tên:Giá)",
+      "Toppings (Tên:Giá | Tên:Giá)",
     ]
 
+    // [Danh mục, Tên, Mô tả, Giá, Giá KM, Badge, Đang bán, Sizes, Toppings]
     const samples = [
-      // [Danh mục, Tên món, Mô tả, Giá, Giá KM, Badge, Đang bán]
-      ["Cơm",          "Cơm sườn bì chả",       "Cơm + sườn nướng + bì + chả lụa",               40000, "",     "bestseller", "CÓ"],
-      ["Cơm",          "Cơm gà xối mỡ",          "Cơm trắng + gà giòn xối mỡ + rau sống",         42000, 38000, "hot",        "CÓ"],
-      ["Cơm",          "Cơm tấm sườn trứng",     "Cơm tấm + sườn cốt lết + trứng + dưa chua",    38000, "",     "",           "CÓ"],
-      ["Bún / Phở",    "Bún bò đặc biệt",        "Bún + thịt bò tươi + giò heo + rau sống",       45000, 40000, "bestseller", "CÓ"],
-      ["Bún / Phở",    "Phở bò tái chín",        "Phở + tái + chín + hành lá + húng quế",         40000, "",     "hot",        "CÓ"],
-      ["Bún / Phở",    "Bún riêu cua",           "Bún + riêu cua + đậu hũ + cà chua + rau",       35000, "",     "",           "CÓ"],
-      ["Gà",           "Gà rán cay Hàn Quốc",    "2 miếng gà rán sốt cay ngọt Hàn Quốc",          55000, "",     "new",        "CÓ"],
-      ["Gà",           "Gà nướng mật ong",       "Gà nướng sốt mật ong + tỏi + ớt",              50000, 45000, "",           "CÓ"],
-      ["Bánh",         "Bánh mì thịt đặc biệt",  "Bánh mì giòn + thịt nguội + pate + rau",         18000, 15000, "bigsale",    "CÓ"],
-      ["Bánh",         "Bánh mì ốp la",           "Bánh mì + trứng ốp la + hành mỡ",               12000, "",     "",           "CÓ"],
-      ["Đồ uống",      "Trà đá",                  "Trà đậm đà pha sẵn mát lạnh",                    5000,  "",     "",           "CÓ"],
-      ["Đồ uống",      "Nước cam tươi",           "Cam vắt tươi nguyên chất không đường",           25000, "",     "hot",        "CÓ"],
-      ["Đồ uống",      "Sinh tố bơ",              "Bơ tươi béo ngậy + sữa đặc",                    30000, "",     "",           "CÓ"],
-      ["Tráng miệng",  "Chè đậu xanh",            "Chè đậu xanh đánh + nước cốt dừa",              15000, "",     "",           "CÓ"],
-      ["Tráng miệng",  "Bánh flan caramel",       "Bánh flan mềm mịn + caramel đắng ngọt",         20000, 18000, "new",        "CÓ"],
+      ["Buổi sáng", "Bún bò đặc biệt",   "Bún + thịt bò tươi + rau sống",       45000, 40000, "bestseller", "CÓ", "",                                   "Thêm thịt:10000|Thêm trứng:5000"],
+      ["Buổi sáng", "Phở bò tái chín",   "Phở + tái + chín + hành lá",          40000, "",    "hot",        "CÓ", "",                                   ""],
+      ["Buổi sáng", "Bánh mì thịt",      "Bánh mì giòn + pate + thịt nguội",    18000, 15000, "bigsale",    "CÓ", "",                                   "Thêm trứng:5000|Thêm phô mai:8000"],
+      ["Buổi trưa", "Cơm sườn bì chả",   "Cơm + sườn nướng + bì + chả lụa",    40000, "",    "bestseller", "CÓ", "",                                   ""],
+      ["Buổi trưa", "Cơm gà xối mỡ",     "Cơm + gà giòn xối mỡ + rau sống",    42000, 38000, "hot",        "CÓ", "",                                   ""],
+      ["Buổi tối",  "Gà nướng mật ong",  "Gà nướng sốt mật ong + tỏi + ớt",   50000, 45000, "",           "CÓ", "",                                   "Thêm cơm:10000|Thêm rau:5000"],
+      ["Buổi tối",  "Lẩu thái hải sản",  "Lẩu chua cay + tôm + mực + nghêu", 180000, "",    "hot",        "CÓ", "Nhỏ (2 người):180000|Lớn (4 người):320000", "Thêm mì:10000|Thêm rau:15000"],
+      ["Nước uống", "Cà phê sữa đá",     "Cà phê phin + sữa đặc + đá",          25000, "",    "",           "CÓ", "Nhỏ:25000|Vừa:30000|Lớn:35000",     "Thêm đường:2000|Ít đá:0"],
+      ["Nước uống", "Trà sữa trân châu", "Trà sữa thơm béo + trân châu đen",    35000, 30000, "bestseller", "CÓ", "Nhỏ:35000|Vừa:42000|Lớn:49000",     "Trân châu:5000|Thạch:5000|Pudding:8000"],
+      ["Nước uống", "Sinh tố bơ",        "Bơ tươi béo ngậy + sữa đặc",          30000, "",    "hot",        "CÓ", "Nhỏ:30000|Lớn:40000",               "Ít đường:0|Không đường:0"],
+      ["Món nhậu",  "Gà chiên nước mắm", "Gà chiên giòn sốt nước mắm + tỏi",   85000, "",    "",           "CÓ", "Nửa con:85000|Nguyên con:160000",    ""],
+      ["Món nhậu",  "Bắp bò ngâm mắm",  "Bắp bò giòn + tương hoisin + lạc",   65000, 55000, "new",        "CÓ", "",                                   "Thêm trứng:10000"],
+      ["Ăn vặt",    "Bánh tráng trộn",   "Bánh tráng + xoài + tôm khô + sa tế", 20000, "",    "hot",        "CÓ", "Nhỏ:20000|Lớn:30000",               "Thêm sa tế:3000|Thêm tôm:5000"],
+      ["Ăn vặt",    "Chè 3 màu",         "Đậu xanh + đậu đỏ + nước cốt dừa",   15000, "",    "",           "CÓ", "",                                   "Ít đường:0|Thêm trân châu:5000"],
     ]
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...samples])
 
     // Độ rộng cột
     ws["!cols"] = [
-      { wch: 16 }, // Danh mục
-      { wch: 26 }, // Tên món
-      { wch: 38 }, // Mô tả
-      { wch: 14 }, // Giá bán
-      { wch: 12 }, // Giá KM
-      { wch: 12 }, // Badge
-      { wch: 11 }, // Đang bán
+      { wch: 14 }, // A Danh mục
+      { wch: 24 }, // B Tên món
+      { wch: 34 }, // C Mô tả
+      { wch: 13 }, // D Giá bán
+      { wch: 11 }, // E Giá KM
+      { wch: 11 }, // F Badge
+      { wch: 10 }, // G Đang bán
+      { wch: 36 }, // H Sizes
+      { wch: 36 }, // I Toppings
     ]
-
-    // Freeze row 1 (tiêu đề)
     ws["!freeze"] = { xSplit: 0, ySplit: 1 }
 
-    // Style tiêu đề — nền cam đậm, chữ trắng in đậm
+    // Style tiêu đề
     const HEADER_FILL = "FF6B1A"
-    const headerRange = XLSX.utils.decode_range(ws["!ref"] ?? "A1:G1")
+    const headerRange = XLSX.utils.decode_range(ws["!ref"] ?? "A1:I1")
     for (let c = headerRange.s.c; c <= headerRange.e.c; c++) {
       const cell = XLSX.utils.encode_cell({ r: 0, c })
       if (!ws[cell]) ws[cell] = { t: "s", v: "" }
       ws[cell].s = {
-        font:      { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
+        font:      { bold: true, sz: 10, color: { rgb: "FFFFFF" } },
         fill:      { patternType: "solid", fgColor: { rgb: HEADER_FILL } },
         alignment: { horizontal: "center", vertical: "center", wrapText: true },
         border:    { bottom: { style: "medium", color: { rgb: "CC5500" } } },
       }
     }
+    // Màu riêng cột H, I (xanh tím nhạt để phân biệt)
+    for (const col of ["H1","I1"]) {
+      if (ws[col]) ws[col].s = { ...ws[col].s, fill: { patternType: "solid", fgColor: { rgb: "5050AA" } } }
+    }
 
-    // Style dòng dữ liệu — xen kẽ màu nhạt
-    const EVEN_FILL = "FFF3EB"  // cam rất nhạt
-    const ODD_FILL  = "FFFFFF"  // trắng
+    // Style data rows — màu xen kẽ + màu đặc biệt cho H, I
     for (let r = 1; r <= samples.length; r++) {
-      const fill = r % 2 === 0 ? EVEN_FILL : ODD_FILL
-      for (let c = 0; c <= 6; c++) {
+      const baseFill = r % 2 === 0 ? "FFF3EB" : "FFFFFF"
+      for (let c = 0; c <= 8; c++) {
         const cell = XLSX.utils.encode_cell({ r, c })
         if (!ws[cell]) ws[cell] = { t: "s", v: "" }
         ws[cell].s = {
-          fill:      { patternType: "solid", fgColor: { rgb: fill } },
-          alignment: { vertical: "center", wrapText: c === 2 },
-          font:      { sz: 10, color: { rgb: c === 3 || c === 4 ? "CC4400" : c === 5 ? "005500" : "000000" } },
-          border: {
-            top:    { style: "thin", color: { rgb: "DDDDDD" } },
-            bottom: { style: "thin", color: { rgb: "DDDDDD" } },
-            left:   { style: "thin", color: { rgb: "DDDDDD" } },
-            right:  { style: "thin", color: { rgb: "DDDDDD" } },
-          },
+          fill:      { patternType: "solid", fgColor: { rgb: c >= 7 ? (r % 2 === 0 ? "EEEEFF" : "F5F5FF") : baseFill } },
+          alignment: { vertical: "center", wrapText: c === 2 || c >= 7 },
+          font:      { sz: 9, color: { rgb: c === 3 || c === 4 ? "CC4400" : c >= 7 ? "333388" : "000000" } },
+          border: { top: { style: "thin", color: { rgb: "DDDDDD" } }, bottom: { style: "thin", color: { rgb: "DDDDDD" } }, left: { style: "thin", color: { rgb: "DDDDDD" } }, right: { style: "thin", color: { rgb: "DDDDDD" } } },
         }
       }
     }
-
-    // Row heights
-    ws["!rows"] = [{ hpt: 24 }, ...Array(samples.length).fill({ hpt: 18 })]
+    ws["!rows"] = [{ hpt: 28 }, ...Array(samples.length).fill({ hpt: 20 })]
 
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "📋 Danh sách món")
 
-    // ── Sheet hướng dẫn chi tiết ──────────────────────────────────────
+    // ── Sheet hướng dẫn ──────────────────────────────────────────────
     const guide = XLSX.utils.aoa_to_sheet([
-      ["📖 HƯỚNG DẪN NHẬP MENU - GIAO NHANH KRÔNG PẮC"],
+      ["📖 HƯỚNG DẪN NHẬP MENU — GIAO NHANH KRÔNG PẮC"],
       [""],
-      ["🔶 BƯỚC 1: Mở sheet '📋 Danh sách món' và điền thông tin vào các cột"],
-      ["🔶 BƯỚC 2: Lưu file (Ctrl+S) → vào App → Thực đơn → Nhập từ Excel → chọn file này"],
-      ["🔶 BƯỚC 3: Kiểm tra danh sách preview → bấm 'Lưu vào hệ thống'"],
+      ["🔶 BƯỚC 1: Điền thông tin vào sheet '📋 Danh sách món'"],
+      ["🔶 BƯỚC 2: Lưu file → App → Thực đơn → Nhập từ Excel → chọn file này"],
+      ["🔶 BƯỚC 3: Kiểm tra preview → bấm Lưu vào hệ thống"],
       [""],
-      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
-      ["📌 MÔ TẢ CÁC CỘT"],
-      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
-      ["Cột",               "Bắt buộc?", "Mô tả chi tiết",                                                        "Ví dụ"],
-      ["A - Danh mục",       "Không",    "Nhóm/tab hiển thị trên app. Các món cùng danh mục sẽ gộp vào 1 tab.",   "Cơm | Bún / Phở | Đồ uống | Tráng miệng"],
-      ["B - Tên món *",      "CÓ ✓",    "Tên đầy đủ của món, hiển thị cho khách đặt.",                            "Bún bò đặc biệt"],
-      ["C - Mô tả / NL",     "Không",    "Nguyên liệu chính hoặc mô tả hấp dẫn. Tối đa ~100 ký tự.",             "Bún + thịt bò tươi + giò heo + rau sống"],
-      ["D - Giá bán * (đ)",  "CÓ ✓",    "Giá niêm yết. Chỉ nhập số nguyên, KHÔNG gõ dấu chấm/phẩy.",            "45000"],
-      ["E - Giá KM (đ)",     "Không",    "Giá khuyến mãi (thấp hơn giá bán). Bỏ trống nếu không giảm.",          "38000"],
-      ["F - Badge",          "Không",    "Nhãn nổi bật trên thẻ món. Chỉ dùng 1 trong 4 giá trị dưới đây:",      "bestseller"],
-      ["",                   "",         "  • bestseller  →  🏆 Bán chạy",                                        ""],
-      ["",                   "",         "  • hot         →  🔥 Đang hot",                                        ""],
-      ["",                   "",         "  • new         →  ✨ Mới có",                                          ""],
-      ["",                   "",         "  • bigsale     →  🎉 Sale lớn",                                        ""],
-      ["",                   "",         "  • (bỏ trống)  →  Không có nhãn",                                      ""],
-      ["G - Đang bán",       "Không",    "Món có đang phục vụ không? Mặc định = CÓ nếu bỏ trống.",               "CÓ  hoặc  KHÔNG"],
+      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
+      ["📌 MÔ TẢ 9 CỘT"],
+      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
+      ["Cột", "Bắt buộc?", "Mô tả", "Ví dụ"],
+      ["A - Danh mục *",  "CÓ ✓",  "Chỉ dùng 1 trong 6 danh mục sau (viết đúng chính tả):",       ""],
+      ["",                "",       "  🌅 Buổi sáng    ☀️ Buổi trưa    🌙 Buổi tối",               ""],
+      ["",                "",       "  🥤 Nước uống    🍺 Món nhậu     🍿 Ăn vặt",                 ""],
+      ["B - Tên món *",   "CÓ ✓",  "Tên hiển thị cho khách đặt.",                                   "Trà sữa trân châu"],
+      ["C - Mô tả",       "Không",  "Nguyên liệu / mô tả ngắn. Tối đa ~80 ký tự.",                  "Trà sữa + trân châu đen"],
+      ["D - Giá bán * (đ)","CÓ ✓", "Số nguyên, KHÔNG gõ dấu chấm/phẩy.",                           "35000"],
+      ["E - Giá KM (đ)",  "Không",  "Giá sau giảm. Phải nhỏ hơn giá bán. Bỏ trống nếu không KM.",  "30000"],
+      ["F - Badge",       "Không",  "bestseller | hot | new | bigsale | (để trống)",                 "bestseller"],
+      ["G - Đang bán",    "Không",  "CÓ hoặc KHÔNG. Mặc định = CÓ nếu bỏ trống.",                  "CÓ"],
+      ["H - Sizes",       "Không",  "Các cỡ của món — dùng dấu | ngăn cách, dấu : ngăn tên và giá.", "Nhỏ:25000|Vừa:30000|Lớn:35000"],
+      ["",                "",       "  ⚠️ Nhập GIÁ THỰC (không phải giá chênh lệch)",               ""],
+      ["",                "",       "  ⚠️ Size đầu tiên = giá gốc (= cột D). Size sau = giá lớn hơn.",""],
+      ["",                "",       "  ✅ Bỏ trống nếu món không có size",                           ""],
+      ["I - Toppings",    "Không",  "Các topping thêm vào — dùng dấu | ngăn cách, dấu : ngăn tên:giá", "Trân châu:5000|Thạch:5000|Pudding:8000"],
+      ["",                "",       "  ✅ Bỏ trống nếu không có topping",                            ""],
       [""],
-      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
-      ["⚠️  LƯU Ý QUAN TRỌNG"],
-      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
-      ["✅", "KHÔNG xóa dòng tiêu đề (dòng 1 màu cam)"],
-      ["✅", "Giá bán phải là SỐ NGUYÊN (VNĐ) — không ghi '45.000' hay '45,000'"],
-      ["✅", "Giá KM phải NHỎ HƠN giá bán — nếu không app sẽ bỏ qua"],
-      ["✅", "Nhiều món cùng Danh mục sẽ tự động gộp vào 1 nhóm trên app"],
-      ["✅", "Danh mục để trống → món sẽ vào nhóm 'Chưa phân loại'"],
-      ["✅", "File hỗ trợ: .xlsx, .xls, .csv (UTF-8)"],
-      ["❌", "Không nhập ảnh món vào file — upload ảnh riêng sau khi lưu"],
-      ["❌", "Không merge ô — mỗi món 1 dòng riêng biệt"],
+      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
+      ["📝 VÍ DỤ CỤ THỂ"],
+      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
+      ["TRƯỜNG HỢP 1: Món không có size, không có topping"],
+      ["→ Sizes: (để trống)    Toppings: (để trống)"],
       [""],
-      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
-      ["💡 MẸO NHẬP NHANH"],
-      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
-      ["→", "Nhóm các món cùng Danh mục lại với nhau để dễ kiểm tra"],
-      ["→", "Copy dòng mẫu xuống rồi chỉnh tên/giá — nhanh hơn nhập từ đầu"],
-      ["→", "Dùng Ctrl+D để copy giá trị ô trên xuống (nếu nhiều món cùng danh mục)"],
-      ["→", "Ctrl+S để lưu file trước khi import vào app"],
+      ["TRƯỜNG HỢP 2: Cà phê có 3 cỡ + topping đường"],
+      ["→ Sizes:    Nhỏ:25000|Vừa:30000|Lớn:35000"],
+      ["→ Toppings: Thêm đường:2000|Ít đá:0"],
       [""],
-      ["📞 Hỗ trợ: Giao Nhanh Krông Pắc — Admin sẽ hỗ trợ nếu gặp lỗi import"],
+      ["TRƯỜNG HỢP 3: Lẩu có 2 phần (2 người / 4 người)"],
+      ["→ Sizes: Nhỏ (2 người):180000|Lớn (4 người):320000"],
+      ["→ Toppings: Thêm mì:10000|Thêm rau:15000|Thêm nấm:20000"],
+      [""],
+      ["TRƯỜNG HỢP 4: Topping miễn phí (tùy chọn)"],
+      ["→ Toppings: Ít đường:0|Không đường:0|Nhiều đá:0"],
+      [""],
+      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
+      ["⚠️  LƯU Ý"],
+      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
+      ["✅ KHÔNG xóa dòng tiêu đề (dòng 1 màu cam)"],
+      ["✅ Mỗi món 1 dòng — KHÔNG merge ô"],
+      ["✅ Giá bán, Sizes, Toppings đều nhập số nguyên (đồng)"],
+      ["✅ Danh mục phải đúng 1 trong 6 tên trên — sai sẽ không hiển thị đúng trên app"],
+      ["❌ Không upload ảnh qua file Excel — upload ảnh trong app sau khi lưu"],
     ])
 
-    guide["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 60 }, { wch: 36 }]
+    guide["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 62 }, { wch: 40 }]
     guide["!rows"] = [{ hpt: 28 }]
-
-    // Style tiêu đề guide sheet
-    const guideRef = XLSX.utils.decode_range(guide["!ref"] ?? "A1")
-    void guideRef
     const titleCell = guide["A1"]
-    if (titleCell) titleCell.s = { font: { bold: true, sz: 14, color: { rgb: "FF6B1A" } }, alignment: { horizontal: "left" } }
-
-    // Style header row (row 9 - 0-indexed row 9)
-    const guideHeaderRow = 9
+    if (titleCell) titleCell.s = { font: { bold: true, sz: 13, color: { rgb: "FF6B1A" } } }
+    // Header row style (row index 9)
     for (let c = 0; c <= 3; c++) {
-      const cell = XLSX.utils.encode_cell({ r: guideHeaderRow, c })
+      const cell = XLSX.utils.encode_cell({ r: 9, c })
       if (!guide[cell]) continue
-      guide[cell].s = {
-        font: { bold: true, sz: 10, color: { rgb: "FFFFFF" } },
-        fill: { patternType: "solid", fgColor: { rgb: "FF6B1A" } },
-        alignment: { vertical: "center" },
-      }
+      guide[cell].s = { font: { bold: true, sz: 10, color: { rgb: "FFFFFF" } }, fill: { patternType: "solid", fgColor: { rgb: "FF6B1A" } } }
     }
 
     XLSX.utils.book_append_sheet(wb, guide, "📖 Hướng dẫn")
-
     XLSX.writeFile(wb, "template_menu_giaonhanh.xlsx")
   }
 
