@@ -306,7 +306,7 @@ function LoginContent() {
     <>
       <style>{`
                 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-        html, body { background:#080806; font-family:'Lexend',sans-serif; height:100%; overflow:hidden; }
+        html, body { background:#FF6B1A; font-family:'Lexend',sans-serif; height:100%; overflow:hidden; }
         ::-webkit-scrollbar { width:3px; }
         ::-webkit-scrollbar-thumb { background:rgba(255,107,0,0.3); border-radius:2px; }
         @keyframes goldGlow {
@@ -320,14 +320,14 @@ function LoginContent() {
       `}</style>
 
       <div style={{
-        position: "fixed", inset: 0, background: "#080806",
+        position: "fixed", inset: 0,
+        background: "linear-gradient(160deg, #FF6B1A 0%, #E05010 35%, #B84000 70%, #7a2d00 100%)",
         display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
       }}>
-        {/* Ambient glow */}
+        {/* Ambient overlay — làm sâu thêm góc dưới */}
         <div style={{
-          position: "absolute", top: "-20%", left: "50%", transform: "translateX(-50%)",
-          width: "60vw", height: "60vw", maxWidth: 360, maxHeight: 360,
-          background: "radial-gradient(circle,rgba(255,107,0,0.13) 0%,transparent 65%)",
+          position: "absolute", bottom: 0, left: 0, right: 0, height: "50%",
+          background: "linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 100%)",
           pointerEvents: "none",
         }} />
 
@@ -341,9 +341,10 @@ function LoginContent() {
               style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
               <div style={{
                 width: 88, height: 88, borderRadius: 24,
-                background: "#F5821E",
+                background: "#CC5500",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                position: "relative", overflow: "hidden", animation: "goldGlow 2s ease-in-out infinite",
+                position: "relative", overflow: "hidden",
+                boxShadow: "0 0 0 4px rgba(255,255,255,0.25), 0 8px 32px rgba(0,0,0,0.4)",
               }}>
                 <Image src="/icon-512.png" alt="Giao Nhanh" width={88} height={88} style={{ borderRadius: 24, objectFit: "contain" }} priority />
                 <div style={{
@@ -353,17 +354,16 @@ function LoginContent() {
                 }} />
               </div>
               <div style={{
-                fontSize: 32, fontWeight: 800, letterSpacing: 2,
-                background: "linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                fontSize: 32, fontWeight: 800, letterSpacing: 2, color: "#fff",
+                textShadow: "0 2px 12px rgba(0,0,0,0.3)",
               }}>GIAO NHANH</div>
-              <div style={{ color: "rgba(176,149,106,.6)", fontSize: 12, textAlign: "center", lineHeight: 1.6 }}>
+              <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, textAlign: "center", lineHeight: 1.6 }}>
                 Giao hàng · Mua hộ · Xe ôm · Taxi<br />tại Krông Pắc, Đắk Lắk
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 {[0, .2, .4].map((d, i) => (
                   <motion.div key={i}
-                    style={{ width: 6, height: 6, borderRadius: "50%", background: "#FF6B00" }}
+                    style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.8)" }}
                     animate={{ opacity: [.3, 1, .3], scale: [.8, 1.2, .8] }}
                     transition={{ duration: 1, delay: d, repeat: Infinity }} />
                 ))}
@@ -388,10 +388,10 @@ function LoginContent() {
                 transition={{ delay: .1, type: "spring", damping: 12 }}
                 style={{
                   width: 56, height: 56, borderRadius: 16,
-                  background: "#F5821E",
+                  background: "#CC5500",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   marginBottom: 10, position: "relative", overflow: "hidden",
-                  boxShadow: "0 0 20px rgba(255,107,0,.4),0 6px 16px rgba(0,0,0,.4)",
+                  boxShadow: "0 0 0 3px rgba(255,255,255,0.3), 0 6px 20px rgba(0,0,0,0.4)",
                 }}>
                 <Image src="/icon-512.png" alt="Giao Nhanh" width={56} height={56} style={{ borderRadius: 16, objectFit: "contain" }} />
                 <div style={{
@@ -403,19 +403,18 @@ function LoginContent() {
 
               <div style={{
                 fontSize: 20, fontWeight: 800, letterSpacing: 2, marginBottom: 3,
-                background: "linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                color: "#fff", textShadow: "0 1px 8px rgba(0,0,0,0.25)",
               }}>GIAO NHANH</div>
-              <div style={{ color: "rgba(106,90,64,.75)", fontSize: 10, marginBottom: 18, textAlign: "center" }}>
+              <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, marginBottom: 18, textAlign: "center" }}>
                 Giao hàng · Xe ôm · Taxi tại Krông Pắc
               </div>
 
               {/* Card */}
               <div style={{
                 width: "100%",
-                background: "rgba(255,255,255,0.06)",
-                backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-                border: "1px solid rgba(255,107,0,0.2)",
+                background: "rgba(0,0,0,0.25)",
+                backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+                border: "1px solid rgba(255,255,255,0.18)",
                 borderRadius: 20, padding: "18px 16px", marginBottom: 14,
               }}>
                 {/* Tabs */}
@@ -672,3 +671,4 @@ export default function LoginPage() {
     </Suspense>
   )
 }
+
