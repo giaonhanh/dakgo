@@ -42,11 +42,7 @@ export async function POST(req: NextRequest) {
       .update({ payment_status: "paid" })
       .eq("id", order.id)
 
-    const commission    = Math.round(order.total_amount * 0.15)
-    const driverEarning = order.total_amount - order.ship_fee - commission
-    const merchantEarning = order.total_amount - order.ship_fee - commission
-
-    // Cộng ví tài xế: ship_fee - hoa hồng
+    // Cộng ví tài xế: phí ship (merchant thanh toán trực tiếp, không qua ví)
     if (order.driver_id) {
       await supabase.rpc("add_to_wallet", {
         p_user_id: order.driver_id,
@@ -60,39 +56,25 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Cộng ví merchant: tiền hàng - hoa hồng 15%
+    // Notify merchant: đơn đã được thanh toán
     try {
       const { data: shop } = await supabase
-        .from("shops").select("owner_id, commission_rate").eq("id", order.shop_id).single()
+        .from("shops").select("owner_id").eq("id", order.shop_id).single()
 
       if (shop?.owner_id) {
-        const rate     = (shop.commission_rate ?? 15) / 100
-        const platfee  = Math.round((order.total_amount - order.ship_fee) * rate)
-        const toMerch  = (order.total_amount - order.ship_fee) - platfee
-
-        await supabase.rpc("add_to_wallet", {
-          p_user_id: shop.owner_id,
-          p_type:    "merchant",
-          p_amount:  toMerch,
-          p_ref_id:  order.id,
-          p_note:    `Đơn #${data.orderCode} · HH ${platfee.toLocaleString("vi-VN")}đ`,
-          p_tx_type: "commission",
-        })
-
-        // Notify merchant thanh toán thành công
         await supabase.from("notifications").insert({
           user_id: shop.owner_id, type: "order",
-          title: "💰 Thanh toán thành công",
-          body:  `Đơn #${data.orderCode} đã được thanh toán · Bạn nhận ${toMerch.toLocaleString("vi-VN")}đ`,
+          title: "💰 Đơn đã được thanh toán",
+          body:  `Đơn #${data.orderCode} · ${order.total_amount.toLocaleString("vi-VN")}đ đã thanh toán thành công`,
           data:  { order_id: order.id, url: "/merchant" },
         })
         await sendPushToUser(shop.owner_id, {
-          title: "💰 Thanh toán thành công",
-          body:  `Đơn #${data.orderCode} · +${toMerch.toLocaleString("vi-VN")}đ vào ví`,
+          title: "💰 Đơn đã được thanh toán",
+          body:  `Đơn #${data.orderCode} · ${order.total_amount.toLocaleString("vi-VN")}đ`,
           url:   "/merchant", tag: `paid-${order.id}`,
         })
       }
-    } catch (e) { console.error("[Webhook] merchant wallet error:", e) }
+    } catch (e) { console.error("[Webhook] merchant notify error:", e) }
 
     // Notify khách thanh toán thành công
     try {
