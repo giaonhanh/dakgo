@@ -38,7 +38,7 @@ function distKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
 }
-type LiveOrderRow = { id: string; status: string; shops: { name: string } | { name: string }[] | null }
+type LiveOrderRow = { id: string; status: string; shops: { name: string } | { name: string }[] | null; _href?: string }
 type RecoRow    = { id: string; name: string; price: number; original_price: number | null; image_url: string | null; sold_count: number; shop_id: string; shop_name: string; order_count: number }
 type BannerRow  = { id: string; title: string; subtitle: string | null; image_url: string | null; link_url: string | null; sort_order: number }
 type NewMenuRow = { id: string; name: string; price: number; image_url: string | null; shop_id: string; created_at: string; shops: { name: string } | null }
@@ -203,13 +203,15 @@ export default function HomePage() {
 
       const ridesMapped = (liveRides ?? []).map(r => ({
         id: r.id,
-        status: r.status,
+        status: r.status === "searching" ? "pending" : r.status,
         shops: { name: r.vehicle_type === "motorbike" ? "🛵 Xe ôm" : "🚕 Taxi" },
+        _href: "/orders",
       }))
       const errandsMapped = (liveErrands ?? []).map(e => ({
         id: e.id,
         status: e.status === "pending" ? "pending" : e.status,
         shops: { name: e.type === "buy_for_me" ? "🛒 Mua hộ" : "📦 Giao hộ" },
+        _href: "/orders",
       }))
 
       setLiveOrders([...(liveFood ?? []), ...ridesMapped, ...errandsMapped] as LiveOrderRow[])
@@ -707,7 +709,7 @@ export default function HomePage() {
                         order.status === "ready"      ? "rgba(255,179,71,0.3)" :
                         "rgba(62,207,110,0.25)"
                       return (
-                        <a key={order.id} href={`/tracking/${order.id}`}
+                        <a key={order.id} href={order._href ?? `/tracking/${order.id}`}
                           style={{ textDecoration:"none", width:"100%", flexShrink:0 }}>
                           <div style={{
                             background: statusBg,

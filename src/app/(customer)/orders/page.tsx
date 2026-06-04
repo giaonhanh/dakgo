@@ -384,7 +384,7 @@ export default function OrdersPage() {
       })
 
       const allOrders = [...mapped, ...errandMapped, ...rideMapped]
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .sort((a, b) => new Date(b.createdAtRaw).getTime() - new Date(a.createdAtRaw).getTime())
 
       setOrders(allOrders)
       setLoading(false)
