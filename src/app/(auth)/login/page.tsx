@@ -378,7 +378,7 @@ function LoginContent() {
               initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: .5, ease: [.34, 1.56, .64, 1] }}
               style={{
-                width: "100%", maxWidth: 400, padding: "0 18px",
+                width: "100%", maxWidth: 400, padding: "20px 18px 0",
                 display: "flex", flexDirection: "column", alignItems: "center",
                 maxHeight: "100dvh", overflowY: "auto",
               }}>
@@ -388,13 +388,13 @@ function LoginContent() {
                 initial={{ scale: 0, rotate: -10 }} animate={{ scale: 1, rotate: 0 }}
                 transition={{ delay: .1, type: "spring", damping: 12 }}
                 style={{
-                  width: 56, height: 56, borderRadius: 16,
+                  width: 68, height: 68, borderRadius: 20,
                   background: "#FF681A",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  marginBottom: 10, position: "relative", overflow: "hidden",
-                  boxShadow: "0 0 0 3px rgba(255,255,255,0.3), 0 6px 20px rgba(0,0,0,0.4)",
+                  marginBottom: 12, position: "relative", overflow: "hidden",
+                  boxShadow: "0 0 0 4px rgba(255,255,255,0.25), 0 8px 24px rgba(0,0,0,0.4)",
                 }}>
-                <Image src="/icon-512.png" alt="Giao Nhanh" width={44} height={44} style={{ objectFit: "contain" }} />
+                <Image src="/icon-512.png" alt="Giao Nhanh" width={52} height={52} style={{ objectFit: "contain" }} />
                 <div style={{
                   position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
                   background: "linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent)",
@@ -407,7 +407,7 @@ function LoginContent() {
                 color: "#fff", textShadow: "0 1px 8px rgba(0,0,0,0.25)",
               }}>GIAO NHANH</div>
               <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, marginBottom: 18, textAlign: "center" }}>
-                Giao hàng · Xe ôm · Taxi tại Krông Pắc
+                Giao đồ ăn · Giao hàng · Xe ôm · Taxi tại Krông Pắc
               </div>
 
               {/* Card */}
