@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
 import { useCartStore } from "@/store/cartStore"
 import { createClient } from "@/lib/supabase/client"
+import { getAdminContact } from "@/lib/adminContact"
 
 // ─── Types ───────────────────────────────────────────────
 type Status = "delivering" | "preparing" | "pending" | "accepted" | "ready" | "completed" | "cancelled"
@@ -158,7 +159,8 @@ function InfoBox({ rows }: { rows: { icon: string; key: string; val: string }[] 
   )
 }
 
-const ADMIN_PHONE = "0901999888"
+// Admin phone loaded dynamically from DB — see useEffect below
+let ADMIN_PHONE = "0901999888"
 
 // ─── Main ─────────────────────────────────────────────────
 export default function OrdersPage() {
@@ -179,8 +181,14 @@ export default function OrdersPage() {
   const [userId,       setUserId]       = useState<string | null>(null)
   const [cancelLocked, setCancelLocked] = useState(false)
   const [cancelSecsLeft, setCancelSecsLeft] = useState(0)
+  const [adminPhone, setAdminPhone] = useState(ADMIN_PHONE)
 
   const fireToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2400) }
+
+  useEffect(() => {
+    getAdminContact().then(c => { if (c.phone) { ADMIN_PHONE = c.phone; setAdminPhone(c.phone) } })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Fetch orders from Supabase ──────────────────────────
   useEffect(() => {
@@ -707,7 +715,7 @@ export default function OrdersPage() {
                         : "Đơn tiền mặt: nếu admin chấp thuận huỷ, chưa có giao dịch phát sinh."}
                     </div>
                   </div>
-                  <a href={`tel:${ADMIN_PHONE}`}
+                  <a href={`tel:${adminPhone}`}
                     style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                       width: "100%", height: 50, borderRadius: 12, textDecoration: "none",
                       background: "linear-gradient(90deg,#4a8ff5,#6aafff)",
@@ -716,7 +724,7 @@ export default function OrdersPage() {
                     📞 Gọi quản trị viên hỗ trợ
                   </a>
                   <div style={{ textAlign: "center", color: "#6a5a40", fontSize: 11, marginTop: 8 }}>
-                    Hotline: {ADMIN_PHONE} · Hỗ trợ 7:00 – 22:00
+                    Hotline: {adminPhone} · Hỗ trợ 7:00 – 22:00
                   </div>
                   <button onClick={() => { setShowCancel(null); setCancelRsn("") }}
                     style={{ width: "100%", height: 38, borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)",

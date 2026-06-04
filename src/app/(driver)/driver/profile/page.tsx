@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
+import { getAdminContact } from "@/lib/adminContact"
 
 /* ── helpers ── */
 function Toggle({ on, onToggle, color = "#3ecf6e" }: { on: boolean; onToggle: () => void; color?: string }) {
@@ -422,7 +423,9 @@ export default function DriverProfilePage() {
   const [avatar,    setAvatar]    = useState<string | null>(null)
   const [bankInfo,  setBankInfo]  = useState<{ bank_name: string | null; bank_account_number: string | null } | null>(null)
   const [stats,     setStats]     = useState({ rating: 0, trips: 0, todayEarnings: 0, walletBal: 0, joinDate: "" })
-  const [vehicleSub, setVehicleSub] = useState("Chưa cập nhật thông tin xe")
+  const [vehicleSub,   setVehicleSub]   = useState("Chưa cập nhật thông tin xe")
+  const [adminZaloLink, setAdminZaloLink] = useState("https://zalo.me/84901999888")
+  const [adminTelLink,  setAdminTelLink]  = useState("")
 
   const loadBankInfo = async (uid: string) => {
     const { data } = await supabase.from("drivers").select("bank_name, bank_account_number").eq("id", uid).single()
@@ -430,6 +433,10 @@ export default function DriverProfilePage() {
   }
 
   useEffect(() => {
+    getAdminContact().then(c => {
+      if (c.zaloLink) setAdminZaloLink(c.zaloLink)
+      if (c.telLink)  setAdminTelLink(c.telLink)
+    })
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
       setUserId(user.id)
@@ -621,8 +628,8 @@ export default function DriverProfilePage() {
           {/* ── 4. Hỗ trợ & Tài khoản ── */}
           <Section title="Hỗ trợ & Tài khoản">
             <Row icon="🔑" label="Đổi mật khẩu" sub="Cập nhật mật khẩu đăng nhập" onClick={() => setShowPw(true)} arrow />
-            <Row icon="💬" label="Chat với hỗ trợ" sub="Nhắn tin Zalo hỗ trợ" onClick={() => window.open("https://zalo.me/0000000000", "_blank")} arrow />
-            <Row icon="⚠️" label="Báo cáo vấn đề" sub="Khiếu nại, sự cố khi giao hàng" onClick={() => window.open("https://zalo.me/0000000000", "_blank")} arrow />
+            <Row icon="💬" label="Chat với hỗ trợ" sub="Nhắn tin Zalo hỗ trợ" onClick={() => window.open(adminZaloLink, "_blank")} arrow />
+            <Row icon="⚠️" label="Báo cáo vấn đề" sub="Khiếu nại, sự cố khi giao hàng" onClick={() => window.open(adminTelLink || adminZaloLink, "_blank")} arrow />
             <Row icon="🚀" label="Giao Nhanh v1.0" sub="© 2025 Giao Nhanh · Krông Pắc" />
             <Row icon="🚪" label="Đăng xuất" danger last
               onClick={async () => { await createClient().auth.signOut(); window.location.href = "/login" }} arrow />

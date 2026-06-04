@@ -8,6 +8,7 @@ import dynamic from "next/dynamic"
 import { useParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { ChatDrawer } from "@/components/chat/ChatDrawer"
+import { getAdminContact } from "@/lib/adminContact"
 
 const LiveTrackMap = dynamic(() => import("@/components/map/LiveTrackMap"), {
   ssr: false,
@@ -84,9 +85,20 @@ export default function TrackingPage() {
   const [toast,         setToast]         = useState("")
   const [mapExpanded,   setMapExpanded]   = useState(false)
   const [paymentStatus, setPaymentStatus] = useState<"pending"|"paid">("pending")
+  const [adminTelLink,  setAdminTelLink]  = useState("tel:0901999888")
+  const [adminPhone,    setAdminPhone]    = useState("0901 999 888")
 
   const fireToast = useCallback((msg: string) => {
     setToast(msg); setTimeout(() => setToast(""), 2200)
+  }, [])
+
+  // ── Fetch admin contact ──────────────────────────────────
+  useEffect(() => {
+    getAdminContact().then(c => {
+      if (c.telLink)  setAdminTelLink(c.telLink)
+      if (c.phone)    setAdminPhone(c.phone.replace(/(\d{4})(\d{3})(\d{3})/, "$1 $2 $3"))
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Fetch order data ──────────────────────────────────────
@@ -331,7 +343,7 @@ export default function TrackingPage() {
                   #{orderData.id.slice(0,8).toUpperCase()}
                 </span>
               </div>
-              <a href="tel:0905000000"
+              <a href={adminTelLink}
                 style={{ display:"flex",alignItems:"center",gap:12,
                   background:"rgba(62,207,110,0.07)",border:"1px solid rgba(62,207,110,0.2)",
                   borderRadius:13,padding:"13px 16px",marginBottom:20,textDecoration:"none" }}>
@@ -339,7 +351,7 @@ export default function TrackingPage() {
                   display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0 }}>📞</div>
                 <div>
                   <div style={{ color:"#f8f0e0",fontSize:13,fontWeight:700 }}>Gọi điện trực tiếp</div>
-                  <div style={{ color:"#6a5a40",fontSize:10.5,marginTop:2 }}>0905 000 000</div>
+                  <div style={{ color:"#6a5a40",fontSize:10.5,marginTop:2 }}>{adminPhone}</div>
                 </div>
                 <span style={{ color:"#6a5a40",fontSize:16,marginLeft:"auto" }}>›</span>
               </a>
