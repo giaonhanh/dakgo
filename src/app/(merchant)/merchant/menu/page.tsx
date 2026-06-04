@@ -828,10 +828,10 @@ export default function MerchantMenuPage() {
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:6,marginBottom:10}}>
             {mainTab === "products" && (<>
-              <button onClick={downloadTemplate}
-                style={{background:"rgba(74,143,245,0.1)",border:"1px solid rgba(74,143,245,0.3)",borderRadius:10,padding:"7px 12px",color:"#4a8ff5",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",whiteSpace:"nowrap"}}>
+              <a href="/template_nhap_menu_giao_nhanh.xlsx" download
+                style={{background:"rgba(74,143,245,0.1)",border:"1px solid rgba(74,143,245,0.3)",borderRadius:10,padding:"7px 12px",color:"#4a8ff5",fontSize:10,fontWeight:700,fontFamily:"Lexend",whiteSpace:"nowrap",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:4}}>
                 📄 Tải file mẫu
-              </button>
+              </a>
               <button onClick={() => csvRef.current?.click()}
                 style={{background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.3)",borderRadius:10,padding:"7px 12px",color:"#3ecf6e",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",whiteSpace:"nowrap"}}>
                 📥 Nhập Excel
@@ -951,9 +951,10 @@ export default function MerchantMenuPage() {
                   <div style={{fontSize:32,marginBottom:8}}>⚠️</div>
                   <div style={{color:"#ff4040",fontSize:12,fontWeight:700,marginBottom:6}}>Lỗi đọc file</div>
                   <div style={{color:"rgba(255,100,100,0.7)",fontSize:10}}>{importError}</div>
-                  <button onClick={downloadTemplate} style={{marginTop:16,background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.3)",borderRadius:10,padding:"8px 16px",color:"#3ecf6e",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"Lexend"}}>
-                    📋 Tải file mẫu (.csv)
-                  </button>
+                  <a href="/template_nhap_menu_giao_nhanh.xlsx" download
+                    style={{marginTop:16,background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.3)",borderRadius:10,padding:"8px 16px",color:"#3ecf6e",fontSize:10,fontWeight:700,fontFamily:"Lexend",textDecoration:"none",display:"inline-block"}}>
+                    📋 Tải file mẫu (.xlsx)
+                  </a>
                 </div>
               ) : importRows && (
                 <>
@@ -963,9 +964,10 @@ export default function MerchantMenuPage() {
                     <div style={{color:"rgba(74,143,245,0.7)",fontSize:8,lineHeight:1.6}}>
                       <strong>Tên món</strong> · Mô tả · Giá bán · Giá KM (tuỳ chọn) · Danh mục · Badge (hot/bigsale/bestseller)
                     </div>
-                    <button onClick={downloadTemplate} style={{marginTop:5,background:"transparent",border:"none",color:"#4a8ff5",fontSize:8,fontWeight:700,cursor:"pointer",fontFamily:"Lexend",textDecoration:"underline",padding:0}}>
+                    <a href="/template_nhap_menu_giao_nhanh.xlsx" download
+                      style={{marginTop:5,display:"inline-block",color:"#4a8ff5",fontSize:8,fontWeight:700,fontFamily:"Lexend",textDecoration:"underline"}}>
                       Tải file mẫu
-                    </button>
+                    </a>
                   </div>
 
                   {/* Preview table */}
