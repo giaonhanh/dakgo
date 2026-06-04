@@ -306,7 +306,7 @@ function LoginContent() {
     <>
       <style>{`
                 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-        html, body { background:#FF6B1A; font-family:'Lexend',sans-serif; height:100%; overflow:hidden; }
+        html, body { background:#080806; font-family:'Lexend',sans-serif; height:100%; overflow:hidden; }
         ::-webkit-scrollbar { width:3px; }
         ::-webkit-scrollbar-thumb { background:rgba(255,107,0,0.3); border-radius:2px; }
         @keyframes goldGlow {
@@ -321,13 +321,14 @@ function LoginContent() {
 
       <div style={{
         position: "fixed", inset: 0,
-        background: "linear-gradient(160deg, #FF6B1A 0%, #E05010 35%, #B84000 70%, #7a2d00 100%)",
+        background: "linear-gradient(160deg, #0e0c09 0%, #151210 50%, #080806 100%)",
         display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
       }}>
-        {/* Ambient overlay — làm sâu thêm góc dưới */}
+        {/* Ambient glow — điểm nhấn cam nhẹ ở giữa */}
         <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0, height: "50%",
-          background: "linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 100%)",
+          position: "absolute", top: "30%", left: "50%", transform: "translateX(-50%)",
+          width: 300, height: 300, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(255,107,0,0.08) 0%, transparent 70%)",
           pointerEvents: "none",
         }} />
 
@@ -357,13 +358,13 @@ function LoginContent() {
                 fontSize: 32, fontWeight: 800, letterSpacing: 2, color: "#fff",
                 textShadow: "0 2px 12px rgba(0,0,0,0.3)",
               }}>GIAO NHANH</div>
-              <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, textAlign: "center", lineHeight: 1.6 }}>
+              <div style={{ color: "rgba(176,149,106,0.9)", fontSize: 12, textAlign: "center", lineHeight: 1.6 }}>
                 Giao hàng · Mua hộ · Xe ôm · Taxi<br />tại Krông Pắc, Đắk Lắk
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 {[0, .2, .4].map((d, i) => (
                   <motion.div key={i}
-                    style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.8)" }}
+                    style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,107,0,0.7)" }}
                     animate={{ opacity: [.3, 1, .3], scale: [.8, 1.2, .8] }}
                     transition={{ duration: 1, delay: d, repeat: Infinity }} />
                 ))}

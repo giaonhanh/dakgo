@@ -29,7 +29,7 @@ import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ─────────────────────────────────────────────────
 type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null }
-type ProductRow = { id: string; name: string; price: number; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string } | { name: string }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
+type ProductRow = { id: string; name: string; price: number; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string; is_open?: boolean; status?: string } | { name: string; is_open?: boolean; status?: string }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null }
 
@@ -65,6 +65,12 @@ function getDefaultMealTime() {
 
 
 // ─── Helpers ────────────────────────────────────────────────
+function isShopOpen(p: ProductRow): boolean {
+  const s = Array.isArray(p.shops) ? p.shops[0] : p.shops
+  if (!s) return false
+  return s.is_open === true && s.status === "approved"
+}
+
 function isProductInTime(p: { all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }): boolean {
   if (p.all_day !== false) return true
   const now = new Date()
@@ -248,25 +254,29 @@ export default function HomePage() {
         .limit(10)
       setNearbyShops((shopData ?? []) as ShopRow[])
 
-      // Best sellers — chỉ lấy sản phẩm đã bán được ít nhất 1 lần, trong khung giờ bán
+      // Best sellers — quán đang mở, trong khung giờ bán
       const { data: bsData } = await supabase
         .from("products")
-        .select("id,name,price,sold_count,shop_id,shops(name),all_day,start_hour,end_hour")
+        .select("id,name,price,sold_count,shop_id,shops!inner(name,is_open,status),all_day,start_hour,end_hour")
         .eq("is_available", true)
+        .eq("shops.is_open", true)
+        .eq("shops.status", "approved")
+        .gt("sold_count", 0)
+        .order("sold_count", { ascending: false })
+        .limit(25)
+      setBestSellers(((bsData ?? []) as ProductRow[]).filter(p => isShopOpen(p) && isProductInTime(p)).slice(0, 8))
+
+      // Promos — quán đang mở, trong khung giờ bán
+      const { data: promoData } = await supabase
+        .from("products")
+        .select("id,name,price,sold_count,shops!inner(name,is_open,status),all_day,start_hour,end_hour")
+        .eq("is_available", true)
+        .eq("shops.is_open", true)
+        .eq("shops.status", "approved")
         .gt("sold_count", 0)
         .order("sold_count", { ascending: false })
         .limit(20)
-      setBestSellers(((bsData ?? []) as ProductRow[]).filter(isProductInTime).slice(0, 8))
-
-      // Promos (products with discount — original_price higher than price)
-      const { data: promoData } = await supabase
-        .from("products")
-        .select("id,name,price,sold_count,shops(name),all_day,start_hour,end_hour")
-        .eq("is_available", true)
-        .gt("sold_count", 0)
-        .order("sold_count", { ascending: false })
-        .limit(15)
-      setPromos(((promoData ?? []) as ProductRow[]).filter(isProductInTime).slice(0, 6))
+      setPromos(((promoData ?? []) as ProductRow[]).filter(p => isShopOpen(p) && isProductInTime(p)).slice(0, 6))
 
       // Admin banners
       const { data: bannerData } = await supabase
@@ -277,14 +287,16 @@ export default function HomePage() {
         .limit(5)
       setAdminBanners((bannerData ?? []) as BannerRow[])
 
-      // Vừa lên menu — sản phẩm mới nhất, trong khung giờ bán
+      // Vừa lên menu — quán đang mở, trong khung giờ bán
       const { data: newMenuData } = await supabase
         .from("products")
-        .select("id,name,price,image_url,shop_id,shops(name),created_at,all_day,start_hour,end_hour")
+        .select("id,name,price,image_url,shop_id,shops!inner(name,is_open,status),created_at,all_day,start_hour,end_hour")
         .eq("is_available", true)
+        .eq("shops.is_open", true)
+        .eq("shops.status", "approved")
         .order("created_at", { ascending: false })
-        .limit(25)
-      setNewMenuItems(((newMenuData ?? []) as unknown as NewMenuRow[]).filter(isProductInTime).slice(0, 10))
+        .limit(30)
+      setNewMenuItems(((newMenuData ?? []) as unknown as NewMenuRow[]).filter(p => isShopOpen(p as unknown as ProductRow) && isProductInTime(p)).slice(0, 10))
 
       // Reorders (last 5 delivered orders for this user)
       const { data: orderData } = await supabase
@@ -313,12 +325,14 @@ export default function HomePage() {
         if (shopIds.length > 0) {
           const { data: recFallback } = await supabase
             .from("products")
-            .select("id, name, price, original_price, image_url, sold_count, shop_id, shops(name), all_day, start_hour, end_hour")
+            .select("id, name, price, original_price, image_url, sold_count, shop_id, shops!inner(name,is_open,status), all_day, start_hour, end_hour")
             .in("shop_id", shopIds)
             .eq("is_available", true)
+            .eq("shops.is_open", true)
+            .eq("shops.status", "approved")
             .order("sold_count", { ascending: false })
-            .limit(20)
-          setRecos((recFallback ?? []).filter(isProductInTime).slice(0, 10).map(p => {
+            .limit(25)
+          setRecos((recFallback ?? []).filter(p => isShopOpen(p as ProductRow) && isProductInTime(p)).slice(0, 10).map(p => {
             const sn = Array.isArray(p.shops) ? (p.shops[0] as { name: string })?.name : (p.shops as { name: string } | null)?.name
             return { id: p.id, name: p.name, price: p.price, original_price: p.original_price,
               image_url: p.image_url, sold_count: p.sold_count, shop_id: p.shop_id,
