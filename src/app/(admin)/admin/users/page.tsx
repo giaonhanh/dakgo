@@ -155,7 +155,20 @@ export default function AdminUsersPage() {
   const [cuError,         setCuError]         = useState("")
 
   // ── Import Menu states ──
-  interface ImportMenuItem { category: string; name: string; description: string; price: number; promoPrice: number | null; badge: "hot"|"bigsale"|"bestseller"|"new"|null; isAvailable: boolean }
+  interface ImportMenuItem {
+    categories: string[]   // danh mục app (col 0)
+    category: string       // nhóm menu nội bộ (col 1)
+    name: string           // tên món (col 2)
+    description: string    // mô tả (col 3)
+    price: number          // giá bán (col 4)
+    promoPrice: number | null  // giá KM (col 5)
+    badge: "hot"|"bigsale"|"bestseller"|"new"|null  // col 6
+    isAvailable: boolean   // col 7
+    startHour: string      // col 8
+    endHour: string        // col 9
+    sizesRaw: string       // col 10
+    toppingsRaw: string    // col 11
+  }
   const [showImport,       setShowImport]       = useState(false)
   const [importShopSearch, setImportShopSearch] = useState("")
   const [importShopId,     setImportShopId]     = useState<string | null>(null)
@@ -166,12 +179,17 @@ export default function AdminUsersPage() {
   const [importEditIdx,    setImportEditIdx]     = useState<number | null>(null)
   const importFileRef = useRef<HTMLInputElement>(null)
 
+  const APP_CATS_IMPORT = ["Buổi sáng","Buổi trưa","Buổi tối","Nước uống","Món nhậu","Ăn vặt"]
+
   const parseImportRow = (cols: string[]): ImportMenuItem | null => {
-    // FORMAT MỚI (12 cột): [0]DanhMục [1]NhómMenu [2]TênMón [3]MôTả [4]Giá [5]GiáKM [6]Badge [7]ĐangBán ...
-    // FORMAT CŨ (9 cột):   [0]DanhMục [1]TênMón [2]MôTả [3]Giá [4]GiáKM [5]Badge [6]ĐangBán ...
+    // FORMAT MỚI (12 cột): [0]DanhMục [1]NhómMenu [2]TênMón [3]MôTả [4]Giá [5]GiáKM [6]Badge [7]ĐangBán [8]GiờTừ [9]GiờĐến [10]Sizes [11]Toppings
+    // FORMAT CŨ (9 cột):   [0]DanhMục [1]TênMón [2]MôTả [3]Giá [4]GiáKM [5]Badge [6]ĐangBán [7]Sizes [8]Toppings
     const isNewFmt = cols.length >= 10
-    let name: string, category: string, description: string, pRaw: string, pmRaw: string, bRaw: string, aRaw: string
+    let catRaw: string, category: string, name: string, description: string
+    let pRaw: string, pmRaw: string, bRaw: string, aRaw: string
+    let startHour: string, endHour: string, sizesRaw: string, toppingsRaw: string
     if (isNewFmt) {
+      catRaw      = cols[0]?.trim() ?? ""
       category    = cols[1]?.trim() ?? ""
       name        = cols[2]?.trim() ?? ""
       description = cols[3]?.trim() ?? ""
@@ -179,21 +197,27 @@ export default function AdminUsersPage() {
       pmRaw       = String(cols[5] ?? "")
       bRaw        = (cols[6] ?? "").toString().toLowerCase().trim()
       aRaw        = (cols[7] ?? "").toString().toLowerCase().trim()
+      startHour   = cols[8]?.toString().trim() ?? ""
+      endHour     = cols[9]?.toString().trim() ?? ""
+      sizesRaw    = cols[10]?.toString().trim() ?? ""
+      toppingsRaw = cols[11]?.toString().trim() ?? ""
     } else {
       const p3 = parseInt((cols[3] ?? "").replace(/\D/g, ""))
       const isOldNew = !isNaN(p3) && p3 > 0
+      catRaw = cols[0]?.trim() ?? ""; startHour = ""; endHour = ""; sizesRaw = ""; toppingsRaw = ""
       if (isOldNew) {
-        category = cols[0]?.trim() ?? ""; name = cols[1]?.trim() ?? ""; description = cols[2]?.trim() ?? ""; pRaw = cols[3] ?? ""; pmRaw = cols[4] ?? ""; bRaw = (cols[5] ?? "").toLowerCase().trim(); aRaw = (cols[6] ?? "").toLowerCase().trim()
+        category = ""; name = cols[1]?.trim() ?? ""; description = cols[2]?.trim() ?? ""; pRaw = cols[3] ?? ""; pmRaw = cols[4] ?? ""; bRaw = (cols[5] ?? "").toLowerCase().trim(); aRaw = (cols[6] ?? "").toLowerCase().trim()
       } else {
-        name = cols[0]?.trim() ?? ""; description = cols[1]?.trim() ?? ""; pRaw = cols[2] ?? ""; pmRaw = cols[3] ?? ""; category = cols[4]?.trim() ?? ""; bRaw = (cols[5] ?? "").toLowerCase().trim(); aRaw = (cols[6] ?? "").toLowerCase().trim()
+        category = ""; name = cols[0]?.trim() ?? ""; description = cols[1]?.trim() ?? ""; pRaw = cols[2] ?? ""; pmRaw = cols[3] ?? ""; bRaw = (cols[5] ?? "").toLowerCase().trim(); aRaw = (cols[6] ?? "").toLowerCase().trim(); catRaw = cols[4]?.trim() ?? ""
       }
     }
     if (!name) return null
+    const categories = catRaw.split(",").map(s => s.trim()).filter(s => APP_CATS_IMPORT.includes(s))
     const price = parseInt(pRaw.replace(/\D/g, "")) || 0
     const promoPrice = pmRaw ? (parseInt(String(pmRaw).replace(/\D/g, "")) || null) : null
     const badge = bRaw === "hot" ? "hot" : bRaw === "bigsale" ? "bigsale" : bRaw === "bestseller" ? "bestseller" : bRaw === "new" ? "new" : null
     const isAvailable = aRaw === "" || ["có","co","yes","1","true"].includes(aRaw)
-    return { category, name, description, price, promoPrice, badge: badge as ImportMenuItem["badge"], isAvailable }
+    return { categories, category, name, description, price, promoPrice, badge: badge as ImportMenuItem["badge"], isAvailable, startHour, endHour, sizesRaw, toppingsRaw }
   }
 
   const onImportFile = (file: File) => {
@@ -222,7 +246,15 @@ export default function AdminUsersPage() {
     let nextOrder = (((ex?.[0] as { sort_order?: number } | undefined)?.sort_order) ?? -1) + 1
     let saved = 0
     for (const item of importItems) {
-      const { error } = await sb.from("products").insert({ shop_id: importShopId, name: item.name, description: item.description || null, price: item.price, original_price: item.promoPrice || null, category: item.category || null, badge: item.badge || null, is_available: item.isAvailable, sold_count: 0, sort_order: nextOrder++ })
+      const allDay = !item.startHour && !item.endHour
+      const { error } = await sb.from("products").insert({
+        shop_id: importShopId, name: item.name, description: item.description || null,
+        price: item.price, original_price: item.promoPrice || null,
+        category: item.category || null, tags: item.categories.length ? item.categories : null,
+        badge: item.badge || null, is_available: item.isAvailable,
+        all_day: allDay, start_hour: item.startHour || null, end_hour: item.endHour || null,
+        sold_count: 0, sort_order: nextOrder++,
+      })
       if (!error) saved++
     }
     setImportSaving(false); setShowImport(false); setImportItems(null); setImportShopId(null); setImportShopSearch(""); setImportShopName("")
@@ -1480,64 +1512,110 @@ export default function AdminUsersPage() {
                       <div style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", flex: 1 }}>③ Xem lại danh sách</div>
                       <div style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 700 }}>{importItems.length} món · {[...new Set(importItems.map(r => r.category).filter(Boolean))].length} nhóm</div>
                     </div>
-                    {/* Table header */}
-                    <div style={{ display: "grid", gridTemplateColumns: "22px 1.4fr 1fr 70px 55px 55px 30px", gap: 4, padding: "5px 8px", background: "rgba(74,143,245,0.08)", borderRadius: 7, marginBottom: 4 }}>
-                      {["#","Tên món","Nhóm","Giá bán","Giá KM","Badge",""].map(h => (
-                        <div key={h} style={{ color: "#4a8ff5", fontSize: 8, fontWeight: 700 }}>{h}</div>
-                      ))}
-                    </div>
-                    <div style={{ maxHeight: 260, overflowY: "auto" }}>
-                      {importItems.map((item, idx) => (
-                        <div key={idx}>
-                          {importEditIdx === idx ? (
-                            <div style={{ background: "rgba(74,143,245,0.06)", border: "1px solid rgba(74,143,245,0.25)", borderRadius: 9, padding: "10px", marginBottom: 4 }}>
-                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
-                                {([["Tên món","name"],["Nhóm","category"],["Mô tả","description"]] as [string,keyof ImportMenuItem][]).map(([lbl, key]) => (
-                                  <div key={key} style={{ gridColumn: key === "description" ? "1/-1" : undefined }}>
-                                    <div style={{ color: "#6a5a40", fontSize: 8, marginBottom: 2 }}>{lbl}</div>
-                                    <input value={String(item[key] ?? "")} onChange={e => setImportItems(p => p?.map((r,i) => i===idx ? {...r,[key]:e.target.value} : r) ?? null)}
-                                      style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 8px", color: "#f0eaff", fontSize: 10, boxSizing: "border-box" as const }} />
+                    <div style={{ maxHeight: 320, overflowY: "auto", display: "flex", flexDirection: "column", gap: 5 }}>
+                      {importItems.map((item, idx) => {
+                        const badgeColors: Record<string, {bg:string,color:string,label:string}> = {
+                          hot:        { bg:"linear-gradient(90deg,#ff4040,#ff8800)", color:"#fff", label:"🔥 HOT" },
+                          bigsale:    { bg:"linear-gradient(90deg,#ff6b00,#ffb347)", color:"#fff", label:"⚡ BIG SALE" },
+                          bestseller: { bg:"linear-gradient(90deg,#f5c542,#ff8c00)", color:"#fff", label:"⭐ BÁN CHẠY" },
+                          new:        { bg:"linear-gradient(90deg,#4a8ff5,#3ecf6e)", color:"#fff", label:"✨ MỚI" },
+                        }
+                        const bc = item.badge ? badgeColors[item.badge] : null
+                        const sizeCount = item.sizesRaw ? item.sizesRaw.split(",").filter(Boolean).length : 0
+                        const toppingCount = item.toppingsRaw ? item.toppingsRaw.split(";").filter(Boolean).length : 0
+                        return (
+                          <div key={idx}>
+                            {importEditIdx === idx ? (
+                              /* ── Edit form ── */
+                              <div style={{ background: "rgba(74,143,245,0.06)", border: "1px solid rgba(74,143,245,0.3)", borderRadius: 10, padding: "12px" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+                                  {([["Tên món","name"],["Nhóm menu (nội bộ)","category"],["Mô tả","description"]] as [string,keyof ImportMenuItem][]).map(([lbl,key]) => (
+                                    <div key={key} style={{ gridColumn: key==="description" ? "1/-1" : undefined }}>
+                                      <div style={{ color:"#6a5a40",fontSize:8,marginBottom:2 }}>{lbl}</div>
+                                      <input value={String(item[key]??"")} onChange={e => setImportItems(p=>p?.map((r,i)=>i===idx?{...r,[key]:e.target.value}:r)??null)}
+                                        style={{ width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,padding:"5px 8px",color:"#f0eaff",fontSize:10,boxSizing:"border-box" as const }} />
+                                    </div>
+                                  ))}
+                                </div>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginBottom: 6 }}>
+                                  {([["Giá bán","price"],["Giá KM","promoPrice"],["Giờ từ","startHour"],["Giờ đến","endHour"]] as [string,keyof ImportMenuItem][]).map(([lbl,key]) => (
+                                    <div key={key}>
+                                      <div style={{ color:"#6a5a40",fontSize:8,marginBottom:2 }}>{lbl}</div>
+                                      <input value={String(item[key]??"")} onChange={e => setImportItems(p=>p?.map((r,i)=>i===idx?{...r,[key]:["price"].includes(key)?parseInt(e.target.value)||0:["promoPrice"].includes(key)?parseInt(e.target.value)||null:e.target.value}:r)??null)}
+                                        style={{ width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,padding:"5px 8px",color:["price","promoPrice"].includes(key)?"#FF8C00":"#f0eaff",fontSize:10,boxSizing:"border-box" as const }} />
+                                    </div>
+                                  ))}
+                                </div>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
+                                  <div>
+                                    <div style={{ color:"#6a5a40",fontSize:8,marginBottom:2 }}>Badge</div>
+                                    <select value={item.badge??""} onChange={e=>setImportItems(p=>p?.map((r,i)=>i===idx?{...r,badge:(e.target.value||null) as ImportMenuItem["badge"]}:r)??null)}
+                                      style={{ width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,padding:"5px 8px",color:"#FFB347",fontSize:10,boxSizing:"border-box" as const }}>
+                                      <option value="">Không badge</option>
+                                      <option value="hot">🔥 HOT</option>
+                                      <option value="bigsale">⚡ BIG SALE</option>
+                                      <option value="bestseller">⭐ BÁN CHẠY</option>
+                                      <option value="new">✨ MỚI</option>
+                                    </select>
                                   </div>
-                                ))}
-                              </div>
-                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
-                                {([["Giá bán","price"],["Giá KM","promoPrice"]] as [string,keyof ImportMenuItem][]).map(([lbl, key]) => (
-                                  <div key={key}>
-                                    <div style={{ color: "#6a5a40", fontSize: 8, marginBottom: 2 }}>{lbl}</div>
-                                    <input type="number" value={String(item[key] ?? "")} onChange={e => setImportItems(p => p?.map((r,i) => i===idx ? {...r,[key]:parseInt(e.target.value)||null} : r) ?? null)}
-                                      style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 8px", color: "#FF8C00", fontSize: 10, boxSizing: "border-box" as const }} />
+                                  <div>
+                                    <div style={{ color:"#6a5a40",fontSize:8,marginBottom:2 }}>Sizes (Tên:Giá, ...)</div>
+                                    <input value={item.sizesRaw} onChange={e=>setImportItems(p=>p?.map((r,i)=>i===idx?{...r,sizesRaw:e.target.value}:r)??null)}
+                                      style={{ width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,padding:"5px 8px",color:"#3ecf6e",fontSize:9,boxSizing:"border-box" as const }} />
                                   </div>
-                                ))}
-                                <div>
-                                  <div style={{ color: "#6a5a40", fontSize: 8, marginBottom: 2 }}>Đang bán</div>
-                                  <button onClick={() => setImportItems(p => p?.map((r,i) => i===idx ? {...r,isAvailable:!r.isAvailable} : r) ?? null)}
-                                    style={{ width: "100%", height: 28, borderRadius: 7, border: "none", cursor: "pointer", fontSize: 10, fontWeight: 700, background: item.isAvailable ? "rgba(62,207,110,0.15)" : "rgba(255,64,64,0.1)", color: item.isAvailable ? "#3ecf6e" : "#ff4040" }}>
-                                    {item.isAvailable ? "CÓ ✓" : "KHÔNG"}
-                                  </button>
+                                  <div>
+                                    <div style={{ color:"#6a5a40",fontSize:8,marginBottom:2 }}>Đang bán</div>
+                                    <button onClick={()=>setImportItems(p=>p?.map((r,i)=>i===idx?{...r,isAvailable:!r.isAvailable}:r)??null)}
+                                      style={{ width:"100%",height:28,borderRadius:7,border:"none",cursor:"pointer",fontSize:10,fontWeight:700,background:item.isAvailable?"rgba(62,207,110,0.15)":"rgba(255,64,64,0.1)",color:item.isAvailable?"#3ecf6e":"#ff4040" }}>
+                                      {item.isAvailable?"CÓ ✓":"KHÔNG"}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div style={{ display:"flex",gap:6 }}>
+                                  <button onClick={()=>setImportEditIdx(null)} style={{ flex:1,height:30,borderRadius:8,border:"none",background:"rgba(62,207,110,0.12)",color:"#3ecf6e",fontSize:10,fontWeight:700,cursor:"pointer" }}>✓ Xong</button>
+                                  <button onClick={()=>{setImportItems(p=>p?.filter((_,i)=>i!==idx)??null);setImportEditIdx(null)}} style={{ height:30,padding:"0 10px",borderRadius:8,border:"none",background:"rgba(255,64,64,0.1)",color:"#ff4040",fontSize:10,cursor:"pointer" }}>🗑</button>
                                 </div>
                               </div>
-                              <div style={{ display: "flex", gap: 6 }}>
-                                <button onClick={() => setImportEditIdx(null)}
-                                  style={{ flex: 1, height: 30, borderRadius: 8, border: "none", background: "rgba(62,207,110,0.12)", color: "#3ecf6e", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>✓ Xong</button>
-                                <button onClick={() => { setImportItems(p => p?.filter((_,i) => i!==idx) ?? null); setImportEditIdx(null) }}
-                                  style={{ height: 30, padding: "0 10px", borderRadius: 8, border: "none", background: "rgba(255,64,64,0.1)", color: "#ff4040", fontSize: 10, cursor: "pointer" }}>🗑</button>
+                            ) : (
+                              /* ── Card view ── */
+                              <div style={{ background: idx%2===0?"rgba(255,255,255,0.025)":"transparent", border:"1px solid rgba(74,143,245,0.1)", borderRadius:9, padding:"8px 10px" }}>
+                                {/* Row 1: Tên + giá */}
+                                <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:4 }}>
+                                  <div style={{ flex:1,minWidth:0 }}>
+                                    <div style={{ display:"flex",alignItems:"center",gap:5,flexWrap:"wrap" }}>
+                                      <span style={{ color:"#6a5a40",fontSize:9,flexShrink:0 }}>{idx+1}.</span>
+                                      <span style={{ color:"#f0eaff",fontSize:11,fontWeight:700 }}>{item.name}</span>
+                                      {bc && <span style={{ background:bc.bg,borderRadius:4,padding:"1px 5px",fontSize:7,fontWeight:700,color:bc.color,flexShrink:0 }}>{bc.label}</span>}
+                                      {!item.isAvailable && <span style={{ background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.25)",borderRadius:4,padding:"1px 5px",fontSize:7,fontWeight:700,color:"#ff4040",flexShrink:0 }}>ẨN</span>}
+                                    </div>
+                                    {item.description && <div style={{ color:"#6a5a40",fontSize:8,marginTop:2,lineHeight:1.4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{item.description}</div>}
+                                  </div>
+                                  <div style={{ textAlign:"right",flexShrink:0,display:"flex",alignItems:"center",gap:8 }}>
+                                    <div>
+                                      <div style={{ color:"#FF8C00",fontSize:11,fontWeight:800 }}>{item.price.toLocaleString("vi-VN")}đ</div>
+                                      {item.promoPrice && <div style={{ color:"#ff4040",fontSize:8,textDecoration:"line-through" }}>{item.promoPrice.toLocaleString("vi-VN")}đ</div>}
+                                    </div>
+                                    <button onClick={()=>setImportEditIdx(idx)} style={{ width:26,height:26,borderRadius:6,border:"none",background:"rgba(255,107,0,0.08)",color:"#FF8C00",fontSize:11,cursor:"pointer",flexShrink:0 }}>✏️</button>
+                                  </div>
+                                </div>
+                                {/* Row 2: Chips */}
+                                <div style={{ display:"flex",flexWrap:"wrap",gap:4 }}>
+                                  {item.categories.map(cat=>(
+                                    <span key={cat} style={{ background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.2)",borderRadius:4,padding:"1px 6px",fontSize:7.5,fontWeight:600,color:"#FF8C00" }}>{cat}</span>
+                                  ))}
+                                  {item.category && <span style={{ background:"rgba(180,100,255,0.1)",border:"1px solid rgba(180,100,255,0.2)",borderRadius:4,padding:"1px 6px",fontSize:7.5,fontWeight:600,color:"#b464ff" }}>📁 {item.category}</span>}
+                                  {item.startHour && item.endHour
+                                    ? <span style={{ background:"rgba(74,143,245,0.1)",border:"1px solid rgba(74,143,245,0.2)",borderRadius:4,padding:"1px 6px",fontSize:7.5,fontWeight:600,color:"#4a8ff5" }}>🕐 {item.startHour}–{item.endHour}</span>
+                                    : <span style={{ background:"rgba(62,207,110,0.07)",border:"1px solid rgba(62,207,110,0.15)",borderRadius:4,padding:"1px 6px",fontSize:7.5,color:"#3ecf6e" }}>🕐 Cả ngày</span>
+                                  }
+                                  {sizeCount > 0 && <span style={{ background:"rgba(62,207,110,0.07)",border:"1px solid rgba(62,207,110,0.15)",borderRadius:4,padding:"1px 6px",fontSize:7.5,color:"#3ecf6e" }}>📏 {sizeCount} size</span>}
+                                  {toppingCount > 0 && <span style={{ background:"rgba(62,207,110,0.07)",border:"1px solid rgba(62,207,110,0.15)",borderRadius:4,padding:"1px 6px",fontSize:7.5,color:"#3ecf6e" }}>🧂 {toppingCount} topping</span>}
+                                </div>
                               </div>
-                            </div>
-                          ) : (
-                            <div style={{ display: "grid", gridTemplateColumns: "22px 1.4fr 1fr 70px 55px 55px 30px", gap: 4, padding: "5px 8px", borderRadius: 7, alignItems: "center",
-                              background: idx % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent", marginBottom: 2 }}>
-                              <span style={{ color: "#6a5a40", fontSize: 9 }}>{idx+1}</span>
-                              <span style={{ color: "#f0eaff", fontSize: 10, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
-                              <span style={{ color: "#6a5a40", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.category || "—"}</span>
-                              <span style={{ color: "#FF8C00", fontSize: 10, fontWeight: 700 }}>{item.price.toLocaleString("vi-VN")}đ</span>
-                              <span style={{ color: "#3ecf6e", fontSize: 9 }}>{item.promoPrice ? item.promoPrice.toLocaleString("vi-VN")+"đ" : "—"}</span>
-                              <span style={{ color: item.badge ? "#FFB347" : "#6a5a40", fontSize: 8, fontWeight: item.badge ? 700 : 400 }}>{item.badge ?? "—"}</span>
-                              <button onClick={() => setImportEditIdx(idx)}
-                                style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "rgba(255,107,0,0.08)", color: "#FF8C00", fontSize: 11, cursor: "pointer" }}>✏️</button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
