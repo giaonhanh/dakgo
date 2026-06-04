@@ -43,13 +43,15 @@ export default function XeOmPage() {
   const [pricingExtra,   setPricingExtra]   = useState("4000")
   const [serviceEnabled, setServiceEnabled] = useState(true)
   const [serviceMsg,     setServiceMsg]     = useState("Dịch vụ xe ôm tạm ngừng phục vụ. Vui lòng thử lại sau.")
+  const [onlineCount,    setOnlineCount]    = useState<number | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
     Promise.all([
       supabase.from("app_settings").select("value").eq("key","pricing").maybeSingle(),
       supabase.from("app_settings").select("value").eq("key","service_toggles").maybeSingle(),
-    ]).then(([pricingRes, toggleRes]) => {
+      supabase.from("drivers").select("id", { count: "exact", head: true }).eq("status", "online").eq("vehicle_type", "motorbike"),
+    ]).then(([pricingRes, toggleRes, driverRes]) => {
       const mb = (pricingRes.data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null)?.motorbike
       if (mb?.rows) setPricingRows(mb.rows)
       if (mb?.extra) setPricingExtra(mb.extra)
@@ -58,6 +60,7 @@ export default function XeOmPage() {
         setServiceEnabled(false)
         if (toggles.motorbike.customerMsg) setServiceMsg(toggles.motorbike.customerMsg)
       }
+      setOnlineCount(driverRes.count ?? 0)
     })
   }, [])
 
@@ -152,7 +155,7 @@ export default function XeOmPage() {
             borderRadius:20,padding:"4px 10px" }}>
             <div style={{ width:6,height:6,borderRadius:"50%",background:"#4a8ff5",
               animation:"xoPulse 2s infinite" }} />
-            <span style={{ color:"#4a8ff5",fontSize: 11,fontWeight:700 }}>12 xe online</span>
+            <span style={{ color:"#4a8ff5",fontSize: 11,fontWeight:700 }}>{onlineCount !== null ? `${onlineCount} xe online` : "Đang tải..."}</span>
           </div>
         </div>
       </div>

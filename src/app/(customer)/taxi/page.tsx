@@ -55,13 +55,15 @@ export default function TaxiPage() {
   const [taxi7Enabled, setTaxi7Enabled] = useState(true)
   const [taxi4Msg,     setTaxi4Msg]     = useState("Dịch vụ taxi 4 chỗ tạm ngừng phục vụ.")
   const [taxi7Msg,     setTaxi7Msg]     = useState("Dịch vụ taxi 7 chỗ tạm ngừng phục vụ.")
+  const [onlineCount,  setOnlineCount]  = useState<number | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
     Promise.all([
       supabase.from("app_settings").select("value").eq("key","pricing").maybeSingle(),
       supabase.from("app_settings").select("value").eq("key","service_toggles").maybeSingle(),
-    ]).then(([pricingRes, toggleRes]) => {
+      supabase.from("drivers").select("id", { count: "exact", head: true }).eq("status", "online").eq("vehicle_type", "car"),
+    ]).then(([pricingRes, toggleRes, driverRes]) => {
       const p = pricingRes.data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null
       const tx  = p?.taxi;  const tx7 = p?.taxi7
       if (tx?.rows)   setPricingRows(tx.rows)
@@ -77,6 +79,7 @@ export default function TaxiPage() {
         setTaxi7Enabled(false)
         if (toggles.taxi_7cho.customerMsg) setTaxi7Msg(toggles.taxi_7cho.customerMsg)
       }
+      setOnlineCount(driverRes.count ?? 0)
     })
   }, [])
 
@@ -163,7 +166,7 @@ export default function TaxiPage() {
             borderRadius:20,padding:"4px 10px" }}>
             <div style={{ width:6,height:6,borderRadius:"50%",background:"#b464ff",
               animation:"txPulse 2s infinite" }} />
-            <span style={{ color:"#b464ff",fontSize: 11,fontWeight:700 }}>6 xe online</span>
+            <span style={{ color:"#b464ff",fontSize: 11,fontWeight:700 }}>{onlineCount !== null ? `${onlineCount} xe online` : "Đang tải..."}</span>
           </div>
         </div>
       </div>

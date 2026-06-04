@@ -174,15 +174,45 @@ export default function HomePage() {
         .eq("user_id", user.id).eq("is_read", false)
       setNotifCount(count ?? 0)
 
-      // Live orders (tất cả đơn đang xử lý / giao)
-      const { data: liveData } = await supabase
+      // Live orders: đơn đồ ăn đang xử lý
+      const { data: liveFood } = await supabase
         .from("orders")
         .select("id, status, shops(name)")
         .eq("customer_id", user.id)
         .in("status", ["pending","accepted","preparing","ready","delivering"])
         .order("created_at", { ascending: false })
-        .limit(10)
-      setLiveOrders((liveData ?? []) as LiveOrderRow[])
+        .limit(5)
+
+      // Live rides (xe ôm / taxi đang tìm xe / đang đi)
+      const { data: liveRides } = await supabase
+        .from("rides")
+        .select("id, status, vehicle_type")
+        .eq("customer_id", user.id)
+        .in("status", ["searching","accepted","delivering"])
+        .order("created_at", { ascending: false })
+        .limit(3)
+
+      // Live errands (giao hộ / mua hộ đang xử lý)
+      const { data: liveErrands } = await supabase
+        .from("errands")
+        .select("id, status, type")
+        .eq("customer_id", user.id)
+        .in("status", ["pending","accepted","delivering"])
+        .order("created_at", { ascending: false })
+        .limit(3)
+
+      const ridesMapped = (liveRides ?? []).map(r => ({
+        id: r.id,
+        status: r.status,
+        shops: { name: r.vehicle_type === "motorbike" ? "🛵 Xe ôm" : "🚕 Taxi" },
+      }))
+      const errandsMapped = (liveErrands ?? []).map(e => ({
+        id: e.id,
+        status: e.status === "pending" ? "pending" : e.status,
+        shops: { name: e.type === "buy_for_me" ? "🛒 Mua hộ" : "📦 Giao hộ" },
+      }))
+
+      setLiveOrders([...(liveFood ?? []), ...ridesMapped, ...errandsMapped] as LiveOrderRow[])
 
       // Vouchers
       const { data: voucherData } = await supabase
@@ -194,11 +224,12 @@ export default function HomePage() {
         .limit(6)
       setVouchers((voucherData ?? []) as VoucherRow[])
 
-      // Nearby shops (approved only)
+      // Nearby shops: chỉ hiện quán ĐANG MỞ, sắp xếp theo rating
       const { data: shopData } = await supabase
         .from("shops")
         .select("id,name,is_open,rating_avg,address,logo_url,location")
         .eq("status", "approved")
+        .eq("is_open", true)
         .order("rating_avg", { ascending: false })
         .limit(10)
       setNearbyShops((shopData ?? []) as ShopRow[])

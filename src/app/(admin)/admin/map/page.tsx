@@ -72,7 +72,7 @@ function AdminMapClientInner({ drivers, shops, selected, onSelect }: AdminMapCli
       if (mapRef.current) return
 
       const map = L.map(divRef.current, {
-        center: [12.6521, 108.5073], zoom: 14,
+        center: [12.5833, 108.4833], zoom: 14,  // Phước An, Krông Pắc
         zoomControl: false, attributionControl: false,
       })
       mapRef.current = map
@@ -196,11 +196,11 @@ export default function AdminMapPage() {
     })
     setOnlineDrivers(drivers)
 
-    // Load shops with location
+    // Load shops — dùng PostGIS location hoặc lat/lng riêng làm fallback
     const { data: shopRows } = await supabase.from("shops")
-      .select("id, name, location, is_open").eq("status", "approved")
+      .select("id, name, location, lat, lng, is_open").eq("status", "approved")
     const shops: ShopMarker[] = (shopRows ?? []).flatMap(s => {
-      const pos = parseWKB(s.location)
+      const pos = parseWKB(s.location) ?? (s.lat && s.lng ? { lat: s.lat, lng: s.lng } : null)
       if (!pos) return []
       return [{ id: s.id, name: s.name, lat: pos.lat, lng: pos.lng, isOpen: s.is_open }]
     })

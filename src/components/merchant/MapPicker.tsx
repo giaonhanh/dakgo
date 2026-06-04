@@ -10,8 +10,8 @@ interface MapPickerProps {
   onClose: () => void
 }
 
-const DEFAULT_LAT = 12.6524   // Buôn Ma Thuột
-const DEFAULT_LNG = 108.0483
+const DEFAULT_LAT = 12.5833   // Phước An, Krông Pắc
+const DEFAULT_LNG = 108.4833
 const TILE_KEY    = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY
 
 export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }: MapPickerProps) {
@@ -65,14 +65,18 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
         zoomControl: true,
       })
 
-      // VietMap raster tiles, fallback OSM nếu tile lỗi
-      L.tileLayer(
-        `https://maps.vietmap.vn/api/maps/light/{z}/{x}/{y}@2x.png?apikey=${TILE_KEY}`,
-        {
-          maxZoom:     20,
-          attribution: "© VietMap",
-        }
-      ).addTo(map)
+      // VietMap nếu có key, fallback OSM
+      if (TILE_KEY) {
+        L.tileLayer(
+          `https://maps.vietmap.vn/api/maps/light/{z}/{x}/{y}@2x.png?apikey=${TILE_KEY}`,
+          { maxZoom: 20, attribution: "© VietMap" },
+        ).addTo(map)
+      } else {
+        L.tileLayer(
+          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          { maxZoom: 19, attribution: "© OpenStreetMap contributors" },
+        ).addTo(map)
+      }
 
       const marker = L.marker([lat, lng], { draggable: true }).addTo(map)
 

@@ -20,6 +20,7 @@ interface Order {
   shopName: string; customerName: string; customerPhone: string
   driverName: string | null; driverPhone: string | null
   items: OrderItem[]
+  _sourceTable?: "orders" | "rides" | "errands"
 }
 interface ManItem  { productId: string; name: string; price: number; qty: number }
 interface ShopSlot { shopId: string; shopName: string; items: ManItem[] }
@@ -287,7 +288,7 @@ export default function AdminOrdersPage() {
     const dMap   = Object.fromEntries((drvProfs ?? []).map(p => [p.id, p.full_name ?? "Tài xế"]))
     const dPhone = Object.fromEntries((drvProfs ?? []).map(p => [p.id, p.phone ?? ""]))
 
-    setOrders(rows.map(r => {
+    const foodOrders: Order[] = rows.map(r => {
       const s = r.shops as unknown
       const shopName = Array.isArray(s) ? (s[0] as {name:string})?.name ?? "—" : (s as {name:string}|null)?.name ?? "—"
       return {
@@ -303,8 +304,77 @@ export default function AdminOrdersPage() {
         driverName:  r.driver_id ? (dMap[r.driver_id]   ?? null) : null,
         driverPhone: r.driver_id ? (dPhone[r.driver_id] ?? null) : null,
         items: itemsByOrder[r.id] ?? [],
+        _sourceTable: "orders" as const,
       }
+    })
+
+    // Fetch rides (xe ôm / taxi)
+    const { data: rideRows } = await supabase
+      .from("rides")
+      .select("id, status, vehicle_type, pickup_address, dropoff_address, estimated_fare, payment_method, note, created_at, driver_id, customer_id")
+      .order("created_at", { ascending: false })
+      .limit(50)
+
+    // Fetch errands (giao hộ / mua hộ)
+    const { data: errandRows } = await supabase
+      .from("errands")
+      .select("id, status, type, pickup_address, delivery_address, service_fee, payment_method, note, created_at, driver_id, customer_id")
+      .order("created_at", { ascending: false })
+      .limit(50)
+
+    // Build profile map for rides + errands
+    const reCustIds = [...new Set([
+      ...(rideRows ?? []).map(r => r.customer_id),
+      ...(errandRows ?? []).map(e => e.customer_id),
+    ].filter(Boolean))]
+    const reDrvIds  = [...new Set([
+      ...(rideRows ?? []).map(r => r.driver_id),
+      ...(errandRows ?? []).map(e => e.driver_id),
+    ].filter(Boolean) as string[])]
+    const [{ data: reProfs }, { data: reDrvProfs }] = await Promise.all([
+      reCustIds.length ? supabase.from("profiles").select("id,full_name,phone").in("id", reCustIds) : Promise.resolve({ data: [] }),
+      reDrvIds.length  ? supabase.from("profiles").select("id,full_name,phone").in("id", reDrvIds)  : Promise.resolve({ data: [] }),
+    ])
+    const reMap   = Object.fromEntries((reProfs  ?? []).map(p => [p.id, p.full_name ?? "Khách hàng"]))
+    reMap  && Object.assign(pMap,   reMap)
+    const rePMap  = Object.fromEntries((reProfs  ?? []).map(p => [p.id, p.phone ?? ""]))
+    const reDMap  = Object.fromEntries((reDrvProfs ?? []).map(p => [p.id, p.full_name ?? "Tài xế"]))
+    const reDPMap = Object.fromEntries((reDrvProfs ?? []).map(p => [p.id, p.phone ?? ""]))
+
+    const rideOrders: Order[] = (rideRows ?? []).map(r => ({
+      id: r.id, status: (r.status ?? "pending") as OrderStatus,
+      total_amount: r.estimated_fare ?? 0, ship_fee: 0,
+      delivery_address: r.dropoff_address ?? "",
+      created_at: r.created_at, pay_method: r.payment_method ?? "cash",
+      note: r.note ?? null, customer_id: r.customer_id, driver_id: r.driver_id ?? null,
+      shopName: r.vehicle_type === "motorbike" ? "🏍️ Xe ôm" : "🚕 Taxi",
+      customerName:  reMap[r.customer_id]   ?? "Khách hàng",
+      customerPhone: rePMap[r.customer_id]  ?? "",
+      driverName:    r.driver_id ? (reDMap[r.driver_id]  ?? null) : null,
+      driverPhone:   r.driver_id ? (reDPMap[r.driver_id] ?? null) : null,
+      items: [{ id: r.id, name: `${r.pickup_address ?? "?"} → ${r.dropoff_address ?? "?"}`, qty: 1, price: r.estimated_fare ?? 0 }],
+      _sourceTable: "rides" as const,
     }))
+
+    const errandOrders: Order[] = (errandRows ?? []).map(e => ({
+      id: e.id, status: (e.status ?? "pending") as OrderStatus,
+      total_amount: e.service_fee ?? 0, ship_fee: 0,
+      delivery_address: e.delivery_address ?? "",
+      created_at: e.created_at, pay_method: e.payment_method ?? "cash",
+      note: e.note ?? null, customer_id: e.customer_id, driver_id: e.driver_id ?? null,
+      shopName: e.type === "buy_for_me" ? "🛒 Mua hộ" : "📦 Giao hộ",
+      customerName:  reMap[e.customer_id]   ?? "Khách hàng",
+      customerPhone: rePMap[e.customer_id]  ?? "",
+      driverName:    e.driver_id ? (reDMap[e.driver_id]  ?? null) : null,
+      driverPhone:   e.driver_id ? (reDPMap[e.driver_id] ?? null) : null,
+      items: [{ id: e.id, name: e.type === "buy_for_me" ? "Mua hộ" : "Giao hộ", qty: 1, price: e.service_fee ?? 0 }],
+      _sourceTable: "errands" as const,
+    }))
+
+    // Gộp tất cả, sắp xếp theo thời gian mới nhất
+    const all = [...foodOrders, ...rideOrders, ...errandOrders]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    setOrders(all)
     setLoading(false)
   }, [])
 
