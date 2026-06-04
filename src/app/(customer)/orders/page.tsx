@@ -203,15 +203,13 @@ export default function OrdersPage() {
 
       if (ordersErr) console.error("[Orders] fetch error:", ordersErr.message)
 
-      if (!rows || rows.length === 0) { setLoading(false); return }
-
-      const orderIds = rows.map(o => o.id)
+      const orderIds = (rows ?? []).map(o => o.id)
 
       // Fetch order_items riêng (tránh nested join RLS)
-      const { data: allItems } = await supabase
+      const { data: allItems } = orderIds.length ? await supabase
         .from("order_items")
         .select("order_id, id, product_id, name, price, qty, note, breakdown")
-        .in("order_id", orderIds)
+        .in("order_id", orderIds) : { data: [] }
       const itemsByOrder: Record<string, { id: string; product_id: string | null; name: string; price: number; qty: number; note?: string; breakdown?: ItemBreakdown }[]> = {}
       ;(allItems ?? []).forEach((item: { order_id: string; id: string; product_id: string | null; name: string; price: number; qty: number; note?: string; breakdown?: ItemBreakdown }) => {
         if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = []
@@ -219,7 +217,7 @@ export default function OrdersPage() {
       })
 
       // Fetch driver profiles for orders that have a driver
-      const driverIds = rows
+      const driverIds = (rows ?? [])
         .filter(o => o.driver_id)
         .map(o => o.driver_id as string)
       let driverProfiles: { id: string; full_name: string | null; phone: string }[] = []
@@ -232,7 +230,7 @@ export default function OrdersPage() {
       }
 
       // Fetch reviews for completed orders
-      const completedIds = rows
+      const completedIds = (rows ?? [])
         .filter(o => o.status === "delivered" || o.status === "completed")
         .map(o => o.id)
       let reviewMap: Record<string, number> = {}
@@ -246,7 +244,7 @@ export default function OrdersPage() {
         })
       }
 
-      const mapped: Order[] = rows.map((o, idx) => {
+      const mapped: Order[] = (rows ?? []).map((o, idx) => {
         const shop = Array.isArray(o.shops) ? o.shops[0] : o.shops
         const driverProfile = driverProfiles.find(p => p.id === o.driver_id)
         const items = itemsByOrder[o.id] ?? []
