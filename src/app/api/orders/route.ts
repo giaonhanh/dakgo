@@ -69,9 +69,68 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    const total        = orderItems.reduce((s: number, i: { subtotal: number }) => s + i.subtotal, 0)
-    const ship_fee     = (clientDeliveryFee ?? 15000) + (surcharge ?? 0)
-    const total_amount = total + ship_fee
+    const total    = orderItems.reduce((s: number, i: { subtotal: number }) => s + i.subtotal, 0)
+    const ship_fee = (clientDeliveryFee ?? 15000) + (surcharge ?? 0)
+
+    // Validate voucher server-side
+    let discount_amount = 0
+    let validatedVoucherId: string | null = null
+
+    if (voucher_id) {
+      const { data: voucher, error: vErr } = await supabase
+        .from("vouchers")
+        .select("id, shop_id, discount_type, discount_value, min_order, max_discount, usage_limit, used_count, per_person_limit, valid_from, valid_to, is_active")
+        .eq("id", voucher_id)
+        .single()
+
+      if (vErr || !voucher) {
+        return NextResponse.json({ error: "Voucher không tồn tại" }, { status: 400 })
+      }
+
+      const now = new Date()
+      if (!voucher.is_active) {
+        return NextResponse.json({ error: "Voucher đã bị vô hiệu hóa" }, { status: 400 })
+      }
+      if (new Date(voucher.valid_from) > now || new Date(voucher.valid_to) < now) {
+        return NextResponse.json({ error: "Voucher đã hết hạn" }, { status: 400 })
+      }
+      if (voucher.shop_id && voucher.shop_id !== shop_id) {
+        return NextResponse.json({ error: "Voucher không áp dụng cho cửa hàng này" }, { status: 400 })
+      }
+      if (total < (voucher.min_order ?? 0)) {
+        return NextResponse.json({ error: `Đơn tối thiểu ${voucher.min_order?.toLocaleString("vi-VN")}đ để dùng voucher này` }, { status: 400 })
+      }
+      if (voucher.usage_limit != null && (voucher.used_count ?? 0) >= voucher.usage_limit) {
+        return NextResponse.json({ error: "Voucher đã hết lượt sử dụng" }, { status: 400 })
+      }
+
+      // Kiểm tra per_person_limit
+      if (voucher.per_person_limit != null) {
+        const { count } = await supabase
+          .from("voucher_usages")
+          .select("id", { count: "exact", head: true })
+          .eq("voucher_id", voucher_id)
+          .eq("user_id", user.id)
+
+        if ((count ?? 0) >= voucher.per_person_limit) {
+          return NextResponse.json({ error: "Bạn đã dùng voucher này đủ số lần cho phép" }, { status: 400 })
+        }
+      }
+
+      // Tính discount
+      if (voucher.discount_type === "percent") {
+        const raw = Math.round(total * voucher.discount_value / 100)
+        discount_amount = voucher.max_discount != null ? Math.min(raw, voucher.max_discount) : raw
+      } else if (voucher.discount_type === "fixed") {
+        discount_amount = Math.min(voucher.discount_value, total)
+      } else if (voucher.discount_type === "freeship") {
+        discount_amount = ship_fee
+      }
+
+      validatedVoucherId = voucher.id
+    }
+
+    const total_amount = total + ship_fee - discount_amount
 
     // payment_code: từ client hoặc tạo mới nếu thanh toán online
     const payment_code = clientPaymentCode
@@ -90,10 +149,11 @@ export async function POST(req: NextRequest) {
         note:             note ?? null,
         total,
         ship_fee,
+        discount_amount,
         total_amount,
         pay_method:       payment_method,
         payment_code,
-        voucher_id:       voucher_id ?? null,
+        voucher_id:       validatedVoucherId,
         scheduled_at:     scheduled_at ?? null,
       })
       .select("id")
@@ -114,6 +174,17 @@ export async function POST(req: NextRequest) {
     if (itemsErr) {
       await supabase.from("orders").delete().eq("id", order.id)
       return NextResponse.json({ error: "Không thể lưu danh sách món" }, { status: 500 })
+    }
+
+    // Ghi lượt dùng voucher — trigger DB tự tăng used_count
+    if (validatedVoucherId) {
+      await supabase.from("voucher_usages").insert({
+        voucher_id: validatedVoucherId,
+        user_id:    user.id,
+        order_id:   order.id,
+      }).then(({ error }) => {
+        if (error) console.error("[orders] voucher_usages insert error:", error)
+      })
     }
 
     // ── Notify merchant ──────────────────────────────────
