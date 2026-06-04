@@ -24,9 +24,27 @@ interface Product {
   badge?:    "hot" | "bigsale" | "bestseller" | null
   toppings:  Topping[]
   sizes:     SizeOpt[]
+  allDay?:    boolean
+  startHour?: string
+  endHour?:   string
 }
 
-interface MenuGroupMeta { id: string; name: string; sortOrder: number }
+interface MenuGroupMeta { id: string; name: string; sortOrder: number; allDay?: boolean; startHour?: string; endHour?: string }
+
+function isInTimeRange(allDay: boolean | undefined, startHour: string | undefined, endHour: string | undefined): boolean {
+  if (allDay !== false) return true
+  const now = new Date()
+  const [sh, sm] = (startHour ?? "00:00").split(":").map(Number)
+  const [eh, em] = (endHour   ?? "23:59").split(":").map(Number)
+  const cur = now.getHours() * 60 + now.getMinutes()
+  const start = sh * 60 + sm
+  const end   = eh * 60 + em
+  if (start <= end) return cur >= start && cur < end
+  return cur >= start || cur < end   // cross-midnight
+}
+function isGroupActive(g: MenuGroupMeta): boolean {
+  return isInTimeRange(g.allDay, g.startHour, g.endHour)
+}
 
 interface ShopInfo {
   name:          string
@@ -524,12 +542,12 @@ export default function ShopPage() {
       // Products
       const { data: prodData } = await supabase
         .from("products")
-        .select("id,name,description,price,original_price,category,is_available,sold_count,image_url,toppings,sizes,badge,sort_order")
+        .select("id,name,description,price,original_price,category,is_available,sold_count,image_url,toppings,sizes,badge,sort_order,all_day,start_hour,end_hour")
         .eq("shop_id", shopId)
         .eq("is_available", true)
         .order("sort_order", { ascending: true })
 
-      type ProdRow = { id:string; name:string; description:string|null; price:number; original_price:number|null; category:string|null; sold_count:number; image_url:string|null; toppings:unknown; sizes:unknown; badge:string|null; sort_order:number }
+      type ProdRow = { id:string; name:string; description:string|null; price:number; original_price:number|null; category:string|null; sold_count:number; image_url:string|null; toppings:unknown; sizes:unknown; badge:string|null; sort_order:number; all_day:boolean|null; start_hour:string|null; end_hour:string|null }
       const mapped: Product[] = (prodData ?? [] as ProdRow[])
         .map((p: ProdRow) => ({
           id: p.id, name: p.name, desc: p.description ?? "",
@@ -540,29 +558,41 @@ export default function ShopPage() {
           badge: (p.badge as Product["badge"]) ?? null,
           toppings: (p.toppings as Topping[] | null) ?? [],
           sizes: (p.sizes as SizeOpt[] | null) ?? [],
+          allDay:    p.all_day ?? true,
+          startHour: p.start_hour ?? "00:00",
+          endHour:   p.end_hour   ?? "23:59",
         }))
+        // Filter out products outside their selling time window
+        .filter(p => isInTimeRange(p.allDay, p.startHour, p.endHour))
         // Badge products float to top within their category
         .sort((a, b) => (b.badge ? 1 : 0) - (a.badge ? 1 : 0))
-      setProducts(mapped)
 
       // Derive category tabs — prefer menu_groups_data names (merchant-defined order & labels)
       const rawGroups = (shopData?.menu_groups_data as MenuGroupMeta[] | null) ?? []
       let cats: { id: string; label: string }[]
       if (rawGroups.length > 0) {
         const sorted = [...rawGroups].sort((a, b) => a.sortOrder - b.sortOrder)
-        const usedIds = new Set(mapped.map(p => p.category).filter(Boolean))
-        // Tabs: only groups that actually have products
+        // Only show groups that are currently active (within their time window)
+        const activeGroupIds = new Set(sorted.filter(isGroupActive).map(g => g.id))
+        const knownIds     = new Set(sorted.map(g => g.id))
+        // Hide products belonging to inactive time-restricted groups
+        const visibleMapped = mapped.filter(p =>
+          !p.category || !knownIds.has(p.category) || activeGroupIds.has(p.category)
+        )
+        setProducts(visibleMapped)
+        const usedIds = new Set(visibleMapped.map(p => p.category).filter(Boolean))
+        // Tabs: only active groups that actually have products
         cats = [
           { id: "__all__", label: "Tất cả" },
-          ...sorted.filter(g => usedIds.has(g.id)).map(g => ({ id: g.id, label: g.name })),
+          ...sorted.filter(g => isGroupActive(g) && usedIds.has(g.id)).map(g => ({ id: g.id, label: g.name })),
         ]
         // Products whose group was deleted / not in groups list → "Khác"
-        const knownIds = new Set(sorted.map(g => g.id))
-        if (mapped.some(p => p.category && !knownIds.has(p.category))) {
+        if (visibleMapped.some(p => p.category && !knownIds.has(p.category))) {
           cats.push({ id: "__other__", label: "Khác" })
         }
       } else {
         // Fallback: derive directly from product category field
+        setProducts(mapped)
         const catMap = new Map<string, string>()
         mapped.forEach(p => { if (p.category && !catMap.has(p.category)) catMap.set(p.category, p.category) })
         cats = [{ id: "__all__", label: "Tất cả" }, ...Array.from(catMap.entries()).map(([id, label]) => ({ id, label }))]
