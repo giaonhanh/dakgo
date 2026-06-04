@@ -720,7 +720,7 @@ export default function HomePage() {
                         order.status === "ready"      ? "rgba(255,179,71,0.3)" :
                         "rgba(62,207,110,0.25)"
                       return (
-                        <a key={order.id} href={order._href ?? `/tracking/${order.id}`}
+                        <a key={order.id} href="/orders"
                           style={{ textDecoration:"none", width:"100%", flexShrink:0 }}>
                           <div style={{
                             background: statusBg,

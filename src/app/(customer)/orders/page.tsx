@@ -908,7 +908,7 @@ export default function OrdersPage() {
                                 background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.28)",
                                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>📞</a>
                           )}
-                          {order.status === "delivering" && (
+                          {isActive && !isRideType(order.serviceType) && (
                             <button onClick={e => { e.stopPropagation(); router.push(`/tracking/${order.id}`) }}
                               style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, cursor: "pointer",
                                 background: "rgba(255,107,0,0.1)", outline: "1px solid rgba(255,107,0,0.28)",
@@ -1280,14 +1280,14 @@ export default function OrdersPage() {
 
                             {/* ── 5. Action buttons ── */}
                             <div style={{ display: "flex", gap: 7, marginTop: 6 }}>
-                              {order.status === "delivering" && (
+                              {isActive && !isRideType(order.serviceType) && (
                                 <button onClick={() => router.push(`/tracking/${order.id}`)}
                                   style={{ flex: 1, height: 36, borderRadius: 9, border: "none",
                                     background: "linear-gradient(90deg,#FF6B00,#FF8C00)",
                                     color: "#fff", fontSize: 10, fontWeight: 700, fontFamily: "Lexend",
                                     display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                                     boxShadow: "0 3px 10px rgba(255,107,0,0.3)", cursor: "pointer" }}>
-                                  🗺️ Theo dõi đơn
+                                  🗺️ Theo dõi đơn hàng
                                 </button>
                               )}
                               {(order.status === "delivering" || order.status === "preparing") && order.driver?.phone && (
