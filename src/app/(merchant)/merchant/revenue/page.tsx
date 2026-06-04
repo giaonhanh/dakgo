@@ -60,7 +60,7 @@ export default function MerchantRevenuePage() {
         // Fetch delivered orders in range
         const { data: orders } = await supabase
           .from("orders")
-          .select("id,total_amount,delivery_fee,pay_method,created_at")
+          .select("id,total_amount,delivery_fee,payment_method,created_at,subtotal,discount_amount")
           .eq("shop_id", shop.id)
           .eq("status", "delivered")
           .gte("created_at", startDate.toISOString())
@@ -81,7 +81,7 @@ export default function MerchantRevenuePage() {
             const label = DAY_LABELS[d.getDay()]
             days.push({
               day: label,
-              subtotal: dayOrders.reduce((s, o) => s + (o.total_amount ?? 0), 0),
+              subtotal: dayOrders.reduce((s, o) => s + (o.subtotal ?? o.total_amount ?? 0), 0),
               orders: dayOrders.length,
               voucherDiscount: 0,
             })
@@ -100,7 +100,7 @@ export default function MerchantRevenuePage() {
             if (wOrders.length > 0 || w < Math.ceil(now.getDate() / 7)) {
               weeks.push({
                 day: `T${w+1}`,
-                subtotal: wOrders.reduce((s, o) => s + (o.total_amount ?? 0), 0),
+                subtotal: wOrders.reduce((s, o) => s + (o.subtotal ?? o.total_amount ?? 0), 0),
                 orders: wOrders.length,
                 voucherDiscount: 0,
               })
@@ -118,7 +118,7 @@ export default function MerchantRevenuePage() {
           const orderIds = todayOrders.map(o => o.id)
           const { data: items } = await supabase
             .from("order_items")
-            .select("order_id,name,qty,price")
+            .select("order_id,name,quantity,price")
             .in("order_id", orderIds)
 
           const itemsByOrder = new Map<string, typeof items>()
@@ -130,14 +130,14 @@ export default function MerchantRevenuePage() {
 
           setRecentOrders(todayOrders.map(o => {
             const oItems = itemsByOrder.get(o.id) ?? []
-            const summary = oItems.map(i => `${i.name} ×${i.qty}`).join(", ") || "—"
+            const summary = oItems.map(i => `${i.name} ×${i.quantity}`).join(", ") || "—"
             const t = new Date(o.created_at)
             return {
               id: o.id.slice(-4).toUpperCase(),
               time: `${t.getHours().toString().padStart(2,"0")}:${t.getMinutes().toString().padStart(2,"0")}`,
-              items: summary, subtotal: o.total_amount ?? 0,
-              voucherDiscount: 0,
-              payMethod: o.pay_method ?? "cash",
+              items: summary, subtotal: o.subtotal ?? o.total_amount ?? 0,
+              voucherDiscount: o.discount_amount ?? 0,
+              payMethod: o.payment_method ?? "cash",
             }
           }))
         } else {
@@ -148,13 +148,13 @@ export default function MerchantRevenuePage() {
         if (ordersData.length > 0) {
           const { data: allItems } = await supabase
             .from("order_items")
-            .select("name,qty,price")
+            .select("name,quantity,price")
             .in("order_id", ordersData.map(o => o.id))
 
           const aggMap = new Map<string, { qty: number; subtotal: number }>()
           for (const item of allItems ?? []) {
             const cur = aggMap.get(item.name) ?? { qty: 0, subtotal: 0 }
-            aggMap.set(item.name, { qty: cur.qty + item.qty, subtotal: cur.subtotal + (item.price * item.qty) })
+            aggMap.set(item.name, { qty: cur.qty + item.quantity, subtotal: cur.subtotal + (item.price * item.quantity) })
           }
           const totalSub = Array.from(aggMap.values()).reduce((s, x) => s + x.subtotal, 0)
           const sorted = Array.from(aggMap.entries())
