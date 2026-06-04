@@ -204,7 +204,7 @@ export default function HomePage() {
       const ridesMapped = (liveRides ?? []).map(r => ({
         id: r.id,
         status: r.status === "searching" ? "pending" : r.status,
-        shops: { name: r.vehicle_type === "motorbike" ? "🛵 Xe ôm" : "🚕 Taxi" },
+        shops: { name: r.vehicle_type === "motorbike" ? "🛵 Xe ôm" : r.vehicle_type === "car_7" ? "🚙 Taxi 7 chỗ" : "🚕 Taxi 4 chỗ" },
         _href: "/orders",
         _type: "ride" as const,
       }))

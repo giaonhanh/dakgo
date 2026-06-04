@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ───────────────────────────────────────────────
 type Status = "delivering" | "preparing" | "pending" | "accepted" | "ready" | "completed" | "cancelled"
-type ServiceType = "food" | "errand_deliver" | "errand_buy" | "ride_motorbike" | "ride_car"
+type ServiceType = "food" | "errand_deliver" | "errand_buy" | "ride_motorbike" | "ride_car" | "ride_car_4" | "ride_car_7"
 
 interface ItemBreakdown {
   basePrice: number
@@ -71,12 +71,15 @@ const SERVICE_CFG: Record<ServiceType, { label: string; emoji: string; color: st
   food:           { label: "Đồ ăn",   emoji: "🍜", color: "#FF6B00", chipBg: "rgba(255,107,0,0.12)",  chipBd: "rgba(255,107,0,0.35)"  },
   errand_deliver: { label: "Giao hộ", emoji: "📦", color: "#b464ff", chipBg: "rgba(180,100,255,0.12)", chipBd: "rgba(180,100,255,0.35)" },
   errand_buy:     { label: "Mua hộ",  emoji: "🛒", color: "#3ecf6e", chipBg: "rgba(62,207,110,0.12)",  chipBd: "rgba(62,207,110,0.35)"  },
-  ride_motorbike: { label: "Xe ôm",   emoji: "🏍", color: "#4a8ff5", chipBg: "rgba(74,143,245,0.12)",  chipBd: "rgba(74,143,245,0.35)"  },
-  ride_car:       { label: "Taxi",    emoji: "🚕", color: "#FFB347", chipBg: "rgba(255,179,71,0.12)",   chipBd: "rgba(255,179,71,0.35)"  },
+  ride_motorbike: { label: "Xe ôm",       emoji: "🏍", color: "#4a8ff5", chipBg: "rgba(74,143,245,0.12)",  chipBd: "rgba(74,143,245,0.35)"  },
+  ride_car:       { label: "Taxi",        emoji: "🚕", color: "#FFB347", chipBg: "rgba(255,179,71,0.12)",   chipBd: "rgba(255,179,71,0.35)"  },
+  ride_car_4:     { label: "Taxi 4 chỗ", emoji: "🚕", color: "#FFB347", chipBg: "rgba(255,179,71,0.12)",   chipBd: "rgba(255,179,71,0.35)"  },
+  ride_car_7:     { label: "Taxi 7 chỗ", emoji: "🚙", color: "#b464ff", chipBg: "rgba(180,100,255,0.12)",  chipBd: "rgba(180,100,255,0.35)" },
 }
 
 const SHOP_COLORS = ["#FF8C00","#4a8ff5","#3ecf6e","#FFB347","#b464ff","#ff6060"]
 function shopColor(idx: number) { return SHOP_COLORS[idx % SHOP_COLORS.length] }
+function isRideType(t: ServiceType) { return t === "ride_motorbike" || t === "ride_car" || t === "ride_car_4" || t === "ride_car_7" }
 
 
 function fmtPayMethod(pm: string): string {
@@ -355,12 +358,19 @@ export default function OrdersPage() {
 
       const rideMapped: Order[] = (rideRows ?? []).map((r, idx) => {
         const isMoto = r.vehicle_type === "motorbike"
+        const svcType: ServiceType = isMoto ? "ride_motorbike"
+          : r.vehicle_type === "car_7" ? "ride_car_7"
+          : "ride_car_4"
+        const svcLabel = isMoto ? "Xe ôm"
+          : r.vehicle_type === "car_7" ? "Taxi 7 chỗ"
+          : "Taxi 4 chỗ"
+        const svcEmoji = isMoto ? "🛵" : r.vehicle_type === "car_7" ? "🚙" : "🚕"
         return {
           id:          r.id,
-          serviceType: (isMoto ? "ride_motorbike" : "ride_car") as ServiceType,
+          serviceType: svcType,
           shopId:      "",
-          shopName:    isMoto ? "Xe ôm" : "Taxi",
-          shopEmoji:   isMoto ? "🛵" : "🚕",
+          shopName:    svcLabel,
+          shopEmoji:   svcEmoji,
           shopColor:   shopColor(idx + 200),
           driverId:    r.driver_id ?? null,
           status:      r.status === "searching" ? "pending" : mapStatus(r.status ?? "pending"),
@@ -1370,3 +1380,4 @@ export default function OrdersPage() {
     </>
   )
 }
+

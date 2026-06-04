@@ -102,7 +102,7 @@ export default function TaxiPage() {
       const dLng = destCoord?.lng ?? 108.483
       const { error } = await supabase.from("rides").insert({
         customer_id:     user.id,
-        vehicle_type:    "car",
+        vehicle_type:    carType === "7cho" ? "car_7" : "car_4",
         pickup_address:  pickup,
         pickup_lat:      pLat,
         pickup_lng:      pLng,
