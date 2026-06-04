@@ -169,17 +169,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Không thể tạo đơn hàng", detail: orderErr?.message }, { status: 500 })
     }
 
-    // Tạo order_items
+    // Tạo order_items — không insert subtotal vì column có thể không tồn tại
     const { error: itemsErr } = await supabase
       .from("order_items")
       .insert(orderItems.map((i: { product_id: string; name: string; price: number; qty: number; subtotal: number; note: string | null }) => ({
-        order_id: order.id,
-        ...i,
+        order_id:   order.id,
+        product_id: i.product_id,
+        name:       i.name,
+        price:      i.price,
+        qty:        i.qty,
+        note:       i.note,
       })))
 
     if (itemsErr) {
+      console.error("[orders] order_items insert error:", itemsErr.code, itemsErr.message, itemsErr.details)
       await supabase.from("orders").delete().eq("id", order.id)
-      return NextResponse.json({ error: "Không thể lưu danh sách món" }, { status: 500 })
+      return NextResponse.json({ error: "Không thể lưu danh sách món", detail: itemsErr.message }, { status: 500 })
     }
 
     // Ghi lượt dùng voucher — trigger DB tự tăng used_count
