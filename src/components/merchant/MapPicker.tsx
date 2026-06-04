@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { reverseGeocode } from "@/lib/vietmapRoute"
+import "leaflet/dist/leaflet.css"
 
 interface MapPickerProps {
   initialLat?: number | null
@@ -126,10 +127,8 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
   }
 
   return (
-    <>
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <div style={{
-        position: "fixed", inset: 0, zIndex: 300,
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 300,
         display: "flex", flexDirection: "column",
         background: "#080806", fontFamily: "'Lexend',sans-serif",
       }}>
@@ -209,7 +208,6 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
             ✓ Xác nhận vị trí này
           </button>
         </div>
-      </div>
-    </>
+    </div>
   )
 }
