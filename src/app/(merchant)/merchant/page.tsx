@@ -72,6 +72,7 @@ export default function MerchantDashboard() {
   const supabase = createClient()
   const [shopId,        setShopId]        = useState<string | null>(null)
   const [shopName,      setShopName]      = useState("Cửa hàng")
+  const [commRate,      setCommRate]      = useState(0.10)
   const [open,          setOpen]          = useState(true)
   const [orders,        setOrders]        = useState<MOrder[]>([])
   const [todayRevenue,  setTodayRevenue]  = useState(0)
@@ -105,7 +106,7 @@ export default function MerchantDashboard() {
       // Get merchant's shop
       const { data: shop } = await supabase
         .from("shops")
-        .select("id, name, is_open, rating_avg, total_reviews, status")
+        .select("id, name, is_open, rating_avg, total_reviews, status, commission_rate")
         .eq("owner_id", user.id)
         .single()
 
@@ -116,6 +117,7 @@ export default function MerchantDashboard() {
       setShopName(shop.name)
       setOpen(shop.is_open)
       setRating(shop.rating_avg ?? null)
+      setCommRate(((shop as { commission_rate?: number }).commission_rate ?? 10) / 100)
 
       await fetchOrders(shop.id)
 
@@ -816,14 +818,14 @@ export default function MerchantDashboard() {
                             Thông tin thanh toán
                           </div>
                           {(() => {
-                            const commission = Math.round(order.subtotal * 0.15)
+                            const commission = Math.round(order.subtotal * commRate)
                             const netReceive = order.subtotal - commission - order.discountAmount
                             return (
                               <div style={{ background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.07)",
                                 borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
                                 {[
                                   { label: "Tiền hàng",        value: order.subtotal,       color: "#f8f0e0", prefix: "" },
-                                  { label: "Hoa hồng app 15%", value: commission,            color: "#ff6060", prefix: "−" },
+                                  { label: `Hoa hồng app ${Math.round(commRate * 100)}%`, value: commission, color: "#ff6060", prefix: "−" },
                                   ...(order.shipFee > 0
                                     ? [{ label: "Phụ phí giao hàng", value: order.shipFee,   color: "#b0956a", prefix: "" }]
                                     : []),
