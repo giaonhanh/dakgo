@@ -79,6 +79,11 @@ export default function AdminMerchantsPage() {
 
   async function load() {
     const supabase = createClient()
+
+    // Đọc defaultRate từ app_settings thay vì hardcode 15
+    const { data: commSetting } = await supabase.from("app_settings").select("value").eq("key", "commission").maybeSingle()
+    const defaultCommRate = parseInt((commSetting?.value as { defaultRate?: string } | null)?.defaultRate ?? "10") || 10
+
     const { data: rows } = await supabase
       .from("shops")
       .select("id, name, category, address, status, is_open, commission_rate, rating_avg, total_reviews, created_at, owner_id, phone, description, opening_hours")
@@ -100,7 +105,7 @@ export default function AdminMerchantsPage() {
         address: r.address, category: r.category,
         categoryIcon: categoryIcon(r.category), status: r.status as ShopStatus,
         registeredDate: new Date(r.created_at).toLocaleDateString("vi-VN"),
-        commissionRate: r.commission_rate ?? 15, rating: r.rating_avg ?? null,
+        commissionRate: r.commission_rate ?? defaultCommRate, rating: r.rating_avg ?? null,
         totalOrders: r.total_reviews ?? 0, isOpen: r.is_open ?? false,
         coverColor: categoryColor(r.category),
         ownerId: r.owner_id,

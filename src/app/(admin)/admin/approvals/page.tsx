@@ -199,7 +199,7 @@ export default function ApprovalsPage() {
     await supabase.from("shops").update(updatePayload).eq("id", id)
 
     const shop = shops.find(s => s.id === id)
-    const effectiveRate = commissionRate ?? shop?.commissionRate ?? 15
+    const effectiveRate = commissionRate ?? shop?.commissionRate ?? commCfg.defaultRate
     if (shop) {
       const ownerId = (await supabase.from("shops").select("owner_id").eq("id", id).single()).data?.owner_id
       if (ownerId) {

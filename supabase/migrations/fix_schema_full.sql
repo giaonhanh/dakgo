@@ -3,6 +3,9 @@
 -- Migration toàn diện cho DB đang chạy (không xóa dữ liệu)
 -- An toàn: IF NOT EXISTS / DO NOTHING / ALTER COLUMN ở mọi bước
 -- Tham chiếu schema đầy đủ: supabase/schema.sql
+
+-- Đổi default commission_rate từ 15 → 10 (theo app_settings)
+ALTER TABLE shops ALTER COLUMN commission_rate SET DEFAULT 10;
 -- ============================================================
 
 
