@@ -1034,7 +1034,7 @@ export default function ShopPage() {
 
           {/* ── Category tabs (sticky) ── */}
           {categories.length > 0 && (
-            <div ref={tabsRef} style={{ position:"sticky", top:72, zIndex:30,
+            <div ref={tabsRef} style={{ position:"sticky", top:"calc(env(safe-area-inset-top, 0px) + 52px)", zIndex:30,
               background:"rgba(8,8,6,0.95)", backdropFilter:"blur(12px)",
               borderBottom:"1px solid rgba(255,255,255,0.06)",
               padding:"10px 14px 10px", marginTop:12 }}>
