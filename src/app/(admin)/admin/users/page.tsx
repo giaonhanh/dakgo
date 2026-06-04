@@ -167,14 +167,26 @@ export default function AdminUsersPage() {
   const importFileRef = useRef<HTMLInputElement>(null)
 
   const parseImportRow = (cols: string[]): ImportMenuItem | null => {
-    const col0 = cols[0]?.trim() ?? "", col1 = cols[1]?.trim() ?? ""
-    const p3 = parseInt((cols[3] ?? "").replace(/\D/g, ""))
-    const isNew = !isNaN(p3) && p3 > 0
+    // FORMAT MỚI (12 cột): [0]DanhMục [1]NhómMenu [2]TênMón [3]MôTả [4]Giá [5]GiáKM [6]Badge [7]ĐangBán ...
+    // FORMAT CŨ (9 cột):   [0]DanhMục [1]TênMón [2]MôTả [3]Giá [4]GiáKM [5]Badge [6]ĐangBán ...
+    const isNewFmt = cols.length >= 10
     let name: string, category: string, description: string, pRaw: string, pmRaw: string, bRaw: string, aRaw: string
-    if (isNew) {
-      category = col0; name = col1; description = cols[2]?.trim() ?? ""; pRaw = cols[3] ?? ""; pmRaw = cols[4] ?? ""; bRaw = (cols[5] ?? "").toLowerCase().trim(); aRaw = (cols[6] ?? "").toLowerCase().trim()
+    if (isNewFmt) {
+      category    = cols[1]?.trim() ?? ""
+      name        = cols[2]?.trim() ?? ""
+      description = cols[3]?.trim() ?? ""
+      pRaw        = String(cols[4] ?? "")
+      pmRaw       = String(cols[5] ?? "")
+      bRaw        = (cols[6] ?? "").toString().toLowerCase().trim()
+      aRaw        = (cols[7] ?? "").toString().toLowerCase().trim()
     } else {
-      name = col0; description = col1; pRaw = cols[2] ?? ""; pmRaw = cols[3] ?? ""; category = cols[4]?.trim() ?? ""; bRaw = (cols[5] ?? "").toLowerCase().trim(); aRaw = (cols[6] ?? "").toLowerCase().trim()
+      const p3 = parseInt((cols[3] ?? "").replace(/\D/g, ""))
+      const isOldNew = !isNaN(p3) && p3 > 0
+      if (isOldNew) {
+        category = cols[0]?.trim() ?? ""; name = cols[1]?.trim() ?? ""; description = cols[2]?.trim() ?? ""; pRaw = cols[3] ?? ""; pmRaw = cols[4] ?? ""; bRaw = (cols[5] ?? "").toLowerCase().trim(); aRaw = (cols[6] ?? "").toLowerCase().trim()
+      } else {
+        name = cols[0]?.trim() ?? ""; description = cols[1]?.trim() ?? ""; pRaw = cols[2] ?? ""; pmRaw = cols[3] ?? ""; category = cols[4]?.trim() ?? ""; bRaw = (cols[5] ?? "").toLowerCase().trim(); aRaw = (cols[6] ?? "").toLowerCase().trim()
+      }
     }
     if (!name) return null
     const price = parseInt(pRaw.replace(/\D/g, "")) || 0
@@ -210,7 +222,7 @@ export default function AdminUsersPage() {
     let nextOrder = (((ex?.[0] as { sort_order?: number } | undefined)?.sort_order) ?? -1) + 1
     let saved = 0
     for (const item of importItems) {
-      const { error } = await sb.from("products").insert({ shop_id: importShopId, name: item.name, description: item.description || null, price: item.price, original_price: item.promoPrice || null, category: item.category || null, is_available: item.isAvailable, sold_count: 0, sort_order: nextOrder++ })
+      const { error } = await sb.from("products").insert({ shop_id: importShopId, name: item.name, description: item.description || null, price: item.price, original_price: item.promoPrice || null, category: item.category || null, badge: item.badge || null, is_available: item.isAvailable, sold_count: 0, sort_order: nextOrder++ })
       if (!error) saved++
     }
     setImportSaving(false); setShowImport(false); setImportItems(null); setImportShopId(null); setImportShopSearch(""); setImportShopName("")
