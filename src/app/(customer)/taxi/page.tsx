@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
 import AddressPicker from "@/components/map/AddressPicker"
 import { createClient } from "@/lib/supabase/client"
+import { haversineKm } from "@/lib/vietmapRoute"
 import type { AddressPickerResult } from "@/types"
 
 type CarType = "4cho" | "7cho"
@@ -29,11 +30,6 @@ function calcFeeFromRows(km: number, rows: string[], extra: string): number {
   return total
 }
 
-function estimateKm(dest: string): number {
-  if (!dest) return 0
-  const seed = dest.split("").reduce((a, c) => a + c.charCodeAt(0), 0)
-  return parseFloat(((seed % 60 + 15) / 10).toFixed(1))
-}
 
 export default function TaxiPage() {
   const router   = useRouter()
@@ -56,6 +52,17 @@ export default function TaxiPage() {
   const [taxi4Msg,     setTaxi4Msg]     = useState("Dịch vụ taxi 4 chỗ tạm ngừng phục vụ.")
   const [taxi7Msg,     setTaxi7Msg]     = useState("Dịch vụ taxi 7 chỗ tạm ngừng phục vụ.")
   const [onlineCount,  setOnlineCount]  = useState<number | null>(null)
+  const [distanceKm,   setDistanceKm]   = useState<number>(0)
+
+  // Tính khoảng cách thực khi có cả 2 tọa độ
+  useEffect(() => {
+    if (pickupCoord && destCoord) {
+      const km = haversineKm(pickupCoord.lat, pickupCoord.lng, destCoord.lat, destCoord.lng)
+      setDistanceKm(parseFloat(km.toFixed(1)))
+    } else {
+      setDistanceKm(0)
+    }
+  }, [pickupCoord, destCoord])
 
   useEffect(() => {
     const supabase = createClient()
@@ -85,10 +92,13 @@ export default function TaxiPage() {
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
   const car          = CARS[carType]
-  const estimatedKm  = estimateKm(dest)
-  const estimatedPrice = carType === "7cho"
-    ? calcFeeFromRows(estimatedKm, pricingRows7, pricingExtra7)
-    : calcFeeFromRows(estimatedKm, pricingRows,  pricingExtra)
+  // Dùng khoảng cách thực (haversine) nếu có coords, fallback tối thiểu 1km
+  const estimatedKm  = distanceKm > 0 ? distanceKm : (dest ? 1 : 0)
+  const estimatedPrice = dest
+    ? (carType === "7cho"
+        ? calcFeeFromRows(estimatedKm, pricingRows7, pricingExtra7)
+        : calcFeeFromRows(estimatedKm, pricingRows,  pricingExtra))
+    : 0
 
   const handleBook = async () => {
     if (!dest.trim()) { fireToast("Vui lòng nhập điểm đến"); return }
@@ -231,9 +241,10 @@ export default function TaxiPage() {
                     {dest ? formatPrice(estimatedPrice) : `Từ ${formatPrice(carType === "7cho" ? calcFeeFromRows(1, pricingRows7, pricingExtra7) : calcFeeFromRows(1, pricingRows, pricingExtra))}`}
                   </span>
                 </div>
-                {dest && (
+                {dest && estimatedKm > 0 && (
                   <div style={{ color:"#6a5a40",fontSize: 11,marginTop:4 }}>
                     ~{estimatedKm}km · {Math.round(estimatedKm * 2 + 8)}–{Math.round(estimatedKm * 3 + 12)} phút
+                    {distanceKm === 0 && <span style={{ color:"#4a5a40" }}> (ước tính)</span>}
                   </div>
                 )}
               </div>
@@ -321,10 +332,14 @@ export default function TaxiPage() {
                   </div>
                   <div style={{ textAlign:"right" }}>
                     <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:2 }}>Khoảng cách</div>
-                    <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>{estimatedKm} km</div>
-                    <div style={{ color:"#6a5a40",fontSize: 11,marginTop:2 }}>
-                      {Math.round(estimatedKm * 2 + 8)}–{Math.round(estimatedKm * 3 + 12)} phút
+                    <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>
+                      {distanceKm > 0 ? `${distanceKm} km` : dest ? "≥1 km" : "—"}
                     </div>
+                    {estimatedKm > 0 && (
+                      <div style={{ color:"#6a5a40",fontSize: 11,marginTop:2 }}>
+                        {Math.round(estimatedKm * 2 + 8)}–{Math.round(estimatedKm * 3 + 12)} phút
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>

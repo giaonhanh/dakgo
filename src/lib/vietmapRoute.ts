@@ -97,7 +97,7 @@ export function calcDeliveryFee(km: number): number {
   return 20000 + Math.round((k - 3) * 3500)
 }
 
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R    = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
   const dLng = (lng2 - lng1) * Math.PI / 180

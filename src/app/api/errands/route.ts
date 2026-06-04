@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
       estimated_items_cost,
       package_description,
       note,
+      service_fee: clientServiceFee,
       payment_method = "cash",
     } = await req.json()
 
@@ -30,6 +31,18 @@ export async function POST(req: NextRequest) {
     if (!["buy_for_me", "deliver_for_me"].includes(type)) {
       return NextResponse.json({ error: "Loại dịch vụ không hợp lệ" }, { status: 400 })
     }
+
+    // Lấy phí dịch vụ từ app_settings, dùng giá trị frontend gửi lên nếu hợp lệ
+    const { data: pricingRow } = await supabase
+      .from("app_settings").select("value").eq("key", "pricing").maybeSingle()
+    const pricingCfg = pricingRow?.value as Record<string, { rows?: string[]; extra?: string }> | null
+    const getMinFee = (rows?: string[]) => parseInt(rows?.[0] ?? "0") || 20000
+    const fallbackFee = type === "buy_for_me"
+      ? getMinFee(pricingCfg?.errand?.rows)
+      : getMinFee(pricingCfg?.delivery_pkg?.rows)
+    const service_fee = (typeof clientServiceFee === "number" && clientServiceFee > 0)
+      ? clientServiceFee
+      : fallbackFee
 
     const { data: errand, error } = await supabase
       .from("errands")
@@ -47,7 +60,7 @@ export async function POST(req: NextRequest) {
         estimated_items_cost: estimated_items_cost ?? null,
         package_description:  package_description ?? null,
         note:                 note ?? null,
-        service_fee:          25000,
+        service_fee,
         payment_method,
       })
       .select("id")

@@ -1,46 +1,77 @@
-﻿"use client";
+"use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import AddressPicker from "@/components/map/AddressPicker";
 import { createClient } from "@/lib/supabase/client";
+import { haversineKm } from "@/lib/vietmapRoute";
 import type { AddressPickerResult } from "@/types";
 
-const SERVICES = [
-  { id: "xe-om", label: "Xe Ôm",  emoji: "🏍️", basePrice: 10000, perKm: 4500,  desc: "Nhanh · Linh hoạt" },
-  { id: "taxi",  label: "Taxi",   emoji: "🚕", basePrice: 15000, perKm: 8000,  desc: "Thoải mái · An toàn" },
-];
-
-// Ước tính km theo độ dài địa chỉ (placeholder — thay bằng OSRM khi có backend)
-function estimateKm(dest: string): number {
-  if (!dest) return 0
-  const seed = dest.split("").reduce((a, c) => a + c.charCodeAt(0), 0)
-  return parseFloat(((seed % 60 + 10) / 10).toFixed(1))
+// Same row-based fare calc as taxi
+function calcFeeFromRows(km: number, rows: string[], extra: string): number {
+  const kmInt = Math.ceil(Math.max(km, 1))
+  let total = 0
+  for (let i = 0; i < Math.min(kmInt, 10); i++) {
+    let price = 0
+    for (let j = i; j >= 0; j--) {
+      if (rows[j] && rows[j] !== "") { price = parseInt(rows[j]) || 0; break }
+    }
+    total += price
+  }
+  if (kmInt > 10) total += (kmInt - 10) * (parseInt(extra) || 0)
+  return total
 }
+
+const DEFAULT_MOTORBIKE_ROWS  = ["10000","9000","8000","7500","7000","6500","6000","5500","5000","4500"]
+const DEFAULT_MOTORBIKE_EXTRA = "4000"
 
 function RideContent() {
   const router = useRouter();
   const params = useSearchParams();
   const supabase = createClient();
-  const [service,     setService]     = useState(
-    params.get("type") === "taxi" ? "taxi" : "xe-om"
-  );
-  const [pickup,      setPickup]      = useState("Phước An, Krông Pắc");
-  const [dest,        setDest]        = useState("");
-  const [loading,     setLoading]     = useState(false);
-  const [toast,       setToast]       = useState("");
-  const [mapMode,     setMapMode]     = useState<null | "pickup" | "dest">(null);
-  const [pickupCoord, setPickupCoord] = useState<{ lat: number; lng: number } | null>(null);
-  const [destCoord,   setDestCoord]   = useState<{ lat: number; lng: number } | null>(null);
+
+  const [service,       setService]       = useState(params.get("type") === "taxi" ? "taxi" : "xe-om");
+  const [pickup,        setPickup]        = useState("Phước An, Krông Pắc");
+  const [dest,          setDest]          = useState("");
+  const [loading,       setLoading]       = useState(false);
+  const [toast,         setToast]         = useState("");
+  const [mapMode,       setMapMode]       = useState<null | "pickup" | "dest">(null);
+  const [pickupCoord,   setPickupCoord]   = useState<{ lat: number; lng: number } | null>(null);
+  const [destCoord,     setDestCoord]     = useState<{ lat: number; lng: number } | null>(null);
+  const [distanceKm,    setDistanceKm]    = useState<number>(0);
+  const [pricingRows,   setPricingRows]   = useState<string[]>(DEFAULT_MOTORBIKE_ROWS);
+  const [pricingExtra,  setPricingExtra]  = useState(DEFAULT_MOTORBIKE_EXTRA);
+
+  // Load motorbike pricing from admin settings
+  useEffect(() => {
+    createClient()
+      .from("app_settings").select("value").eq("key", "pricing").maybeSingle()
+      .then(({ data }) => {
+        const p = data?.value as Record<string, { rows?: string[]; extra?: string }> | null
+        if (p?.motorbike?.rows)  setPricingRows(p.motorbike.rows)
+        if (p?.motorbike?.extra) setPricingExtra(p.motorbike.extra)
+      })
+  }, [])
+
+  // Recalculate distance when both coords are available
+  useEffect(() => {
+    if (pickupCoord && destCoord) {
+      const km = haversineKm(pickupCoord.lat, pickupCoord.lng, destCoord.lat, destCoord.lng)
+      setDistanceKm(parseFloat(km.toFixed(1)))
+    } else {
+      setDistanceKm(0)
+    }
+  }, [pickupCoord, destCoord])
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
 
-  const selected = SERVICES.find((s) => s.id === service);
-  const estimatedKm = estimateKm(dest);
-  const estimatedPrice = selected ? selected.basePrice + Math.round(selected.perKm * estimatedKm) : 0;
+  const estimatedKm    = distanceKm
+  const estimatedPrice = dest
+    ? calcFeeFromRows(estimatedKm || 1, pricingRows, pricingExtra)
+    : 0
 
   const handleBook = async () => {
     if (!dest.trim()) { fireToast("Vui lòng nhập điểm đến"); return }
@@ -54,20 +85,20 @@ function RideContent() {
       const dLng = destCoord?.lng ?? 108.483
       const { error } = await supabase.from("rides").insert({
         customer_id:     user.id,
-        vehicle_type:    service,
+        vehicle_type:    "motorbike",
         pickup_address:  pickup,
         pickup_lat:      pLat,
         pickup_lng:      pLng,
         dropoff_address: dest,
         dropoff_lat:     dLat,
         dropoff_lng:     dLng,
-        distance_km:     estimatedKm,
+        distance_km:     estimatedKm || null,
         estimated_fare:  estimatedPrice,
         payment_method:  "cash",
         status:          "searching",
       })
       if (error) { fireToast("Không thể đặt xe. Thử lại sau."); setLoading(false); return }
-      fireToast(`✅ Đang tìm ${selected?.label} cho bạn...`)
+      fireToast("✅ Đang tìm xe ôm cho bạn...")
       setTimeout(() => router.push("/orders"), 2000)
     } catch {
       fireToast("Có lỗi xảy ra, vui lòng thử lại")
@@ -106,12 +137,13 @@ function RideContent() {
             background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}>
           <ArrowLeft size={20} style={{ color: "var(--acc)" }} />
         </button>
-        <h1 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Đặt xe</h1>
+        <h1 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Đặt xe ôm</h1>
       </header>
 
       <main className="max-w-md mx-auto px-4 space-y-4"
         style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 68px)" }}>
-        {/* Route preview / prompt */}
+
+        {/* Route preview */}
         {(pickupCoord || destCoord) ? (
           <motion.div
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -129,11 +161,6 @@ function RideContent() {
                 <span style={{ color: pickupCoord ? "#f8f0e0" : "#6a5a40", fontSize: 10.5, flex: 1, lineHeight: 1.4 }}>
                   {pickup || "Chưa chọn điểm đón"}
                 </span>
-                {pickupCoord && (
-                  <span style={{ color: "#6a5a40", fontSize: 10, fontFamily: "monospace", flexShrink: 0 }}>
-                    {pickupCoord.lat.toFixed(4)},{pickupCoord.lng.toFixed(4)}
-                  </span>
-                )}
               </div>
               <div style={{ width: 1, height: 10, background: "rgba(255,255,255,0.1)", marginLeft: 3.5 }} />
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -142,12 +169,14 @@ function RideContent() {
                 <span style={{ color: destCoord ? "#f8f0e0" : "#6a5a40", fontSize: 10.5, flex: 1, lineHeight: 1.4 }}>
                   {dest || "Chưa chọn điểm đến"}
                 </span>
-                {destCoord && (
-                  <span style={{ color: "#6a5a40", fontSize: 10, fontFamily: "monospace", flexShrink: 0 }}>
-                    {destCoord.lat.toFixed(4)},{destCoord.lng.toFixed(4)}
-                  </span>
-                )}
               </div>
+              {distanceKm > 0 && (
+                <div style={{ marginTop: 4, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)",
+                  color: "#b0956a", fontSize: 10 }}>
+                  📏 Khoảng cách: <strong style={{ color: "#f8f0e0" }}>{distanceKm} km</strong>
+                  <span style={{ color: "#6a5a40", marginLeft: 6 }}>(đường chim bay)</span>
+                </div>
+              )}
             </div>
           </motion.div>
         ) : (
@@ -156,34 +185,13 @@ function RideContent() {
             style={{ height: 80, background: "var(--glass)", border: "1px dashed rgba(255,215,0,0.2)",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}
           >
-            <span style={{ fontSize: 26 }}>🗺️</span>
+            <span style={{ fontSize: 26 }}>🏍️</span>
             <div>
               <p style={{ color: "#b0956a", fontSize: 11, fontWeight: 600 }}>Chọn điểm đón & điểm đến</p>
               <p style={{ color: "#6a5a40", fontSize: 11, marginTop: 2 }}>Nhấn 📍 hoặc 🗺️ để chọn trên bản đồ</p>
             </div>
           </div>
         )}
-
-        {/* Service tabs */}
-        <div className="flex gap-2">
-          {SERVICES.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setService(s.id)}
-              className="flex-1 p-3 rounded-2xl text-left transition-all"
-              style={{
-                background: service === s.id ? "var(--glass-acc)" : "var(--glass)",
-                border: service === s.id ? "1px solid var(--border)" : "1px solid var(--border-2)",
-              }}
-            >
-              <div className="text-2xl mb-1">{s.emoji}</div>
-              <p className="text-sm font-bold" style={{ color: service === s.id ? "var(--acc)" : "var(--text-primary)" }}>
-                {s.label}
-              </p>
-              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{s.desc}</p>
-            </button>
-          ))}
-        </div>
 
         {/* Địa chỉ */}
         <div
@@ -237,16 +245,25 @@ function RideContent() {
           >
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>Ước tính</p>
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {distanceKm > 0 ? "Ước tính" : "Tối thiểu"}
+                </p>
                 <p className="text-xl font-black mt-0.5" style={{ color: "var(--acc)" }}>
                   {formatPrice(estimatedPrice)}
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>Khoảng cách</p>
-                <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>{estimatedKm} km</p>
+                <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                  {distanceKm > 0 ? `${distanceKm} km` : "—"}
+                </p>
               </div>
             </div>
+            {distanceKm === 0 && dest && (
+              <p style={{ color: "#6a5a40", fontSize: 9, marginTop: 6 }}>
+                * Chọn điểm trên bản đồ để tính khoảng cách chính xác
+              </p>
+            )}
           </motion.div>
         )}
 
@@ -264,32 +281,32 @@ function RideContent() {
             boxShadow: dest && !loading ? "0 4px 20px rgba(255,107,0,0.4)" : "none",
           }}
         >
-          {loading ? "Đang tìm xe..." : <>{selected?.emoji} Đặt {selected?.label} ngay <ChevronRight size={18} /></>}
+          {loading ? "Đang tìm xe..." : <>🏍️ Đặt xe ôm ngay <ChevronRight size={18} /></>}
         </motion.button>
       </main>
     </div>
 
     {/* AddressPicker fullscreen overlay */}
-      {mapMode && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 300 }}>
-          <AddressPicker
-            height="100dvh"
-            initialLat={mapMode === "pickup" ? (pickupCoord?.lat ?? 12.6455) : (destCoord?.lat ?? 12.6455)}
-            initialLng={mapMode === "pickup" ? (pickupCoord?.lng ?? 108.2612) : (destCoord?.lng ?? 108.2612)}
-            onClose={() => setMapMode(null)}
-            onConfirm={(result: AddressPickerResult) => {
-              if (mapMode === "pickup") {
-                setPickup(result.address)
-                setPickupCoord({ lat: result.lat, lng: result.lng })
-              } else {
-                setDest(result.address)
-                setDestCoord({ lat: result.lat, lng: result.lng })
-              }
-              setMapMode(null)
-            }}
-          />
-        </div>
-      )}
+    {mapMode && (
+      <div style={{ position: "fixed", inset: 0, zIndex: 300 }}>
+        <AddressPicker
+          height="100dvh"
+          initialLat={mapMode === "pickup" ? (pickupCoord?.lat ?? 12.6455) : (destCoord?.lat ?? 12.6455)}
+          initialLng={mapMode === "pickup" ? (pickupCoord?.lng ?? 108.2612) : (destCoord?.lng ?? 108.2612)}
+          onClose={() => setMapMode(null)}
+          onConfirm={(result: AddressPickerResult) => {
+            if (mapMode === "pickup") {
+              setPickup(result.address)
+              setPickupCoord({ lat: result.lat, lng: result.lng })
+            } else {
+              setDest(result.address)
+              setDestCoord({ lat: result.lat, lng: result.lng })
+            }
+            setMapMode(null)
+          }}
+        />
+      </div>
+    )}
     </>
   );
 }

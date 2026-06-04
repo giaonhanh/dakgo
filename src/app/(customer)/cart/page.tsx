@@ -7,7 +7,7 @@ import { useCartStore } from "@/store/cartStore"
 import { formatPrice } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 
-const SHIP_FEE = 15000
+const SHIP_FEE_DEFAULT = 15000
 
 interface AppliedCombo { title: string; discount: number }
 
@@ -23,6 +23,17 @@ export default function CartPage() {
 
   const [openNoteId,     setOpenNoteId]     = useState<string | null>(null)
   const [appliedCombos,  setAppliedCombos]  = useState<AppliedCombo[]>([])
+  const [shipFee,        setShipFee]        = useState(SHIP_FEE_DEFAULT)
+
+  // Load phí giao hàng tối thiểu từ app_settings
+  useEffect(() => {
+    supabase.from("app_settings").select("value").eq("key","pricing").maybeSingle()
+      .then(({ data }) => {
+        const p = data?.value as Record<string, { rows?: string[] }> | null
+        const firstKm = parseInt(p?.food?.rows?.[0] ?? "0")
+        if (firstKm > 0) setShipFee(firstKm)
+      })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tự nhận diện combo đủ điều kiện
   useEffect(() => {
@@ -51,7 +62,7 @@ export default function CartPage() {
 
   const comboDiscount = appliedCombos.reduce((s, c) => s + c.discount, 0)
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
-  const total    = subtotal + SHIP_FEE - comboDiscount
+  const total    = subtotal + shipFee - comboDiscount
 
   return (
     <>
