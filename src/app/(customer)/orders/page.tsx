@@ -857,7 +857,7 @@ export default function OrdersPage() {
                         <span style={{ color: "rgba(255,255,255,0.12)", margin: "0 5px", fontSize: 11 }}>·</span>
                         <span style={{ color: "#6a5a40", fontSize: 11 }}>{order.createdAt}</span>
                         <span style={{ color: "rgba(255,255,255,0.12)", margin: "0 5px", fontSize: 11 }}>·</span>
-                        {(order.serviceType === "ride_motorbike" || order.serviceType === "ride_car")
+                        {(isRideType(order.serviceType))
                           ? <span style={{ color: "#6a5a40", fontSize: 11 }}>{order.distanceKm ? `~${order.distanceKm}km` : "Chuyến xe"}</span>
                           : <span style={{ color: "#6a5a40", fontSize: 11 }}>{order.items.length} món</span>
                         }
@@ -881,10 +881,10 @@ export default function OrdersPage() {
                       {/* Địa chỉ / Điểm trả khách */}
                       <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginBottom: 7 }}>
                         <span style={{ fontSize: 12, flexShrink: 0, marginTop: 1 }}>
-                          {(order.serviceType === "ride_motorbike" || order.serviceType === "ride_car") ? "🚩" : "📍"}
+                          {(isRideType(order.serviceType)) ? "🚩" : "📍"}
                         </span>
                         <span style={{ color: "#b0956a", fontSize: 11, lineHeight: 1.45, flex: 1 }}>
-                          {(order.serviceType === "ride_motorbike" || order.serviceType === "ride_car")
+                          {(isRideType(order.serviceType))
                             ? `${order.pickupAddress?.split(",")[0] ?? "—"} → ${order.address?.split(",")[0] ?? "—"}`
                             : (order.address || "Chưa có địa chỉ")
                           }
@@ -953,7 +953,7 @@ export default function OrdersPage() {
                             )}
 
                             {/* ── 1a. Chi tiết chuyến xe (rides) ── */}
-                            {(order.serviceType === "ride_motorbike" || order.serviceType === "ride_car") && (
+                            {(isRideType(order.serviceType)) && (
                               <>
                                 <SLabel>Chi tiết chuyến xe</SLabel>
                                 <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
@@ -997,7 +997,7 @@ export default function OrdersPage() {
                             )}
 
                             {/* ── 1b. Chi tiết món (food / errand) ── */}
-                            {order.serviceType !== "ride_motorbike" && order.serviceType !== "ride_car" && (
+                            {!isRideType(order.serviceType) && (
                             <><SLabel>Chi tiết món</SLabel>
                             <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
                               borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
@@ -1116,7 +1116,7 @@ export default function OrdersPage() {
                                   <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
                                     borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
                                     {[
-                                      { label: (order.serviceType === "ride_motorbike" || order.serviceType === "ride_car") ? "Cước phí xe" : "Tiền món", val: order.subtotal, c: "#b0956a" },
+                                      { label: (isRideType(order.serviceType)) ? "Cước phí xe" : "Tiền món", val: order.subtotal, c: "#b0956a" },
                                       order.deliveryFee > 0 ? { label: "Phí giao hàng", val: order.deliveryFee, c: "#b0956a" } : null,
                                       order.discount > 0    ? { label: "Voucher giảm",  val: -order.discount,   c: "#3ecf6e" } : null,
                                       xuUsed > 0            ? { label: "🪙 Xu đã dùng", val: -xuUsed,           c: "#FFB347" } : null,
@@ -1145,7 +1145,7 @@ export default function OrdersPage() {
                             })()}
 
                             {/* ── 3. Thông tin giao hàng (food / errand only) ── */}
-                            {order.serviceType !== "ride_motorbike" && order.serviceType !== "ride_car" && (
+                            {!isRideType(order.serviceType) && (
                             <><SLabel>Thông tin giao hàng</SLabel>
                             <InfoBox rows={[
                               ...(order.pickupAddress ? [{ icon: "📤", key: "Lấy tại",     val: order.pickupAddress }] : []),
@@ -1388,4 +1388,5 @@ export default function OrdersPage() {
     </>
   )
 }
+
 
