@@ -1523,6 +1523,8 @@ export default function CheckoutPage() {
       {showMapPicker && (
         <div style={{ position: "fixed", inset: 0, zIndex: 300 }}>
           <AddressPicker height="100dvh"
+            initialLat={mapAddress?.lat}
+            initialLng={mapAddress?.lng}
             onClose={() => setShowMapPicker(false)}
             onConfirm={(result: AddressPickerResult) => {
               setMapAddress({ address: result.address, lat: result.lat, lng: result.lng })
