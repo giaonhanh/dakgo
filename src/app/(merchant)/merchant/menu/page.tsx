@@ -28,7 +28,7 @@ interface Product {
   toppings: Topping[]; sizes: SizeOpt[]
   promoEnabled: boolean; promoPrice: number | null
   promoStart: string; promoEnd: string; promoPerPerson: number | null
-  badge: "hot" | "bigsale" | "bestseller" | null
+  badge: "hot" | "bigsale" | "bestseller" | "new" | null
   available: boolean; soldCount: number; sortOrder: number
 }
 
@@ -41,6 +41,7 @@ const BADGE_LIST = [
   { key:"hot"        as const, label:"🔥 HOT",      color:"#ff4040", bg:"rgba(255,64,64,0.15)",    border:"rgba(255,64,64,0.4)"    },
   { key:"bigsale"    as const, label:"💸 BIG SALE", color:"#FFD700", bg:"rgba(255,215,0,0.12)",    border:"rgba(255,215,0,0.4)"    },
   { key:"bestseller" as const, label:"📈 BÁN CHẠY", color:"#3ecf6e", bg:"rgba(62,207,110,0.12)",  border:"rgba(62,207,110,0.4)"   },
+  { key:"new"        as const, label:"✨ MỚI CÓ",   color:"#4a8ff5", bg:"rgba(74,143,245,0.12)",   border:"rgba(74,143,245,0.4)"   },
 ]
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 const uid = () => `${Date.now()}_${Math.random().toString(36).slice(2,6)}`
@@ -59,7 +60,7 @@ const blankProduct = (): Product => ({
 // (no hardcoded sample data — loaded from Supabase)
 
 // ── CSV Import types ───────────────────────────────────────────────────────
-interface ImportRow { name: string; description: string; price: number; promoPrice: number | null; category: string; badge: Product["badge"] }
+interface ImportRow { name: string; description: string; price: number; promoPrice: number | null; category: string; badge: Product["badge"]; isAvailable: boolean }
 
 // ── Drag-and-drop product card ─────────────────────────────────────────────
 interface ProductCardProps {
@@ -308,13 +309,42 @@ export default function MerchantMenuPage() {
   }
 
   const parseRawRow = (cols: string[]): ImportRow | null => {
-    const name = cols[0]?.trim()
+    // Thứ tự cột mới: [0]Danh mục [1]Tên món [2]Mô tả [3]Giá bán [4]Giá KM [5]Badge [6]Đang bán
+    // Backward compat: nếu cột 0 trông như tên món (không có giá ở cột 3) → dùng thứ tự cũ
+    const col0 = cols[0]?.trim() ?? ""
+    const col1 = cols[1]?.trim() ?? ""
+    const priceAt3 = parseInt((cols[3] ?? "").replace(/\D/g, ""))
+    const priceAt2 = parseInt((cols[2] ?? "").replace(/\D/g, ""))
+    const isNewFormat = !isNaN(priceAt3) && priceAt3 > 0
+
+    let name: string, category: string, description: string, priceRaw: string, promoRaw: string, badgeRaw: string, availRaw: string
+    if (isNewFormat) {
+      // Thứ tự mới: Danh mục | Tên | Mô tả | Giá | Giá KM | Badge | Đang bán
+      category    = col0
+      name        = col1
+      description = cols[2]?.trim() ?? ""
+      priceRaw    = cols[3] ?? ""
+      promoRaw    = cols[4] ?? ""
+      badgeRaw    = (cols[5] ?? "").toLowerCase().trim()
+      availRaw    = (cols[6] ?? "").toLowerCase().trim()
+    } else {
+      // Thứ tự cũ (backward compat): Tên | Mô tả | Giá | Giá KM | Danh mục | Badge
+      name        = col0
+      description = col1
+      priceRaw    = cols[2] ?? ""
+      promoRaw    = cols[3] ?? ""
+      category    = cols[4]?.trim() ?? ""
+      badgeRaw    = (cols[5] ?? "").toLowerCase().trim()
+      availRaw    = (cols[6] ?? "").toLowerCase().trim()
+      void priceAt3
+    }
+
     if (!name) return null
-    const price = parseInt((cols[2] ?? "").replace(/\D/g, "")) || 0
-    const promoPrice = cols[3] ? (parseInt(String(cols[3]).replace(/\D/g, "")) || null) : null
-    const badgeRaw = (cols[5] ?? "").toLowerCase().trim()
-    const badge: Product["badge"] = badgeRaw === "hot" ? "hot" : badgeRaw === "bigsale" ? "bigsale" : badgeRaw === "bestseller" ? "bestseller" : null
-    return { name, description: (cols[1] ?? "").trim(), price, promoPrice, category: (cols[4] ?? "").trim(), badge }
+    const price     = parseInt(priceRaw.replace(/\D/g, "")) || (isNewFormat ? 0 : priceAt2) || 0
+    const promoPrice = promoRaw ? (parseInt(String(promoRaw).replace(/\D/g, "")) || null) : null
+    const badge: Product["badge"] = badgeRaw === "hot" ? "hot" : badgeRaw === "bigsale" ? "bigsale" : badgeRaw === "bestseller" ? "bestseller" : badgeRaw === "new" ? "new" : null
+    const isAvailable = availRaw === "" || availRaw === "có" || availRaw === "co" || availRaw === "yes" || availRaw === "1" || availRaw === "true"
+    return { name, description, price, promoPrice, category, badge, isAvailable }
   }
 
   const onCSVFile = (file: File) => {
@@ -363,7 +393,7 @@ export default function MerchantMenuPage() {
       const { data, error } = await supabase.from("products").insert({
         shop_id: shopId, name: r.name, description: r.description || null,
         price: r.price, original_price: r.promoPrice || null,
-        category, is_available: true, sold_count: 0,
+        category, is_available: r.isAvailable, sold_count: 0,
         sort_order: products.length + saved.length,
       }).select("id").single()
       if (!error && data) {
@@ -387,61 +417,164 @@ export default function MerchantMenuPage() {
   }
 
   const downloadTemplate = () => {
-    const headers = ["Tên món *", "Mô tả", "Giá bán * (VNĐ)", "Giá khuyến mãi (VNĐ)", "Danh mục", "Badge"]
+    // ── Cột: Danh mục | Tên món | Mô tả | Giá bán | Giá KM | Badge | Đang bán ──
+    const headers = [
+      "Danh mục",
+      "Tên món *",
+      "Mô tả / Nguyên liệu",
+      "Giá bán * (đ)",
+      "Giá KM (đ)",
+      "Badge",
+      "Đang bán",
+    ]
+
     const samples = [
-      ["Bún bò đặc biệt", "Thịt bò tươi + bún thơm + rau sống", 45000, 38000, "Bún / Phở", "bestseller"],
-      ["Cơm gà xối mỡ",  "Cơm trắng + gà giòn xối mỡ + rau",  42000, "",     "Cơm",       "hot"],
-      ["Trà đá",          "Trà đậm đà mát lạnh",                5000,  "",     "Đồ uống",   ""],
-      ["Nước cam tươi",   "Cam vắt tươi không đường",           25000, "",     "Đồ uống",   ""],
-      ["Bánh mì thịt",    "Bánh mì giòn + thịt nguội + pate",   18000, 15000,  "Bánh",      "bigsale"],
-      ["Gà rán cay",      "2 miếng gà rán sốt cay Hàn Quốc",   55000, "",     "Gà",        ""],
-      ["Cơm sườn bì chả", "Cơm + sườn nướng + bì + chả lụa",   40000, "",     "Cơm",       "bestseller"],
-      ["Sinh tố bơ",      "Bơ tươi béo ngậy không đường",       30000, "",     "Đồ uống",   "hot"],
+      // [Danh mục, Tên món, Mô tả, Giá, Giá KM, Badge, Đang bán]
+      ["Cơm",          "Cơm sườn bì chả",       "Cơm + sườn nướng + bì + chả lụa",               40000, "",     "bestseller", "CÓ"],
+      ["Cơm",          "Cơm gà xối mỡ",          "Cơm trắng + gà giòn xối mỡ + rau sống",         42000, 38000, "hot",        "CÓ"],
+      ["Cơm",          "Cơm tấm sườn trứng",     "Cơm tấm + sườn cốt lết + trứng + dưa chua",    38000, "",     "",           "CÓ"],
+      ["Bún / Phở",    "Bún bò đặc biệt",        "Bún + thịt bò tươi + giò heo + rau sống",       45000, 40000, "bestseller", "CÓ"],
+      ["Bún / Phở",    "Phở bò tái chín",        "Phở + tái + chín + hành lá + húng quế",         40000, "",     "hot",        "CÓ"],
+      ["Bún / Phở",    "Bún riêu cua",           "Bún + riêu cua + đậu hũ + cà chua + rau",       35000, "",     "",           "CÓ"],
+      ["Gà",           "Gà rán cay Hàn Quốc",    "2 miếng gà rán sốt cay ngọt Hàn Quốc",          55000, "",     "new",        "CÓ"],
+      ["Gà",           "Gà nướng mật ong",       "Gà nướng sốt mật ong + tỏi + ớt",              50000, 45000, "",           "CÓ"],
+      ["Bánh",         "Bánh mì thịt đặc biệt",  "Bánh mì giòn + thịt nguội + pate + rau",         18000, 15000, "bigsale",    "CÓ"],
+      ["Bánh",         "Bánh mì ốp la",           "Bánh mì + trứng ốp la + hành mỡ",               12000, "",     "",           "CÓ"],
+      ["Đồ uống",      "Trà đá",                  "Trà đậm đà pha sẵn mát lạnh",                    5000,  "",     "",           "CÓ"],
+      ["Đồ uống",      "Nước cam tươi",           "Cam vắt tươi nguyên chất không đường",           25000, "",     "hot",        "CÓ"],
+      ["Đồ uống",      "Sinh tố bơ",              "Bơ tươi béo ngậy + sữa đặc",                    30000, "",     "",           "CÓ"],
+      ["Tráng miệng",  "Chè đậu xanh",            "Chè đậu xanh đánh + nước cốt dừa",              15000, "",     "",           "CÓ"],
+      ["Tráng miệng",  "Bánh flan caramel",       "Bánh flan mềm mịn + caramel đắng ngọt",         20000, 18000, "new",        "CÓ"],
     ]
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...samples])
 
     // Độ rộng cột
     ws["!cols"] = [
-      { wch: 28 }, // Tên món
-      { wch: 36 }, // Mô tả
-      { wch: 18 }, // Giá bán
-      { wch: 20 }, // Giá KM
       { wch: 16 }, // Danh mục
-      { wch: 14 }, // Badge
+      { wch: 26 }, // Tên món
+      { wch: 38 }, // Mô tả
+      { wch: 14 }, // Giá bán
+      { wch: 12 }, // Giá KM
+      { wch: 12 }, // Badge
+      { wch: 11 }, // Đang bán
     ]
 
-    // Style dòng tiêu đề (in đậm nền cam)
-    const headerRange = XLSX.utils.decode_range(ws["!ref"] ?? "A1:F1")
+    // Freeze row 1 (tiêu đề)
+    ws["!freeze"] = { xSplit: 0, ySplit: 1 }
+
+    // Style tiêu đề — nền cam đậm, chữ trắng in đậm
+    const HEADER_FILL = "FF6B1A"
+    const headerRange = XLSX.utils.decode_range(ws["!ref"] ?? "A1:G1")
     for (let c = headerRange.s.c; c <= headerRange.e.c; c++) {
       const cell = XLSX.utils.encode_cell({ r: 0, c })
-      if (!ws[cell]) continue
+      if (!ws[cell]) ws[cell] = { t: "s", v: "" }
       ws[cell].s = {
-        font: { bold: true, color: { rgb: "FFFFFF" } },
-        fill: { fgColor: { rgb: "FF6B00" } },
-        alignment: { horizontal: "center" },
+        font:      { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
+        fill:      { patternType: "solid", fgColor: { rgb: HEADER_FILL } },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border:    { bottom: { style: "medium", color: { rgb: "CC5500" } } },
       }
     }
 
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "Menu mẫu")
+    // Style dòng dữ liệu — xen kẽ màu nhạt
+    const EVEN_FILL = "FFF3EB"  // cam rất nhạt
+    const ODD_FILL  = "FFFFFF"  // trắng
+    for (let r = 1; r <= samples.length; r++) {
+      const fill = r % 2 === 0 ? EVEN_FILL : ODD_FILL
+      for (let c = 0; c <= 6; c++) {
+        const cell = XLSX.utils.encode_cell({ r, c })
+        if (!ws[cell]) ws[cell] = { t: "s", v: "" }
+        ws[cell].s = {
+          fill:      { patternType: "solid", fgColor: { rgb: fill } },
+          alignment: { vertical: "center", wrapText: c === 2 },
+          font:      { sz: 10, color: { rgb: c === 3 || c === 4 ? "CC4400" : c === 5 ? "005500" : "000000" } },
+          border: {
+            top:    { style: "thin", color: { rgb: "DDDDDD" } },
+            bottom: { style: "thin", color: { rgb: "DDDDDD" } },
+            left:   { style: "thin", color: { rgb: "DDDDDD" } },
+            right:  { style: "thin", color: { rgb: "DDDDDD" } },
+          },
+        }
+      }
+    }
 
-    // Sheet hướng dẫn
+    // Row heights
+    ws["!rows"] = [{ hpt: 24 }, ...Array(samples.length).fill({ hpt: 18 })]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "📋 Danh sách món")
+
+    // ── Sheet hướng dẫn chi tiết ──────────────────────────────────────
     const guide = XLSX.utils.aoa_to_sheet([
-      ["HƯỚNG DẪN NHẬP MENU"],
+      ["📖 HƯỚNG DẪN NHẬP MENU - GIAO NHANH KRÔNG PẮC"],
       [""],
-      ["Cột", "Bắt buộc", "Mô tả"],
-      ["Tên món *",              "Có",  "Tên hiển thị của món ăn"],
-      ["Mô tả",                  "Không","Mô tả ngắn, nguyên liệu chính"],
-      ["Giá bán * (VNĐ)",        "Có",  "Số nguyên, không có dấu phẩy. Ví dụ: 45000"],
-      ["Giá khuyến mãi (VNĐ)",   "Không","Giá sau giảm, bỏ trống nếu không KM"],
-      ["Danh mục",               "Không","Nhóm món. Ví dụ: Cơm, Bún / Phở, Đồ uống"],
-      ["Badge",                  "Không","bestseller | hot | new | bigsale (hoặc bỏ trống)"],
+      ["🔶 BƯỚC 1: Mở sheet '📋 Danh sách món' và điền thông tin vào các cột"],
+      ["🔶 BƯỚC 2: Lưu file (Ctrl+S) → vào App → Thực đơn → Nhập từ Excel → chọn file này"],
+      ["🔶 BƯỚC 3: Kiểm tra danh sách preview → bấm 'Lưu vào hệ thống'"],
       [""],
-      ["Lưu ý: Không xoá dòng tiêu đề. Giá phải là số nguyên (VNĐ)."],
+      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
+      ["📌 MÔ TẢ CÁC CỘT"],
+      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
+      ["Cột",               "Bắt buộc?", "Mô tả chi tiết",                                                        "Ví dụ"],
+      ["A - Danh mục",       "Không",    "Nhóm/tab hiển thị trên app. Các món cùng danh mục sẽ gộp vào 1 tab.",   "Cơm | Bún / Phở | Đồ uống | Tráng miệng"],
+      ["B - Tên món *",      "CÓ ✓",    "Tên đầy đủ của món, hiển thị cho khách đặt.",                            "Bún bò đặc biệt"],
+      ["C - Mô tả / NL",     "Không",    "Nguyên liệu chính hoặc mô tả hấp dẫn. Tối đa ~100 ký tự.",             "Bún + thịt bò tươi + giò heo + rau sống"],
+      ["D - Giá bán * (đ)",  "CÓ ✓",    "Giá niêm yết. Chỉ nhập số nguyên, KHÔNG gõ dấu chấm/phẩy.",            "45000"],
+      ["E - Giá KM (đ)",     "Không",    "Giá khuyến mãi (thấp hơn giá bán). Bỏ trống nếu không giảm.",          "38000"],
+      ["F - Badge",          "Không",    "Nhãn nổi bật trên thẻ món. Chỉ dùng 1 trong 4 giá trị dưới đây:",      "bestseller"],
+      ["",                   "",         "  • bestseller  →  🏆 Bán chạy",                                        ""],
+      ["",                   "",         "  • hot         →  🔥 Đang hot",                                        ""],
+      ["",                   "",         "  • new         →  ✨ Mới có",                                          ""],
+      ["",                   "",         "  • bigsale     →  🎉 Sale lớn",                                        ""],
+      ["",                   "",         "  • (bỏ trống)  →  Không có nhãn",                                      ""],
+      ["G - Đang bán",       "Không",    "Món có đang phục vụ không? Mặc định = CÓ nếu bỏ trống.",               "CÓ  hoặc  KHÔNG"],
+      [""],
+      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
+      ["⚠️  LƯU Ý QUAN TRỌNG"],
+      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
+      ["✅", "KHÔNG xóa dòng tiêu đề (dòng 1 màu cam)"],
+      ["✅", "Giá bán phải là SỐ NGUYÊN (VNĐ) — không ghi '45.000' hay '45,000'"],
+      ["✅", "Giá KM phải NHỎ HƠN giá bán — nếu không app sẽ bỏ qua"],
+      ["✅", "Nhiều món cùng Danh mục sẽ tự động gộp vào 1 nhóm trên app"],
+      ["✅", "Danh mục để trống → món sẽ vào nhóm 'Chưa phân loại'"],
+      ["✅", "File hỗ trợ: .xlsx, .xls, .csv (UTF-8)"],
+      ["❌", "Không nhập ảnh món vào file — upload ảnh riêng sau khi lưu"],
+      ["❌", "Không merge ô — mỗi món 1 dòng riêng biệt"],
+      [""],
+      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
+      ["💡 MẸO NHẬP NHANH"],
+      ["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"],
+      ["→", "Nhóm các món cùng Danh mục lại với nhau để dễ kiểm tra"],
+      ["→", "Copy dòng mẫu xuống rồi chỉnh tên/giá — nhanh hơn nhập từ đầu"],
+      ["→", "Dùng Ctrl+D để copy giá trị ô trên xuống (nếu nhiều món cùng danh mục)"],
+      ["→", "Ctrl+S để lưu file trước khi import vào app"],
+      [""],
+      ["📞 Hỗ trợ: Giao Nhanh Krông Pắc — Admin sẽ hỗ trợ nếu gặp lỗi import"],
     ])
-    guide["!cols"] = [{ wch: 26 }, { wch: 12 }, { wch: 48 }]
-    XLSX.utils.book_append_sheet(wb, guide, "Hướng dẫn")
+
+    guide["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 60 }, { wch: 36 }]
+    guide["!rows"] = [{ hpt: 28 }]
+
+    // Style tiêu đề guide sheet
+    const guideRef = XLSX.utils.decode_range(guide["!ref"] ?? "A1")
+    void guideRef
+    const titleCell = guide["A1"]
+    if (titleCell) titleCell.s = { font: { bold: true, sz: 14, color: { rgb: "FF6B1A" } }, alignment: { horizontal: "left" } }
+
+    // Style header row (row 9 - 0-indexed row 9)
+    const guideHeaderRow = 9
+    for (let c = 0; c <= 3; c++) {
+      const cell = XLSX.utils.encode_cell({ r: guideHeaderRow, c })
+      if (!guide[cell]) continue
+      guide[cell].s = {
+        font: { bold: true, sz: 10, color: { rgb: "FFFFFF" } },
+        fill: { patternType: "solid", fgColor: { rgb: "FF6B1A" } },
+        alignment: { vertical: "center" },
+      }
+    }
+
+    XLSX.utils.book_append_sheet(wb, guide, "📖 Hướng dẫn")
 
     XLSX.writeFile(wb, "template_menu_giaonhanh.xlsx")
   }
