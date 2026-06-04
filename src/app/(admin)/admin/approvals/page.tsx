@@ -207,7 +207,7 @@ export default function ApprovalsPage() {
           await supabase.from("notifications").insert({
             user_id: ownerId, type: "system",
             title: "✅ Cửa hàng được duyệt",
-            body: `Cửa hàng "${shop.shopName}" đã được phê duyệt với phí hoa hồng ${effectiveRate}%. Bạn có thể bắt đầu nhận đơn ngay.`,
+            body: `Cửa hàng "${shop.shopName}" đã được phê duyệt. ${effectiveRate !== commCfg.defaultRate ? `Hoa hồng thoả thuận: ${effectiveRate}%.` : `Hoa hồng mặc định: ${effectiveRate}%.`} Bạn có thể bắt đầu nhận đơn ngay.`,
           })
         } else if (status === "suspended" && reason) {
           await supabase.from("notifications").insert({
@@ -450,11 +450,13 @@ function DriversTab({ drivers, filter, loading, selected, saving, onFilterChange
               ))}
               {selected.status === "pending" && (
                 <div style={{ marginTop: 12, padding: "10px 12px", background: "rgba(180,100,255,0.06)", border: "1px solid rgba(180,100,255,0.2)", borderRadius: 10, marginBottom: 10 }}>
-                  <div style={{ color: "rgba(180,100,255,0.8)", fontSize: 9, marginBottom: 6, fontWeight: 700 }}>💜 Phí hoa hồng khi duyệt (%)</div>
+                  <div style={{ color: "rgba(180,100,255,0.8)", fontSize: 9, marginBottom: 6, fontWeight: 700 }}>💜 Hoa hồng tài xế (%) — mặc định: {commCfg.defaultRate}%</div>
                   <input type="number" min={0} max={50} value={pendingCommission}
                     onChange={e => setPendingCommission(parseInt(e.target.value) || 0)}
                     style={{ width: "100%", height: 36, borderRadius: 8, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.35)", color: "#b464ff", fontSize: 16, fontWeight: 800, textAlign: "center", padding: "0 8px", fontFamily: "Lexend" }} />
-                  <div style={{ color: "rgba(180,100,255,0.4)", fontSize: 8, marginTop: 4 }}>Mặc định: {selected.commissionRate}%</div>
+                  <div style={{ color: "rgba(180,100,255,0.4)", fontSize: 8, marginTop: 4 }}>
+                    {pendingCommission !== commCfg.defaultRate ? `⚠️ Thoả thuận riêng — khác mặc định ${commCfg.defaultRate}%` : `✓ Dùng mức mặc định hệ thống`}
+                  </div>
                 </div>
               )}
               {selected.status === "pending" && (
@@ -536,7 +538,7 @@ function ShopsTab({ shops, filter, loading, selected, saving, onFilterChange, on
                 </div>
               </div>
               <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 5 }}>
-                Đăng ký: {s.registeredDate} · HH {s.commissionRate}% · {s.totalOrders} đơn{s.rating ? ` · ⭐ ${s.rating}` : ""}
+                Đăng ký: {s.registeredDate}{s.commissionRate !== commCfg.defaultRate ? ` · Thoả thuận ${s.commissionRate}%` : ""} · {s.totalOrders} đơn{s.rating ? ` · ⭐ ${s.rating}` : ""}
               </div>
             </div>
           )
@@ -559,7 +561,7 @@ function ShopsTab({ shops, filter, loading, selected, saving, onFilterChange, on
                 { label: "SĐT",         val: selected.phone            },
                 { label: "Loại",        val: selected.category         },
                 { label: "Địa chỉ",     val: selected.address          },
-                { label: "Hoa hồng",    val: `${selected.commissionRate}%` },
+                { label: "Hoa hồng",    val: selected.commissionRate !== commCfg.defaultRate ? `Thoả thuận ${selected.commissionRate}%` : `Mặc định ${selected.commissionRate}%` },
                 { label: "Tổng đơn",    val: selected.totalOrders.toString() },
                 { label: "Rating",      val: selected.rating ? `⭐ ${selected.rating}` : "—" },
                 { label: "Ngày ĐK",     val: selected.registeredDate   },
@@ -571,11 +573,13 @@ function ShopsTab({ shops, filter, loading, selected, saving, onFilterChange, on
               ))}
               {selected.status === "pending" && (
                 <div style={{ marginTop: 12, padding: "10px 12px", background: "rgba(180,100,255,0.06)", border: "1px solid rgba(180,100,255,0.2)", borderRadius: 10 }}>
-                  <div style={{ color: "rgba(180,100,255,0.8)", fontSize: 9, marginBottom: 6, fontWeight: 700 }}>💜 Phí hoa hồng khi duyệt (%)</div>
+                  <div style={{ color: "rgba(180,100,255,0.8)", fontSize: 9, marginBottom: 6, fontWeight: 700 }}>💜 Hoa hồng khi duyệt (%) — mặc định: {commCfg.defaultRate}%</div>
                   <input type="number" min={0} max={50} value={pendingCommission}
                     onChange={e => setPendingCommission(parseInt(e.target.value) || 0)}
                     style={{ width: "100%", height: 36, borderRadius: 8, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.35)", color: "#b464ff", fontSize: 16, fontWeight: 800, textAlign: "center", padding: "0 8px", fontFamily: "Lexend" }} />
-                  <div style={{ color: "rgba(180,100,255,0.4)", fontSize: 8, marginTop: 4 }}>Mặc định hệ thống: {selected.commissionRate}%</div>
+                  <div style={{ color: "rgba(180,100,255,0.4)", fontSize: 8, marginTop: 4 }}>
+                    {pendingCommission !== commCfg.defaultRate ? `⚠️ Thoả thuận riêng — khác mặc định ${commCfg.defaultRate}%` : `✓ Dùng mức mặc định hệ thống`}
+                  </div>
                 </div>
               )}
               <div style={{ display: "flex", gap: 8, marginTop: 12 }}>

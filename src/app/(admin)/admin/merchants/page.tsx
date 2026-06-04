@@ -70,6 +70,7 @@ export default function AdminMerchantsPage() {
   const [inlineEdit, setInlineEdit] = useState<{ id: string; value: string } | null>(null)
   const [toast, setToast] = useState("")
   const [toastOk, setToastOk] = useState(true)
+  const [defaultCommRate, setDefaultCommRate] = useState(10)
 
   const fireToast = (msg: string, ok = true) => {
     setToast(msg); setToastOk(ok); setTimeout(() => setToast(""), 3000)
@@ -80,9 +81,10 @@ export default function AdminMerchantsPage() {
   async function load() {
     const supabase = createClient()
 
-    // Đọc defaultRate từ app_settings thay vì hardcode 15
+    // Đọc defaultRate từ app_settings
     const { data: commSetting } = await supabase.from("app_settings").select("value").eq("key", "commission").maybeSingle()
     const defaultCommRate = parseInt((commSetting?.value as { defaultRate?: string } | null)?.defaultRate ?? "10") || 10
+    setDefaultCommRate(defaultCommRate)
 
     const { data: rows } = await supabase
       .from("shops")
@@ -162,12 +164,13 @@ export default function AdminMerchantsPage() {
 
   const saveInlineCommission = async (id: string, rate: number) => {
     const supabase = createClient()
-    const { error } = await supabase.from("shops").update({ commission_rate: rate, is_negotiated_commission: true }).eq("id", id)
+    const isNegotiated = rate !== defaultCommRate
+    const { error } = await supabase.from("shops").update({ commission_rate: rate, is_negotiated_commission: isNegotiated }).eq("id", id)
     if (error) { fireToast("❌ Lỗi cập nhật hoa hồng", false); return }
     setMerchants(ps => ps.map(m => m.id === id ? { ...m, commissionRate: rate } : m))
     if (selected?.id === id) setSelected(p => p ? { ...p, commissionRate: rate } : p)
     setInlineEdit(null)
-    fireToast(`✅ Hoa hồng thoả thuận ${rate}% đã lưu`)
+    fireToast(isNegotiated ? `✅ Hoa hồng thoả thuận ${rate}% đã lưu` : `✅ Đặt về hoa hồng mặc định ${rate}%`)
   }
 
   const deleteShop = async () => {
@@ -352,9 +355,13 @@ export default function AdminMerchantsPage() {
                         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                           <span className="comm-badge"
                             onClick={() => setInlineEdit({ id: m.id, value: m.commissionRate.toString() })}
-                            title="Click để chỉnh hoa hồng inline"
-                            style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.3)", color: "#b464ff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, userSelect: "none" }}>
-                            {m.commissionRate}%
+                            title="Click để chỉnh hoa hồng"
+                            style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
+                              background: m.commissionRate !== defaultCommRate ? "rgba(180,100,255,0.1)" : "rgba(255,255,255,0.05)",
+                              border: `1px solid ${m.commissionRate !== defaultCommRate ? "rgba(180,100,255,0.3)" : "rgba(255,255,255,0.1)"}`,
+                              color: m.commissionRate !== defaultCommRate ? "#b464ff" : "#6a5a40",
+                              cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, userSelect: "none" }}>
+                            {m.commissionRate !== defaultCommRate ? `Thoả thuận ${m.commissionRate}%` : `${m.commissionRate}%`}
                             <span style={{ fontSize: 8 }}>✏️</span>
                           </span>
                         </div>
@@ -417,7 +424,7 @@ export default function AdminMerchantsPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 12 }}>
                   {[
                     { label: "Rating",     value: selected.rating !== null ? `⭐ ${selected.rating}` : "—", c: "#f5c542" },
-                    { label: "Hoa hồng",  value: `${selected.commissionRate}%`,                           c: "#b464ff" },
+                    { label: "Hoa hồng",  value: selected.commissionRate !== defaultCommRate ? `Thoả thuận ${selected.commissionRate}%` : `Mặc định ${selected.commissionRate}%`, c: selected.commissionRate !== defaultCommRate ? "#b464ff" : "#6a5a40" },
                     { label: "Trạng thái", value: selected.isOpen ? "🟢 Mở" : "🔴 Đóng",               c: selected.isOpen ? "#3ecf6e" : "#ff4040" },
                   ].map(s => (
                     <div key={s.label} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "7px 8px", textAlign: "center" }}>
@@ -506,10 +513,13 @@ export default function AdminMerchantsPage() {
                       </div>
                     </div>
 
-                    <SLabel>Hoa hồng (%)</SLabel>
+                    <SLabel>Hoa hồng (%) — mặc định hệ thống: {defaultCommRate}%</SLabel>
                     <input type="number" min={0} max={50} value={editShop.commissionRate}
                       onChange={e => setEditShop(s => s ? { ...s, commissionRate: parseInt(e.target.value) || 0 } : s)}
-                      style={{ width: "100%", height: 40, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 10, color: "#f0eaff", fontSize: 12, padding: "0 12px", marginBottom: 12 }} />
+                      style={{ width: "100%", height: 40, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 10, color: "#f0eaff", fontSize: 12, padding: "0 12px", marginBottom: 4 }} />
+                    <div style={{ color: "#6a5a40", fontSize: 9, marginBottom: 8 }}>
+                      {editShop.commissionRate !== defaultCommRate ? `⚠️ Thoả thuận riêng — khác mặc định ${defaultCommRate}%` : `✓ Đang dùng mức mặc định`}
+                    </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, padding: "10px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.07)" }}>
                       <button onClick={() => setEditShop(s => s ? { ...s, isOpen: !s.isOpen } : s)}
