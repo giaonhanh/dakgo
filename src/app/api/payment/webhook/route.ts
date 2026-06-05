@@ -120,14 +120,20 @@ async function handleWalletTopup(
   orderCode: number,
   amount: number,
 ) {
+  // Atomic update: chỉ update nếu status vẫn là "pending" — chống race condition double-credit
   const { data: topup } = await supabase
     .from("wallet_topups")
-    .select("user_id, wallet_type")
+    .update({ status: "paid" })
     .eq("payment_code", orderCode)
     .eq("status", "pending")
+    .select("user_id, wallet_type")
     .single()
 
-  if (!topup) return
+  // Nếu không có row nào được update → đã xử lý rồi, bỏ qua
+  if (!topup) {
+    console.log(`[Webhook] Wallet topup #${orderCode} đã xử lý hoặc không tồn tại, bỏ qua`)
+    return
+  }
 
   const { error: rpcErr } = await supabase.rpc("add_to_wallet", {
     p_user_id: topup.user_id,
@@ -140,13 +146,10 @@ async function handleWalletTopup(
 
   if (rpcErr) {
     console.error("[Webhook] add_to_wallet error:", rpcErr)
+    // Rollback status về pending để retry được
+    await supabase.from("wallet_topups").update({ status: "pending" }).eq("payment_code", orderCode)
     return
   }
-
-  await supabase
-    .from("wallet_topups")
-    .update({ status: "paid" })
-    .eq("payment_code", orderCode)
 
   // Notify khách nạp ví thành công
   try {

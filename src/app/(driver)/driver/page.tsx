@@ -499,7 +499,11 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
         }),
       })
       const json = await res.json()
-      if (!res.ok || json.error) throw new Error(json.error ?? "Không thể kết nối cổng thanh toán")
+      if (!res.ok || json.error) {
+        // Cleanup record pending nếu PayOS fail
+        await supabase.from("wallet_topups").delete().eq("payment_code", payCode)
+        throw new Error(json.error ?? "Không thể kết nối cổng thanh toán")
+      }
 
       setPayInfo({
         bin:           json.bin ?? "",
@@ -511,7 +515,15 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
       })
       setStep("pay")
 
+      // Polling mỗi 5s, tối đa 60 lần (5 phút) — tránh interval vô hạn
+      let retries = 0
       intervalRef.current = setInterval(async () => {
+        retries++
+        if (retries > 60) {
+          clearInterval(intervalRef.current!)
+          setErr("Hết thời gian chờ. Nếu đã chuyển khoản, ví sẽ được cộng tự động trong vài phút.")
+          return
+        }
         const { data: topup } = await supabase
           .from("wallet_topups").select("status")
           .eq("payment_code", payCode).single()
@@ -728,6 +740,7 @@ function WithdrawSheet({ onClose, walletBalance, onSuccess }: {
   const [done,      setDone]      = useState(false)
   const [err,       setErr]       = useState("")
   const [bankInfo,  setBankInfo]  = useState<{ bank_name: string; bank_account_number: string; bank_account_name: string } | null>(null)
+  const submittingRef = useRef(false)
 
   const finalAmount = useCustom ? (parseInt(custom.replace(/\D/g, "")) || 0) : amount
 
@@ -743,28 +756,27 @@ function WithdrawSheet({ onClose, walletBalance, onSuccess }: {
   }, [])
 
   async function submit() {
+    if (submittingRef.current) return  // chống double-submit
     setErr("")
     if (finalAmount < 50000) return setErr("Số tiền tối thiểu 50,000đ")
     if (finalAmount > walletBalance) return setErr(`Số dư không đủ. Ví hiện có ${walletBalance.toLocaleString("vi-VN")}đ`)
     if (!bankInfo) return setErr("Bạn chưa liên kết tài khoản ngân hàng")
+    submittingRef.current = true
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setLoading(false); return setErr("Chưa đăng nhập") }
-    const { error } = await supabase.rpc("subtract_from_wallet", {
-      p_user_id: user.id,
-      p_type:    "driver",
-      p_amount:  finalAmount,
-      p_ref_id:  null,
-      p_note:    `Rút tiền · ${bankInfo.bank_name} · ${bankInfo.bank_account_number}`,
-      p_tx_type: "withdrawal",
-    })
-    setLoading(false)
-    if (error) {
-      if (error.message.includes("insufficient")) return setErr("Số dư không đủ")
-      return setErr("Không thể xử lý yêu cầu. Thử lại sau.")
+    try {
+      const res = await fetch("/api/driver/withdraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: finalAmount }),
+      })
+      const json = await res.json()
+      if (!res.ok) return setErr(json.error ?? "Không thể xử lý yêu cầu")
+      setDone(true)
+      setTimeout(onSuccess, 2000)
+    } finally {
+      setLoading(false)
+      submittingRef.current = false
     }
-    setDone(true)
-    setTimeout(onSuccess, 2000)
   }
 
   return (

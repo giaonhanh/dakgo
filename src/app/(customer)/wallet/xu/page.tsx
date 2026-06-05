@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 
@@ -75,18 +75,24 @@ export default function XuPage() {
   const finalTopup = customAmount ? parseInt(customAmount.replace(/\D/g,"")) || 0 : topupAmount
   const filtered   = txs.filter(t => filterType === "all" || t.type === filterType)
 
-  const [qrUrl,       setQrUrl]       = useState<string | null>(null)
-  const [topupCode,   setTopupCode]   = useState<number | null>(null)
-  const [qrLoading,   setQrLoading]   = useState(false)
+  const [qrUrl,        setQrUrl]        = useState<string | null>(null)
+  const [topupCode,    setTopupCode]    = useState<number | null>(null)
+  const [qrLoading,    setQrLoading]    = useState(false)
+  const [withdrawing,  setWithdrawing]  = useState(false)
+  const pollRef        = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Cleanup interval khi unmount
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
   const handleCreateQR = async () => {
     if (finalTopup < 10000) return
     setQrLoading(true)
+    let code = 0
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { fireToast("Vui lòng đăng nhập lại"); return }
 
-      const code = Math.floor(10000000 + Math.random() * 90000000)
+      code = Math.floor(10000000 + Math.random() * 90000000)
 
       // Tạo wallet_topups record để webhook nhận diện
       await supabase.from("wallet_topups").insert({
@@ -110,15 +116,62 @@ export default function XuPage() {
         }),
       })
       const data = await res.json() as { qrCode?: string; error?: string }
-      if (data.error || !data.qrCode) throw new Error(data.error ?? "Không thể tạo QR")
+      if (data.error || !data.qrCode) {
+        // Cleanup record pending nếu PayOS fail
+        await supabase.from("wallet_topups").delete().eq("payment_code", code)
+        throw new Error(data.error ?? "Không thể tạo QR")
+      }
 
       setQrUrl(data.qrCode)
       setTopupCode(code)
       setShowQR(true)
+
+      // Polling tự động sau khi hiện QR, tối đa 60 lần (5 phút)
+      let retries = 0
+      pollRef.current = setInterval(async () => {
+        retries++
+        if (retries > 60) { clearInterval(pollRef.current!); return }
+        const { data: topup } = await supabase
+          .from("wallet_topups").select("status")
+          .eq("payment_code", code).single()
+        if (topup?.status === "paid") {
+          clearInterval(pollRef.current!)
+          fireToast("🎉 Nạp xu thành công!")
+          setShowQR(false); setShowTopup(false)
+          // Reload balance
+          const { data: w } = await supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "customer").maybeSingle()
+          if (w) setBalance((w as { balance: number }).balance)
+        }
+      }, 5000)
     } catch {
       fireToast("Không thể tạo QR, vui lòng thử lại")
     } finally {
       setQrLoading(false)
+    }
+  }
+
+  const handleWithdraw = async () => {
+    if (!withdrawBank || !withdrawAmount) return
+    const amt = parseInt(withdrawAmount) || 0
+    if (amt <= 0) { fireToast("Số xu không hợp lệ"); return }
+    if (amt > balance) { fireToast(`Chỉ rút được tối đa ${fmt(balance)} xu`); return }
+    if (withdrawBank.replace(/\D/g,"").length < 8) { fireToast("Số tài khoản không hợp lệ"); return }
+    setWithdrawing(true)
+    try {
+      const res = await fetch("/api/customer/withdraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amt, bank_account: withdrawBank }),
+      })
+      const json = await res.json()
+      if (!res.ok) { fireToast(json.error ?? "Không thể xử lý yêu cầu"); return }
+      fireToast("✅ Đã gửi yêu cầu rút xu thành công!")
+      setShowWithdraw(false); setWithdrawBank(""); setWithdrawAmount("")
+      setBalance(b => b - amt)
+    } catch {
+      fireToast("Lỗi kết nối, vui lòng thử lại")
+    } finally {
+      setWithdrawing(false)
     }
   }
 
@@ -291,19 +344,13 @@ export default function XuPage() {
                 color:"rgba(245,197,66,0.6)", fontSize: 11, lineHeight:1.6 }}>
                 ⚠️ Phí rút: 0đ · 1 xu = 1đ · Xử lý 1–3 ngày làm việc
               </div>
-              <button onClick={() => {
-                if (!withdrawBank || !withdrawAmount) return
-                const amt = parseInt(withdrawAmount) || 0
-                if (amt <= 0) { fireToast("Số xu không hợp lệ"); return }
-                if (amt > balance) { fireToast(`Chỉ rút được tối đa ${fmt(balance)} xu (xu thưởng không rút được)`); return }
-                if (withdrawBank.replace(/\D/g,"").length < 8) { fireToast("Số tài khoản không hợp lệ"); return }
-                fireToast("Đã gửi yêu cầu rút xu thành công!")
-                setShowWithdraw(false); setWithdrawBank(""); setWithdrawAmount("")
-              }} style={{ width:"100%", height:46, borderRadius:12, border:"none",
-                background:"linear-gradient(90deg,#b464ff,#d484ff)",
-                color:"#fff", fontSize:12, fontWeight:700, fontFamily:"Lexend",
-                cursor:"pointer", boxShadow:"0 3px 14px rgba(180,100,255,0.3)" }}>
-                💜 Xác nhận rút xu
+              <button onClick={handleWithdraw} disabled={withdrawing}
+                style={{ width:"100%", height:46, borderRadius:12, border:"none",
+                  background: withdrawing ? "rgba(180,100,255,0.3)" : "linear-gradient(90deg,#b464ff,#d484ff)",
+                  color:"#fff", fontSize:12, fontWeight:700, fontFamily:"Lexend",
+                  cursor: withdrawing ? "not-allowed" : "pointer",
+                  boxShadow: withdrawing ? "none" : "0 3px 14px rgba(180,100,255,0.3)" }}>
+                {withdrawing ? "Đang xử lý..." : "💜 Xác nhận rút xu"}
               </button>
             </motion.div>
           </>
