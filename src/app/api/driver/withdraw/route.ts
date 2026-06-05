@@ -115,14 +115,14 @@ export async function POST(req: NextRequest) {
             user_id: a.id, type: "system",
             title:   "🏦 Tài xế yêu cầu rút tiền",
             body,
-            data:    { url: "/admin/wallets", withdraw_user_id: user.id, amount: amt, bank: driver.bank_account_number, withdraw_id: withdrawalId },
+            data:    { url: "/admin/withdrawals", withdraw_user_id: user.id, amount: amt, bank: driver.bank_account_number, withdraw_id: withdrawalId },
           })
         ),
         ...admins.map(a =>
           sendPushToUser(a.id, {
             title: "🏦 Yêu cầu rút tiền tài xế",
             body:  `${amt.toLocaleString("vi-VN")}đ · ${profile?.full_name ?? "Tài xế"}`,
-            url:   "/admin/wallets", tag: `withdraw-req-${user.id}`,
+            url:   "/admin/withdrawals", tag: `withdraw-req-${user.id}`,
           })
         ),
       ])

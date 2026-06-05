@@ -122,14 +122,14 @@ export async function POST(req: NextRequest) {
             user_id: a.id, type: "system",
             title:   "🏦 Khách yêu cầu rút xu",
             body,
-            data:    { url: "/admin/wallets", withdraw_user_id: user.id, amount: amt, bank_account, bank_bin, withdraw_id: withdrawalId },
+            data:    { url: "/admin/withdrawals", withdraw_user_id: user.id, amount: amt, bank_account, bank_bin, withdraw_id: withdrawalId },
           })
         ),
         ...admins.map(a =>
           sendPushToUser(a.id, {
             title: "🏦 Yêu cầu rút xu",
             body:  `${amt.toLocaleString("vi-VN")}xu · ${profile?.full_name ?? "Khách hàng"}`,
-            url:   "/admin/wallets", tag: `withdraw-req-${user.id}`,
+            url:   "/admin/withdrawals", tag: `withdraw-req-${user.id}`,
           })
         ),
       ])
