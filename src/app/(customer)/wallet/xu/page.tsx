@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { BANKS } from "@/lib/banks"
@@ -47,29 +47,36 @@ export default function XuPage() {
   const [filterType,     setFilterType]     = useState<TxType|"all">("all")
   const [toast,          setToast]          = useState("")
 
-  useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: wallet } = await supabase
-        .from("wallets").select("id,balance,bonus_balance").eq("user_id", user.id).eq("type", "customer").maybeSingle()
-      if (wallet) {
-        setBalance(wallet.balance)
-        setBonusBalance((wallet as { bonus_balance?: number }).bonus_balance ?? 0)
-        const { data: txData } = await supabase
-          .from("transactions")
-          .select("id,type,amount,balance_after,note,created_at")
-          .eq("wallet_id", wallet.id)
-          .order("created_at", { ascending: false })
-          .limit(30)
-        setTxs((txData ?? []).map((t: {id:string;type:string;amount:number;balance_after:number;note:string|null;created_at:string}) => ({
-          id: t.id, type: t.type as TxType,
-          label: t.note ?? TX_CFG[t.type]?.label ?? t.type,
-          amount: t.amount, balance: t.balance_after, time: timeAgo(t.created_at),
-        })))
-      }
+  const loadWallet = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: wallet } = await supabase
+      .from("wallets").select("id,balance,bonus_balance").eq("user_id", user.id).eq("type", "customer").maybeSingle()
+    if (wallet) {
+      setBalance(wallet.balance)
+      setBonusBalance((wallet as { bonus_balance?: number }).bonus_balance ?? 0)
+      const { data: txData } = await supabase
+        .from("transactions")
+        .select("id,type,amount,balance_after,note,created_at")
+        .eq("wallet_id", wallet.id)
+        .order("created_at", { ascending: false })
+        .limit(30)
+      setTxs((txData ?? []).map((t: {id:string;type:string;amount:number;balance_after:number;note:string|null;created_at:string}) => ({
+        id: t.id, type: t.type as TxType,
+        label: t.note ?? TX_CFG[t.type]?.label ?? t.type,
+        amount: t.amount, balance: t.balance_after, time: timeAgo(t.created_at),
+      })))
     }
-    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    loadWallet()
+
+    // Khi user quay lại tab/app sau khi thanh toán, reload balance ngay
+    const onFocus = () => loadWallet()
+    window.addEventListener("focus", onFocus)
+    return () => window.removeEventListener("focus", onFocus)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -140,9 +147,7 @@ export default function XuPage() {
           clearInterval(pollRef.current!)
           fireToast("🎉 Nạp xu thành công!")
           setShowQR(false); setShowTopup(false)
-          // Reload balance
-          const { data: w } = await supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "customer").maybeSingle()
-          if (w) setBalance((w as { balance: number }).balance)
+          await loadWallet()
         }
       }, 5000)
     } catch {
