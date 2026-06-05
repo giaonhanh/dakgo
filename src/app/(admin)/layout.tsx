@@ -1,3 +1,12 @@
+import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar"
+import PushPermissionPrompt from "@/components/PushPermissionPrompt"
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return (
+    <>
+      <ServiceWorkerRegistrar />
+      <PushPermissionPrompt />
+      {children}
+    </>
+  )
 }
