@@ -26,10 +26,10 @@ import Image from "next/image"
 import { useCartStore } from "@/store/cartStore"
 import { useLocationStore } from "@/store/locationStore"
 import { createClient } from "@/lib/supabase/client"
-import { SHOP_CATEGORIES } from "@/lib/categories"
+import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/lib/categories"
 
 // ─── Types ─────────────────────────────────────────────────
-type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null }
+type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null; category?: string; categories?: string[] | null }
 type ProductRow = { id: string; name: string; price: number; original_price?: number | null; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string; is_open?: boolean; status?: string } | { name: string; is_open?: boolean; status?: string }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null }
@@ -147,6 +147,7 @@ export default function HomePage() {
   type PendingItem = { id:string; name:string; price:number; shop:string; shopId:string }
 
   const [activeMealTime,  setActiveMealTime]  = useState(0)
+  const [nearbyFilter,    setNearbyFilter]    = useState<string>("all")
   const [savedVoucherIds, setSavedVoucherIds] = useState<string[]>([])
   const [bannerIdx,     setBannerIdx]     = useState(0)
   const [countdown,     setCountdown]     = useState({ h:0, m:0, s:0 })
@@ -252,17 +253,17 @@ export default function HomePage() {
       // Nearby shops: fetch cả đóng lẫn mở, tính giờ client-side
       const { data: shopData } = await supabase
         .from("shops")
-        .select("id,name,is_open,rating_avg,address,logo_url,location,opening_hours")
+        .select("id,name,is_open,rating_avg,address,logo_url,location,opening_hours,category,categories")
         .eq("status", "approved")
         .order("rating_avg", { ascending: false })
-        .limit(20)
+        .limit(30)
       // Sort: đang mở lên trước, đóng xuống dưới
       const sorted = (shopData ?? [] as ShopRow[]).sort((a, b) => {
         const aOpen = isShopInHours(a as ShopRow) ? 1 : 0
         const bOpen = isShopInHours(b as ShopRow) ? 1 : 0
         return bOpen - aOpen
       })
-      setNearbyShops(sorted.slice(0, 12) as ShopRow[])
+      setNearbyShops(sorted as ShopRow[])
 
       // Best sellers — top bán chạy, không lọc theo giờ (sold_count >= 0)
       const { data: bsData } = await supabase
@@ -1117,8 +1118,9 @@ export default function HomePage() {
                 whileTap={{ scale:.93 }}
                 onClick={() => router.push(`/danh-muc/${m.value}`)}
                 style={{
-                  flexShrink:0, background:"rgba(255,255,255,0.04)",
-                  border:"1px solid rgba(255,255,255,0.08)",
+                  flexShrink:0,
+                  background: m.color,
+                  border:`1px solid ${m.color.replace(/[\d.]+\)$/, "0.4)")}`,
                   borderRadius:14, padding:"10px 12px",
                   display:"flex", flexDirection:"column", alignItems:"center", gap:5,
                   cursor:"pointer", minWidth:72,
@@ -1126,12 +1128,12 @@ export default function HomePage() {
                 <div style={{
                   width:44, height:44, borderRadius:13,
                   display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:22, background: m.color,
+                  fontSize:24, background:"rgba(0,0,0,0.15)",
                 }}>
                   {m.emoji}
                 </div>
                 <div style={{
-                  fontSize:9, fontWeight:600, color:"#b0956a",
+                  fontSize:9, fontWeight:700, color:"#f8f0e0",
                   textAlign:"center", lineHeight:1.3,
                   maxWidth:68, wordBreak:"keep-all",
                 }}>
@@ -1260,13 +1262,57 @@ export default function HomePage() {
               S9 — NearbyShops
           ────────────────────────────────────── */}
           <SectionHeader title="📍 Quán gần bạn" more="Xem tất cả →" href="/nearby-shops" />
+
+          {/* Filter chips — danh mục có quán */}
+          {(() => {
+            const usedCats = [...new Set(nearbyShops.flatMap(s => {
+              const cats = Array.isArray(s.categories) && s.categories.length > 0 ? s.categories : s.category ? [s.category] : []
+              return cats.map((v: string) => normalizeCategoryValue(v))
+            }))].filter(v => v !== "khac")
+            if (usedCats.length === 0) return null
+            return (
+              <div style={{ overflowX:"auto", display:"flex", gap:6, padding:"0 16px 10px",
+                scrollbarWidth:"none", msOverflowStyle:"none" }}>
+                <button onClick={() => setNearbyFilter("all")}
+                  style={{ flexShrink:0, padding:"5px 12px", borderRadius:20, cursor:"pointer",
+                    fontFamily:"Lexend", fontSize:10, fontWeight:600,
+                    background: nearbyFilter==="all" ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.05)",
+                    border: nearbyFilter==="all" ? "1px solid rgba(255,107,0,0.4)" : "1px solid rgba(255,255,255,0.08)",
+                    color: nearbyFilter==="all" ? "#FF8C00" : "#6a5a40", transition:"all .15s" }}>
+                  Tất cả
+                </button>
+                {usedCats.map(v => {
+                  const cat = getCategoryByValue(v)
+                  const active = nearbyFilter === v
+                  return (
+                    <button key={v} onClick={() => setNearbyFilter(active ? "all" : v)}
+                      style={{ flexShrink:0, padding:"5px 12px", borderRadius:20, cursor:"pointer",
+                        fontFamily:"Lexend", fontSize:10, fontWeight:600,
+                        background: active ? cat.color : "rgba(255,255,255,0.05)",
+                        border: active ? `1px solid ${cat.color.replace(/[\d.]+\)$/, "0.5)")}` : "1px solid rgba(255,255,255,0.08)",
+                        color: active ? "#f8f0e0" : "#6a5a40", transition:"all .15s",
+                        display:"flex", alignItems:"center", gap:4 }}>
+                      {cat.emoji} {cat.label.split(" · ")[0]}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })()}
+
+          {(() => {
+            const filteredShops = nearbyFilter === "all" ? nearbyShops : nearbyShops.filter(s => {
+              const cats = Array.isArray(s.categories) && s.categories.length > 0 ? s.categories : s.category ? [s.category] : []
+              return (cats.map((v: string) => normalizeCategoryValue(v)) as string[]).includes(nearbyFilter)
+            })
+            return (
           <div style={{ padding:"0 16px", display:"flex", flexDirection:"column",
             gap:9, marginBottom:14 }}>
-            {nearbyShops.length === 0 ? (
+            {filteredShops.length === 0 ? (
               <div style={{ textAlign:"center", padding:"20px 0", color:"#6a5a40", fontSize:11 }}>
-                Chưa có quán nào trong khu vực
+                Chưa có quán nào{nearbyFilter !== "all" ? " trong danh mục này" : " trong khu vực"}
               </div>
-            ) : nearbyShops.map(s => {
+            ) : filteredShops.map(s => {
               const isFav    = favoriteIds.includes(s.id)
               const uLat     = locationData.lat, uLng = locationData.lng
               const coords   = s.location?.coordinates  // GeoJSON: [lng, lat]
@@ -1386,6 +1432,8 @@ export default function HomePage() {
               </div>
             )})}
           </div>
+            )
+          })()}
 
           {/* ──────────────────────────────────────
               S9.5 — Vừa lên menu (sản phẩm mới nhất)
