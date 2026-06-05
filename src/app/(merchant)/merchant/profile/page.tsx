@@ -31,7 +31,7 @@ export default function MerchantProfilePage() {
   const [name,        setName]        = useState("")
   const [phone,       setPhone]       = useState("")
   const [address,     setAddress]     = useState("")
-  const [category,    setCategory]    = useState("")
+  const [categories,  setCategories]  = useState<string[]>([])
   const [avatar,      setAvatar]      = useState("🍜")
   const [rating,      setRating]      = useState<number | null>(null)
   const [totalReview, setTotalReview] = useState(0)
@@ -55,7 +55,7 @@ export default function MerchantProfilePage() {
         const [{ data: profile }, { data: shop }] = await Promise.all([
           supabase.from("profiles").select("created_at").eq("id", user.id).single(),
           supabase.from("shops")
-            .select("id,name,phone,address,category,is_open,rating_avg,total_reviews,commission_rate,location")
+            .select("id,name,phone,address,category,categories,is_open,rating_avg,total_reviews,commission_rate,location")
             .eq("owner_id", user.id)
             .single(),
         ])
@@ -68,7 +68,10 @@ export default function MerchantProfilePage() {
           setName(shop.name ?? "")
           setPhone(shop.phone ?? "")
           setAddress(shop.address ?? "")
-          setCategory(normalizeCategoryValue(shop.category ?? "khac"))
+          const rawCats: string[] = Array.isArray(shop.categories) && shop.categories.length > 0
+            ? shop.categories
+            : shop.category ? [shop.category] : []
+          setCategories(rawCats.map((v: string) => normalizeCategoryValue(v)))
           setIsOpen(shop.is_open ?? false)
           setRating(shop.rating_avg ?? null)
           setTotalReview(shop.total_reviews ?? 0)
@@ -124,7 +127,8 @@ export default function MerchantProfilePage() {
 
     if (shopId) {
       const updatePayload: Record<string, unknown> = {
-        name, phone, address, category,
+        name, phone, address, categories,
+        category: categories[0] ?? "khac",
         updated_at: new Date().toISOString(),
       }
       if (lat !== null && lng !== null) {
@@ -209,7 +213,7 @@ export default function MerchantProfilePage() {
 
             <div style={{ color:"#f8f0e0",fontSize:17,fontWeight:800,marginBottom:4 }}>{name || "Chưa đặt tên"}</div>
             <div style={{ color:"#6a5a40",fontSize:10,marginBottom:10 }}>
-              {category ? `${getCategoryByValue(category).emoji} ${getCategoryByValue(category).label}` : "Chưa chọn loại hình"}
+              {categories.length > 0 ? categories.map(v => getCategoryByValue(v).emoji).join(" ") + " " + categories.map(v => getCategoryByValue(v).label).join(", ") : "Chưa chọn loại hình"}
             </div>
 
             <div style={{ display:"flex",justifyContent:"center",gap:16,marginBottom:14 }}>
@@ -263,21 +267,25 @@ export default function MerchantProfilePage() {
                 <span style={{ color:"#6a5a40",fontSize:10,flexShrink:0,marginRight:8,paddingTop:4 }}>Loại hình</span>
                 {editing ? (
                   <div style={{ flex:1,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6 }}>
-                    {SHOP_CATEGORIES.map(c => (
-                      <button key={c.value} onClick={()=>setCategory(c.value)}
-                        style={{ background:category===c.value?c.color:"rgba(255,255,255,0.04)",
-                          border:category===c.value?"1px solid rgba(255,107,0,0.4)":"1px solid rgba(255,255,255,0.07)",
-                          borderRadius:10,padding:"7px 4px",
-                          display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-                          cursor:"pointer",fontFamily:"Lexend",transition:"all .15s" }}>
-                        <span style={{ fontSize:18 }}>{c.emoji}</span>
-                        <span style={{ fontSize:7,fontWeight:600,color:category===c.value?"#FF8C00":"#6a5a40",textAlign:"center",lineHeight:1.2 }}>{c.label}</span>
-                      </button>
-                    ))}
+                    {SHOP_CATEGORIES.map(c => {
+                      const active = categories.includes(c.value)
+                      return (
+                        <button key={c.value} onClick={()=>setCategories(prev=>active?prev.filter(x=>x!==c.value):[...prev,c.value])}
+                          style={{ background:active?c.color:"rgba(255,255,255,0.04)",
+                            border:active?"1px solid rgba(255,107,0,0.4)":"1px solid rgba(255,255,255,0.07)",
+                            borderRadius:10,padding:"7px 4px",
+                            display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+                            cursor:"pointer",fontFamily:"Lexend",transition:"all .15s",position:"relative" }}>
+                          {active && <div style={{ position:"absolute",top:3,right:3,width:11,height:11,borderRadius:99,background:"#FF6B00",display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,color:"#fff",fontWeight:800 }}>✓</div>}
+                          <span style={{ fontSize:18 }}>{c.emoji}</span>
+                          <span style={{ fontSize:7,fontWeight:600,color:active?"#FF8C00":"#6a5a40",textAlign:"center",lineHeight:1.2 }}>{c.label}</span>
+                        </button>
+                      )
+                    })}
                   </div>
                 ) : (
                   <span style={{ color:"#f8f0e0",fontSize:11,fontWeight:600 }}>
-                    {getCategoryByValue(category).emoji} {getCategoryByValue(category).label}
+                    {categories.length > 0 ? categories.map(v=>`${getCategoryByValue(v).emoji} ${getCategoryByValue(v).label}`).join(", ") : "Chưa chọn"}
                   </span>
                 )}
               </div>

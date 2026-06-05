@@ -17,6 +17,7 @@ interface ShopRow {
   is_open: boolean
   opening_hours: { open?: string; close?: string } | null
   category: string
+  categories: string[] | null
 }
 
 function isShopOpen(shop: ShopRow): boolean {
@@ -62,16 +63,19 @@ export default function CategoryPage() {
       setLoading(true)
       const { data } = await supabase
         .from("shops")
-        .select("id, name, address, rating_avg, total_orders, image_url, is_open, opening_hours, category")
+        .select("id, name, address, rating_avg, total_orders, image_url, is_open, opening_hours, category, categories")
         .eq("status", "approved")
         .order("rating_avg", { ascending: false })
         .limit(60)
 
       if (!data) { setLoading(false); return }
 
-      const filtered = (data as ShopRow[]).filter(s =>
-        normalizeCategoryValue(s.category ?? "khac") === slug
-      )
+      const filtered = (data as ShopRow[]).filter(s => {
+        const cats = Array.isArray(s.categories) && s.categories.length > 0
+          ? s.categories.map((v: string) => normalizeCategoryValue(v))
+          : [normalizeCategoryValue(s.category ?? "khac")]
+        return (cats as string[]).includes(slug)
+      })
       setShops(filtered)
       setLoading(false)
     }

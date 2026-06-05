@@ -74,7 +74,7 @@ interface MerchantRow {
   ratingAvg: number | null; totalReviews: number
   commissionRate: number; isNegotiated: boolean; createdDate: string
   shopType: "partner" | "delivery" | null
-  address: string; category: string
+  address: string; category: string; categories: string[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ export default function AdminUsersPage() {
   const [merchantSaving,   setMerchantSaving]   = useState(false)
   const [shopTypeModal,    setShopTypeModal]    = useState<{ id: string; name: string; current: "partner" | "delivery" | null } | null>(null)
   const [shopTypeSaving,   setShopTypeSaving]   = useState(false)
-  const [catModal,         setCatModal]         = useState<{ id: string; name: string; current: string } | null>(null)
+  const [catModal,         setCatModal]         = useState<{ id: string; name: string; current: string[] } | null>(null)
   const [catSaving,        setCatSaving]        = useState(false)
 
   const [toast,   setToast]   = useState("")
@@ -442,7 +442,7 @@ export default function AdminUsersPage() {
     const supabase = createClient()
     const { data: rows, error: shopErr } = await supabase
       .from("shops")
-      .select("id, owner_id, name, address, category, status, is_open, rating_avg, total_reviews, commission_rate, is_negotiated_commission, created_at, shop_type")
+      .select("id, owner_id, name, address, category, categories, status, is_open, rating_avg, total_reviews, commission_rate, is_negotiated_commission, created_at, shop_type")
       .order("created_at", { ascending: false })
     if (shopErr) console.error("[loadMerchants] shops query error:", shopErr)
     if (!rows || rows.length === 0) { setMerchantsLoading(false); setMerchantsLoaded(true); return }
@@ -466,6 +466,9 @@ export default function AdminUsersPage() {
         shopType: (r.shop_type as "partner" | "delivery" | null) ?? null,
         address: r.address ?? "",
         category: normalizeCategoryValue(r.category ?? "khac"),
+        categories: Array.isArray(r.categories) && r.categories.length > 0
+          ? r.categories.map((v: string) => normalizeCategoryValue(v))
+          : [normalizeCategoryValue(r.category ?? "khac")],
       }
     }))
     setMerchantsLoading(false)
@@ -624,14 +627,14 @@ export default function AdminUsersPage() {
     fire(isNegotiated ? `✅ Hoa hồng thoả thuận ${rate}% đã lưu` : `✅ Đặt về hoa hồng mặc định ${rate}%`)
   }
 
-  const saveCategory = async (category: string) => {
+  const saveCategory = async (cats: string[]) => {
     if (!catModal) return
     setCatSaving(true)
     const supabase = createClient()
-    const { error } = await supabase.from("shops").update({ category }).eq("id", catModal.id)
+    const { error } = await supabase.from("shops").update({ categories: cats, category: cats[0] ?? "khac" }).eq("id", catModal.id)
     setCatSaving(false)
     if (error) { fire("❌ Lỗi cập nhật danh mục", false); return }
-    setMerchants(ms => ms.map(m => m.id === catModal.id ? { ...m, category } : m))
+    setMerchants(ms => ms.map(m => m.id === catModal.id ? { ...m, categories: cats, category: cats[0] ?? "khac" } : m))
     setCatModal(null)
     fire(`✅ Đã cập nhật danh mục`)
   }
@@ -1049,8 +1052,8 @@ export default function AdminUsersPage() {
                           <div style={{ minWidth: 0 }}>
                             <div style={{ color: "#f0eaff", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.shopName}</div>
                             <div style={{ display:"flex", alignItems:"center", gap:4, marginTop:2 }}>
-                              <span style={{ color:"rgba(144,128,176,0.5)", fontSize:8 }}>{getCategoryByValue(m.category).label}</span>
-                              <button onClick={() => setCatModal({ id: m.id, name: m.shopName, current: m.category })}
+                              <span style={{ color:"rgba(144,128,176,0.5)", fontSize:8 }}>{m.categories.map(v=>getCategoryByValue(v).emoji).join("")} {getCategoryByValue(m.category).label}</span>
+                              <button onClick={() => setCatModal({ id: m.id, name: m.shopName, current: m.categories })}
                                 style={{ fontSize:7, padding:"1px 4px", borderRadius:4, border:"1px solid rgba(255,255,255,0.1)", background:"rgba(255,255,255,0.04)", color:"rgba(144,128,176,0.5)", cursor:"pointer", fontFamily:"Lexend" }}>✏️</button>
                             </div>
                           </div>
@@ -1373,14 +1376,16 @@ export default function AdminUsersPage() {
                 <button onClick={() => setCatModal(null)} style={{ width:28, height:28, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:15, cursor:"pointer" }}>×</button>
               </div>
               <div style={{ color:"#6a5a40", fontSize:10, marginBottom:14 }}>{catModal.name}</div>
+              <div style={{ color:"#6a5a40", fontSize:9, marginBottom:10 }}>Chọn nhiều loại nếu quán phục vụ nhiều món</div>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:18 }}>
                 {SHOP_CATEGORIES.map(c => {
-                  const sel = catModal.current === c.value
+                  const sel = catModal.current.includes(c.value)
                   return (
-                    <button key={c.value} onClick={() => setCatModal(m => m ? { ...m, current: c.value } : m)}
+                    <button key={c.value} onClick={() => setCatModal(m => m ? { ...m, current: sel ? m.current.filter(x=>x!==c.value) : [...m.current, c.value] } : m)}
                       style={{ padding:"10px 6px", borderRadius:12, cursor:"pointer", fontFamily:"Lexend", textAlign:"center",
                         border:`2px solid ${sel ? "rgba(255,107,0,0.5)" : "rgba(255,255,255,0.08)"}`,
-                        background: sel ? c.color : "rgba(255,255,255,0.04)", transition:"all .15s" }}>
+                        background: sel ? c.color : "rgba(255,255,255,0.04)", transition:"all .15s", position:"relative" }}>
+                      {sel && <div style={{ position:"absolute",top:4,right:4,width:12,height:12,borderRadius:99,background:"#FF6B00",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#fff",fontWeight:800 }}>✓</div>}
                       <div style={{ fontSize:20, marginBottom:4 }}>{c.emoji}</div>
                       <div style={{ color: sel ? "#FF8C00" : "#b0956a", fontSize:8, fontWeight:700, lineHeight:1.3 }}>{c.label}</div>
                     </button>
