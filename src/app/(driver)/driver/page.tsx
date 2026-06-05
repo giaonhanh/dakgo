@@ -941,7 +941,7 @@ export default function DriverDashboard() {
     if (!setupDone) { setShowSetupGate(true); return }
     setToggling(true)
     const next = !online
-    await supabase.from("drivers").update({ status: next ? "online" : "offline" }).eq("id", driverId)
+    await supabase.from("drivers").update({ status: next ? "online" : "offline", is_online: next }).eq("id", driverId)
     setOnline(next)
     if (!next) setShowOrder(false)
     setToggling(false)
@@ -971,24 +971,37 @@ export default function DriverDashboard() {
     }
   }, [supabase])
 
-  // ── Khi bật online: query đơn pending chưa có tài xế ──────────
+  // ── Khi bật online: gọi API để tìm đơn pending (bypass RLS) ──
   useEffect(() => {
     if (!online || !driverId) return
     async function checkPendingOrders() {
-      const { data: pendingRows } = await supabase
-        .from("orders")
-        .select("id, shop_id, customer_id, delivery_address, total, ship_fee, total_amount, pay_method")
-        .eq("status", "pending")
-        .or(`driver_id.is.null,driver_id.eq.${driverId}`)
-        .order("created_at", { ascending: true })
-        .limit(1)
-      if (!pendingRows?.length || showOrder || accepted) return
-      const orderData = await buildOrderData(pendingRows[0])
-      if (orderData) { setPendingOrder(orderData); setShowOrder(true) }
+      if (showOrder || accepted) return
+      try {
+        const res = await fetch("/api/driver/check-pending")
+        if (!res.ok) return
+        const { order } = await res.json()
+        if (order) { setPendingOrder(order); setShowOrder(true) }
+      } catch { /* ignore */ }
     }
     checkPendingOrders()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, driverId])
+
+  // ── Poll đơn pending mỗi 20 giây khi online (dự phòng nếu realtime miss) ──
+  useEffect(() => {
+    if (!online || !driverId) return
+    const interval = setInterval(async () => {
+      if (showOrder || accepted) return
+      try {
+        const res = await fetch("/api/driver/check-pending")
+        if (!res.ok) return
+        const { order } = await res.json()
+        if (order) { setPendingOrder(order); setShowOrder(true) }
+      } catch { /* ignore */ }
+    }, 20_000)
+    return () => clearInterval(interval)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online, driverId, showOrder, accepted])
 
   // ── Subscribe to pending orders when online ──
   useEffect(() => {
