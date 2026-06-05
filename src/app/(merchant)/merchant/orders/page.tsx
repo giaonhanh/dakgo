@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatPrice } from "@/lib/utils"
 
@@ -86,6 +86,8 @@ export default function MerchantOrdersPage() {
   const [period,    setPeriod]    = useState<Period>("today")
   const [expand,    setExpand]    = useState<string | null>(null)
   const [summary,   setSummary]   = useState({ count: 0, revenue: 0, cancelled: 0 })
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   // ── Load shop ────────────────────────────────────────────────
   useEffect(() => {
@@ -183,6 +185,32 @@ export default function MerchantOrdersPage() {
     setOrders([])
     fetchOrders(shopId, 0)
   }, [shopId, status, period, fetchOrders])
+
+  // ── Realtime: đơn mới / đổi status ────────────────────────────
+  useEffect(() => {
+    if (!shopId) return
+    channelRef.current?.unsubscribe()
+    const ch = supabase
+      .channel(`merchant-orders-${shopId}`)
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "orders",
+        filter: `shop_id=eq.${shopId}`,
+      }, () => {
+        setPage(0); setOrders([]); fetchOrders(shopId, 0)
+      })
+      .subscribe()
+    channelRef.current = ch
+    return () => { ch.unsubscribe(); channelRef.current = null }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopId])
+
+  // ── Đổi trạng thái đơn ────────────────────────────────────────
+  const updateStatus = async (orderId: string, nextStatus: string) => {
+    setUpdatingId(orderId)
+    await supabase.from("orders").update({ status: nextStatus }).eq("id", orderId)
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o))
+    setUpdatingId(null)
+  }
 
   function loadMore() {
     if (!shopId) return
@@ -366,6 +394,42 @@ export default function MerchantOrdersPage() {
                         <Tag icon="💳" label={PAY_LABEL[order.payMethod] ?? order.payMethod} />
                         {order.note && <Tag icon="📝" label={order.note} />}
                       </div>
+
+                      {/* Action buttons theo trạng thái */}
+                      {order.status === "pending" && (
+                        <div style={{ display:"flex", gap:8, marginTop:8 }}>
+                          <button
+                            onClick={e => { e.stopPropagation(); updateStatus(order.id, "cancelled") }}
+                            disabled={updatingId === order.id}
+                            style={{ flex:1, height:38, borderRadius:10, border:"1px solid rgba(255,64,64,0.3)", background:"rgba(255,64,64,0.07)", color:"#ff6060", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", opacity: updatingId===order.id?0.5:1 }}>
+                            ✕ Từ chối
+                          </button>
+                          <button
+                            onClick={e => { e.stopPropagation(); updateStatus(order.id, "preparing") }}
+                            disabled={updatingId === order.id}
+                            style={{ flex:2, height:38, borderRadius:10, border:"none", background:"linear-gradient(90deg,#FF6B00,#FF8C00)", color:"#fff", fontSize:11, fontWeight:800, cursor:"pointer", fontFamily:"Lexend", opacity: updatingId===order.id?0.5:1 }}>
+                            {updatingId===order.id ? "..." : "✅ Xác nhận & Chuẩn bị"}
+                          </button>
+                        </div>
+                      )}
+                      {(order.status === "accepted" || order.status === "preparing") && (
+                        <button
+                          onClick={e => { e.stopPropagation(); updateStatus(order.id, "ready") }}
+                          disabled={updatingId === order.id}
+                          style={{ width:"100%", height:38, borderRadius:10, border:"none", marginTop:8, background:"linear-gradient(90deg,#3ecf6e,#2db55d)", color:"#fff", fontSize:11, fontWeight:800, cursor:"pointer", fontFamily:"Lexend", opacity: updatingId===order.id?0.5:1 }}>
+                          {updatingId===order.id ? "..." : "🍱 Sẵn sàng giao — Gọi tài xế đến lấy"}
+                        </button>
+                      )}
+                      {order.status === "ready" && (
+                        <div style={{ marginTop:8, padding:"8px 12px", borderRadius:10, background:"rgba(62,207,110,0.08)", border:"1px solid rgba(62,207,110,0.2)", color:"#3ecf6e", fontSize:11, fontWeight:700, textAlign:"center" }}>
+                          🛵 Đang chờ tài xế đến lấy hàng...
+                        </div>
+                      )}
+                      {order.status === "delivering" && (
+                        <div style={{ marginTop:8, padding:"8px 12px", borderRadius:10, background:"rgba(180,100,255,0.08)", border:"1px solid rgba(180,100,255,0.2)", color:"#b464ff", fontSize:11, fontWeight:700, textAlign:"center" }}>
+                          🛵 Tài xế đang giao hàng đến khách
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

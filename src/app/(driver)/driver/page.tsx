@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { usePushNotification } from "@/hooks/usePushNotification"
 import { useOrderSound } from "@/hooks/useOrderSound"
 import { motion, AnimatePresence } from "framer-motion"
@@ -947,6 +947,49 @@ export default function DriverDashboard() {
     setToggling(false)
   }
 
+  // ── Helper: build OrderData from a raw order row ──────────────
+  const buildOrderData = useCallback(async (o: {
+    id: string; shop_id: string; customer_id: string
+    delivery_address: string; total: number; ship_fee: number
+    total_amount: number; pay_method: string
+  }): Promise<OrderData | null> => {
+    const [{ data: shop }, { data: customer }, { data: items }] = await Promise.all([
+      supabase.from("shops").select("name, address, commission_rate").eq("id", o.shop_id).single(),
+      supabase.from("profiles").select("full_name").eq("id", o.customer_id).single(),
+      supabase.from("order_items").select("name, qty, price").eq("order_id", o.id),
+    ])
+    const commRate  = Number(shop?.commission_rate ?? 15)
+    const earnerFee = Math.round((o.ship_fee ?? 0) * (1 - commRate / 100))
+    return {
+      id: o.id.slice(0, 8).toUpperCase(), fullId: o.id, orderTable: "orders",
+      shopName: shop?.name ?? "Cửa hàng", shopAddress: shop?.address ?? "",
+      customerName: customer?.full_name ?? "Khách hàng", customerAddress: o.delivery_address ?? "",
+      distanceToShop: 1.0, distanceToCustomer: 2.0,
+      items: (items ?? []).map(i => ({ name: i.name, qty: i.qty ?? 1, price: i.price })),
+      subtotal: o.total ?? 0, deliveryFee: o.ship_fee ?? 0, total: o.total_amount ?? 0,
+      earnerFee, payMethod: o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+    }
+  }, [supabase])
+
+  // ── Khi bật online: query đơn pending chưa có tài xế ──────────
+  useEffect(() => {
+    if (!online || !driverId) return
+    async function checkPendingOrders() {
+      const { data: pendingRows } = await supabase
+        .from("orders")
+        .select("id, shop_id, customer_id, delivery_address, total, ship_fee, total_amount, pay_method")
+        .eq("status", "pending")
+        .is("driver_id", null)
+        .order("created_at", { ascending: true })
+        .limit(1)
+      if (!pendingRows?.length || showOrder || accepted) return
+      const orderData = await buildOrderData(pendingRows[0])
+      if (orderData) { setPendingOrder(orderData); setShowOrder(true) }
+    }
+    checkPendingOrders()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online, driverId])
+
   // ── Subscribe to pending orders when online ──
   useEffect(() => {
     if (!online || !driverId) {
@@ -967,36 +1010,8 @@ export default function DriverDashboard() {
           delivery_address: string; total: number; ship_fee: number
           total_amount: number; pay_method: string
         }
-
-        // Fetch shop + customer + items
-        const [{ data: shop }, { data: customer }, { data: items }] = await Promise.all([
-          supabase.from("shops").select("name, address, commission_rate").eq("id", o.shop_id).single(),
-          supabase.from("profiles").select("full_name").eq("id", o.customer_id).single(),
-          supabase.from("order_items").select("name, qty, price").eq("order_id", o.id),
-        ])
-
-        const commRate = Number(shop?.commission_rate ?? 15)
-        const earnerFee = Math.round((o.ship_fee ?? 0) * (1 - commRate / 100))
-
-        const orderData: OrderData = {
-          id:                  o.id.slice(0, 8).toUpperCase(),
-          fullId:              o.id,
-          orderTable:          "orders",
-          shopName:            shop?.name ?? "Cửa hàng",
-          shopAddress:         shop?.address ?? "",
-          customerName:        customer?.full_name ?? "Khách hàng",
-          customerAddress:     o.delivery_address ?? "",
-          distanceToShop:      1.0,
-          distanceToCustomer:  2.0,
-          items:               (items ?? []).map(i => ({ name: i.name, qty: i.qty ?? 1, price: i.price })),
-          subtotal:            o.total    ?? 0,
-          deliveryFee:         o.ship_fee ?? 0,
-          total:               o.total_amount ?? 0,
-          earnerFee,
-          payMethod:           o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
-        }
-        setPendingOrder(orderData)
-        setShowOrder(true)
+        const orderData = await buildOrderData(o)
+        if (orderData) { setPendingOrder(orderData); setShowOrder(true) }
       })
       .subscribe()
 
@@ -1057,8 +1072,23 @@ export default function DriverDashboard() {
       })
       .subscribe()
 
+    // ── Lắng nghe UPDATE khi auto-dispatch gán driver_id ──────────
+    const chAssigned = supabase
+      .channel("driver-assigned-orders")
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "orders",
+        filter: `driver_id=eq.${driverId}`,
+      }, async (payload) => {
+        const o = payload.new as { id: string; status: string; driver_id: string; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; total_amount: number; pay_method: string }
+        // Chỉ show popup nếu vừa được gán (status vẫn pending) và chưa có popup khác
+        if (o.status !== "pending" || showOrder || accepted) return
+        const orderData = await buildOrderData(o)
+        if (orderData) { setPendingOrder(orderData); setShowOrder(true) }
+      })
+      .subscribe()
+
     channelRef.current = ch
-    return () => { ch.unsubscribe(); chErrands.unsubscribe(); channelRef.current = null }
+    return () => { ch.unsubscribe(); chErrands.unsubscribe(); chAssigned.unsubscribe(); channelRef.current = null }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, driverId, showOrder, accepted])
 
