@@ -29,7 +29,7 @@ import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ─────────────────────────────────────────────────
 type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null }
-type ProductRow = { id: string; name: string; price: number; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string; is_open?: boolean; status?: string } | { name: string; is_open?: boolean; status?: string }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
+type ProductRow = { id: string; name: string; price: number; original_price?: number | null; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string; is_open?: boolean; status?: string } | { name: string; is_open?: boolean; status?: string }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null }
 
@@ -278,29 +278,40 @@ export default function HomePage() {
       })
       setNearbyShops(sorted.slice(0, 12) as ShopRow[])
 
-      // Best sellers — quán đang mở, trong khung giờ bán
+      // Best sellers — top bán chạy, không lọc theo giờ (sold_count >= 0)
       const { data: bsData } = await supabase
         .from("products")
-        .select("id,name,price,sold_count,shop_id,shops!inner(name,is_open,status),all_day,start_hour,end_hour")
+        .select("id,name,price,sold_count,shop_id,image_url,shops!inner(name,is_open,status),all_day,start_hour,end_hour")
         .eq("is_available", true)
-        .eq("shops.is_open", true)
         .eq("shops.status", "approved")
-        .gt("sold_count", 0)
-        .order("sold_count", { ascending: false })
-        .limit(25)
-      setBestSellers(((bsData ?? []) as ProductRow[]).filter(p => isShopOpen(p) && isProductInTime(p)).slice(0, 8))
-
-      // Promos — quán đang mở, trong khung giờ bán
-      const { data: promoData } = await supabase
-        .from("products")
-        .select("id,name,price,sold_count,shops!inner(name,is_open,status),all_day,start_hour,end_hour")
-        .eq("is_available", true)
-        .eq("shops.is_open", true)
-        .eq("shops.status", "approved")
-        .gt("sold_count", 0)
         .order("sold_count", { ascending: false })
         .limit(20)
-      setPromos(((promoData ?? []) as ProductRow[]).filter(p => isShopOpen(p) && isProductInTime(p)).slice(0, 6))
+      setBestSellers(((bsData ?? []) as ProductRow[]).filter(p => isShopOpen(p)).slice(0, 8))
+
+      // Promos — sản phẩm có giá khuyến mãi (original_price > price)
+      const { data: promoData } = await supabase
+        .from("products")
+        .select("id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status),all_day,start_hour,end_hour")
+        .eq("is_available", true)
+        .eq("shops.status", "approved")
+        .not("original_price", "is", null)
+        .order("sold_count", { ascending: false })
+        .limit(20)
+      // Fallback: nếu không có sản phẩm KM, lấy sản phẩm bán chạy nhất
+      const promoFiltered = ((promoData ?? []) as ProductRow[]).filter(p => isShopOpen(p))
+      if (promoFiltered.length > 0) {
+        setPromos(promoFiltered.slice(0, 8))
+      } else {
+        // fallback: top sản phẩm từ quán đang mở
+        const { data: fallbackPromo } = await supabase
+          .from("products")
+          .select("id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status),all_day,start_hour,end_hour")
+          .eq("is_available", true)
+          .eq("shops.status", "approved")
+          .order("sold_count", { ascending: false })
+          .limit(20)
+        setPromos(((fallbackPromo ?? []) as ProductRow[]).filter(p => isShopOpen(p)).slice(0, 8))
+      }
 
       // Admin banners
       const { data: bannerData } = await supabase
@@ -1155,8 +1166,11 @@ export default function HomePage() {
             <HScroll>
             {promos.map(p => {
               const shopName = (p.shops as {name:string}|null)?.name ?? ""
+              const discountPct = p.original_price && p.original_price > p.price
+                ? Math.round((1 - p.price / p.original_price) * 100) : 0
               return (
-                <div key={p.id} className="promo-card" style={{
+                <a key={p.id} href={`/shop/${p.shop_id}`} style={{ textDecoration:"none" }}>
+                <div className="promo-card" style={{
                   minWidth:120, flexShrink:0,
                   background:"rgba(255,255,255,0.04)", backdropFilter:"blur(10px)",
                   border:"1px solid rgba(255,255,255,0.08)",
@@ -1164,29 +1178,43 @@ export default function HomePage() {
                 }}>
                   <div style={{ height:74, display:"flex", alignItems:"center",
                     justifyContent:"center", fontSize:32, position:"relative",
-                    background:"rgba(255,107,0,0.04)" }}>
-                    <div style={{ position:"absolute", inset:0,
-                      background:"radial-gradient(circle at 50% 65%,rgba(255,107,0,0.1) 0%,transparent 65%)" }} />
-                    🍽️
-                    {p.sold_count > 0 && (
-                      <div style={{ position:"absolute", top:5, left:5,
+                    background:"rgba(255,107,0,0.04)", overflow:"hidden" }}>
+                    {p.image_url
+                      ? <Image src={p.image_url} alt={p.name} fill sizes="120px" style={{ objectFit:"cover" }} />
+                      : <span style={{ zIndex:1 }}>🍽️</span>}
+                    {discountPct > 0 && (
+                      <div style={{ position:"absolute", top:5, left:5, zIndex:2,
                         background:"#ff4040", color:"#fff",
-                        fontSize: 10, fontWeight:700, padding:"2px 5px", borderRadius:5 }}>
-                        HOT
+                        fontSize:9, fontWeight:800, padding:"2px 5px", borderRadius:5 }}>
+                        -{discountPct}%
+                      </div>
+                    )}
+                    {discountPct === 0 && p.sold_count > 0 && (
+                      <div style={{ position:"absolute", top:5, left:5, zIndex:2,
+                        background:"linear-gradient(90deg,#FF6B00,#FFB347)", color:"#fff",
+                        fontSize:9, fontWeight:800, padding:"2px 5px", borderRadius:5 }}>
+                        🔥 HOT
                       </div>
                     )}
                   </div>
                   <div style={{ padding:"7px 9px 8px" }}>
                     <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600,
                       whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
-                    <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
+                    <div style={{ color:"#6a5a40", fontSize:9, marginTop:1,
                       whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
-                    <div style={{ background:"linear-gradient(135deg,#FF6B00,#FFB347)",
-                      WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
-                      backgroundClip:"text", fontSize:11, fontWeight:700, marginTop:3 }}>{fmt(p.price)}</div>
+                    <div style={{ marginTop:3 }}>
+                      <span style={{ background:"linear-gradient(135deg,#FF6B00,#FFB347)",
+                        WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                        backgroundClip:"text", fontSize:11, fontWeight:700 }}>{fmt(p.price)}</span>
+                      {p.original_price && p.original_price > p.price && (
+                        <span style={{ color:"#6a5a40", fontSize:9, textDecoration:"line-through", marginLeft:4 }}>
+                          {fmt(p.original_price)}
+                        </span>
+                      )}
+                    </div>
                     <div style={{ display:"flex", alignItems:"center",
                       justifyContent:"space-between", marginTop:4 }}>
-                      <span style={{ color:"#6a5a40", fontSize: 10 }}>🔥 {p.sold_count} đã bán</span>
+                      <span style={{ color:"#6a5a40", fontSize:9 }}>🔥 {p.sold_count} đã bán</span>
                       <button
                         onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:p.id, name:p.name, price:p.price, shop:shopName, shopId:p.shop_id }) }}
                         style={{ width:22, height:22, borderRadius:7,
@@ -1197,6 +1225,7 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
+                </a>
               )
             })}
             </HScroll>
