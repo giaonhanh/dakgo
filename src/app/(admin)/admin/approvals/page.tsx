@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import AdminShell from "@/components/admin/AdminShell"
+import { getCategoryByValue, normalizeCategoryValue } from "@/lib/categories"
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -20,7 +21,7 @@ interface Driver {
 
 interface Shop {
   id: string; shopName: string; ownerName: string; phone: string
-  address: string; category: string; status: ShopStatus
+  address: string; category: string; categories: string[]; status: ShopStatus
   registeredDate: string; commissionRate: number
   rating: number | null; totalOrders: number; isOpen: boolean
 }
@@ -120,7 +121,7 @@ export default function ApprovalsPage() {
       const supabase = createClient()
       const { data: rows } = await supabase
         .from("shops")
-        .select("id, name, address, category, status, commission_rate, rating_avg, is_open, created_at, owner:profiles(full_name, phone), orders(count)")
+        .select("id, name, address, category, categories, status, commission_rate, rating_avg, is_open, created_at, owner:profiles(full_name, phone), orders(count)")
         .eq("status", "pending")
         .order("created_at", { ascending: false })
 
@@ -134,7 +135,10 @@ export default function ApprovalsPage() {
           ownerName:      o?.full_name ?? "—",
           phone:          o?.phone ?? "—",
           address:        r.address,
-          category:       r.category,
+          category:       normalizeCategoryValue(r.category ?? "khac"),
+          categories:     Array.isArray(r.categories) && r.categories.length > 0
+                            ? r.categories.map((v: string) => normalizeCategoryValue(v))
+                            : [normalizeCategoryValue(r.category ?? "khac")],
           status:         r.status as ShopStatus,
           registeredDate: new Date(r.created_at).toLocaleDateString("vi-VN"),
           commissionRate: r.commission_rate,
@@ -523,7 +527,7 @@ function ShopsTab({ shops, filter, loading, selected, saving, defaultRate, onFil
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{s.shopName}</div>
                   <div style={{ color: "#6a5a40", fontSize: 10 }}>{s.ownerName} · {s.phone}</div>
-                  <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 2 }}>{s.category} · {s.address}</div>
+                  <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 2 }}>{s.categories.map(v=>getCategoryByValue(v).emoji).join("")} {getCategoryByValue(s.category).label} · {s.address}</div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
                   <span style={{ background: cfg.bg, color: cfg.color, borderRadius: 6, padding: "2px 8px", fontSize: 9, fontWeight: 700 }}>{cfg.label}</span>
@@ -563,7 +567,7 @@ function ShopsTab({ shops, filter, loading, selected, saving, defaultRate, onFil
                 { label: "Tên quán",    val: selected.shopName         },
                 { label: "Chủ quán",    val: selected.ownerName        },
                 { label: "SĐT",         val: selected.phone            },
-                { label: "Loại",        val: selected.category         },
+                { label: "Loại",        val: selected.categories.map(v => `${getCategoryByValue(v).emoji} ${getCategoryByValue(v).label}`).join(", ") },
                 { label: "Địa chỉ",     val: selected.address          },
                 { label: "Hoa hồng",    val: selected.commissionRate !== defaultRate ? `Thoả thuận ${selected.commissionRate}%` : `Mặc định ${selected.commissionRate}%` },
                 { label: "Tổng đơn",    val: selected.totalOrders.toString() },
