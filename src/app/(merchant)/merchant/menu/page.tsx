@@ -33,10 +33,6 @@ interface Product {
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
-const CATEGORY_LIST = [
-  "Buổi sáng","Buổi trưa","Buổi tối",
-  "Nước uống","Món nhậu","Ăn vặt",
-]
 const BADGE_LIST = [
   { key:"hot"        as const, label:"🔥 HOT",      color:"#ff4040", bg:"rgba(255,64,64,0.15)",    border:"rgba(255,64,64,0.4)"    },
   { key:"bigsale"    as const, label:"💸 BIG SALE", color:"#FFD700", bg:"rgba(255,215,0,0.12)",    border:"rgba(255,215,0,0.4)"    },
@@ -69,7 +65,6 @@ interface ImportRow {
   sizes: SizeOpt[]; toppings: Topping[]
 }
 
-const APP_CATEGORIES = ["Buổi sáng", "Buổi trưa", "Buổi tối", "Nước uống", "Món nhậu", "Ăn vặt"]
 
 // Parse "Nhỏ:25000, Vừa:30000, Lớn:35000" → SizeOpt[]
 function parseSizes(raw: string): SizeOpt[] {
@@ -385,7 +380,7 @@ export default function MerchantMenuPage() {
     const badge: Product["badge"] = badgeRaw === "hot" ? "hot" : badgeRaw === "bigsale" ? "bigsale" : badgeRaw === "bestseller" ? "bestseller" : badgeRaw === "new" ? "new" : null
     const isAvailable = availRaw === "" || ["có","co","yes","1","true","có"].includes(availRaw)
     // Danh mục: tách và lọc chỉ lấy giá trị hợp lệ
-    const categories = categoriesRaw.split(",").map(s => s.trim()).filter(s => APP_CATEGORIES.includes(s))
+    const categories: string[] = [] // product tags không còn dùng, category filter theo shop
     return { name, description, price, promoPrice, categories, menuGroup, badge, isAvailable, startHour, endHour, sizes: parseSizes(sizesRaw), toppings: parseToppings(toppingsRaw) }
   }
 
@@ -1195,33 +1190,8 @@ export default function MerchantMenuPage() {
                   )}
                 </div>
 
-                {/* ─ Danh mục trang chủ (hiển thị ở mục duyệt theo danh mục ngoài trang chủ, tối đa 3) ─ */}
-                <div style={{marginBottom:14}}>
-                  <FLabel>
-                    🏷️ Danh mục trang chủ
-                    <span style={{color:"#6a5a40"}}> · chọn 1–3 · đã chọn {pModal.categories.length}/3</span>
-                  </FLabel>
-                  <div style={{background:"rgba(74,143,245,0.05)",border:"1px solid rgba(74,143,245,0.15)",borderRadius:10,padding:"7px 10px",marginBottom:8}}>
-                    <div style={{color:"#4a8ff5",fontSize:8.5,lineHeight:1.6}}>
-                      Danh mục giúp khách tìm món theo loại <strong>ngoài trang chủ</strong> — khác với Nhóm menu chỉ hiển thị bên trong cửa hàng.
-                    </div>
-                  </div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                    {CATEGORY_LIST.map(c => {
-                      const on       = pModal.categories.includes(c)
-                      const disabled = !on && pModal.categories.length >= 3
-                      return (
-                        <button key={c} onClick={() => toggleCat(c)} disabled={disabled}
-                          style={{padding:"5px 11px",borderRadius:20,
-                            background:on?"rgba(255,107,0,0.14)":"rgba(255,255,255,0.04)",
-                            border:on?"1px solid rgba(255,107,0,0.4)":"1px solid rgba(255,255,255,0.07)",
-                            color:on?"#FF8C00":disabled?"rgba(106,90,64,0.4)":"#6a5a40",
-                            fontSize:10,fontWeight:on?700:400,cursor:disabled?"not-allowed":"pointer",fontFamily:"Lexend",opacity:disabled?0.5:1}}>
-                          {on && "✓ "}{c}
-                        </button>
-                      )
-                    })}
-                  </div>
+                {/* Danh mục trang chủ đã được quản lý ở cấp cửa hàng (shop.categories) */}
+                <div style={{marginBottom:14, display:"none"}}>
                 </div>
 
                 {/* ─ Badge / Ghim ─ */}
