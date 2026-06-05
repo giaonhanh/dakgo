@@ -12,11 +12,10 @@ interface ShopRow {
   name: string
   address: string
   rating_avg: number | null
-  total_orders: number
-  image_url: string | null
+  logo_url: string | null
   is_open: boolean
   opening_hours: { open?: string; close?: string } | null
-  category: string
+  category: string | null
   categories: string[] | null
 }
 
@@ -54,27 +53,30 @@ export default function CategoryPage() {
 
   const [shops,   setShops]   = useState<ShopRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [sortBy,  setSortBy]  = useState<"default" | "rating" | "orders">("default")
+  const [sortBy,  setSortBy]  = useState<"default" | "rating">("default")
   const [toast,   setToast]   = useState("")
 
   useEffect(() => {
     if (!validSlug) { setLoading(false); return }
     async function load() {
       setLoading(true)
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("shops")
-        .select("id, name, address, rating_avg, total_orders, image_url, is_open, opening_hours, category, categories")
+        .select("id, name, address, rating_avg, logo_url, is_open, opening_hours, category, categories")
         .eq("status", "approved")
+        .order("is_open", { ascending: false })
         .order("rating_avg", { ascending: false })
-        .limit(60)
+        .limit(80)
 
+      if (error) console.error("[category page] query error:", error.message)
       if (!data) { setLoading(false); return }
 
       const filtered = (data as ShopRow[]).filter(s => {
-        const cats = Array.isArray(s.categories) && s.categories.length > 0
-          ? s.categories.map((v: string) => normalizeCategoryValue(v))
-          : [normalizeCategoryValue(s.category ?? "khac")]
-        return (cats as string[]).includes(slug)
+        const rawCats = Array.isArray(s.categories) && s.categories.length > 0
+          ? s.categories
+          : s.category ? [s.category] : ["khac"]
+        const normalized = rawCats.map((v: string) => normalizeCategoryValue(v))
+        return (normalized as string[]).includes(slug)
       })
       setShops(filtered)
       setLoading(false)
@@ -86,8 +88,6 @@ export default function CategoryPage() {
     const aOpen = isShopOpen(a) ? 0 : 1
     const bOpen = isShopOpen(b) ? 0 : 1
     if (aOpen !== bOpen) return aOpen - bOpen
-    if (sortBy === "rating") return (b.rating_avg ?? 0) - (a.rating_avg ?? 0)
-    if (sortBy === "orders") return (b.total_orders ?? 0) - (a.total_orders ?? 0)
     return (b.rating_avg ?? 0) - (a.rating_avg ?? 0)
   })
 
@@ -163,9 +163,8 @@ export default function CategoryPage() {
         {/* Sort bar */}
         <div style={{ display:"flex", gap:7, padding:"12px 16px 10px", overflowX:"auto", scrollbarWidth:"none" }}>
           {([
-            { key:"default", label:"⭐ Nổi bật"   },
-            { key:"rating",  label:"🏅 Đánh giá"  },
-            { key:"orders",  label:"🔥 Nhiều đơn" },
+            { key:"default", label:"⭐ Nổi bật"  },
+            { key:"rating",  label:"🏅 Đánh giá" },
           ] as const).map(opt => (
             <button key={opt.key} onClick={() => setSortBy(opt.key)}
               style={{ flexShrink:0, padding:"6px 13px", borderRadius:20, cursor:"pointer",
@@ -219,8 +218,8 @@ export default function CategoryPage() {
                     background: cat.color, border:`1px solid ${borderColor}`,
                     display:"flex", alignItems:"center", justifyContent:"center",
                     fontSize:28, overflow:"hidden", position:"relative" }}>
-                    {shop.image_url
-                      ? <img src={shop.image_url} alt={shop.name}
+                    {shop.logo_url
+                      ? <img src={shop.logo_url} alt={shop.name}
                           style={{ width:"100%", height:"100%", objectFit:"cover" }} />
                       : cat.emoji}
                     {!open && (
@@ -245,14 +244,6 @@ export default function CategoryPage() {
                       <span style={{ color:"#FFB347", fontSize:11 }}>
                         ★ {(shop.rating_avg ?? 5).toFixed(1)}
                       </span>
-                      {(shop.total_orders ?? 0) > 0 && (
-                        <>
-                          <span style={{ color:"rgba(255,255,255,0.1)" }}>·</span>
-                          <span style={{ color:"#6a5a40", fontSize:10 }}>
-                            {shop.total_orders.toLocaleString("vi-VN")} đơn
-                          </span>
-                        </>
-                      )}
                       <span style={{ color:"rgba(255,255,255,0.1)" }}>·</span>
                       {open ? (
                         <span style={{ color:"#3ecf6e", fontSize:10, fontWeight:600 }}>🟢 Đang mở</span>
