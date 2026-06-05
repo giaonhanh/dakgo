@@ -26,6 +26,7 @@ import Image from "next/image"
 import { useCartStore } from "@/store/cartStore"
 import { useLocationStore } from "@/store/locationStore"
 import { createClient } from "@/lib/supabase/client"
+import { SHOP_CATEGORIES } from "@/lib/categories"
 
 // ─── Types ─────────────────────────────────────────────────
 type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null }
@@ -43,23 +44,8 @@ type RecoRow    = { id: string; name: string; price: number; original_price: num
 type BannerRow  = { id: string; title: string; subtitle: string | null; image_url: string | null; link_url: string | null; sort_order: number }
 type NewMenuRow = { id: string; name: string; price: number; image_url: string | null; shop_id: string; created_at: string; shops: { name: string } | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 
-const MEAL_TIMES = [
-  { icon:"☀️",  label:"Buổi sáng",  value:"buoi-sang"  },
-  { icon:"🌤️", label:"Buổi trưa",  value:"buoi-trua"  },
-  { icon:"🌙",  label:"Buổi tối",   value:"buoi-toi"   },
-  { icon:"🧋",  label:"Nước uống", value:"nuoc-uong"  },
-  { icon:"🍺",  label:"Món nhậu",  value:"mon-nhau"   },
-  { icon:"🍿",  label:"Ăn vặt",    value:"an-vat"     },
-]
-
-function getDefaultMealTime() {
-  const h = new Date().getHours()
-  if (h >= 5  && h < 10) return 0 // Sáng
-  if (h >= 10 && h < 14) return 1 // Trưa
-  if (h >= 14 && h < 18) return 3 // Nước (chiều)
-  if (h >= 18 && h < 23) return 2 // Tối
-  return 4                         // Nhậu (khuya)
-}
+// Danh mục hiển thị trên trang chủ — lấy từ SHOP_CATEGORIES (bỏ "Khác")
+const HOME_CATS = SHOP_CATEGORIES.filter(c => c.value !== "khac")
 
 // ─── Không còn mock data — dùng Supabase thật ─────────────
 
@@ -160,7 +146,7 @@ export default function HomePage() {
 
   type PendingItem = { id:string; name:string; price:number; shop:string; shopId:string }
 
-  const [activeMealTime,  setActiveMealTime]  = useState(getDefaultMealTime)
+  const [activeMealTime,  setActiveMealTime]  = useState(0)
   const [savedVoucherIds, setSavedVoucherIds] = useState<string[]>([])
   const [bannerIdx,     setBannerIdx]     = useState(0)
   const [countdown,     setCountdown]     = useState({ h:0, m:0, s:0 })
@@ -1119,38 +1105,35 @@ export default function HomePage() {
           )}
 
           {/* ──────────────────────────────────────
-              S7 — Danh mục (navigate to /danh-muc/{value})
+              S7 — Danh mục theo loại món
           ────────────────────────────────────── */}
-          <SectionHeader title="Danh mục" />
-          <div style={{
-            display:"grid", gridTemplateColumns:"repeat(3,1fr)",
-            gap:8, padding:"0 16px", marginBottom:14,
-          }}>
-            {MEAL_TIMES.map((m,i) => (
-              <motion.button key={i}
+          <SectionHeader title="Danh mục" more="Tất cả →" href="/danh-muc" />
+          <div style={{ overflowX:"auto", display:"flex", gap:8, padding:"0 16px 4px", marginBottom:10,
+            scrollbarWidth:"none", msOverflowStyle:"none" }}>
+            {HOME_CATS.map((m, i) => (
+              <motion.button key={m.value}
                 initial={{ opacity:0, scale:.9 }} animate={{ opacity:1, scale:1 }}
-                transition={{ delay: i * 0.05 }}
-                whileTap={{ scale:.94 }}
+                transition={{ delay: i * 0.04 }}
+                whileTap={{ scale:.93 }}
                 onClick={() => router.push(`/danh-muc/${m.value}`)}
                 style={{
-                  background:"rgba(255,255,255,0.05)",
+                  flexShrink:0, background:"rgba(255,255,255,0.04)",
                   border:"1px solid rgba(255,255,255,0.08)",
-                  borderRadius:14, padding:"12px 8px",
-                  display:"flex", flexDirection:"column", alignItems:"center", gap:6,
-                  cursor:"pointer", transition:"all .2s",
+                  borderRadius:14, padding:"10px 12px",
+                  display:"flex", flexDirection:"column", alignItems:"center", gap:5,
+                  cursor:"pointer", minWidth:72,
                 }}>
                 <div style={{
-                  width:46, height:46, borderRadius:13,
+                  width:44, height:44, borderRadius:13,
                   display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:22,
-                  background:"rgba(255,107,0,0.08)",
-                  border:"1px solid rgba(255,107,0,0.18)",
+                  fontSize:22, background: m.color,
                 }}>
-                  {m.icon}
+                  {m.emoji}
                 </div>
                 <div style={{
-                  fontSize: 11, fontWeight:600, color:"#b0956a",
-                  textAlign:"center", whiteSpace:"nowrap",
+                  fontSize:9, fontWeight:600, color:"#b0956a",
+                  textAlign:"center", lineHeight:1.3,
+                  maxWidth:68, wordBreak:"keep-all",
                 }}>
                   {m.label}
                 </div>

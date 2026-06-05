@@ -283,6 +283,7 @@ export default function ApprovalsPage() {
             <DriversTab
               drivers={filteredDrivers} filter={driverFilter} loading={driverLoading}
               selected={selectedDriver} saving={saving}
+              commCfg={commCfg}
               onFilterChange={setDriverFilter}
               onSelect={setSelectedDriver}
               onApprove={(id, commissionRate) => approveDriver(id, true, undefined, commissionRate)}
@@ -292,6 +293,7 @@ export default function ApprovalsPage() {
             <ShopsTab
               shops={filteredShops} filter={shopFilter} loading={shopLoading}
               selected={selectedShop} saving={saving}
+              commCfg={commCfg}
               onFilterChange={setShopFilter}
               onSelect={setSelectedShop}
               onUpdateStatus={updateShopStatus}
@@ -369,9 +371,10 @@ export default function ApprovalsPage() {
 
 // ── Drivers Tab ────────────────────────────────────────────────
 
-function DriversTab({ drivers, filter, loading, selected, saving, onFilterChange, onSelect, onApprove, onReject }: {
+function DriversTab({ drivers, filter, loading, selected, saving, commCfg, onFilterChange, onSelect, onApprove, onReject }: {
   drivers: Driver[]; filter: string; loading: boolean
   selected: Driver | null; saving: boolean
+  commCfg: { defaultRate: number; minRate: number; maxRate: number }
   onFilterChange: (f: "all" | DriverStatus) => void
   onSelect: (d: Driver | null) => void
   onApprove: (id: string, commissionRate?: number) => void
@@ -483,9 +486,10 @@ function DriversTab({ drivers, filter, loading, selected, saving, onFilterChange
 
 // ── Shops Tab ──────────────────────────────────────────────────
 
-function ShopsTab({ shops, filter, loading, selected, saving, onFilterChange, onSelect, onUpdateStatus, onReject }: {
+function ShopsTab({ shops, filter, loading, selected, saving, commCfg, onFilterChange, onSelect, onUpdateStatus, onReject }: {
   shops: Shop[]; filter: string; loading: boolean
   selected: Shop | null; saving: boolean
+  commCfg: { defaultRate: number; minRate: number; maxRate: number }
   onFilterChange: (f: "all" | ShopStatus) => void
   onSelect: (s: Shop | null) => void
   onUpdateStatus: (id: string, status: ShopStatus, reason?: string, commissionRate?: number) => void

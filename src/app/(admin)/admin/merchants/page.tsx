@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import AdminShell from "@/components/admin/AdminShell"
+import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/lib/categories"
 
 type ShopStatus = "pending" | "approved" | "suspended"
 
@@ -40,16 +41,11 @@ const STATUS_CFG: Record<ShopStatus, { label: string; color: string; bg: string;
   suspended: { label: "Tạm khóa",       color: "#ff4040", bg: "rgba(255,64,64,0.10)",   border: "rgba(255,64,64,0.25)"  },
 }
 
-const CATEGORIES = ["Bún/Phở","Cơm hộp","Gà rán","Đồ uống","Bánh mì","Pizza","Bánh/Kem","Cà phê","Hải sản","Lẩu","Khác"]
-
-
 function categoryIcon(cat: string): string {
-  const map: Record<string, string> = { "Bún/Phở": "🍜", "Cơm hộp": "🍱", "Gà rán": "🍗", "Đồ uống": "🥤", "Bánh mì": "🥖", "Pizza": "🍕", "Bánh/Kem": "🧁", "Cà phê": "☕", "Hải sản": "🦐", "Lẩu": "🍲" }
-  return map[cat] ?? "🏪"
+  return getCategoryByValue(normalizeCategoryValue(cat)).emoji
 }
 function categoryColor(cat: string): string {
-  const map: Record<string, string> = { "Bún/Phở": "rgba(255,107,0,0.15)", "Cơm hộp": "rgba(62,207,110,0.12)", "Gà rán": "rgba(255,179,71,0.12)", "Đồ uống": "rgba(74,143,245,0.12)", "Bánh mì": "rgba(245,197,66,0.12)", "Pizza": "rgba(180,100,255,0.12)", "Bánh/Kem": "rgba(74,143,245,0.10)", "Cà phê": "rgba(255,64,64,0.12)" }
-  return map[cat] ?? "rgba(255,255,255,0.06)"
+  return getCategoryByValue(normalizeCategoryValue(cat)).color
 }
 
 const fmt      = (n: number) => n.toLocaleString("vi-VN") + "đ"
@@ -104,7 +100,7 @@ export default function AdminMerchantsPage() {
         id: r.id, shopName: r.name,
         ownerName: (prof as { full_name?: string }).full_name ?? "Chủ quán",
         phone: r.phone ?? (prof as { phone?: string }).phone ?? "—",
-        address: r.address, category: r.category,
+        address: r.address, category: normalizeCategoryValue(r.category ?? "khac"),
         categoryIcon: categoryIcon(r.category), status: r.status as ShopStatus,
         registeredDate: new Date(r.created_at).toLocaleDateString("vi-VN"),
         commissionRate: r.commission_rate ?? defaultCommRate, rating: r.rating_avg ?? null,
@@ -497,7 +493,7 @@ export default function AdminMerchantsPage() {
                     <SLabel>Danh mục</SLabel>
                     <select value={editShop.category} onChange={e => setEditShop(s => s ? { ...s, category: e.target.value } : s)}
                       style={{ width: "100%", height: 40, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 10, color: "#f0eaff", fontSize: 11, padding: "0 12px", marginBottom: 12, fontFamily: "Lexend", colorScheme: "dark" }}>
-                      {CATEGORIES.map(c => <option key={c} value={c} style={{ background: "#0d0b19" }}>{c}</option>)}
+                      {SHOP_CATEGORIES.map(c => <option key={c.value} value={c.value} style={{ background: "#0d0b19" }}>{c.emoji} {c.label}</option>)}
                     </select>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>

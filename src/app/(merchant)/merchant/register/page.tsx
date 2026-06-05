@@ -2,24 +2,25 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { SHOP_CATEGORIES } from "@/lib/categories"
 
 const ALL_DAYS = ["T2","T3","T4","T5","T6","T7","CN"]
 const STEPS = ["Thông tin cơ bản","Địa điểm & giờ mở","Xác nhận & gửi"]
 
 interface Form {
-  name:string; phone:string; description:string
+  name:string; phone:string; category:string; description:string
   address:string; openTime:string; closeTime:string; days:string[]
 }
 
 export default function MerchantRegisterPage() {
   const [step, setStep] = useState(0)
   const [submitted, setSubmitted] = useState(false)
-  const [form, setForm] = useState<Form>({ name:"",phone:"",description:"",address:"",openTime:"07:00",closeTime:"22:00",days:["T2","T3","T4","T5","T6","T7","CN"] })
+  const [form, setForm] = useState<Form>({ name:"",phone:"",category:"",description:"",address:"",openTime:"07:00",closeTime:"22:00",days:["T2","T3","T4","T5","T6","T7","CN"] })
 
   const update = (k: keyof Form, v: string) => setForm(f => ({ ...f, [k]: v }))
   const toggleDay = (d: string) => setForm(f => ({ ...f, days: f.days.includes(d) ? f.days.filter(x=>x!==d) : [...f.days,d] }))
   const canNext = () => {
-    if (step===0) return !!(form.name && form.phone)
+    if (step===0) return !!(form.name && form.phone && form.category)
     if (step===1) return !!(form.address && form.days.length)
     return true
   }
@@ -36,7 +37,12 @@ export default function MerchantRegisterPage() {
           <div style={{ color:"#FF8C00",fontSize:14,fontWeight:700 }}>1-2 ngày làm việc</div>
         </div>
         <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,width:"100%",maxWidth:340 }}>
-          {[["Tên cửa hàng",form.name],["Số điện thoại",form.phone],["Địa chỉ",form.address]].map(([k,v]) => (
+          {[
+          ["Tên cửa hàng",form.name],
+          ["Loại hình", SHOP_CATEGORIES.find(c=>c.value===form.category)?.label ?? "—"],
+          ["Số điện thoại",form.phone],
+          ["Địa chỉ",form.address],
+        ].map(([k,v]) => (
             <div key={k} style={{ display:"flex",justifyContent:"space-between",gap:12,marginBottom:8,paddingBottom:8,borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
               <span style={{ color:"#6a5a40",fontSize:9,flexShrink:0 }}>{k}</span>
               <span style={{ color:"#b0956a",fontSize:9,fontWeight:600,textAlign:"right" }}>{v}</span>
@@ -84,6 +90,34 @@ export default function MerchantRegisterPage() {
                 <div style={{ marginBottom:12 }}>
                   <label style={{ color:"#6a5a40",fontSize:9,fontWeight:600,display:"block",marginBottom:6 }}>SỐ ĐIỆN THOẠI *</label>
                   <input value={form.phone} onChange={e=>update("phone",e.target.value)} placeholder="0901 234 567" type="tel" style={{ width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 14px",color:"#f8f0e0",fontSize:13 }} />
+                </div>
+                <div style={{ marginBottom:12 }}>
+                  <label style={{ color:"#6a5a40",fontSize:9,fontWeight:600,display:"block",marginBottom:8 }}>LOẠI HÌNH CỬA HÀNG *</label>
+                  <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7 }}>
+                    {SHOP_CATEGORIES.filter(c=>c.value!=="khac").map(c => {
+                      const active = form.category === c.value
+                      return (
+                        <button key={c.value} onClick={()=>update("category",c.value)}
+                          style={{ background:active?c.color:"rgba(255,255,255,0.04)",
+                            border:active?"1px solid rgba(255,107,0,0.4)":"1px solid rgba(255,255,255,0.08)",
+                            borderRadius:12,padding:"10px 6px",
+                            display:"flex",flexDirection:"column",alignItems:"center",gap:5,
+                            cursor:"pointer",fontFamily:"Lexend",transition:"all .15s" }}>
+                          <span style={{ fontSize:22 }}>{c.emoji}</span>
+                          <span style={{ fontSize:8,fontWeight:600,color:active?"#FF8C00":"#6a5a40",textAlign:"center",lineHeight:1.3 }}>{c.label}</span>
+                        </button>
+                      )
+                    })}
+                    <button onClick={()=>update("category","khac")}
+                      style={{ background:form.category==="khac"?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.04)",
+                        border:form.category==="khac"?"1px solid rgba(255,107,0,0.4)":"1px solid rgba(255,255,255,0.08)",
+                        borderRadius:12,padding:"10px 6px",
+                        display:"flex",flexDirection:"column",alignItems:"center",gap:5,
+                        cursor:"pointer",fontFamily:"Lexend",transition:"all .15s" }}>
+                      <span style={{ fontSize:22 }}>🏪</span>
+                      <span style={{ fontSize:8,fontWeight:600,color:form.category==="khac"?"#FF8C00":"#6a5a40" }}>Khác</span>
+                    </button>
+                  </div>
                 </div>
                 <div style={{ marginBottom:12 }}>
                   <label style={{ color:"#6a5a40",fontSize:9,fontWeight:600,display:"block",marginBottom:6 }}>MÔ TẢ (tùy chọn)</label>
@@ -146,7 +180,13 @@ export default function MerchantRegisterPage() {
                       <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:800 }}>{form.name || "Tên cửa hàng"}</div>
                     </div>
                   </div>
-                  {[["Số ĐT",form.phone],["Địa chỉ",form.address||"Chưa nhập"],["Giờ mở",`${form.openTime} – ${form.closeTime}`],["Ngày mở",form.days.join(", ")||"Chưa chọn"]].map(([k,v]) => (
+                  {[
+                    ["Số ĐT",form.phone],
+                    ["Loại hình", SHOP_CATEGORIES.find(c=>c.value===form.category)?.emoji + " " + (SHOP_CATEGORIES.find(c=>c.value===form.category)?.label ?? "Chưa chọn")],
+                    ["Địa chỉ",form.address||"Chưa nhập"],
+                    ["Giờ mở",`${form.openTime} – ${form.closeTime}`],
+                    ["Ngày mở",form.days.join(", ")||"Chưa chọn"],
+                  ].map(([k,v]) => (
                     <div key={k} style={{ display:"flex",justifyContent:"space-between",gap:12,marginBottom:8,paddingBottom:8,borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
                       <span style={{ color:"#6a5a40",fontSize:9,flexShrink:0 }}>{k}</span>
                       <span style={{ color:"#b0956a",fontSize:9,fontWeight:600,textAlign:"right" }}>{v}</span>

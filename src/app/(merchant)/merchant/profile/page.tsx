@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/client"
+import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/lib/categories"
 
 const MapPicker = dynamic(() => import("@/components/merchant/MapPicker"), {
   ssr: false,
@@ -67,7 +68,7 @@ export default function MerchantProfilePage() {
           setName(shop.name ?? "")
           setPhone(shop.phone ?? "")
           setAddress(shop.address ?? "")
-          setCategory(shop.category ?? "")
+          setCategory(normalizeCategoryValue(shop.category ?? "khac"))
           setIsOpen(shop.is_open ?? false)
           setRating(shop.rating_avg ?? null)
           setTotalReview(shop.total_reviews ?? 0)
@@ -123,7 +124,7 @@ export default function MerchantProfilePage() {
 
     if (shopId) {
       const updatePayload: Record<string, unknown> = {
-        name, phone, address,
+        name, phone, address, category,
         updated_at: new Date().toISOString(),
       }
       if (lat !== null && lng !== null) {
@@ -207,7 +208,9 @@ export default function MerchantProfilePage() {
             </div>
 
             <div style={{ color:"#f8f0e0",fontSize:17,fontWeight:800,marginBottom:4 }}>{name || "Chưa đặt tên"}</div>
-            <div style={{ color:"#6a5a40",fontSize:10,marginBottom:10 }}>{category || "Chưa chọn loại hình"}</div>
+            <div style={{ color:"#6a5a40",fontSize:10,marginBottom:10 }}>
+              {category ? `${getCategoryByValue(category).emoji} ${getCategoryByValue(category).label}` : "Chưa chọn loại hình"}
+            </div>
 
             <div style={{ display:"flex",justifyContent:"center",gap:16,marginBottom:14 }}>
               <div style={{ textAlign:"center" }}>
@@ -253,6 +256,32 @@ export default function MerchantProfilePage() {
               value={phone}
               onChange={v => { setPhone(v); clearError("phone") }}
             />
+
+            {/* Danh mục */}
+            <div style={{ marginBottom:10,paddingBottom:10,borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
+              <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start" }}>
+                <span style={{ color:"#6a5a40",fontSize:10,flexShrink:0,marginRight:8,paddingTop:4 }}>Loại hình</span>
+                {editing ? (
+                  <div style={{ flex:1,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6 }}>
+                    {SHOP_CATEGORIES.map(c => (
+                      <button key={c.value} onClick={()=>setCategory(c.value)}
+                        style={{ background:category===c.value?c.color:"rgba(255,255,255,0.04)",
+                          border:category===c.value?"1px solid rgba(255,107,0,0.4)":"1px solid rgba(255,255,255,0.07)",
+                          borderRadius:10,padding:"7px 4px",
+                          display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+                          cursor:"pointer",fontFamily:"Lexend",transition:"all .15s" }}>
+                        <span style={{ fontSize:18 }}>{c.emoji}</span>
+                        <span style={{ fontSize:7,fontWeight:600,color:category===c.value?"#FF8C00":"#6a5a40",textAlign:"center",lineHeight:1.2 }}>{c.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <span style={{ color:"#f8f0e0",fontSize:11,fontWeight:600 }}>
+                    {getCategoryByValue(category).emoji} {getCategoryByValue(category).label}
+                  </span>
+                )}
+              </div>
+            </div>
 
             {/* Địa chỉ — custom: textarea + bản đồ */}
             <div style={{ marginBottom: 10 }}>
