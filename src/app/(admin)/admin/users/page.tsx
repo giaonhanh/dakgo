@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import AdminShell from "@/components/admin/AdminShell"
 import * as XLSX from "xlsx"
+import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/lib/categories"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ interface MerchantRow {
   ratingAvg: number | null; totalReviews: number
   commissionRate: number; isNegotiated: boolean; createdDate: string
   shopType: "partner" | "delivery" | null
-  address: string
+  address: string; category: string
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -138,6 +139,8 @@ export default function AdminUsersPage() {
   const [merchantSaving,   setMerchantSaving]   = useState(false)
   const [shopTypeModal,    setShopTypeModal]    = useState<{ id: string; name: string; current: "partner" | "delivery" | null } | null>(null)
   const [shopTypeSaving,   setShopTypeSaving]   = useState(false)
+  const [catModal,         setCatModal]         = useState<{ id: string; name: string; current: string } | null>(null)
+  const [catSaving,        setCatSaving]        = useState(false)
 
   const [toast,   setToast]   = useState("")
   const [toastOk, setToastOk] = useState(true)
@@ -439,7 +442,7 @@ export default function AdminUsersPage() {
     const supabase = createClient()
     const { data: rows, error: shopErr } = await supabase
       .from("shops")
-      .select("id, owner_id, name, address, status, is_open, rating_avg, total_reviews, commission_rate, is_negotiated_commission, created_at, shop_type")
+      .select("id, owner_id, name, address, category, status, is_open, rating_avg, total_reviews, commission_rate, is_negotiated_commission, created_at, shop_type")
       .order("created_at", { ascending: false })
     if (shopErr) console.error("[loadMerchants] shops query error:", shopErr)
     if (!rows || rows.length === 0) { setMerchantsLoading(false); setMerchantsLoaded(true); return }
@@ -462,6 +465,7 @@ export default function AdminUsersPage() {
         createdDate: new Date(r.created_at).toLocaleDateString("vi-VN"),
         shopType: (r.shop_type as "partner" | "delivery" | null) ?? null,
         address: r.address ?? "",
+        category: normalizeCategoryValue(r.category ?? "khac"),
       }
     }))
     setMerchantsLoading(false)
@@ -618,6 +622,18 @@ export default function AdminUsersPage() {
     setMerchants(ms => ms.map(m => m.id === id ? { ...m, commissionRate: rate, isNegotiated } : m))
     setMerchantInline(null)
     fire(isNegotiated ? `✅ Hoa hồng thoả thuận ${rate}% đã lưu` : `✅ Đặt về hoa hồng mặc định ${rate}%`)
+  }
+
+  const saveCategory = async (category: string) => {
+    if (!catModal) return
+    setCatSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from("shops").update({ category }).eq("id", catModal.id)
+    setCatSaving(false)
+    if (error) { fire("❌ Lỗi cập nhật danh mục", false); return }
+    setMerchants(ms => ms.map(m => m.id === catModal.id ? { ...m, category } : m))
+    setCatModal(null)
+    fire(`✅ Đã cập nhật danh mục`)
   }
 
   const saveShopType = async (shopType: "partner" | "delivery") => {
@@ -1026,12 +1042,17 @@ export default function AdminUsersPage() {
                       return (
                         <div key={m.id} className="user-row"
                           style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 55px 72px 80px 70px", gap: 8, padding: "10px 14px", alignItems: "center", borderBottom: idx < shownMerchants.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", transition: "all 0.15s" }}>
-                          <div style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,179,71,0.12)", border: "1px solid rgba(255,179,71,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, position: "relative" }}>
-                            🏪
+                          <div style={{ width: 34, height: 34, borderRadius: 9, background: getCategoryByValue(m.category).color, border: "1px solid rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, position: "relative" }}>
+                            {getCategoryByValue(m.category).emoji}
                             {m.isOpen && <div style={{ position: "absolute", bottom: -2, right: -2, width: 10, height: 10, borderRadius: "50%", background: "#3ecf6e", border: "1.5px solid #06050a", boxShadow: "0 0 4px #3ecf6e" }} />}
                           </div>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ color: "#f0eaff", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.shopName}</div>
+                            <div style={{ display:"flex", alignItems:"center", gap:4, marginTop:2 }}>
+                              <span style={{ color:"rgba(144,128,176,0.5)", fontSize:8 }}>{getCategoryByValue(m.category).label}</span>
+                              <button onClick={() => setCatModal({ id: m.id, name: m.shopName, current: m.category })}
+                                style={{ fontSize:7, padding:"1px 4px", borderRadius:4, border:"1px solid rgba(255,255,255,0.1)", background:"rgba(255,255,255,0.04)", color:"rgba(144,128,176,0.5)", cursor:"pointer", fontFamily:"Lexend" }}>✏️</button>
+                            </div>
                           </div>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ color: "#f0eaff", fontSize: 10, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.ownerName}</div>
@@ -1335,6 +1356,46 @@ export default function AdminUsersPage() {
               </motion.div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Category modal ── */}
+      <AnimatePresence>
+        {catModal && (
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+            onClick={() => setCatModal(null)}
+            style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", backdropFilter:"blur(6px)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+            <motion.div initial={{ opacity:0, scale:.95 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:.95 }}
+              onClick={e => e.stopPropagation()}
+              style={{ width:"100%", maxWidth:380, background:"#0e0b07", border:"1px solid rgba(255,107,0,0.3)", borderRadius:20, padding:"22px 20px" }}>
+              <div style={{ display:"flex", alignItems:"center", marginBottom:12 }}>
+                <div style={{ flex:1, color:"#f8f0e0", fontSize:14, fontWeight:800 }}>🏷️ Danh mục cửa hàng</div>
+                <button onClick={() => setCatModal(null)} style={{ width:28, height:28, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:15, cursor:"pointer" }}>×</button>
+              </div>
+              <div style={{ color:"#6a5a40", fontSize:10, marginBottom:14 }}>{catModal.name}</div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:18 }}>
+                {SHOP_CATEGORIES.map(c => {
+                  const sel = catModal.current === c.value
+                  return (
+                    <button key={c.value} onClick={() => setCatModal(m => m ? { ...m, current: c.value } : m)}
+                      style={{ padding:"10px 6px", borderRadius:12, cursor:"pointer", fontFamily:"Lexend", textAlign:"center",
+                        border:`2px solid ${sel ? "rgba(255,107,0,0.5)" : "rgba(255,255,255,0.08)"}`,
+                        background: sel ? c.color : "rgba(255,255,255,0.04)", transition:"all .15s" }}>
+                      <div style={{ fontSize:20, marginBottom:4 }}>{c.emoji}</div>
+                      <div style={{ color: sel ? "#FF8C00" : "#b0956a", fontSize:8, fontWeight:700, lineHeight:1.3 }}>{c.label}</div>
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:10 }}>
+                <button onClick={() => setCatModal(null)} style={{ height:42, borderRadius:11, background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", color:"#b0956a", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>Hủy</button>
+                <button onClick={() => saveCategory(catModal.current)} disabled={catSaving}
+                  style={{ height:42, borderRadius:11, border:"none", background:catSaving?"rgba(255,255,255,0.06)":"linear-gradient(90deg,#FF6B00,#FF8C00)", color:catSaving?"#6a5a40":"#fff", fontSize:12, fontWeight:800, cursor:"pointer", fontFamily:"Lexend" }}>
+                  {catSaving ? "⏳ Đang lưu..." : "✓ Lưu danh mục"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
