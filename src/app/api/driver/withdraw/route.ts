@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Số dư không đủ. Ví hiện có ${balance.toLocaleString("vi-VN")}đ` }, { status: 400 })
     }
 
-    // ── Bước 2: Tạo withdrawal record (chặn duplicate) ──────────────────────
+    // ── Bước 2: Tạo withdrawal record (chặn duplicate concurrent) ───────────
     const { data: wd, error: wdErr } = await db
       .from("withdrawals")
       .insert({
@@ -68,23 +68,8 @@ export async function POST(req: NextRequest) {
 
     withdrawalId = wd.id
 
-    // ── Bước 3: Trừ ví (atomic RPC, có FOR UPDATE lock) ─────────────────────
-    const { error: rpcErr } = await db.rpc("subtract_from_wallet", {
-      p_user_id: user.id,
-      p_type:    "driver",
-      p_amount:  amt,
-      p_ref_id:  null,
-      p_note:    `Rút tiền · ${driver.bank_name} · ${driver.bank_account_number}`,
-      p_tx_type: "withdrawal",
-    })
-
-    if (rpcErr) {
-      const msg = rpcErr.message.includes("insufficient") ? "Số dư không đủ" : "Không thể xử lý. Thử lại sau."
-      await db.from("withdrawals").update({ status: "failed", error_msg: rpcErr.message }).eq("id", withdrawalId)
-      return NextResponse.json({ error: msg }, { status: 400 })
-    }
-
-    // ── Bước 4: Gọi PayOS Chi ────────────────────────────────────────────────
+    // ── Bước 3: Gọi PayOS Chi TRƯỚC (ví chưa bị trừ) ───────────────────────
+    // Nếu PayOS fail → ví nguyên vẹn, không cần refund
     const referenceId = `DRV-${user.id.slice(0, 8)}-${Date.now()}`
     try {
       await payosPayout.payouts.create({
@@ -95,47 +80,48 @@ export async function POST(req: NextRequest) {
         toAccountNumber: driver.bank_account_number,
       })
     } catch (payosErr) {
-      console.error("[Driver Withdraw] PayOS payout error:", payosErr)
-
-      // Hoàn tiền về ví
-      const { error: refundErr } = await db.rpc("add_to_wallet", {
-        p_user_id: user.id,
-        p_type:    "driver",
-        p_amount:  amt,
-        p_ref_id:  null,
-        p_note:    `Hoàn rút tiền (PayOS lỗi) · Ref: ${referenceId}`,
-        p_tx_type: "refund",
-      })
-
-      if (refundErr) {
-        // ⚠️ CRITICAL: ví đã trừ nhưng không hoàn được → alert admin ngay
-        console.error(`[CRITICAL] Driver withdraw refund FAILED. user=${user.id} amount=${amt} withdrawalId=${withdrawalId} refundErr=${refundErr.message}`)
-        await db.from("withdrawals").update({
-          status:       "failed",
-          reference_id: referenceId,
-          error_msg:    `PayOS fail + refund fail: ${refundErr.message}`,
-        }).eq("id", withdrawalId)
-
-        const { data: admins } = await db.from("profiles").select("id").eq("role", "admin").limit(5)
-        if (admins?.length) {
-          await Promise.allSettled(admins.map(a =>
-            db.from("notifications").insert({
-              user_id: a.id, type: "system",
-              title:   "🚨 KHẨN: Hoàn tiền tài xế thất bại",
-              body:    `user=${user.id} · ${amt.toLocaleString("vi-VN")}đ · Cần xử lý thủ công ngay · Ref: ${referenceId}`,
-              data:    { url: "/admin/wallets", critical: true, withdraw_id: withdrawalId },
-            })
-          ))
-        }
-        return NextResponse.json({ error: "Lỗi nghiêm trọng, đội hỗ trợ đã được thông báo." }, { status: 500 })
-      }
-
+      const errMsg = payosErr instanceof Error ? payosErr.message : String(payosErr)
+      console.error("[Driver Withdraw] PayOS payout error:", errMsg)
       await db.from("withdrawals").update({
-        status:    "refunded",
-        error_msg: `PayOS: ${payosErr instanceof Error ? payosErr.message : String(payosErr)}`,
+        status:    "failed",
+        error_msg: `PayOS: ${errMsg}`,
+      }).eq("id", withdrawalId)
+      // Ví chưa bị trừ → trả lỗi thông thường, user thử lại
+      return NextResponse.json({ error: `Cổng thanh toán lỗi: ${errMsg}. Vui lòng thử lại.` }, { status: 500 })
+    }
+
+    // ── Bước 4: PayOS OK → Trừ ví (atomic RPC) ──────────────────────────────
+    const { error: rpcErr } = await db.rpc("subtract_from_wallet", {
+      p_user_id: user.id,
+      p_type:    "driver",
+      p_amount:  amt,
+      p_ref_id:  null,
+      p_note:    `Rút tiền · ${driver.bank_name} · ${driver.bank_account_number} · Ref: ${referenceId}`,
+      p_tx_type: "withdrawal",
+    })
+
+    if (rpcErr) {
+      // PayOS đã chuyển khoản THÀNH CÔNG nhưng trừ ví thất bại
+      console.error(`[CRITICAL] Driver withdraw: PayOS SUCCESS but subtract FAILED. user=${user.id} amount=${amt} ref=${referenceId} err=${rpcErr.message}`)
+      await db.from("withdrawals").update({
+        status:       "failed",
+        reference_id: referenceId,
+        error_msg:    `PayOS thành công nhưng trừ ví thất bại: ${rpcErr.message}`,
       }).eq("id", withdrawalId)
 
-      return NextResponse.json({ error: "Cổng thanh toán lỗi, tiền đã được hoàn lại ví. Thử lại sau." }, { status: 500 })
+      const { data: admins } = await db.from("profiles").select("id").eq("role", "admin").limit(5)
+      if (admins?.length) {
+        await Promise.allSettled(admins.map(a =>
+          db.from("notifications").insert({
+            user_id: a.id, type: "system",
+            title:   "⚠️ Rút tiền tài xế: PayOS OK nhưng trừ ví thất bại",
+            body:    `user=${user.id} · ${amt.toLocaleString("vi-VN")}đ · Ref: ${referenceId} · Cần kiểm tra thủ công`,
+            data:    { url: "/admin/wallets", withdraw_id: withdrawalId, ref: referenceId },
+          })
+        ))
+      }
+      // Tiền đã chuyển thật → báo user thành công
+      return NextResponse.json({ success: true, referenceId, warning: "partial" })
     }
 
     // ── Bước 5: Cập nhật withdrawal thành công ───────────────────────────────
@@ -147,18 +133,19 @@ export async function POST(req: NextRequest) {
     // ── Bước 6: Notify ───────────────────────────────────────────────────────
     const { data: profile } = await db.from("profiles").select("full_name, phone").eq("id", user.id).single()
 
-    await db.from("notifications").insert({
-      user_id: user.id, type: "system",
-      title:   "✅ Rút tiền thành công",
-      body:    `${amt.toLocaleString("vi-VN")}đ → ${driver.bank_name} · ${driver.bank_account_number} · Đã chuyển khoản tự động`,
-      data:    { url: "/driver" },
-    })
-    await sendPushToUser(user.id, {
-      title: "✅ Rút tiền thành công",
-      body:  `${amt.toLocaleString("vi-VN")}đ đã chuyển vào ${driver.bank_name}`,
-      url:   "/driver",
-      tag:   `withdraw-done-${user.id}`,
-    })
+    await Promise.allSettled([
+      db.from("notifications").insert({
+        user_id: user.id, type: "system",
+        title:   "✅ Rút tiền thành công",
+        body:    `${amt.toLocaleString("vi-VN")}đ → ${driver.bank_name} · ${driver.bank_account_number} · Đã chuyển khoản tự động`,
+        data:    { url: "/driver" },
+      }),
+      sendPushToUser(user.id, {
+        title: "✅ Rút tiền thành công",
+        body:  `${amt.toLocaleString("vi-VN")}đ đã chuyển vào ${driver.bank_name}`,
+        url:   "/driver", tag: `withdraw-done-${user.id}`,
+      }),
+    ])
 
     const { data: admins } = await db.from("profiles").select("id").eq("role", "admin").limit(5)
     if (admins?.length) {
@@ -177,7 +164,7 @@ export async function POST(req: NextRequest) {
 
   } catch (err) {
     if (withdrawalId) {
-      await adminDb().from("withdrawals").update({
+      await db.from("withdrawals").update({
         status:    "failed",
         error_msg: err instanceof Error ? err.message : "Unexpected error",
       }).eq("id", withdrawalId)
