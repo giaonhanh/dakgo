@@ -172,7 +172,7 @@ export default function XuPage() {
       })
       const json = await res.json()
       if (!res.ok) { fireToast(json.error ?? "Không thể xử lý yêu cầu"); return }
-      fireToast("✅ Rút xu thành công! Tiền đang chuyển khoản.")
+      fireToast("✅ Yêu cầu rút xu đã ghi nhận! Admin xử lý trong 24h.")
       setShowWithdraw(false); setWithdrawBank(""); setWithdrawAmount(""); setWithdrawBankBin(BANKS[0].bin)
       setBalance(b => b - amt)
     } catch {

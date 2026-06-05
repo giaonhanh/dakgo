@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdmin } from "@supabase/supabase-js"
 import { sendPushToUser } from "@/lib/webpush"
-import { payosPayout } from "@/lib/payos"
 
 function adminDb() {
   return createAdmin(
@@ -33,7 +32,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Vui lòng chọn ngân hàng" }, { status: 400 })
     }
 
-    // ── Bước 1: Tạo withdrawal record (chặn duplicate concurrent) ───────────
+    // ── Chặn duplicate concurrent ────────────────────────────────────────────
     const { data: wd, error: wdErr } = await db
       .from("withdrawals")
       .insert({
@@ -57,7 +56,7 @@ export async function POST(req: NextRequest) {
 
     withdrawalId = wd.id
 
-    // ── Bước 2: Kiểm tra số dư ──────────────────────────────────────────────
+    // ── Kiểm tra số dư ───────────────────────────────────────────────────────
     const { data: wallet } = await db
       .from("wallets")
       .select("id, balance")
@@ -71,100 +70,68 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Số dư không đủ. Ví hiện có ${currentBalance.toLocaleString("vi-VN")} xu` }, { status: 400 })
     }
 
-    // ── Bước 3: Gọi PayOS Chi TRƯỚC (ví chưa bị trừ) ───────────────────────
-    // Nếu PayOS fail → ví nguyên vẹn, không cần refund
-    const referenceId = `CUS-${user.id.slice(0, 8)}-${Date.now()}`
-    try {
-      await payosPayout.payouts.create({
-        referenceId,
-        amount:          amt,
-        description:     `Rut xu khach hang`,
-        toBin:           String(bank_bin),
-        toAccountNumber: String(bank_account).replace(/\D/g, ""),
-      })
-    } catch (payosErr) {
-      const errMsg = payosErr instanceof Error ? payosErr.message : String(payosErr)
-      console.error("[Customer Withdraw] PayOS payout error:", errMsg)
-      await db.from("withdrawals").update({
-        status:    "failed",
-        error_msg: `PayOS: ${errMsg}`,
-      }).eq("id", withdrawalId)
-      // Ví chưa bị trừ → trả lỗi thông thường, user thử lại
-      return NextResponse.json({ error: `Cổng thanh toán lỗi: ${errMsg}. Vui lòng thử lại.` }, { status: 500 })
-    }
-
-    // ── Bước 4: PayOS OK → Trừ ví (atomic RPC) ──────────────────────────────
+    // ── Trừ ví (atomic RPC) ──────────────────────────────────────────────────
     const { error: rpcErr } = await db.rpc("subtract_from_wallet", {
       p_user_id: user.id,
       p_type:    "customer",
       p_amount:  amt,
       p_ref_id:  null,
-      p_note:    `Rút xu · TK ${bank_account} · Ref: ${referenceId}`,
+      p_note:    `Rút xu · TK ${bank_account}`,
       p_tx_type: "withdrawal",
     })
 
     if (rpcErr) {
-      // PayOS đã chuyển khoản THÀNH CÔNG nhưng trừ ví thất bại
-      // → Ghi lại để admin xử lý (cộng thủ công hoặc thu hồi từ PayOS)
-      console.error(`[CRITICAL] Customer withdraw: PayOS SUCCESS but subtract FAILED. user=${user.id} amount=${amt} ref=${referenceId} err=${rpcErr.message}`)
-      await db.from("withdrawals").update({
-        status:       "failed",
-        reference_id: referenceId,
-        error_msg:    `PayOS thành công nhưng trừ ví thất bại: ${rpcErr.message}`,
-      }).eq("id", withdrawalId)
-
-      // Alert admin để xử lý thủ công
-      const { data: admins } = await db.from("profiles").select("id").eq("role", "admin").limit(5)
-      if (admins?.length) {
-        await Promise.allSettled(admins.map(a =>
-          db.from("notifications").insert({
-            user_id: a.id, type: "system",
-            title:   "⚠️ Rút xu: PayOS OK nhưng trừ ví thất bại",
-            body:    `user=${user.id} · ${amt.toLocaleString("vi-VN")}xu · Ref: ${referenceId} · Cần kiểm tra thủ công`,
-            data:    { url: "/admin/wallets", withdraw_id: withdrawalId, ref: referenceId },
-          })
-        ))
-      }
-      // Vẫn thông báo user là thành công vì tiền đã được chuyển thật
-      return NextResponse.json({ success: true, referenceId, warning: "partial" })
+      const msg = rpcErr.message.includes("insufficient") ? "Số dư không đủ" : "Không thể xử lý yêu cầu"
+      await db.from("withdrawals").update({ status: "failed", error_msg: rpcErr.message }).eq("id", withdrawalId)
+      return NextResponse.json({ error: msg }, { status: 400 })
     }
 
-    // ── Bước 5: Cập nhật withdrawal thành công ───────────────────────────────
-    await db.from("withdrawals").update({
-      status:       "success",
-      reference_id: referenceId,
-    }).eq("id", withdrawalId)
+    // ── Cập nhật withdrawal → pending (chờ admin chuyển khoản) ───────────────
+    await db.from("withdrawals").update({ status: "success" }).eq("id", withdrawalId)
 
-    // ── Bước 6: Notify ───────────────────────────────────────────────────────
+    // ── Lấy thông tin user ───────────────────────────────────────────────────
     const { data: profile } = await db.from("profiles").select("full_name, phone").eq("id", user.id).single()
+    const { data: banks } = await db.from("withdrawals").select("bank_account, bank_bin").eq("id", withdrawalId).single()
 
+    // ── Notify user ──────────────────────────────────────────────────────────
     await Promise.allSettled([
       db.from("notifications").insert({
         user_id: user.id, type: "system",
-        title:   "✅ Rút xu thành công",
-        body:    `${amt.toLocaleString("vi-VN")} xu đã chuyển vào TK ${bank_account} · Ref: ${referenceId}`,
+        title:   "✅ Yêu cầu rút xu đã ghi nhận",
+        body:    `${amt.toLocaleString("vi-VN")} xu · TK ${bank_account} · Admin sẽ chuyển khoản trong 24h`,
         data:    { url: "/wallet/xu" },
       }),
       sendPushToUser(user.id, {
-        title: "✅ Rút xu thành công",
-        body:  `${amt.toLocaleString("vi-VN")}xu đã chuyển khoản tự động`,
-        url:   "/wallet/xu", tag: `withdraw-done-${user.id}`,
+        title: "✅ Yêu cầu rút xu đã ghi nhận",
+        body:  `${amt.toLocaleString("vi-VN")}xu · Xử lý trong 24h`,
+        url:   "/wallet/xu", tag: `withdraw-${user.id}`,
       }),
     ])
 
+    // ── Notify admin chuyển khoản thủ công ──────────────────────────────────
     const { data: admins } = await db.from("profiles").select("id").eq("role", "admin").limit(5)
     if (admins?.length) {
-      await Promise.allSettled(admins.map(a =>
-        db.from("notifications").insert({
-          user_id: a.id, type: "system",
-          title:   "🏦 Khách rút xu tự động",
-          body:    `✅ ${amt.toLocaleString("vi-VN")}xu · TK ${bank_account} · ${profile?.full_name ?? ""} · Ref: ${referenceId}`,
-          data:    { url: "/admin/wallets", withdraw_user_id: user.id, amount: amt, bank_account, ref: referenceId },
-        })
-      ))
+      const body = `💸 ${amt.toLocaleString("vi-VN")}xu · TK ${bank_account} · ${profile?.full_name ?? ""} ${profile?.phone ?? ""}`
+      await Promise.allSettled([
+        ...admins.map(a =>
+          db.from("notifications").insert({
+            user_id: a.id, type: "system",
+            title:   "🏦 Khách yêu cầu rút xu",
+            body,
+            data:    { url: "/admin/wallets", withdraw_user_id: user.id, amount: amt, bank_account, bank_bin, withdraw_id: withdrawalId },
+          })
+        ),
+        ...admins.map(a =>
+          sendPushToUser(a.id, {
+            title: "🏦 Yêu cầu rút xu",
+            body:  `${amt.toLocaleString("vi-VN")}xu · ${profile?.full_name ?? "Khách hàng"}`,
+            url:   "/admin/wallets", tag: `withdraw-req-${user.id}`,
+          })
+        ),
+      ])
     }
 
-    return NextResponse.json({ success: true, referenceId })
+    return NextResponse.json({ success: true })
 
   } catch (err) {
     if (withdrawalId) {
