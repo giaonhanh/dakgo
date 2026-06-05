@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { SHOP_CATEGORIES } from "@/lib/categories"
+import { createClient } from "@/lib/supabase/client"
 
 const ALL_DAYS = ["T2","T3","T4","T5","T6","T7","CN"]
 const STEPS = ["Thông tin cơ bản","Địa điểm & giờ mở","Xác nhận & gửi"]
@@ -15,6 +16,8 @@ interface Form {
 export default function MerchantRegisterPage() {
   const [step, setStep] = useState(0)
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState("")
   const [form, setForm] = useState<Form>({ name:"",phone:"",categories:[],description:"",address:"",openTime:"07:00",closeTime:"22:00",days:["T2","T3","T4","T5","T6","T7","CN"] })
 
   const update = (k: keyof Form, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -23,6 +26,35 @@ export default function MerchantRegisterPage() {
     ...f,
     categories: f.categories.includes(v) ? f.categories.filter(x=>x!==v) : [...f.categories, v]
   }))
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    setSubmitError("")
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setSubmitError("Bạn cần đăng nhập trước khi đăng ký cửa hàng."); setSubmitting(false); return }
+
+    const { error } = await supabase.from("shops").insert({
+      owner_id: user.id,
+      name: form.name,
+      phone: form.phone,
+      description: form.description || null,
+      address: form.address,
+      category: form.categories[0] ?? "khac",
+      categories: form.categories,
+      opening_hours: { open: form.openTime, close: form.closeTime },
+      status: "pending",
+      is_open: false,
+    })
+
+    setSubmitting(false)
+    if (error) {
+      if (error.code === "23505") setSubmitError("Số điện thoại này đã được đăng ký.")
+      else setSubmitError("Đã có lỗi xảy ra. Vui lòng thử lại.")
+      return
+    }
+    setSubmitted(true)
+  }
+
   const canNext = () => {
     if (step===0) return !!(form.name && form.phone && form.categories.length > 0)
     if (step===1) return !!(form.address && form.days.length)
@@ -202,9 +234,12 @@ export default function MerchantRegisterPage() {
 
         {/* CTA */}
         <div style={{ position:"absolute",bottom:0,left:0,right:0,background:"rgba(8,8,6,0.97)",backdropFilter:"blur(20px)",borderTop:"1px solid rgba(255,255,255,0.07)",padding:"12px 16px 28px",zIndex:10 }}>
-          <button disabled={!canNext()} onClick={() => step<STEPS.length-1?setStep(s=>s+1):setSubmitted(true)}
-            style={{ width:"100%",height:52,borderRadius:14,background:canNext()?"linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)":"rgba(255,255,255,0.06)",border:"none",cursor:canNext()?"pointer":"not-allowed",color:canNext()?"#fff":"#6a5a40",fontSize:14,fontWeight:800,fontFamily:"Lexend",boxShadow:canNext()?"0 4px 24px rgba(255,107,0,0.45)":"none",transition:"all .2s" }}>
-            {step<STEPS.length-1?"Tiếp tục →":"✅ Gửi đăng ký"}
+          {submitError && (
+            <div style={{ color:"#ff6060", fontSize:10, textAlign:"center", marginBottom:8 }}>{submitError}</div>
+          )}
+          <button disabled={!canNext() || submitting} onClick={() => step<STEPS.length-1?setStep(s=>s+1):handleSubmit()}
+            style={{ width:"100%",height:52,borderRadius:14,background:canNext()&&!submitting?"linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)":"rgba(255,255,255,0.06)",border:"none",cursor:canNext()&&!submitting?"pointer":"not-allowed",color:canNext()&&!submitting?"#fff":"#6a5a40",fontSize:14,fontWeight:800,fontFamily:"Lexend",boxShadow:canNext()&&!submitting?"0 4px 24px rgba(255,107,0,0.45)":"none",transition:"all .2s" }}>
+            {submitting ? "⏳ Đang gửi..." : step<STEPS.length-1 ? "Tiếp tục →" : "✅ Gửi đăng ký"}
           </button>
         </div>
       </div>
