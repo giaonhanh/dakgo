@@ -182,11 +182,9 @@ export default function AdminUsersPage() {
   const [importEditIdx,    setImportEditIdx]     = useState<number | null>(null)
   const importFileRef = useRef<HTMLInputElement>(null)
 
-  const APP_CATS_IMPORT = ["Buổi sáng","Buổi trưa","Buổi tối","Nước uống","Món nhậu","Ăn vặt"]
-
   const parseImportRow = (cols: string[]): ImportMenuItem | null => {
-    // FORMAT MỚI (12 cột): [0]DanhMục [1]NhómMenu [2]TênMón [3]MôTả [4]Giá [5]GiáKM [6]Badge [7]ĐangBán [8]GiờTừ [9]GiờĐến [10]Sizes [11]Toppings
-    // FORMAT CŨ (9 cột):   [0]DanhMục [1]TênMón [2]MôTả [3]Giá [4]GiáKM [5]Badge [6]ĐangBán [7]Sizes [8]Toppings
+    // FORMAT MỚI (12 cột): [0]Menu [1]TênMón [2]MôTả [3]Giá [4]GiáKM [5]Badge [6]ĐangBán [7]GiờTừ [8]GiờĐến [9]Sizes [10]Toppings
+    // FORMAT CŨ (9 cột):   [0]Menu [1]TênMón [2]MôTả [3]Giá [4]GiáKM [5]Badge [6]ĐangBán [7]Sizes [8]Toppings
     const isNewFmt = cols.length >= 10
     let catRaw: string, category: string, name: string, description: string
     let pRaw: string, pmRaw: string, bRaw: string, aRaw: string
@@ -215,7 +213,7 @@ export default function AdminUsersPage() {
       }
     }
     if (!name) return null
-    const categories = catRaw.split(",").map(s => s.trim()).filter(s => APP_CATS_IMPORT.includes(s))
+    const categories: string[] = []
     const price = parseInt(pRaw.replace(/\D/g, "")) || 0
     const promoPrice = pmRaw ? (parseInt(String(pmRaw).replace(/\D/g, "")) || null) : null
     const badge = bRaw === "hot" ? "hot" : bRaw === "bigsale" ? "bigsale" : bRaw === "bestseller" ? "bestseller" : bRaw === "new" ? "new" : null
