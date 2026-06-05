@@ -283,7 +283,7 @@ export default function ApprovalsPage() {
             <DriversTab
               drivers={filteredDrivers} filter={driverFilter} loading={driverLoading}
               selected={selectedDriver} saving={saving}
-              commCfg={commCfg}
+              defaultRate={commCfg.defaultRate}
               onFilterChange={setDriverFilter}
               onSelect={setSelectedDriver}
               onApprove={(id, commissionRate) => approveDriver(id, true, undefined, commissionRate)}
@@ -293,7 +293,7 @@ export default function ApprovalsPage() {
             <ShopsTab
               shops={filteredShops} filter={shopFilter} loading={shopLoading}
               selected={selectedShop} saving={saving}
-              commCfg={commCfg}
+              defaultRate={commCfg.defaultRate}
               onFilterChange={setShopFilter}
               onSelect={setSelectedShop}
               onUpdateStatus={updateShopStatus}
@@ -371,10 +371,10 @@ export default function ApprovalsPage() {
 
 // ── Drivers Tab ────────────────────────────────────────────────
 
-function DriversTab({ drivers, filter, loading, selected, saving, commCfg, onFilterChange, onSelect, onApprove, onReject }: {
+function DriversTab({ drivers, filter, loading, selected, saving, defaultRate, onFilterChange, onSelect, onApprove, onReject }: {
   drivers: Driver[]; filter: string; loading: boolean
   selected: Driver | null; saving: boolean
-  commCfg: { defaultRate: number; minRate: number; maxRate: number }
+  defaultRate: number
   onFilterChange: (f: "all" | DriverStatus) => void
   onSelect: (d: Driver | null) => void
   onApprove: (id: string, commissionRate?: number) => void
@@ -453,12 +453,12 @@ function DriversTab({ drivers, filter, loading, selected, saving, commCfg, onFil
               ))}
               {selected.status === "pending" && (
                 <div style={{ marginTop: 12, padding: "10px 12px", background: "rgba(180,100,255,0.06)", border: "1px solid rgba(180,100,255,0.2)", borderRadius: 10, marginBottom: 10 }}>
-                  <div style={{ color: "rgba(180,100,255,0.8)", fontSize: 9, marginBottom: 6, fontWeight: 700 }}>💜 Hoa hồng tài xế (%) — mặc định: {commCfg.defaultRate}%</div>
+                  <div style={{ color: "rgba(180,100,255,0.8)", fontSize: 9, marginBottom: 6, fontWeight: 700 }}>💜 Hoa hồng tài xế (%) — mặc định: {defaultRate}%</div>
                   <input type="number" min={0} max={50} value={pendingCommission}
                     onChange={e => setPendingCommission(parseInt(e.target.value) || 0)}
                     style={{ width: "100%", height: 36, borderRadius: 8, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.35)", color: "#b464ff", fontSize: 16, fontWeight: 800, textAlign: "center", padding: "0 8px", fontFamily: "Lexend" }} />
                   <div style={{ color: "rgba(180,100,255,0.4)", fontSize: 8, marginTop: 4 }}>
-                    {pendingCommission !== commCfg.defaultRate ? `⚠️ Thoả thuận riêng — khác mặc định ${commCfg.defaultRate}%` : `✓ Dùng mức mặc định hệ thống`}
+                    {pendingCommission !== defaultRate ? `⚠️ Thoả thuận riêng — khác mặc định ${defaultRate}%` : `✓ Dùng mức mặc định hệ thống`}
                   </div>
                 </div>
               )}
@@ -486,10 +486,10 @@ function DriversTab({ drivers, filter, loading, selected, saving, commCfg, onFil
 
 // ── Shops Tab ──────────────────────────────────────────────────
 
-function ShopsTab({ shops, filter, loading, selected, saving, commCfg, onFilterChange, onSelect, onUpdateStatus, onReject }: {
+function ShopsTab({ shops, filter, loading, selected, saving, defaultRate, onFilterChange, onSelect, onUpdateStatus, onReject }: {
   shops: Shop[]; filter: string; loading: boolean
   selected: Shop | null; saving: boolean
-  commCfg: { defaultRate: number; minRate: number; maxRate: number }
+  defaultRate: number
   onFilterChange: (f: "all" | ShopStatus) => void
   onSelect: (s: Shop | null) => void
   onUpdateStatus: (id: string, status: ShopStatus, reason?: string, commissionRate?: number) => void
@@ -542,7 +542,7 @@ function ShopsTab({ shops, filter, loading, selected, saving, commCfg, onFilterC
                 </div>
               </div>
               <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 5 }}>
-                Đăng ký: {s.registeredDate}{s.commissionRate !== commCfg.defaultRate ? ` · Thoả thuận ${s.commissionRate}%` : ""} · {s.totalOrders} đơn{s.rating ? ` · ⭐ ${s.rating}` : ""}
+                Đăng ký: {s.registeredDate}{s.commissionRate !== defaultRate ? ` · Thoả thuận ${s.commissionRate}%` : ""} · {s.totalOrders} đơn{s.rating ? ` · ⭐ ${s.rating}` : ""}
               </div>
             </div>
           )
@@ -565,7 +565,7 @@ function ShopsTab({ shops, filter, loading, selected, saving, commCfg, onFilterC
                 { label: "SĐT",         val: selected.phone            },
                 { label: "Loại",        val: selected.category         },
                 { label: "Địa chỉ",     val: selected.address          },
-                { label: "Hoa hồng",    val: selected.commissionRate !== commCfg.defaultRate ? `Thoả thuận ${selected.commissionRate}%` : `Mặc định ${selected.commissionRate}%` },
+                { label: "Hoa hồng",    val: selected.commissionRate !== defaultRate ? `Thoả thuận ${selected.commissionRate}%` : `Mặc định ${selected.commissionRate}%` },
                 { label: "Tổng đơn",    val: selected.totalOrders.toString() },
                 { label: "Rating",      val: selected.rating ? `⭐ ${selected.rating}` : "—" },
                 { label: "Ngày ĐK",     val: selected.registeredDate   },
@@ -577,12 +577,12 @@ function ShopsTab({ shops, filter, loading, selected, saving, commCfg, onFilterC
               ))}
               {selected.status === "pending" && (
                 <div style={{ marginTop: 12, padding: "10px 12px", background: "rgba(180,100,255,0.06)", border: "1px solid rgba(180,100,255,0.2)", borderRadius: 10 }}>
-                  <div style={{ color: "rgba(180,100,255,0.8)", fontSize: 9, marginBottom: 6, fontWeight: 700 }}>💜 Hoa hồng khi duyệt (%) — mặc định: {commCfg.defaultRate}%</div>
+                  <div style={{ color: "rgba(180,100,255,0.8)", fontSize: 9, marginBottom: 6, fontWeight: 700 }}>💜 Hoa hồng khi duyệt (%) — mặc định: {defaultRate}%</div>
                   <input type="number" min={0} max={50} value={pendingCommission}
                     onChange={e => setPendingCommission(parseInt(e.target.value) || 0)}
                     style={{ width: "100%", height: 36, borderRadius: 8, background: "rgba(180,100,255,0.1)", border: "1px solid rgba(180,100,255,0.35)", color: "#b464ff", fontSize: 16, fontWeight: 800, textAlign: "center", padding: "0 8px", fontFamily: "Lexend" }} />
                   <div style={{ color: "rgba(180,100,255,0.4)", fontSize: 8, marginTop: 4 }}>
-                    {pendingCommission !== commCfg.defaultRate ? `⚠️ Thoả thuận riêng — khác mặc định ${commCfg.defaultRate}%` : `✓ Dùng mức mặc định hệ thống`}
+                    {pendingCommission !== defaultRate ? `⚠️ Thoả thuận riêng — khác mặc định ${defaultRate}%` : `✓ Dùng mức mặc định hệ thống`}
                   </div>
                 </div>
               )}
