@@ -155,18 +155,25 @@ function calcFeeFromPricing(distKm: number, rows: string[], extra: string): numb
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
-const fmtTime = (iso: string) => {
+const todayStr = () => new Date().toISOString().split("T")[0]
+
+function fmtTime(iso: string, showDate = false) {
   const d = new Date(iso)
-  return `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`
+  const hhmm = `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`
+  if (!showDate) return hhmm
+  return `${d.getDate().toString().padStart(2,"0")}/${(d.getMonth()+1).toString().padStart(2,"0")} · ${hhmm}`
 }
 
 export default function AdminOrdersPage() {
-  const [filter,   setFilter]   = useState<"all" | OrderStatus>("all")
-  const [selected, setSelected] = useState<Order | null>(null)
-  const [search,   setSearch]   = useState("")
-  const [orders,   setOrders]   = useState<Order[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [adminId,  setAdminId]  = useState("")
+  const [filter,    setFilter]   = useState<"all" | OrderStatus>("all")
+  const [selected,  setSelected] = useState<Order | null>(null)
+  const [search,    setSearch]   = useState("")
+  const [orders,    setOrders]   = useState<Order[]>([])
+  const [loading,   setLoading]  = useState(true)
+  const [adminId,   setAdminId]  = useState("")
+  const [dateFrom,  setDateFrom] = useState(todayStr())
+  const [dateTo,    setDateTo]   = useState(todayStr())
+  const isToday = dateFrom === todayStr() && dateTo === todayStr()
 
   // Cancel modal
   const [cancelModal,    setCancelModal]    = useState<Order | null>(null)
@@ -253,16 +260,21 @@ export default function AdminOrdersPage() {
   const foodTotal    = foodSubtotal + totalShipFee
 
   /* ── Load orders ── */
-  const load = useCallback(async () => {
+  const load = useCallback(async (from = dateFrom, to = dateTo) => {
     setLoading(true)
     const supabase = createClient()
+    // Lấy từ 00:00:00 đến 23:59:59 theo giờ Việt Nam (UTC+7)
+    const fromISO = `${from}T00:00:00+07:00`
+    const toISO   = `${to}T23:59:59+07:00`
 
     // Không join order_items trong nested query để tránh RLS block
     const { data: rows, error } = await supabase
       .from("orders")
       .select("id,status,total_amount,ship_fee,delivery_address,created_at,customer_id,driver_id,pay_method,note,shops!shop_id(name)")
+      .gte("created_at", fromISO)
+      .lte("created_at", toISO)
       .order("created_at", { ascending: false })
-      .limit(100)
+      .limit(300)
     if (error || !rows) { setLoading(false); return }
 
     // Fetch order_items riêng (tránh nested join RLS)
@@ -312,15 +324,19 @@ export default function AdminOrdersPage() {
     const { data: rideRows } = await supabase
       .from("rides")
       .select("id, status, vehicle_type, pickup_address, dropoff_address, estimated_fare, payment_method, note, created_at, driver_id, customer_id")
+      .gte("created_at", fromISO)
+      .lte("created_at", toISO)
       .order("created_at", { ascending: false })
-      .limit(50)
+      .limit(100)
 
     // Fetch errands (giao hộ / mua hộ)
     const { data: errandRows } = await supabase
       .from("errands")
       .select("id, status, type, pickup_address, delivery_address, service_fee, payment_method, note, created_at, driver_id, customer_id")
+      .gte("created_at", fromISO)
+      .lte("created_at", toISO)
       .order("created_at", { ascending: false })
-      .limit(50)
+      .limit(100)
 
     // Build profile map for rides + errands
     const reCustIds = [...new Set([
@@ -388,20 +404,27 @@ export default function AdminOrdersPage() {
   }, [])
 
   useEffect(() => {
+    load(dateFrom, dateTo)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo])
+
+  useEffect(() => {
     const supabase = createClient()
-    load()
     supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? ""))
-    // Load pricing settings
     supabase.from("app_settings").select("value").eq("key","pricing").maybeSingle()
       .then(({ data }) => { if (data?.value) setPricing(data.value as PricingMap) })
 
+    // Realtime chỉ auto-reload khi đang xem hôm nay
     const ch = supabase
       .channel("admin-orders-watch")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => { load() })
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        if (dateFrom === todayStr() && dateTo === todayStr()) load(dateFrom, dateTo)
+      })
       .subscribe()
 
     return () => { supabase.removeChannel(ch) }
-  }, [load])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Tính khoảng cách qua VietMap Route API (fallback Haversine × 1.3 nếu lỗi)
   useEffect(() => {
@@ -717,7 +740,7 @@ export default function AdminOrdersPage() {
 
       <AdminShell
         pageTitle="📦 Quản lý đơn hàng"
-        pageSubtitle={loading ? "Đang tải..." : `${orders.length} đơn · ${fmt(todayTotal)}`}
+        pageSubtitle={loading ? "Đang tải..." : `${orders.length} đơn · ${fmt(todayTotal)} · ${isToday ? "Hôm nay" : `${dateFrom} → ${dateTo}`}`}
         actions={
           <button onClick={() => { setShowCreate(true); loadShops() }}
             style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg,#FF6B00,#FF8C00)", border:"none", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:800, color:"#fff", cursor:"pointer", boxShadow:"0 4px 14px rgba(255,107,0,0.4)" }}>
@@ -733,6 +756,29 @@ export default function AdminOrdersPage() {
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Tìm mã đơn, khách hàng, quán..." style={{ flex:1, background:"none", border:"none", color:"#f8f0e0", fontSize:11 }} />
             </div>
 
+            {/* Date range filter */}
+            <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:8, flexWrap:"wrap" }}>
+              <button onClick={() => { setDateFrom(todayStr()); setDateTo(todayStr()) }}
+                style={{ flexShrink:0, height:32, padding:"0 10px", borderRadius:8, cursor:"pointer", fontFamily:"Lexend", fontSize:9, fontWeight:700,
+                  background: isToday ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.04)",
+                  border: isToday ? "1px solid rgba(255,107,0,0.4)" : "1px solid rgba(255,255,255,0.08)",
+                  color: isToday ? "#FF8C00" : "#6a5a40" }}>
+                📅 Hôm nay
+              </button>
+              <div style={{ display:"flex", alignItems:"center", gap:5, flex:1 }}>
+                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                  style={{ flex:1, minWidth:0, height:32, padding:"0 8px", borderRadius:8, background:"rgba(255,255,255,0.04)",
+                    border:"1px solid rgba(255,255,255,0.1)", color:"#f8f0e0", fontSize:11,
+                    fontFamily:"Lexend", colorScheme:"dark" }} />
+                <span style={{ color:"#6a5a40", fontSize:10, flexShrink:0 }}>→</span>
+                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                  style={{ flex:1, minWidth:0, height:32, padding:"0 8px", borderRadius:8, background:"rgba(255,255,255,0.04)",
+                    border:"1px solid rgba(255,255,255,0.1)", color:"#f8f0e0", fontSize:11,
+                    fontFamily:"Lexend", colorScheme:"dark" }} />
+              </div>
+            </div>
+
+            {/* Status filter chips */}
             <div style={{ display:"flex", gap:5, overflowX:"auto" }}>
               {(["all","pending","accepted","preparing","ready","delivering","delivered","cancelled"] as const).map(f => (
                 <button key={f} onClick={()=>setFilter(f)}
