@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { getAdminContact } from "@/lib/adminContact"
+import { BANKS } from "@/lib/banks"
 
 /* ── helpers ── */
 function Toggle({ on, onToggle, color = "#3ecf6e" }: { on: boolean; onToggle: () => void; color?: string }) {
@@ -162,25 +163,32 @@ function VehicleSheet({ onClose }: { onClose: () => void }) {
 }
 
 /* ── bank sheet ── */
-const BANK_LIST = ["Vietcombank","Techcombank","MB Bank","BIDV","VPBank","Agribank","ACB","VietinBank","TPBank","HDBank","Sacombank","MSB","SHB","OCB","Eximbank","Nam A Bank"]
 function maskAcct(s: string) { return s.length <= 5 ? s : s.slice(0, 2) + "••••" + s.slice(-3) }
 
 function BankSheet({ onClose, onSaved }: { onClose: () => void; onSaved?: () => void }) {
   const supabase = createClient()
-  const [bank, setBank]     = useState("Vietcombank")
-  const [acct, setAcct]     = useState("")
-  const [name, setName]     = useState("")
-  const [saving, setSaving] = useState(false)
+  const [bankBin, setBankBin] = useState(BANKS[0].bin)
+  const [acct, setAcct]       = useState("")
+  const [name, setName]       = useState("")
+  const [saving, setSaving]   = useState(false)
   const [loading, setLoading] = useState(true)
-  const [err, setErr]       = useState("")
+  const [err, setErr]         = useState("")
   const [editing, setEditing] = useState(false)
+
+  const selectedBank = BANKS.find(b => b.bin === bankBin) ?? BANKS[0]
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); setEditing(true); return }
-      supabase.from("drivers").select("bank_name, bank_account_number, bank_account_name").eq("id", user.id).single()
+      supabase.from("drivers").select("bank_name, bank_bin, bank_account_number, bank_account_name").eq("id", user.id).single()
         .then(({ data }) => {
-          if (data?.bank_name)           setBank(data.bank_name)
+          if (data?.bank_bin) {
+            setBankBin(data.bank_bin)
+          } else if (data?.bank_name) {
+            // migrate: tìm bin từ tên cũ
+            const match = BANKS.find(b => b.name.toLowerCase() === (data.bank_name as string).toLowerCase())
+            if (match) setBankBin(match.bin)
+          }
           if (data?.bank_account_number) setAcct(data.bank_account_number)
           if (data?.bank_account_name)   setName(data.bank_account_name)
           setEditing(!data?.bank_account_number)
@@ -197,7 +205,12 @@ function BankSheet({ onClose, onSaved }: { onClose: () => void; onSaved?: () => 
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return setErr("Chưa đăng nhập") }
-    const { error } = await supabase.from("drivers").update({ bank_name: bank, bank_account_number: acct.trim(), bank_account_name: name.trim().toUpperCase() }).eq("id", user.id)
+    const { error } = await supabase.from("drivers").update({
+      bank_name:           selectedBank.name,
+      bank_bin:            selectedBank.bin,
+      bank_account_number: acct.trim(),
+      bank_account_name:   name.trim().toUpperCase(),
+    }).eq("id", user.id)
     setSaving(false)
     if (error) return setErr("Lưu thất bại, thử lại sau")
     setEditing(false); onSaved?.()
@@ -217,7 +230,7 @@ function BankSheet({ onClose, onSaved }: { onClose: () => void; onSaved?: () => 
           <>
             <div style={{ background: "rgba(62,207,110,0.07)", border: "1px solid rgba(62,207,110,0.2)", borderRadius: 16, padding: "18px 16px", marginBottom: 16 }}>
               <div style={{ color: "#6a5a40", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>Tài khoản nhận tiền</div>
-              {[["Ngân hàng", bank, "#f8f0e0"], ["Số tài khoản", maskAcct(acct), "#3ecf6e"], ["Chủ tài khoản", name, "#f8f0e0"]].map(([k, v, c]) => (
+              {[["Ngân hàng", selectedBank.name, "#f8f0e0"], ["Số tài khoản", maskAcct(acct), "#3ecf6e"], ["Chủ tài khoản", name, "#f8f0e0"]].map(([k, v, c]) => (
                 <div key={k} style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                   <span style={{ color: "#6a5a40", fontSize: 11 }}>{k}</span>
                   <span style={{ color: c, fontSize: 11, fontWeight: 700 }}>{v}</span>
@@ -231,8 +244,8 @@ function BankSheet({ onClose, onSaved }: { onClose: () => void; onSaved?: () => 
             {acct && <div style={{ background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)", borderRadius: 11, padding: "9px 13px", marginBottom: 14, display: "flex", gap: 8, alignItems: "center" }}><span style={{ fontSize: 14 }}>⚠️</span><span style={{ color: "#f5c542", fontSize: 10, lineHeight: 1.5 }}>Đang sửa tài khoản. Hãy kiểm tra kỹ trước khi lưu.</span></div>}
             <div style={{ marginBottom: 12 }}>
               <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 8 }}>Ngân hàng</div>
-              <select value={bank} onChange={e => setBank(e.target.value)} style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", appearance: "auto" }}>
-                {BANK_LIST.map(b => <option key={b} value={b} style={{ background: "#0e0b07" }}>{b}</option>)}
+              <select value={bankBin} onChange={e => setBankBin(e.target.value)} style={{ width: "100%", height: 44, padding: "0 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 11, color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", appearance: "auto" }}>
+                {BANKS.map(b => <option key={b.bin} value={b.bin} style={{ background: "#0e0b07" }}>{b.name}</option>)}
               </select>
             </div>
             {[{ label: "Số tài khoản", value: acct, set: setAcct, ph: "VD: 1234567890" }, { label: "Tên chủ tài khoản (IN HOA)", value: name, set: setName, ph: "VD: PHAM HONG MY" }].map(f => (

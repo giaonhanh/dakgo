@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
+import { BANKS } from "@/lib/banks"
 
 type TxType = "payment" | "topup" | "refund" | "reward" | "commission" | "withdrawal"
 interface XuTx {
@@ -40,8 +41,9 @@ export default function XuPage() {
   const [showQR,         setShowQR]         = useState(false)
   const [topupAmount,    setTopupAmount]    = useState(100000)
   const [customAmount,   setCustomAmount]   = useState("")
-  const [withdrawAmount, setWithdrawAmount] = useState("")
-  const [withdrawBank,   setWithdrawBank]   = useState("")
+  const [withdrawAmount,  setWithdrawAmount]  = useState("")
+  const [withdrawBank,    setWithdrawBank]    = useState("")
+  const [withdrawBankBin, setWithdrawBankBin] = useState(BANKS[0].bin)
   const [filterType,     setFilterType]     = useState<TxType|"all">("all")
   const [toast,          setToast]          = useState("")
 
@@ -161,12 +163,12 @@ export default function XuPage() {
       const res = await fetch("/api/customer/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amt, bank_account: withdrawBank }),
+        body: JSON.stringify({ amount: amt, bank_account: withdrawBank, bank_bin: withdrawBankBin }),
       })
       const json = await res.json()
       if (!res.ok) { fireToast(json.error ?? "Không thể xử lý yêu cầu"); return }
-      fireToast("✅ Đã gửi yêu cầu rút xu thành công!")
-      setShowWithdraw(false); setWithdrawBank(""); setWithdrawAmount("")
+      fireToast("✅ Rút xu thành công! Tiền đang chuyển khoản.")
+      setShowWithdraw(false); setWithdrawBank(""); setWithdrawAmount(""); setWithdrawBankBin(BANKS[0].bin)
       setBalance(b => b - amt)
     } catch {
       fireToast("Lỗi kết nối, vui lòng thử lại")
@@ -334,6 +336,15 @@ export default function XuPage() {
                   <span style={{ color:"#b464ff", fontSize:14, fontWeight:700 }}>{fmt(balance)} xu</span>
                   <div style={{ color:"rgba(180,100,255,0.45)", fontSize: 11 }}>= {fmt(balance)}đ</div>
                 </div>
+              </div>
+              <div style={{ marginBottom:10 }}>
+                <label style={{ color:"rgba(180,100,255,0.55)", fontSize:11, display:"block", marginBottom:4 }}>Ngân hàng</label>
+                <select value={withdrawBankBin} onChange={e => setWithdrawBankBin(e.target.value)}
+                  style={{ width:"100%", height:44, padding:"0 12px", borderRadius:12,
+                    background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)",
+                    color:"#f8f0e0", fontSize:12, fontFamily:"Lexend", appearance:"auto", colorScheme:"dark" }}>
+                  {BANKS.map(b => <option key={b.bin} value={b.bin} style={{ background:"#0e0c09" }}>{b.name}</option>)}
+                </select>
               </div>
               <FInput label="Số tài khoản ngân hàng" value={withdrawBank}
                 onChange={setWithdrawBank} placeholder="VD: 0123456789" icon="🏦" type="number" />
