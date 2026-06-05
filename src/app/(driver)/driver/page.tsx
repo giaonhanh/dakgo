@@ -979,7 +979,7 @@ export default function DriverDashboard() {
         .from("orders")
         .select("id, shop_id, customer_id, delivery_address, total, ship_fee, total_amount, pay_method")
         .eq("status", "pending")
-        .is("driver_id", null)
+        .or(`driver_id.is.null,driver_id.eq.${driverId}`)
         .order("created_at", { ascending: true })
         .limit(1)
       if (!pendingRows?.length || showOrder || accepted) return

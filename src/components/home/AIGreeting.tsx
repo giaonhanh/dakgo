@@ -274,20 +274,51 @@ function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length
 function buildPool(h: number, day: number, month: number, wk: WKey | null): Pair[] {
   const tKey = timeKey(h)
   const isWeekend = day === 0 || day === 6
-  const isCoolSeason = month >= 11 || month <= 3 // tháng 11–3 ở Tây Nguyên
+  const isCoolSeason = month >= 11 || month <= 3
   const pool: Pair[] = []
-
-  // 60% time-based
   pool.push(...TIME[tKey])
-
-  // 40% weather-based if available
   if (wk) pool.push(...WEATHER_POOL[wk])
-
-  // Extra: weekend or season (bonus variety)
   if (isWeekend) pool.push(...WEEKEND_POOL)
   pool.push(...SEASON_POOL[isCoolSeason ? 'cool' : 'hot'])
-
   return pool
+}
+
+// ── Suggestion dedup via localStorage ────────────────────────────────────────
+// Lưu các key đã dùng trong hôm nay và hôm qua để không lặp lại
+const LS_KEY = "ai_suggestions_used"
+type HistoryEntry = { date: string; keys: string[] }
+
+function todayStr() { return new Date().toISOString().split("T")[0] }
+function yesterdayStr() {
+  const d = new Date(); d.setDate(d.getDate() - 1)
+  return d.toISOString().split("T")[0]
+}
+
+function loadHistory(): HistoryEntry[] {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]") } catch { return [] }
+}
+
+function getUsedKeys(): Set<string> {
+  const t = todayStr(), y = yesterdayStr()
+  const hist = loadHistory()
+  const keys: string[] = []
+  hist.forEach(h => { if (h.date === t || h.date === y) keys.push(...h.keys) })
+  return new Set(keys)
+}
+
+function markUsed(key: string) {
+  const t = todayStr(), y = yesterdayStr()
+  const hist = loadHistory().filter(h => h.date === t || h.date === y)
+  const entry = hist.find(h => h.date === t)
+  if (entry) { if (!entry.keys.includes(key)) entry.keys.push(key) }
+  else hist.push({ date: t, keys: [key] })
+  try { localStorage.setItem(LS_KEY, JSON.stringify(hist)) } catch {}
+}
+
+function pickUnique(pool: Pair[]): Pair {
+  const used = getUsedKeys()
+  const available = pool.filter(p => !used.has(p[0]))
+  return available.length > 0 ? pick(available) : pick(pool)
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -303,8 +334,9 @@ export default function AIGreeting() {
 
   // Pick initial suggestion from time pool immediately (no flicker)
   useEffect(() => {
-    setSuggestion(pick(TIME[tKey]))
-  }, [tKey])
+    const chosen = pickUnique(TIME[tKey])
+    setSuggestion(chosen)
+  }, [tKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch real weather (Open-Meteo, no API key)
   useEffect(() => {
@@ -320,21 +352,19 @@ export default function AIGreeting() {
           rain: cur.precipitation ?? 0,
         }
         setWeather(w)
-        // Re-pick suggestion with weather context
+        // Re-pick from full pool (weather-aware), mark as used
         const pool = buildPool(h, day, mon, wClass(w))
-        setSuggestion(pick(pool))
-      } catch { /* keep time-based suggestion */ }
+        const chosen = pickUnique(pool)
+        markUsed(chosen[0])
+        setSuggestion(chosen)
+      } catch {
+        // Weather failed → mark the time-based suggestion as used
+        setSuggestion(prev => { if (prev) markUsed(prev[0]); return prev })
+      }
     }
 
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude),
-        ()    => fetchWeather(12.6455, 108.2612), // fallback: Krông Pắc, Đắk Lắk
-        { timeout: 5000, maximumAge: 600_000 }
-      )
-    } else {
-      fetchWeather(12.6455, 108.2612)
-    }
+    // Cố định tọa độ Phước An, Krông Pắc, Đắk Lắk
+    fetchWeather(12.6453, 108.0956)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

@@ -49,9 +49,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ dispatched: false, reason: "no_driver_nearby" })
     }
 
-    // Gán tài xế
+    // Gán tài xế (chưa set accepted_at — driver phải bấm Nhận đơn)
     await db.from("orders")
-      .update({ driver_id: driverId, accepted_at: new Date().toISOString() })
+      .update({ driver_id: driverId })
       .eq("id", order_id)
 
     // Notify tài xế có đơn mới
