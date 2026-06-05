@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 })
 
-    const { amount, bank_account, bank_bin } = await req.json()
+    const { amount, bank_account, bank_bin, account_name } = await req.json()
     const amt = Number(amount)
 
     if (!amt || amt < 50000) {
@@ -31,6 +31,9 @@ export async function POST(req: NextRequest) {
     if (!bank_bin) {
       return NextResponse.json({ error: "Vui lòng chọn ngân hàng" }, { status: 400 })
     }
+    if (!account_name || String(account_name).trim().length < 3) {
+      return NextResponse.json({ error: "Vui lòng nhập tên chủ tài khoản" }, { status: 400 })
+    }
 
     // ── Chặn duplicate concurrent ────────────────────────────────────────────
     const { data: wd, error: wdErr } = await db
@@ -41,6 +44,7 @@ export async function POST(req: NextRequest) {
         amount:       amt,
         bank_bin:     String(bank_bin),
         bank_account: String(bank_account).replace(/\D/g, ""),
+        account_name: String(account_name).trim().toUpperCase(),
         status:       "processing",
       })
       .select("id")
@@ -111,7 +115,7 @@ export async function POST(req: NextRequest) {
     // ── Notify admin chuyển khoản thủ công ──────────────────────────────────
     const { data: admins } = await db.from("profiles").select("id").eq("role", "admin").limit(5)
     if (admins?.length) {
-      const body = `💸 ${amt.toLocaleString("vi-VN")}xu · TK ${bank_account} · ${profile?.full_name ?? ""} ${profile?.phone ?? ""}`
+      const body = `💸 ${amt.toLocaleString("vi-VN")}xu · TK ${bank_account} · CTK: ${account_name} · ${profile?.full_name ?? ""} ${profile?.phone ?? ""}`
       await Promise.allSettled([
         ...admins.map(a =>
           db.from("notifications").insert({

@@ -41,9 +41,10 @@ export default function XuPage() {
   const [showQR,         setShowQR]         = useState(false)
   const [topupAmount,    setTopupAmount]    = useState(100000)
   const [customAmount,   setCustomAmount]   = useState("")
-  const [withdrawAmount,  setWithdrawAmount]  = useState("")
-  const [withdrawBank,    setWithdrawBank]    = useState("")
-  const [withdrawBankBin, setWithdrawBankBin] = useState(BANKS[0].bin)
+  const [withdrawAmount,    setWithdrawAmount]    = useState("")
+  const [withdrawBank,      setWithdrawBank]      = useState("")
+  const [withdrawBankBin,   setWithdrawBankBin]   = useState(BANKS[0].bin)
+  const [withdrawAcctName,  setWithdrawAcctName]  = useState("")
   const [filterType,     setFilterType]     = useState<TxType|"all">("all")
   const [toast,          setToast]          = useState("")
 
@@ -165,15 +166,16 @@ export default function XuPage() {
     if (withdrawBank.replace(/\D/g,"").length < 8) { fireToast("Số tài khoản không hợp lệ"); return }
     setWithdrawing(true)
     try {
-      const res = await fetch("/api/customer/withdraw", {
+      if (!withdrawAcctName.trim()) { fireToast("Vui lòng nhập tên chủ tài khoản"); return }
+    const res = await fetch("/api/customer/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amt, bank_account: withdrawBank, bank_bin: withdrawBankBin }),
+        body: JSON.stringify({ amount: amt, bank_account: withdrawBank, bank_bin: withdrawBankBin, account_name: withdrawAcctName.trim().toUpperCase() }),
       })
       const json = await res.json()
       if (!res.ok) { fireToast(json.error ?? "Không thể xử lý yêu cầu"); return }
       fireToast("✅ Yêu cầu rút xu đã ghi nhận! Admin xử lý trong 24h.")
-      setShowWithdraw(false); setWithdrawBank(""); setWithdrawAmount(""); setWithdrawBankBin(BANKS[0].bin)
+      setShowWithdraw(false); setWithdrawBank(""); setWithdrawAmount(""); setWithdrawBankBin(BANKS[0].bin); setWithdrawAcctName("")
       setBalance(b => b - amt)
     } catch {
       fireToast("Lỗi kết nối, vui lòng thử lại")
@@ -353,6 +355,8 @@ export default function XuPage() {
               </div>
               <FInput label="Số tài khoản ngân hàng" value={withdrawBank}
                 onChange={setWithdrawBank} placeholder="VD: 0123456789" icon="🏦" type="number" />
+              <FInput label="Tên chủ tài khoản (IN HOA)" value={withdrawAcctName}
+                onChange={v => setWithdrawAcctName(v.toUpperCase())} placeholder="VD: NGUYEN VAN A" icon="👤" />
               <FInput label="Số xu muốn rút" value={withdrawAmount}
                 onChange={setWithdrawAmount} placeholder="VD: 100000" icon="💳" type="number" suffix="xu" />
               <div style={{ background:"rgba(245,197,66,0.06)", border:"1px solid rgba(245,197,66,0.18)",

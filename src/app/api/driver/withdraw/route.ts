@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
         amount:       amt,
         bank_bin:     driver.bank_bin ?? "",
         bank_account: driver.bank_account_number,
+        account_name: driver.bank_account_name ?? "",
         status:       "processing",
       })
       .select("id")
