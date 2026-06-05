@@ -28,7 +28,7 @@ import { useLocationStore } from "@/store/locationStore"
 import { createClient } from "@/lib/supabase/client"
 
 // ─── Types ─────────────────────────────────────────────────
-type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null }
+type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null }
 type ProductRow = { id: string; name: string; price: number; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string; is_open?: boolean; status?: string } | { name: string; is_open?: boolean; status?: string }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null }
@@ -69,6 +69,25 @@ function isShopOpen(p: ProductRow): boolean {
   const s = Array.isArray(p.shops) ? p.shops[0] : p.shops
   if (!s) return false
   return s.is_open === true && s.status === "approved"
+}
+
+// Tính quán có đang trong giờ mở cửa không (múi giờ VN UTC+7)
+function isShopInHours(shop: ShopRow): boolean {
+  if (!shop.is_open) return false
+  const oh = shop.opening_hours
+  if (!oh?.open || !oh?.close) return shop.is_open
+  const now = new Date()
+  const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+  const toMin = (t: string) => { const [h,m] = t.split(":").map(Number); return (h??0)*60+(m??0) }
+  const o = toMin(oh.open), c = toMin(oh.close)
+  return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c
+}
+
+// Giờ mở cửa tiếp theo để hiển thị "Mở lúc HH:mm"
+function nextOpenLabel(shop: ShopRow): string {
+  const oh = shop.opening_hours
+  if (oh?.open) return `Mở lúc ${oh.open}`
+  return "Đang đóng cửa"
 }
 
 function isProductInTime(p: { all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }): boolean {
@@ -244,15 +263,20 @@ export default function HomePage() {
         .limit(6)
       setVouchers((voucherData ?? []) as VoucherRow[])
 
-      // Nearby shops: chỉ hiện quán ĐANG MỞ, sắp xếp theo rating
+      // Nearby shops: fetch cả đóng lẫn mở, tính giờ client-side
       const { data: shopData } = await supabase
         .from("shops")
-        .select("id,name,is_open,rating_avg,address,logo_url,location")
+        .select("id,name,is_open,rating_avg,address,logo_url,location,opening_hours")
         .eq("status", "approved")
-        .eq("is_open", true)
         .order("rating_avg", { ascending: false })
-        .limit(10)
-      setNearbyShops((shopData ?? []) as ShopRow[])
+        .limit(20)
+      // Sort: đang mở lên trước, đóng xuống dưới
+      const sorted = (shopData ?? [] as ShopRow[]).sort((a, b) => {
+        const aOpen = isShopInHours(a as ShopRow) ? 1 : 0
+        const bOpen = isShopInHours(b as ShopRow) ? 1 : 0
+        return bOpen - aOpen
+      })
+      setNearbyShops(sorted.slice(0, 12) as ShopRow[])
 
       // Best sellers — quán đang mở, trong khung giờ bán
       const { data: bsData } = await supabase
@@ -1231,19 +1255,40 @@ export default function HomePage() {
                 Chưa có quán nào trong khu vực
               </div>
             ) : nearbyShops.map(s => {
-              const isFav  = favoriteIds.includes(s.id)
-              const uLat   = locationData.lat, uLng = locationData.lng
-              const coords = s.location?.coordinates  // GeoJSON: [lng, lat]
-              const dist   = (uLat && uLng && coords)
+              const isFav    = favoriteIds.includes(s.id)
+              const uLat     = locationData.lat, uLng = locationData.lng
+              const coords   = s.location?.coordinates  // GeoJSON: [lng, lat]
+              const dist     = (uLat && uLng && coords)
                 ? distKm(uLat, uLng, coords[1], coords[0])
                 : null
               const distLabel = dist != null
                 ? dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`
                 : null
-              const rating = s.rating_avg?.toFixed(1) ?? null
+              const rating   = s.rating_avg?.toFixed(1) ?? null
+              const shopOpen = isShopInHours(s)
               return (
-              <div key={s.id} style={{ position:"relative" }}>
-                <a href={`/shop/${s.id}`} style={{ textDecoration:"none" }}>
+              <div key={s.id} style={{ position:"relative", opacity: shopOpen ? 1 : 0.55 }}>
+                {/* Quán đóng: chặn click, hiện toast */}
+                {!shopOpen && (
+                  <div onClick={() => {
+                    const el = document.getElementById(`closed-toast-${s.id}`)
+                    if (el) { el.style.opacity="1"; setTimeout(() => { el.style.opacity="0" }, 2000) }
+                  }}
+                  style={{ position:"absolute", inset:0, zIndex:2, cursor:"not-allowed", borderRadius:14 }} />
+                )}
+                {/* Toast đóng cửa */}
+                {!shopOpen && (
+                  <div id={`closed-toast-${s.id}`} style={{
+                    position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)",
+                    background:"rgba(0,0,0,0.82)", backdropFilter:"blur(8px)",
+                    borderRadius:10, padding:"8px 14px", zIndex:3, whiteSpace:"nowrap",
+                    color:"#f8f0e0", fontSize:11, fontWeight:700, pointerEvents:"none",
+                    opacity:0, transition:"opacity 0.2s",
+                  }}>
+                    🔴 {nextOpenLabel(s)}
+                  </div>
+                )}
+                <a href={shopOpen ? `/shop/${s.id}` : "#"} onClick={e => !shopOpen && e.preventDefault()} style={{ textDecoration:"none" }}>
                   <div className="shop-card" style={{
                     background:"rgba(255,255,255,0.06)", backdropFilter:"blur(10px)",
                     border:`1px solid ${isFav ? "rgba(255,64,64,0.25)" : "rgba(255,255,255,0.08)"}`,
@@ -1258,7 +1303,7 @@ export default function HomePage() {
                         ? <Image src={s.logo_url} alt={s.name} fill sizes="56px" style={{ objectFit:"cover" }} />
                         : "🏪"}
                       {/* Closed overlay */}
-                      {!s.is_open && (
+                      {!shopOpen && (
                         <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.52)",
                           display:"flex", alignItems:"center", justifyContent:"center", borderRadius:13 }}>
                           <span style={{ fontSize:16 }}>🔒</span>
@@ -1296,7 +1341,7 @@ export default function HomePage() {
                           </div>
                         )}
                         {/* Open/closed */}
-                        {s.is_open ? (
+                        {shopOpen ? (
                           <div style={{ display:"flex", alignItems:"center", gap:3,
                             background:"rgba(62,207,110,0.08)", border:"1px solid rgba(62,207,110,0.2)",
                             borderRadius:6, padding:"2px 7px" }}>
@@ -1308,7 +1353,7 @@ export default function HomePage() {
                           <div style={{ display:"flex", alignItems:"center", gap:3,
                             background:"rgba(255,64,64,0.07)", border:"1px solid rgba(255,64,64,0.18)",
                             borderRadius:6, padding:"2px 7px" }}>
-                            <span style={{ color:"#ff6060", fontSize: 11 }}>Đóng cửa</span>
+                            <span style={{ color:"#ff6060", fontSize: 11 }}>🔴 {nextOpenLabel(s)}</span>
                           </div>
                         )}
                       </div>
