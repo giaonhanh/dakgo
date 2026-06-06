@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/utils"
 import AddressPicker from "@/components/map/AddressPicker"
 import { createClient } from "@/lib/supabase/client"
 import type { AddressPickerResult } from "@/types"
+import { reverseGeocodeStructured } from "@/lib/vietmapRoute"
 
 function calcFeeFromRows(km: number, rows: string[], extra: string): number {
   const kmInt = Math.ceil(Math.max(km, 1))
@@ -31,7 +32,8 @@ function estimateKm(dest: string): number {
 export default function XeOmPage() {
   const router   = useRouter()
   const supabase = createClient()
-  const [pickup,      setPickup]      = useState("Phước An, Krông Pắc")
+  const [pickup,      setPickup]      = useState("")
+  const [pickupLoading, setPickupLoading] = useState(true)
   const [dest,        setDest]        = useState("")
   const [mapMode,     setMapMode]     = useState<null | "pickup" | "dest">(null)
   const [pickupCoord, setPickupCoord] = useState<{ lat: number; lng: number } | null>(null)
@@ -44,6 +46,24 @@ export default function XeOmPage() {
   const [serviceEnabled, setServiceEnabled] = useState(true)
   const [serviceMsg,     setServiceMsg]     = useState("Dịch vụ xe ôm tạm ngừng phục vụ. Vui lòng thử lại sau.")
   const [onlineCount,    setOnlineCount]    = useState<number | null>(null)
+
+  // Auto-detect GPS pickup
+  useEffect(() => {
+    if (!navigator.geolocation) { setPickupLoading(false); setPickup("Phước An, Krông Pắc"); return }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const { latitude: lat, longitude: lng } = coords
+        setPickupCoord({ lat, lng })
+        reverseGeocodeStructured(lat, lng).then(({ address }) => {
+          setPickup(address)
+          setPickupLoading(false)
+        })
+      },
+      () => { setPickup("Phước An, Krông Pắc"); setPickupLoading(false) },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const supabase = createClient()
@@ -241,7 +261,7 @@ export default function XeOmPage() {
               <input value={pickup} onChange={e=>setPickup(e.target.value)}
                 style={{ flex:1,background:"transparent",border:"none",color:"#f8f0e0",
                   fontSize:12,caretColor:"#4a8ff5" }}
-                placeholder="Điểm đón..." />
+                placeholder={pickupLoading ? "Đang lấy vị trí của bạn..." : "Nhập địa chỉ đón..."} />
               <button onClick={() => setMapMode("pickup")}
                 style={{ width:44,height:44,borderRadius:10,border:"none",cursor:"pointer",
                   background:"rgba(62,207,110,0.12)",flexShrink:0,

@@ -1,5 +1,35 @@
 const SERVICES_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY
 
+interface VietmapReverseItem {
+  display?: string; name?: string; hs_num?: string
+  street?: string; ward?: string; district?: string; city?: string
+}
+
+/** Reverse geocode v3 — trả về địa chỉ đầy đủ (số nhà, đường, phường, huyện, tỉnh) */
+export async function reverseGeocodeStructured(lat: number, lng: number): Promise<{ address: string; houseNote: string }> {
+  try {
+    const res = await fetch(
+      `https://maps.vietmap.vn/api/reverse/v3?apikey=${SERVICES_KEY}&lat=${lat}&lng=${lng}`,
+      { headers: { Accept: "application/json" } }
+    )
+    if (res.ok) {
+      const list = (await res.json()) as VietmapReverseItem[]
+      const d = list[0]
+      if (d) {
+        const parts: string[] = []
+        if (d.hs_num && d.street) parts.push(`${d.hs_num} ${d.street}`)
+        else if (d.street)        parts.push(d.street)
+        if (d.ward)               parts.push(d.ward)
+        if (d.district)           parts.push(d.district)
+        if (d.city)               parts.push(d.city)
+        const address = parts.length > 0 ? parts.join(", ") : (d.display ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+        return { address, houseNote: d.hs_num ? `Số ${d.hs_num}` : "" }
+      }
+    }
+  } catch { /* fallback */ }
+  return { address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, houseNote: "" }
+}
+
 /** Reverse geocode dùng VietMap, fallback Nominatim */
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   // Thử VietMap trước

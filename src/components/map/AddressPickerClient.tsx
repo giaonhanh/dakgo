@@ -92,10 +92,12 @@ async function vietmapSearch(fullQuery: string, rawQuery: string, lat: number, l
 
   return sorted.slice(0, 6).map(item => {
     const parts = item.display.split(", ")
+    const name  = item.name && item.name !== item.display ? item.name : parts[0]
+    const rest  = parts.filter((p, i) => i > 0 || p !== name).join(", ")
     return {
       refId:         item.ref_id,
-      mainText:      item.name || parts[0] || item.display,
-      secondaryText: parts.slice(1).join(", "),
+      mainText:      name || item.display,
+      secondaryText: rest || item.display,
     }
   })
 }
@@ -421,14 +423,19 @@ export default function AddressPickerClient({
       centerRef.current = pos
       setCenter(pos)
       setFlyTarget([detail.lat, detail.lng])
-      setAddress(detail.display || (s.secondaryText ? `${s.mainText}, ${s.secondaryText}` : s.mainText))
-      applyNote(detail.hs_num ? `Số ${detail.hs_num}` : "")
+      // Xây địa chỉ đầy đủ từ detail nếu có, fallback về display
+      const addr = detail.display || (s.secondaryText ? `${s.mainText}, ${s.secondaryText}` : s.mainText)
+      const houseNote = detail.hs_num ? `Số ${detail.hs_num}` : ""
+      setAddress(addr)
+      applyNote(houseNote)
+      // Auto-confirm ngay sau khi chọn từ gợi ý — không cần ấn nút
+      onConfirm({ lat: detail.lat, lng: detail.lng, address: addr, note: houseNote })
     } catch {
       // fallback: keep current position
     } finally {
       setGeocoding(false)
     }
-  }, [applyNote])
+  }, [applyNote, onConfirm])
 
   // ── Confirm ───────────────────────────────────────────────────────────────
 
@@ -535,14 +542,16 @@ export default function AddressPickerClient({
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,215,0,0.06)")}
                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
               >
-                <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>📍</span>
-                <div>
-                  <div style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 600, lineHeight: 1.3 }}>
+                <span style={{ fontSize: 15, flexShrink: 0, marginTop: 2 }}>📍</span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: "#f8f0e0", fontSize: 13, fontWeight: 700, lineHeight: 1.4, wordBreak: "break-word" }}>
                     {s.mainText}
                   </div>
-                  <div style={{ color: "#6a5a40", fontSize: 10, marginTop: 2, lineHeight: 1.3 }}>
-                    {s.secondaryText}
-                  </div>
+                  {s.secondaryText && (
+                    <div style={{ color: "#8a7a60", fontSize: 11, marginTop: 2, lineHeight: 1.5, wordBreak: "break-word" }}>
+                      {s.secondaryText}
+                    </div>
+                  )}
                 </div>
               </button>
             ))}

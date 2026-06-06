@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
 import AddressPicker from "@/components/map/AddressPicker"
 import { createClient } from "@/lib/supabase/client"
-import { getRouteKm } from "@/lib/vietmapRoute"
+import { getRouteKm, reverseGeocodeStructured } from "@/lib/vietmapRoute"
 import type { AddressPickerResult } from "@/types"
 
 type CarType = "4cho" | "7cho"
@@ -45,7 +45,8 @@ export default function TaxiPage() {
   const router   = useRouter()
   const supabase = createClient()
   const [carType,     setCarType]     = useState<CarType>("4cho")
-  const [pickup,      setPickup]      = useState("Phước An, Krông Pắc")
+  const [pickup,      setPickup]      = useState("")
+  const [pickupLoading, setPickupLoading] = useState(true)
   const [dest,        setDest]        = useState("")
   const [mapMode,     setMapMode]     = useState<null | "pickup" | "dest">(null)
   const [pickupCoord, setPickupCoord] = useState<{ lat: number; lng: number } | null>(null)
@@ -70,6 +71,24 @@ export default function TaxiPage() {
   const [selectedFixedId,  setSelectedFixedId]  = useState<string | null>(null)
   const [fixedDirection,   setFixedDirection]   = useState<"oneWay"|"twoWay">("oneWay")
   const [showFixedRoutes,  setShowFixedRoutes]  = useState(false)
+
+  // Auto-detect GPS pickup khi vào trang
+  useEffect(() => {
+    if (!navigator.geolocation) { setPickupLoading(false); setPickup("Phước An, Krông Pắc"); return }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const { latitude: lat, longitude: lng } = coords
+        setPickupCoord({ lat, lng })
+        reverseGeocodeStructured(lat, lng).then(({ address }) => {
+          setPickup(address)
+          setPickupLoading(false)
+        })
+      },
+      () => { setPickup("Phước An, Krông Pắc"); setPickupLoading(false) },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Tính khoảng cách thực theo cung đường từ VietMap
   useEffect(() => {
@@ -362,7 +381,7 @@ export default function TaxiPage() {
                 <input value={pickup} onChange={e=>{setPickup(e.target.value);setSelectedFixedId(null)}}
                   style={{ flex:1,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(62,207,110,0.2)",
                     borderRadius:10,padding:"9px 12px",color:"#f8f0e0",fontSize:12,caretColor:"#3ecf6e",fontFamily:"Lexend" }}
-                  placeholder="Nhập địa chỉ đón..." />
+                  placeholder={pickupLoading ? "Đang lấy vị trí của bạn..." : "Nhập địa chỉ đón..."} />
                 <button onClick={() => setMapMode("pickup")}
                   style={{ width:42,height:42,borderRadius:10,border:"1px solid rgba(62,207,110,0.2)",cursor:"pointer",
                     background:"rgba(62,207,110,0.08)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>📍</button>

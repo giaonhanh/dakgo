@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import AddressPicker from "@/components/map/AddressPicker"
 import { createClient } from "@/lib/supabase/client"
 import type { AddressPickerResult } from "@/types"
+import { reverseGeocodeStructured } from "@/lib/vietmapRoute"
 
 type BuyItem = { id: number; name: string; qty: number; price: string }
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
@@ -42,12 +43,31 @@ export default function MuaHoPage() {
   const [items,         setItems]         = useState<BuyItem[]>([{ id: 1, name: "", qty: 1, price: "" }])
   const [note,          setNote]          = useState("")
   const [mapMode,       setMapMode]       = useState<null | "pickup" | "delivery">(null)
-  const [loading,       setLoading]       = useState(false)
-  const [toast,         setToast]         = useState("")
+  const [loading,        setLoading]        = useState(false)
+  const [toast,          setToast]          = useState("")
+  const [deliveryLoading, setDeliveryLoading] = useState(true)
 
   const [pricingRows,  setPricingRows]  = useState<string[]>(["20000","17000","14000","12000","11000","10000","9000","8500","8000","7500"])
   const [pricingExtra, setPricingExtra] = useState("7000")
   const [distanceKm,   setDistanceKm]  = useState<number | null>(null)
+
+  // Auto-GPS địa chỉ giao hàng (vị trí khách nhận)
+  useEffect(() => {
+    if (!navigator.geolocation) { setDeliveryLoading(false); return }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const { latitude: lat, longitude: lng } = coords
+        setDeliveryCoord({ lat, lng })
+        reverseGeocodeStructured(lat, lng).then(({ address }) => {
+          setDelivery(address)
+          setDeliveryLoading(false)
+        })
+      },
+      () => setDeliveryLoading(false),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     createClient().from("app_settings").select("value").eq("key","pricing").maybeSingle()
@@ -193,7 +213,7 @@ export default function MuaHoPage() {
               <div style={{ flex:1 }}>
                 <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:3 }}>Giao đến nhà bạn</div>
                 <input value={delivery} onChange={e=>setDelivery(e.target.value)}
-                  placeholder="Địa chỉ nhận hàng..."
+                  placeholder={deliveryLoading ? "Đang lấy vị trí của bạn..." : "Địa chỉ nhận hàng..."}
                   style={{ width:"100%",background:"none",border:"none",color:"#f8f0e0",fontSize:11.5,padding:0 }} />
               </div>
               <button onClick={() => setMapMode("delivery")}
