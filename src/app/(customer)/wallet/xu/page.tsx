@@ -14,12 +14,17 @@ interface XuTx {
 const TOPUP_AMOUNTS = [50000, 100000, 200000, 500000]
 const fmt = (n: number) => Math.abs(n).toLocaleString("vi-VN")
 
-const TX_CFG: Record<string, { icon:string; color:string; bg:string; label:string }> = {
-  payment:    { icon:"🛒", color:"#ff6060", bg:"rgba(255,64,64,0.1)",    label:"Thanh toán" },
-  topup:      { icon:"💳", color:"#b464ff", bg:"rgba(180,100,255,0.12)", label:"Nạp xu"     },
-  refund:     { icon:"↩️", color:"#4a8ff5", bg:"rgba(74,143,245,0.1)",  label:"Hoàn xu"    },
-  commission: { icon:"🎁", color:"#FFB347", bg:"rgba(255,179,71,0.12)",  label:"Hoa hồng"   },
-  withdrawal: { icon:"🏦", color:"#9080b0", bg:"rgba(144,128,176,0.1)", label:"Rút xu"     },
+// debit = trừ ví, credit = cộng ví
+const TX_DEBIT = new Set(["payment", "withdrawal"])
+
+const TX_CFG: Record<string, { icon:string; color:string; bg:string; label:string; badge:string }> = {
+  payment:    { icon:"🛒", color:"#ff6060", bg:"rgba(255,64,64,0.1)",    label:"Thanh toán đơn hàng", badge:"↓ TRỪ VÍ"   },
+  topup:      { icon:"💳", color:"#3ecf6e", bg:"rgba(62,207,110,0.1)",   label:"Nạp xu",              badge:"↑ CỘNG VÍ"  },
+  refund:     { icon:"↩️", color:"#3ecf6e", bg:"rgba(62,207,110,0.1)",   label:"Hoàn xu",             badge:"↑ HOÀN VÍ"  },
+  reward:     { icon:"🎁", color:"#3ecf6e", bg:"rgba(62,207,110,0.1)",   label:"Admin cộng thưởng",   badge:"↑ CỘNG VÍ"  },
+  commission: { icon:"🎁", color:"#3ecf6e", bg:"rgba(62,207,110,0.1)",   label:"Hoa hồng",            badge:"↑ CỘNG VÍ"  },
+  withdrawal: { icon:"🏦", color:"#ff6060", bg:"rgba(255,64,64,0.1)",    label:"Rút xu về ngân hàng", badge:"↓ TRỪ VÍ"   },
+  minigame:   { icon:"🎮", color:"#3ecf6e", bg:"rgba(62,207,110,0.1)",   label:"Mini game",           badge:"↑ CỘNG VÍ"  },
 }
 
 function timeAgo(dateStr: string): string {
@@ -518,38 +523,53 @@ export default function XuPage() {
           {/* Transaction list */}
           <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, overflow:"hidden" }}>
             <AnimatePresence>
+              {filtered.length === 0 && (
+                <div style={{ padding:"32px 16px", textAlign:"center", color:"#6a5a40", fontSize:12 }}>
+                  Chưa có giao dịch nào
+                </div>
+              )}
               {filtered.map((tx, i) => {
-                const cfg = TX_CFG[tx.type]
+                const cfg = TX_CFG[tx.type] ?? { icon:"💳", color:"#b464ff", bg:"rgba(180,100,255,0.1)", label:tx.type, badge:"—" }
+                const isDebit = TX_DEBIT.has(tx.type)
+                const sign    = isDebit ? "-" : "+"
+                const amtColor = isDebit ? "#ff5555" : "#3ecf6e"
                 return (
                   <motion.div key={tx.id} initial={{ opacity:0 }} animate={{ opacity:1 }}
                     transition={{ delay:i*0.03 }}
-                    style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 13px",
+                    style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px",
                       borderBottom: i < filtered.length-1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                    <div style={{ width:34, height:34, borderRadius:10, background:cfg.bg,
-                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
+
+                    {/* Icon */}
+                    <div style={{ width:38, height:38, borderRadius:11, background:cfg.bg, border:`1px solid ${cfg.color}33`,
+                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>
                       {cfg.icon}
                     </div>
+
+                    {/* Info */}
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:500,
+                      <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600,
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                         {tx.label}
                       </div>
-                      <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:2 }}>
-                        <span style={{ color:"#6a5a40", fontSize: 11 }}>{tx.time}</span>
-                        <span style={{ fontSize: 10, fontWeight:600, padding:"1px 5px", borderRadius:4,
-                          background:cfg.bg, color:cfg.color }}>
-                          {cfg.label}
+                      <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:3 }}>
+                        <span style={{ color:"#6a5a40", fontSize:10 }}>{tx.time}</span>
+                        <span style={{ fontSize:9, fontWeight:700, padding:"2px 6px", borderRadius:4,
+                          background: isDebit ? "rgba(255,64,64,0.12)" : "rgba(62,207,110,0.12)",
+                          color: amtColor, letterSpacing:0.3 }}>
+                          {cfg.badge}
                         </span>
                       </div>
-                      <div style={{ color:"#6a5a40", fontSize: 10, marginTop:1 }}>
-                        Số dư: {tx.balance.toLocaleString("vi-VN")} xu
+                      <div style={{ color:"#5a5060", fontSize:10, marginTop:2 }}>
+                        Số dư sau: <span style={{ color:"#8070a0" }}>{tx.balance.toLocaleString("vi-VN")} xu</span>
                       </div>
                     </div>
+
+                    {/* Amount — to lớn, rõ ràng */}
                     <div style={{ textAlign:"right", flexShrink:0 }}>
-                      <div style={{ color: tx.amount > 0 ? "#3ecf6e" : "#ff6060", fontSize:11, fontWeight:700 }}>
-                        {tx.amount > 0 ? "+" : "-"}{Math.abs(tx.amount).toLocaleString("vi-VN")}
+                      <div style={{ color:amtColor, fontSize:15, fontWeight:800, lineHeight:1.2 }}>
+                        {sign}{Math.abs(tx.amount).toLocaleString("vi-VN")}
                       </div>
-                      <div style={{ color:"rgba(180,100,255,0.5)", fontSize: 11 }}>xu</div>
+                      <div style={{ color: isDebit ? "rgba(255,85,85,0.5)" : "rgba(62,207,110,0.5)", fontSize:10, marginTop:1 }}>xu</div>
                     </div>
                   </motion.div>
                 )
