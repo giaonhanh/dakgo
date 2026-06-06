@@ -16,18 +16,26 @@ const CARS: Record<CarType, { emoji: string; label: string; sub: string; seats: 
   "7cho": { emoji:"🚙", label:"SUV / 7 chỗ",  sub:"Rộng rãi · Gia đình",  seats:7 },
 }
 
-function calcFeeFromRows(km: number, rows: string[], extra: string): number {
-  const kmInt = Math.ceil(Math.max(km, 1))
-  let total = 0
-  for (let i = 0; i < Math.min(kmInt, 10); i++) {
-    let price = 0
-    for (let j = i; j >= 0; j--) {
-      if (rows[j] && rows[j] !== "") { price = parseInt(rows[j]) || 0; break }
-    }
-    total += price
-  }
-  if (kmInt > 10) total += (kmInt - 10) * (parseInt(extra) || 0)
-  return total
+function calcFare(baseFare: number, perKm: number, km: number): number {
+  return Math.round((baseFare + Math.max(0, km - 1) * perKm) / 1000) * 1000
+}
+
+function isNightTime(start: string, end: string): boolean {
+  const now = new Date()
+  const cur = now.getHours() * 60 + now.getMinutes()
+  const [sh, sm] = start.split(":").map(Number)
+  const [eh, em] = end.split(":").map(Number)
+  const s = sh * 60 + sm, e = eh * 60 + em
+  return s > e ? (cur >= s || cur <= e) : (cur >= s && cur <= e)
+}
+
+function isServiceOpen(open: string, close: string, allDay: boolean): boolean {
+  if (allDay) return true
+  const now = new Date()
+  const cur = now.getHours() * 60 + now.getMinutes()
+  const [oh, om] = open.split(":").map(Number)
+  const [ch, cm] = close.split(":").map(Number)
+  return cur >= oh * 60 + om && cur <= ch * 60 + cm
 }
 
 
@@ -43,14 +51,18 @@ export default function TaxiPage() {
   const [loading,     setLoading]     = useState(false)
   const [toast,       setToast]       = useState("")
 
-  const [pricingRows,    setPricingRows]    = useState<string[]>(["15000","13000","11000","10000","9500","9000","8500","8000","7500","7000"])
-  const [pricingExtra,   setPricingExtra]   = useState("6500")
-  const [pricingRows7,   setPricingRows7]   = useState<string[]>(["20000","17000","14000","12000","11000","10000","9500","9000","8500","8000"])
-  const [pricingExtra7,  setPricingExtra7]  = useState("7500")
+  // Taxi pricing từ admin settings
+  const [taxi4, setTaxi4] = useState({ baseFare: 15000, perKm: 12000, commissionRate: 10 })
+  const [taxi7, setTaxi7] = useState({ baseFare: 20000, perKm: 15000, commissionRate: 10 })
+  const [taxiNight, setTaxiNight] = useState({ enabled: false, start: "22:00", end: "05:00", type: "percent" as "percent"|"fixed", value: 20 })
+  const [fixedRoutes, setFixedRoutes] = useState<{ id:string; from:string; to:string; oneWay:number; twoWay:number; note:string }[]>([])
+
+  // Service toggles & hours
   const [taxi4Enabled, setTaxi4Enabled] = useState(true)
   const [taxi7Enabled, setTaxi7Enabled] = useState(true)
   const [taxi4Msg,     setTaxi4Msg]     = useState("Dịch vụ taxi 4 chỗ tạm ngừng phục vụ.")
   const [taxi7Msg,     setTaxi7Msg]     = useState("Dịch vụ taxi 7 chỗ tạm ngừng phục vụ.")
+  const [taxiOpen,     setTaxiOpen]     = useState(true)   // dựa vào service_hours
   const [onlineCount,  setOnlineCount]  = useState<number | null>(null)
   const [distanceKm,   setDistanceKm]   = useState<number>(0)
 
@@ -67,16 +79,19 @@ export default function TaxiPage() {
   useEffect(() => {
     const supabase = createClient()
     Promise.all([
-      supabase.from("app_settings").select("value").eq("key","pricing").maybeSingle(),
+      supabase.from("app_settings").select("value").eq("key","taxi_pricing").maybeSingle(),
       supabase.from("app_settings").select("value").eq("key","service_toggles").maybeSingle(),
+      supabase.from("app_settings").select("value").eq("key","service_hours").maybeSingle(),
       supabase.from("drivers").select("id", { count: "exact", head: true }).eq("status", "online").eq("vehicle_type", "car"),
-    ]).then(([pricingRes, toggleRes, driverRes]) => {
-      const p = pricingRes.data?.value as Record<string, { rows?: string[]; extra?: string } | undefined> | null
-      const tx  = p?.taxi;  const tx7 = p?.taxi7
-      if (tx?.rows)   setPricingRows(tx.rows)
-      if (tx?.extra)  setPricingExtra(tx.extra)
-      if (tx7?.rows)  setPricingRows7(tx7.rows)
-      if (tx7?.extra) setPricingExtra7(tx7.extra)
+    ]).then(([txRes, toggleRes, hoursRes, driverRes]) => {
+      // Taxi pricing mới
+      const tp = txRes.data?.value as Record<string, unknown> | null
+      if (tp?.taxi4) setTaxi4(p => ({ ...p, ...(tp.taxi4 as typeof p) }))
+      if (tp?.taxi7) setTaxi7(p => ({ ...p, ...(tp.taxi7 as typeof p) }))
+      if (tp?.nightSurcharge) setTaxiNight(tp.nightSurcharge as typeof taxiNight)
+      if (tp?.fixedRoutes)    setFixedRoutes(tp.fixedRoutes as typeof fixedRoutes)
+
+      // Service toggles
       const toggles = toggleRes.data?.value as Record<string, { enabled?: boolean; customerMsg?: string }> | null
       if (toggles?.taxi_4cho?.enabled === false) {
         setTaxi4Enabled(false)
@@ -86,19 +101,31 @@ export default function TaxiPage() {
         setTaxi7Enabled(false)
         if (toggles.taxi_7cho.customerMsg) setTaxi7Msg(toggles.taxi_7cho.customerMsg)
       }
+
+      // Service hours
+      const sh = hoursRes.data?.value as Record<string, { open:string; close:string; allDay:boolean }> | null
+      const txHours = sh?.taxi ?? { open:"00:00", close:"23:59", allDay:true }
+      setTaxiOpen(isServiceOpen(txHours.open, txHours.close, txHours.allDay))
+
       setOnlineCount(driverRes.count ?? 0)
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
-  const car          = CARS[carType]
-  // Dùng khoảng cách thực (haversine) nếu có coords, fallback tối thiểu 1km
-  const estimatedKm  = distanceKm > 0 ? distanceKm : (dest ? 1 : 0)
-  const estimatedPrice = dest
-    ? (carType === "7cho"
-        ? calcFeeFromRows(estimatedKm, pricingRows7, pricingExtra7)
-        : calcFeeFromRows(estimatedKm, pricingRows,  pricingExtra))
-    : 0
+  const car         = CARS[carType]
+  const estimatedKm = distanceKm > 0 ? distanceKm : (dest ? 1 : 0)
+  const isNight     = taxiNight.enabled && isNightTime(taxiNight.start, taxiNight.end)
+
+  function applyNight(fare: number): number {
+    if (!isNight) return fare
+    if (taxiNight.type === "percent") return Math.round(fare * (1 + taxiNight.value / 100) / 1000) * 1000
+    return fare // fixed per km handled separately
+  }
+
+  const v = carType === "7cho" ? taxi7 : taxi4
+  const baseFareDisplay = applyNight(v.baseFare)
+  const estimatedPrice  = dest ? applyNight(calcFare(v.baseFare, v.perKm, Math.max(estimatedKm, 1))) : 0
 
   const handleBook = async () => {
     if (!dest.trim()) { fireToast("Vui lòng nhập điểm đến"); return }
@@ -186,10 +213,32 @@ export default function TaxiPage() {
         paddingBottom:"calc(env(safe-area-inset-bottom,0px) + 120px)" }}>
         <div style={{ maxWidth:480,margin:"0 auto",padding:"16px 16px 0" }}>
 
+          {/* Banner ngoài giờ hoạt động */}
+          {!taxiOpen && (
+            <div style={{ background:"rgba(255,64,64,0.08)",border:"1px solid rgba(255,64,64,0.25)",borderRadius:12,
+              padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8 }}>
+              <span style={{ fontSize:16 }}>🕐</span>
+              <span style={{ color:"#ff8080",fontSize:12,fontWeight:600 }}>Dịch vụ taxi hiện ngoài giờ hoạt động</span>
+            </div>
+          )}
+
+          {/* Banner cước đêm */}
+          {isNight && (
+            <div style={{ background:"rgba(144,128,192,0.1)",border:"1px solid rgba(144,128,192,0.3)",borderRadius:12,
+              padding:"8px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8 }}>
+              <span style={{ fontSize:14 }}>🌙</span>
+              <span style={{ color:"#b090e0",fontSize:11,fontWeight:600 }}>
+                Cước đêm khuya ({taxiNight.start}–{taxiNight.end})
+                {taxiNight.type === "percent" ? ` +${taxiNight.value}%` : ` +${taxiNight.value.toLocaleString("vi-VN")}đ/km`}
+              </span>
+            </div>
+          )}
+
           {/* Chọn loại xe */}
           <div style={{ display:"flex",gap:10,marginBottom:14 }}>
             {(Object.entries(CARS) as [CarType, typeof CARS[CarType]][]).map(([key, c]) => {
               const isDisabled = key === "4cho" ? !taxi4Enabled : !taxi7Enabled
+              const cfg = key === "7cho" ? taxi7 : taxi4
               return (
                 <motion.button key={key} whileTap={{ scale: isDisabled ? 1 : 0.97 }}
                   onClick={() => { if (!isDisabled) setCarType(key) }}
@@ -213,7 +262,7 @@ export default function TaxiPage() {
                   {!isDisabled && (
                     <div style={{ display:"flex",alignItems:"center",gap:5 }}>
                       <span style={{ color:carType===key?"#b464ff":"#6a5a40",fontSize: 11,fontWeight:700 }}>
-                        Từ {formatPrice(key === "7cho" ? calcFeeFromRows(1, pricingRows7, pricingExtra7) : calcFeeFromRows(1, pricingRows, pricingExtra))}
+                        Từ {formatPrice(applyNight(cfg.baseFare))}
                       </span>
                       <span style={{ color:"#4a3a28",fontSize: 11 }}>· {c.seats} chỗ</span>
                     </div>
@@ -238,7 +287,7 @@ export default function TaxiPage() {
                   <span style={{ background:"linear-gradient(90deg,#b464ff,#d49aff)",
                     WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
                     backgroundClip:"text",fontSize:22,fontWeight:900 }}>
-                    {dest ? formatPrice(estimatedPrice) : `Từ ${formatPrice(carType === "7cho" ? calcFeeFromRows(1, pricingRows7, pricingExtra7) : calcFeeFromRows(1, pricingRows, pricingExtra))}`}
+                    {dest ? formatPrice(estimatedPrice) : `Từ ${formatPrice(baseFareDisplay)}`}
                   </span>
                 </div>
                 {dest && estimatedKm > 0 && (
@@ -251,7 +300,7 @@ export default function TaxiPage() {
               <div style={{ fontSize:48,lineHeight:1 }}>{car.emoji}</div>
             </div>
             <div style={{ display:"flex",gap:0,borderTop:"1px solid rgba(180,100,255,0.1)" }}>
-              {[[`${formatPrice(carType === "7cho" ? calcFeeFromRows(1, pricingRows7, pricingExtra7) : calcFeeFromRows(1, pricingRows, pricingExtra))}`, "Giá mở cửa"],["Theo km","Mỗi km tiếp"],["~5 phút","Thời gian đến"]].map(([val,lab],i) => (
+              {[[`${formatPrice(baseFareDisplay)}`, "Giá mở cửa"],[`+${formatPrice(isNight && taxiNight.type==="fixed" ? v.perKm + taxiNight.value : v.perKm)}/km`,"Mỗi km tiếp"],["~5 phút","Thời gian đến"]].map(([val,lab],i) => (
                 <div key={i} style={{ flex:1,padding:"8px 0",textAlign:"center",
                   borderLeft:i>0?"1px solid rgba(180,100,255,0.08)":"none" }}>
                   <div style={{ color:"#b464ff",fontSize: 11,fontWeight:700 }}>{val}</div>
@@ -285,6 +334,29 @@ export default function TaxiPage() {
                 </div>
               </div>
             </motion.div>
+          )}
+
+          {/* Chuyến cố định */}
+          {fixedRoutes.length > 0 && (
+            <div style={{ marginBottom:12 }}>
+              <div style={{ color:"#6a5a40",fontSize:10,fontWeight:700,letterSpacing:.8,marginBottom:6 }}>📍 CHUYẾN CỐ ĐỊNH</div>
+              <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+                {fixedRoutes.filter(r => r.from && r.to).map(r => (
+                  <div key={r.id} style={{ background:"rgba(180,100,255,0.05)",border:"1px solid rgba(180,100,255,0.15)",
+                    borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer" }}
+                    onClick={() => { setPickup(r.from); setDest(r.to) }}>
+                    <div>
+                      <div style={{ color:"#f8f0e0",fontSize:12,fontWeight:700 }}>{r.from} → {r.to}</div>
+                      {r.note && <div style={{ color:"#6a5a40",fontSize:10,marginTop:1 }}>{r.note}</div>}
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <div style={{ color:"#b464ff",fontSize:13,fontWeight:800 }}>{r.oneWay.toLocaleString("vi-VN")}đ</div>
+                      <div style={{ color:"#6a5a40",fontSize:10 }}>2 chiều: {r.twoWay.toLocaleString("vi-VN")}đ</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Địa chỉ form */}
