@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { formatPrice } from "@/lib/utils"
 import AddressPicker from "@/components/map/AddressPicker"
 import { createClient } from "@/lib/supabase/client"
-import { haversineKm } from "@/lib/vietmapRoute"
+import { getRouteKm } from "@/lib/vietmapRoute"
 import type { AddressPickerResult } from "@/types"
 
 type CarType = "4cho" | "7cho"
@@ -70,14 +70,14 @@ export default function TaxiPage() {
   const [selectedFixedId,  setSelectedFixedId]  = useState<string | null>(null)
   const [fixedDirection,   setFixedDirection]   = useState<"oneWay"|"twoWay">("oneWay")
 
-  // Tính khoảng cách thực khi có cả 2 tọa độ
+  // Tính khoảng cách thực theo cung đường từ VietMap
   useEffect(() => {
-    if (pickupCoord && destCoord) {
-      const km = haversineKm(pickupCoord.lat, pickupCoord.lng, destCoord.lat, destCoord.lng)
-      setDistanceKm(parseFloat(km.toFixed(1)))
-    } else {
-      setDistanceKm(0)
-    }
+    if (!pickupCoord || !destCoord) { setDistanceKm(0); return }
+    let cancelled = false
+    getRouteKm(pickupCoord.lat, pickupCoord.lng, destCoord.lat, destCoord.lng).then(km => {
+      if (!cancelled) setDistanceKm(parseFloat(km.toFixed(1)))
+    })
+    return () => { cancelled = true }
   }, [pickupCoord, destCoord])
 
   useEffect(() => {
