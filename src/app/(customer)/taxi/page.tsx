@@ -59,6 +59,7 @@ export default function TaxiPage() {
   const [taxi7, setTaxi7] = useState({ baseFare: 20000, perKm: 15000, perKmOver30: 12000, commissionRate: 10 })
   const [taxiNight, setTaxiNight] = useState({ enabled: false, start: "22:00", end: "05:00", type: "percent" as "percent"|"per_km"|"flat", value: 20 })
   const [fixedRoutes, setFixedRoutes] = useState<{ id:string; from:string; to:string; oneWay:number; twoWay:number; note:string }[]>([])
+  const [taxiWaiting, setTaxiWaiting] = useState({ freeMinutes: 90, extraHourFee: 50000, doubleAfterHours: 3 })
 
   // Service toggles & hours
   const [taxi4Enabled, setTaxi4Enabled] = useState(true)
@@ -114,6 +115,7 @@ export default function TaxiPage() {
       if (tp?.taxi7) setTaxi7(p => ({ ...p, ...(tp.taxi7 as typeof p) }))
       if (tp?.nightSurcharge) setTaxiNight(tp.nightSurcharge as typeof taxiNight)
       if (tp?.fixedRoutes)    setFixedRoutes(tp.fixedRoutes as typeof fixedRoutes)
+      if (tp?.waiting)        setTaxiWaiting(tp.waiting as typeof taxiWaiting)
 
       // Service toggles
       const toggles = toggleRes.data?.value as Record<string, { enabled?: boolean; customerMsg?: string }> | null
@@ -492,8 +494,28 @@ export default function TaxiPage() {
                               <span style={{ fontSize:13 }}>{r.twoWay.toLocaleString("vi-VN")}đ</span>
                             </button>
                           </div>
-                          <div style={{ color:"rgba(180,100,255,0.5)",fontSize:10,marginTop:8,textAlign:"center" }}>
-                            Giá cố định — tài xế sẽ xác nhận trước khi đón
+                          {/* Chính sách thời gian chờ */}
+                          <div style={{ marginTop:10, borderTop:"1px solid rgba(180,100,255,0.15)", paddingTop:10 }}>
+                            <div style={{ color:"#b464ff",fontSize:10,fontWeight:700,marginBottom:7 }}>⏱️ CHÍNH SÁCH THỜI GIAN CHỜ</div>
+                            <div style={{ display:"flex",flexDirection:"column",gap:5 }}>
+                              {[
+                                { icon:"✅", label:`Miễn phí chờ`, desc:`${taxiWaiting.freeMinutes} phút đầu`, color:"#3ecf6e" },
+                                { icon:"💰", label:`Chờ thêm mỗi giờ`, desc:`+${taxiWaiting.extraHourFee.toLocaleString("vi-VN")}đ/giờ`, color:"#FFB347" },
+                                { icon:"🔴", label:`Quá ${taxiWaiting.doubleAfterHours} giờ tổng`, desc:"Tính thành 2 chuyến", color:"#ff6060" },
+                              ].map((row,i) => (
+                                <div key={i} style={{ display:"flex",alignItems:"center",justifyContent:"space-between",
+                                  background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"6px 10px" }}>
+                                  <div style={{ display:"flex",alignItems:"center",gap:6 }}>
+                                    <span style={{ fontSize:12 }}>{row.icon}</span>
+                                    <span style={{ color:"#a0a0b0",fontSize:10 }}>{row.label}</span>
+                                  </div>
+                                  <span style={{ color:row.color,fontSize:11,fontWeight:700 }}>{row.desc}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ color:"rgba(180,100,255,0.5)",fontSize:9.5,marginTop:8,textAlign:"center",lineHeight:1.5 }}>
+                              Giá cố định · Tài xế xác nhận trước khi đón
+                            </div>
                           </div>
                         </motion.div>
                       )}
