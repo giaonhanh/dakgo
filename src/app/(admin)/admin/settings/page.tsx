@@ -282,8 +282,6 @@ export default function AdminSettingsPage() {
     { key:"flash_sale",        label:"Flash Sale",                description:"Bật tính năng Flash Sale trên trang chủ",                         value:true  },
     { key:"loyalty_program",   label:"Chương trình tích điểm",   description:"Khách hàng tích điểm từ mỗi đơn hàng",                           value:true  },
     { key:"surge_pricing",     label:"Giá tăng theo nhu cầu",    description:"Tự động tăng phí ship khi nhu cầu cao hoặc trời mưa",            value:false },
-    { key:"ride_service",      label:"Dịch vụ xe ôm / Taxi",     description:"Cho phép đặt xe ôm và taxi",                                     value:true  },
-    { key:"errand_service",    label:"Dịch vụ mua hộ / giao hộ", description:"Cho phép đặt dịch vụ mua hộ và giao hộ",                        value:true  },
     { key:"wallet_topup",      label:"Nạp ví điện tử",           description:"Cho phép nạp tiền vào ví qua VietQR / MoMo",                    value:false },
   ])
 
