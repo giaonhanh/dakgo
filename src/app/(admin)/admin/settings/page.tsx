@@ -798,10 +798,8 @@ export default function AdminSettingsPage() {
 
               <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
                 <div style={{ padding:"12px 0 4px", color:"#f0eaff", fontSize:12, fontWeight:700 }}>🛵 Điều chỉnh & hệ số</div>
-                {renderInput("Bán kính tối đa",         "Khoảng cách tối đa hệ thống chấp nhận đơn",          deliverySettings.maxRadius,          v => setDeliverySettings(p=>({...p,maxRadius:v})),          "km")}
-                {renderInput("Hệ số giờ cao điểm",      "Nhân phí trong giờ cao điểm (7-9h, 11-13h, 17-19h)",deliverySettings.rushHourMultiplier, v => setDeliverySettings(p=>({...p,rushHourMultiplier:v})), "x", false)}
-                {renderInput("Hệ số trời mưa",          "Nhân phí khi thời tiết xấu",                         deliverySettings.rainMultiplier,     v => setDeliverySettings(p=>({...p,rainMultiplier:v})),     "x", false)}
-                {renderInput("Rating tài xế tối thiểu", "Điểm đánh giá tối thiểu để nhận đơn",                deliverySettings.minDriverRating,    v => setDeliverySettings(p=>({...p,minDriverRating:v})),    "⭐")}
+                {renderInput("Bán kính tối đa",         "Khoảng cách tối đa hệ thống chấp nhận đơn", deliverySettings.maxRadius,      v => setDeliverySettings(p=>({...p,maxRadius:v})),      "km")}
+                {renderInput("Rating tài xế tối thiểu", "Điểm đánh giá tối thiểu để nhận đơn",      deliverySettings.minDriverRating, v => setDeliverySettings(p=>({...p,minDriverRating:v})), "⭐")}
               </div>
 
               {renderSvcTimeBlock(activeService)}
