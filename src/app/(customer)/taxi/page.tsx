@@ -72,6 +72,8 @@ export default function TaxiPage() {
   const [selectedFixedId,  setSelectedFixedId]  = useState<string | null>(null)
   const [fixedDirection,   setFixedDirection]   = useState<"oneWay"|"twoWay">("oneWay")
   const [showFixedRoutes,  setShowFixedRoutes]  = useState(false)
+  const [customerName,  setCustomerName]  = useState("")
+  const [customerPhone, setCustomerPhone] = useState("")
 
   // Auto-detect GPS pickup khi vào trang
   useEffect(() => {
@@ -103,6 +105,17 @@ export default function TaxiPage() {
 
   useEffect(() => {
     const supabase = createClient()
+    // Load profile
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        supabase.from("profiles").select("full_name,phone").eq("id", user.id).single()
+          .then(({ data }) => {
+            if (data?.full_name) setCustomerName(data.full_name)
+            if (data?.phone)     setCustomerPhone(data.phone)
+          })
+      }
+    })
+
     Promise.all([
       supabase.from("app_settings").select("value").eq("key","taxi_pricing").maybeSingle(),
       supabase.from("app_settings").select("value").eq("key","service_toggles").maybeSingle(),
@@ -157,7 +170,9 @@ export default function TaxiPage() {
   const estimatedPrice  = fixedPrice ?? (dest ? applyNight(calcFare(v.baseFare, v.perKm, Math.max(estimatedKm, 1), v.perKmOver30)) : 0)
 
   const handleBook = async () => {
-    if (!dest.trim()) { fireToast("Vui lòng nhập điểm đến"); return }
+    if (!dest.trim())         { fireToast("Vui lòng nhập điểm đến"); return }
+    if (!customerName.trim()) { fireToast("Vui lòng nhập họ tên"); return }
+    if (!customerPhone.trim()){ fireToast("Vui lòng nhập số điện thoại"); return }
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -179,6 +194,8 @@ export default function TaxiPage() {
         estimated_fare:  estimatedPrice,
         payment_method:  "cash",
         status:          "searching",
+        customer_name:   customerName || null,
+        customer_phone:  customerPhone || null,
       })
       if (error) { fireToast("Lỗi: " + (error?.message ?? "Không thể đặt xe")); setLoading(false); return }
       fireToast(`✅ Đang tìm ${car.label} cho bạn...`)
@@ -576,6 +593,31 @@ export default function TaxiPage() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Thông tin người đặt */}
+          <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(180,100,255,0.15)",
+            borderRadius:14,padding:"12px 14px",marginBottom:12 }}>
+            <div style={{ color:"#6a5a40",fontSize:9,fontWeight:700,letterSpacing:.8,marginBottom:10 }}>
+              👤 THÔNG TIN NGƯỜI ĐẶT — Tài xế dùng để liên hệ bạn
+            </div>
+            <div style={{ display:"flex",gap:10 }}>
+              <div style={{ flex:1 }}>
+                <div style={{ color:"#6a5a40",fontSize:9,marginBottom:4 }}>Họ tên</div>
+                <input value={customerName} onChange={e=>setCustomerName(e.target.value)}
+                  placeholder="Nhập họ tên..."
+                  style={{ width:"100%",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(180,100,255,0.2)",
+                    borderRadius:9,padding:"8px 10px",color:"#f8f0e0",fontSize:12,fontFamily:"Lexend",boxSizing:"border-box" as const }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ color:"#6a5a40",fontSize:9,marginBottom:4 }}>Số điện thoại</div>
+                <input value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)}
+                  placeholder="Số điện thoại..."
+                  inputMode="tel"
+                  style={{ width:"100%",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(180,100,255,0.2)",
+                    borderRadius:9,padding:"8px 10px",color:"#f8f0e0",fontSize:12,fontFamily:"Lexend",boxSizing:"border-box" as const }} />
+              </div>
+            </div>
+          </div>
 
           {/* Features */}
           <div style={{ display:"flex",gap:8 }}>
