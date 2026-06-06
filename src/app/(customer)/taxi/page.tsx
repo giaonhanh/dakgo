@@ -69,6 +69,7 @@ export default function TaxiPage() {
   const [distanceKm,       setDistanceKm]       = useState<number>(0)
   const [selectedFixedId,  setSelectedFixedId]  = useState<string | null>(null)
   const [fixedDirection,   setFixedDirection]   = useState<"oneWay"|"twoWay">("oneWay")
+  const [showFixedRoutes,  setShowFixedRoutes]  = useState(false)
 
   // Tính khoảng cách thực theo cung đường từ VietMap
   useEffect(() => {
@@ -388,13 +389,31 @@ export default function TaxiPage() {
             </div>
           </div>
 
-          {/* ── Chuyến cố định — gợi ý bên dưới form ── */}
+          {/* ── Chuyến cố định — toggle ── */}
           {fixedRoutes.filter(r => r.from && r.to).length > 0 && (
             <div style={{ marginBottom:12 }}>
-              <div style={{ color:"#6a5a40",fontSize:9,fontWeight:700,letterSpacing:.8,marginBottom:7 }}>
-                📍 CHUYẾN TRỌN GÓI CÓ SẴN — Giá cố định, không tính theo km
-              </div>
-              <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+              <button
+                onClick={() => { setShowFixedRoutes(p => !p); if (showFixedRoutes) { setSelectedFixedId(null); setDest("") } }}
+                style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+                  padding:"10px 14px", borderRadius:12, cursor:"pointer", fontFamily:"Lexend",
+                  background: showFixedRoutes ? "rgba(180,100,255,0.1)" : "rgba(255,255,255,0.04)",
+                  border:`1px solid ${showFixedRoutes ? "rgba(180,100,255,0.35)" : "rgba(255,255,255,0.1)"}` }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ fontSize:15 }}>📍</span>
+                  <div style={{ textAlign:"left" }}>
+                    <div style={{ color: showFixedRoutes ? "#d49aff" : "#f8f0e0", fontSize:12, fontWeight:700 }}>Chuyến trọn gói</div>
+                    <div style={{ color:"#6a5a40", fontSize:10 }}>Giá cố định theo tuyến, không tính km</div>
+                  </div>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  {showFixedRoutes && selectedFixedId && (
+                    <span style={{ background:"rgba(180,100,255,0.2)", border:"1px solid rgba(180,100,255,0.4)",
+                      borderRadius:6, padding:"2px 7px", color:"#d49aff", fontSize:10, fontWeight:700 }}>Đã chọn</span>
+                  )}
+                  <span style={{ color:"#6a5a40", fontSize:16 }}>{showFixedRoutes ? "▲" : "▼"}</span>
+                </div>
+              </button>
+              {showFixedRoutes && <div style={{ display:"flex",flexDirection:"column",gap:6,marginTop:8 }}>
                 {fixedRoutes.filter(r => r.from && r.to).map(r => {
                   const isSelected = selectedFixedId === r.id
                   return (
@@ -461,7 +480,7 @@ export default function TaxiPage() {
                     </div>
                   )
                 })}
-              </div>
+              </div>}
             </div>
           )}
 
