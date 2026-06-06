@@ -65,8 +65,10 @@ export default function TaxiPage() {
   const [taxi4Msg,     setTaxi4Msg]     = useState("Dịch vụ taxi 4 chỗ tạm ngừng phục vụ.")
   const [taxi7Msg,     setTaxi7Msg]     = useState("Dịch vụ taxi 7 chỗ tạm ngừng phục vụ.")
   const [taxiOpen,     setTaxiOpen]     = useState(true)   // dựa vào service_hours
-  const [onlineCount,  setOnlineCount]  = useState<number | null>(null)
-  const [distanceKm,   setDistanceKm]   = useState<number>(0)
+  const [onlineCount,      setOnlineCount]      = useState<number | null>(null)
+  const [distanceKm,       setDistanceKm]       = useState<number>(0)
+  const [selectedFixedId,  setSelectedFixedId]  = useState<string | null>(null)
+  const [fixedDirection,   setFixedDirection]   = useState<"oneWay"|"twoWay">("oneWay")
 
   // Tính khoảng cách thực khi có cả 2 tọa độ
   useEffect(() => {
@@ -127,7 +129,9 @@ export default function TaxiPage() {
 
   const v = carType === "7cho" ? taxi7 : taxi4
   const baseFareDisplay = applyNight(v.baseFare)
-  const estimatedPrice  = dest ? applyNight(calcFare(v.baseFare, v.perKm, Math.max(estimatedKm, 1), v.perKmOver30)) : 0
+  const selectedRoute   = fixedRoutes.find(r => r.id === selectedFixedId) ?? null
+  const fixedPrice      = selectedRoute ? selectedRoute[fixedDirection] : null
+  const estimatedPrice  = fixedPrice ?? (dest ? applyNight(calcFare(v.baseFare, v.perKm, Math.max(estimatedKm, 1), v.perKmOver30)) : 0)
 
   const handleBook = async () => {
     if (!dest.trim()) { fireToast("Vui lòng nhập điểm đến"); return }
@@ -338,84 +342,176 @@ export default function TaxiPage() {
             </motion.div>
           )}
 
-          {/* Chuyến cố định */}
-          {fixedRoutes.length > 0 && (
+          {/* ── Form nhập địa chỉ (luôn hiện) ── */}
+          <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(180,100,255,0.18)",
+            borderRadius:16,padding:14,marginBottom:12 }}>
+
+            {/* Label section */}
+            <div style={{ color:"#6a5a40",fontSize:9,fontWeight:700,letterSpacing:.8,marginBottom:10 }}>
+              NHẬP ĐỊA CHỈ CỦA BẠN
+            </div>
+
+            {/* Điểm đón */}
             <div style={{ marginBottom:12 }}>
-              <div style={{ color:"#6a5a40",fontSize:10,fontWeight:700,letterSpacing:.8,marginBottom:6 }}>📍 CHUYẾN CỐ ĐỊNH</div>
+              <div style={{ color:"#3ecf6e",fontSize:10,fontWeight:700,marginBottom:5,display:"flex",alignItems:"center",gap:5 }}>
+                <div style={{ width:7,height:7,borderRadius:"50%",background:"#3ecf6e",boxShadow:"0 0 5px #3ecf6e" }} />
+                ĐIỂM ĐÓN KHÁCH
+              </div>
+              <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                <input value={pickup} onChange={e=>{setPickup(e.target.value);setSelectedFixedId(null)}}
+                  style={{ flex:1,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(62,207,110,0.2)",
+                    borderRadius:10,padding:"9px 12px",color:"#f8f0e0",fontSize:12,caretColor:"#3ecf6e",fontFamily:"Lexend" }}
+                  placeholder="Nhập địa chỉ đón..." />
+                <button onClick={() => setMapMode("pickup")}
+                  style={{ width:42,height:42,borderRadius:10,border:"1px solid rgba(62,207,110,0.2)",cursor:"pointer",
+                    background:"rgba(62,207,110,0.08)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>📍</button>
+              </div>
+            </div>
+
+            <div style={{ height:1,background:"rgba(180,100,255,0.08)",marginBottom:12 }} />
+
+            {/* Điểm đến */}
+            <div>
+              <div style={{ color:"#b464ff",fontSize:10,fontWeight:700,marginBottom:5,display:"flex",alignItems:"center",gap:5 }}>
+                <div style={{ width:7,height:7,borderRadius:2,background:"#b464ff",boxShadow:"0 0 5px #b464ff" }} />
+                ĐIỂM ĐẾN
+              </div>
+              <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                <input value={dest} onChange={e=>{setDest(e.target.value);setSelectedFixedId(null)}}
+                  style={{ flex:1,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(180,100,255,0.2)",
+                    borderRadius:10,padding:"9px 12px",color:"#f8f0e0",fontSize:12,caretColor:"#b464ff",fontFamily:"Lexend" }}
+                  placeholder="Bạn muốn đến đâu?" />
+                <button onClick={() => setMapMode("dest")}
+                  style={{ width:42,height:42,borderRadius:10,border:"1px solid rgba(180,100,255,0.2)",cursor:"pointer",
+                    background:"rgba(180,100,255,0.08)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>🗺️</button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Chuyến cố định — gợi ý bên dưới form ── */}
+          {fixedRoutes.filter(r => r.from && r.to).length > 0 && (
+            <div style={{ marginBottom:12 }}>
+              <div style={{ color:"#6a5a40",fontSize:9,fontWeight:700,letterSpacing:.8,marginBottom:7 }}>
+                📍 CHUYẾN TRỌN GÓI CÓ SẴN — Giá cố định, không tính theo km
+              </div>
               <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
-                {fixedRoutes.filter(r => r.from && r.to).map(r => (
-                  <div key={r.id} style={{ background:"rgba(180,100,255,0.05)",border:"1px solid rgba(180,100,255,0.15)",
-                    borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer" }}
-                    onClick={() => { setPickup(r.from); setDest(r.to) }}>
-                    <div>
-                      <div style={{ color:"#f8f0e0",fontSize:12,fontWeight:700 }}>{r.from} → {r.to}</div>
-                      {r.note && <div style={{ color:"#6a5a40",fontSize:10,marginTop:1 }}>{r.note}</div>}
+                {fixedRoutes.filter(r => r.from && r.to).map(r => {
+                  const isSelected = selectedFixedId === r.id
+                  return (
+                    <div key={r.id}>
+                      {/* Card chọn tuyến */}
+                      <div
+                        onClick={() => {
+                          if (isSelected) { setSelectedFixedId(null) }
+                          else { setSelectedFixedId(r.id); setPickup(r.from); setDest(r.to) }
+                        }}
+                        style={{ background: isSelected ? "rgba(180,100,255,0.12)" : "rgba(255,255,255,0.03)",
+                          border:`1px solid ${isSelected ? "rgba(180,100,255,0.45)" : "rgba(255,255,255,0.08)"}`,
+                          borderRadius:12,padding:"11px 14px",cursor:"pointer",
+                          display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:2 }}>
+                            {isSelected && <span style={{ fontSize:11 }}>✓</span>}
+                            <span style={{ color: isSelected ? "#d49aff" : "#f8f0e0",fontSize:12,fontWeight:700 }}>
+                              {r.from} → {r.to}
+                            </span>
+                          </div>
+                          {r.note && <div style={{ color:"#6a5a40",fontSize:10 }}>{r.note}</div>}
+                          <div style={{ color:"#6a5a40",fontSize:10,marginTop:2 }}>
+                            Giá trọn gói · Chạm để chọn tuyến này
+                          </div>
+                        </div>
+                        <div style={{ textAlign:"right",flexShrink:0,marginLeft:12 }}>
+                          <div style={{ color:"#b464ff",fontSize:14,fontWeight:800 }}>{r.oneWay.toLocaleString("vi-VN")}đ</div>
+                          <div style={{ color:"#6a5a40",fontSize:10 }}>1 chiều</div>
+                        </div>
+                      </div>
+
+                      {/* Panel chọn chiều — chỉ hiện khi được chọn */}
+                      {isSelected && (
+                        <motion.div initial={{opacity:0,y:-4}} animate={{opacity:1,y:0}}
+                          style={{ background:"rgba(180,100,255,0.07)",border:"1px solid rgba(180,100,255,0.25)",
+                            borderRadius:"0 0 12px 12px",borderTop:"none",padding:"10px 14px",marginTop:-2 }}>
+                          <div style={{ color:"#b464ff",fontSize:10,fontWeight:700,marginBottom:8 }}>CHỌN CHIỀU ĐI</div>
+                          <div style={{ display:"flex",gap:8 }}>
+                            <button onClick={()=>setFixedDirection("oneWay")}
+                              style={{ flex:1,padding:"8px 0",borderRadius:9,cursor:"pointer",fontFamily:"Lexend",
+                                fontSize:11,fontWeight:700,
+                                background: fixedDirection==="oneWay" ? "rgba(180,100,255,0.2)" : "rgba(255,255,255,0.04)",
+                                border:`1px solid ${fixedDirection==="oneWay" ? "rgba(180,100,255,0.5)" : "rgba(255,255,255,0.1)"}`,
+                                color: fixedDirection==="oneWay" ? "#d49aff" : "#6a5a40" }}>
+                              ➡️ 1 chiều<br/>
+                              <span style={{ fontSize:13 }}>{r.oneWay.toLocaleString("vi-VN")}đ</span>
+                            </button>
+                            <button onClick={()=>setFixedDirection("twoWay")}
+                              style={{ flex:1,padding:"8px 0",borderRadius:9,cursor:"pointer",fontFamily:"Lexend",
+                                fontSize:11,fontWeight:700,
+                                background: fixedDirection==="twoWay" ? "rgba(180,100,255,0.2)" : "rgba(255,255,255,0.04)",
+                                border:`1px solid ${fixedDirection==="twoWay" ? "rgba(180,100,255,0.5)" : "rgba(255,255,255,0.1)"}`,
+                                color: fixedDirection==="twoWay" ? "#d49aff" : "#6a5a40" }}>
+                              🔄 2 chiều<br/>
+                              <span style={{ fontSize:13 }}>{r.twoWay.toLocaleString("vi-VN")}đ</span>
+                            </button>
+                          </div>
+                          <div style={{ color:"rgba(180,100,255,0.5)",fontSize:10,marginTop:8,textAlign:"center" }}>
+                            Giá cố định — tài xế sẽ xác nhận trước khi đón
+                          </div>
+                        </motion.div>
+                      )}
                     </div>
-                    <div style={{ textAlign:"right" }}>
-                      <div style={{ color:"#b464ff",fontSize:13,fontWeight:800 }}>{r.oneWay.toLocaleString("vi-VN")}đ</div>
-                      <div style={{ color:"#6a5a40",fontSize:10 }}>2 chiều: {r.twoWay.toLocaleString("vi-VN")}đ</div>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
 
-          {/* Địa chỉ form */}
-          <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(180,100,255,0.12)",
-            borderRadius:16,padding:14,marginBottom:12 }}>
-            <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:12 }}>
-              <div style={{ width:8,height:8,borderRadius:"50%",flexShrink:0,
-                background:"#3ecf6e",boxShadow:"0 0 6px #3ecf6e" }} />
-              <input value={pickup} onChange={e=>setPickup(e.target.value)}
-                style={{ flex:1,background:"transparent",border:"none",color:"#f8f0e0",
-                  fontSize:12,caretColor:"#b464ff" }}
-                placeholder="Điểm đón..." />
-              <button onClick={() => setMapMode("pickup")}
-                style={{ width:44,height:44,borderRadius:10,border:"none",cursor:"pointer",
-                  background:"rgba(62,207,110,0.12)",flexShrink:0,
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>📍</button>
-            </div>
-            <div style={{ height:1,background:"rgba(180,100,255,0.1)",marginLeft:18,marginBottom:12 }} />
-            <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-              <div style={{ width:8,height:8,borderRadius:2,flexShrink:0,
-                background:"#b464ff",boxShadow:"0 0 6px #b464ff" }} />
-              <input value={dest} onChange={e=>setDest(e.target.value)}
-                style={{ flex:1,background:"transparent",border:"none",color:"#f8f0e0",
-                  fontSize:12,caretColor:"#b464ff" }}
-                placeholder="Bạn muốn đến đâu?" />
-              <button onClick={() => setMapMode("dest")}
-                style={{ width:44,height:44,borderRadius:10,border:"none",cursor:"pointer",
-                  background:"rgba(180,100,255,0.12)",flexShrink:0,
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>🗺️</button>
-            </div>
-          </div>
-
-          {/* Ước tính giá */}
+          {/* Ước tính giá / Giá cố định */}
           <AnimatePresence>
-            {dest && (
+            {(dest || selectedRoute) && (
               <motion.div initial={{ opacity:0,y:10 }} animate={{ opacity:1,y:0 }} exit={{ opacity:0 }}
-                style={{ background:"rgba(180,100,255,0.08)",border:"1px solid rgba(180,100,255,0.2)",
+                style={{ background: selectedRoute ? "rgba(180,100,255,0.1)" : "rgba(180,100,255,0.08)",
+                  border:`1px solid ${selectedRoute ? "rgba(180,100,255,0.35)" : "rgba(180,100,255,0.2)"}`,
                   borderRadius:14,padding:14,marginBottom:12 }}>
+                {selectedRoute ? (
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                    <div>
+                      <div style={{ color:"#b464ff",fontSize:10,fontWeight:700,marginBottom:2 }}>
+                        💰 GIÁ TRỌN GÓI — {fixedDirection === "oneWay" ? "1 chiều" : "2 chiều"}
+                      </div>
+                      <div style={{ color:"#d49aff",fontSize:26,fontWeight:900,lineHeight:1 }}>
+                        {formatPrice(estimatedPrice)}
+                      </div>
+                      <div style={{ color:"#6a5a40",fontSize:10,marginTop:3 }}>
+                        {selectedRoute.from} → {selectedRoute.to} · Giá cố định
+                      </div>
+                    </div>
+                    <button onClick={()=>{setSelectedFixedId(null);setDest("")}}
+                      style={{ background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",
+                        borderRadius:8,padding:"5px 10px",cursor:"pointer",color:"#6a5a40",fontSize:10,fontFamily:"Lexend" }}>
+                      Huỷ
+                    </button>
+                  </div>
+                ) : (
                 <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                   <div>
-                    <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:2 }}>Ước tính cước</div>
+                    <div style={{ color:"#6a5a40",fontSize:10,marginBottom:2 }}>Ước tính cước (tính theo km)</div>
                     <div style={{ color:"#b464ff",fontSize:22,fontWeight:900,lineHeight:1 }}>
                       {formatPrice(estimatedPrice)}
                     </div>
                   </div>
                   <div style={{ textAlign:"right" }}>
-                    <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:2 }}>Khoảng cách</div>
+                    <div style={{ color:"#6a5a40",fontSize:10,marginBottom:2 }}>Khoảng cách</div>
                     <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>
-                      {distanceKm > 0 ? `${distanceKm} km` : dest ? "≥1 km" : "—"}
+                      {distanceKm > 0 ? `${distanceKm} km` : "≥1 km"}
                     </div>
                     {estimatedKm > 0 && (
-                      <div style={{ color:"#6a5a40",fontSize: 11,marginTop:2 }}>
+                      <div style={{ color:"#6a5a40",fontSize:10,marginTop:2 }}>
                         {Math.round(estimatedKm * 2 + 8)}–{Math.round(estimatedKm * 3 + 12)} phút
                       </div>
                     )}
                   </div>
                 </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
