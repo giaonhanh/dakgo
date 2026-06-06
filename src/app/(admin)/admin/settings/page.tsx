@@ -151,13 +151,34 @@ export default function AdminSettingsPage() {
     taxi4: { baseFare: 15000, perKm: 12000, perKmOver30: 10000, commissionRate: 10 },
     taxi7: { baseFare: 20000, perKm: 15000, perKmOver30: 12000, commissionRate: 10 },
   })
-  const [taxiNight, setTaxiNight] = useState({ enabled: false, start: "22:00", end: "05:00", type: "percent" as "percent"|"fixed", value: 20 })
   const [taxiRoutes, setTaxiRoutes] = useState<TaxiRoute[]>([
     { id: "1", from: "Phước An", to: "BMT (Buôn Ma Thuột)", oneWay: 300000, twoWay: 400000, note: "" },
   ])
   const [taxiWaiting, setTaxiWaiting] = useState({ freeMinutes: 90, extraHourFee: 50000, doubleAfterHours: 3 })
 
-  const calcTaxiFare = (v: TaxiVehicle, km: number, night: typeof taxiNight): number => {
+  /* ── Per-service: giờ hoạt động + đêm khuya + thời tiết xấu ── */
+  interface SvcTime {
+    hours:   { open: string; close: string; allDay: boolean }
+    night:   { enabled: boolean; start: string; end: string; type: "percent"|"fixed"; value: number }
+    weather: { enabled: boolean; type: "percent"|"fixed"; value: number }
+  }
+  const SVC_TIME_DEFAULT: SvcTime = {
+    hours:   { open: "07:00", close: "21:00", allDay: false },
+    night:   { enabled: false, start: "22:00", end: "05:00", type: "percent", value: 20 },
+    weather: { enabled: false, type: "percent", value: 20 },
+  }
+  const [svcTime, setSvcTimeState] = useState<Record<string, SvcTime>>({
+    food:         { ...SVC_TIME_DEFAULT },
+    delivery_pkg: { ...SVC_TIME_DEFAULT },
+    errand:       { ...SVC_TIME_DEFAULT },
+    motorbike:    { ...SVC_TIME_DEFAULT, hours: { open: "06:00", close: "21:00", allDay: false } },
+    taxi:         { ...SVC_TIME_DEFAULT, hours: { open: "00:00", close: "23:59", allDay: true } },
+    taxi7:        { ...SVC_TIME_DEFAULT, hours: { open: "00:00", close: "23:59", allDay: true } },
+  })
+  const setSvcTime = (svc: string, field: keyof SvcTime, val: Partial<SvcTime[keyof SvcTime]>) =>
+    setSvcTimeState(p => ({ ...p, [svc]: { ...p[svc], [field]: { ...(p[svc]?.[field] as object), ...val } } }))
+
+  const calcTaxiFare = (v: TaxiVehicle, km: number, night: SvcTime["night"]): number => {
     const base = Math.min(km - 1, 29)
     const over = Math.max(0, km - 30)
     let total = v.baseFare + base * v.perKm + over * (v.perKmOver30 ?? v.perKm)
@@ -169,21 +190,6 @@ export default function AdminSettingsPage() {
   const [deliverySettings, setDeliverySettings] = useState({
     maxRadius: "10", rushHourMultiplier: "1.3", rainMultiplier: "1.2", minDriverRating: "4.0",
   })
-
-  /* ── Giờ hoạt động từng dịch vụ ── */
-  const [serviceHours, setServiceHours] = useState<Record<string, { open: string; close: string; allDay: boolean }>>({
-    food:         { open: "07:00", close: "21:00", allDay: false },
-    delivery_pkg: { open: "07:00", close: "21:00", allDay: false },
-    errand:       { open: "07:00", close: "21:00", allDay: false },
-    motorbike:    { open: "07:00", close: "21:00", allDay: false },
-    taxi:         { open: "00:00", close: "23:59", allDay: true  },
-    taxi7:        { open: "00:00", close: "23:59", allDay: true  },
-  })
-
-  /* ── New: hours, weather, night surcharge ── */
-  const [appHours,        setAppHours]        = useState({ open: "07:00", close: "21:00" })
-  const [weatherSurcharge, setWeatherSurcharge] = useState<{ enabled: boolean; type: "percent"|"fixed"; value: string }>({ enabled: false, type: "percent", value: "20" })
-  const [nightSurcharge,  setNightSurcharge]  = useState<{ enabled: boolean; start: string; end: string; fee: string }>({ enabled: false, start: "22:00", end: "05:00", fee: "5000" })
 
   /* ── Load all settings from Supabase on mount ── */
   useEffect(() => {
@@ -208,17 +214,23 @@ export default function AdminSettingsPage() {
       }
       if (map.area)             setAreaSettings(map.area)
       if (map.delivery)         setDeliverySettings(map.delivery)
-      if (map.app_hours)        setAppHours(map.app_hours)
-      if (map.service_hours)    setServiceHours(prev => ({ ...prev, ...(map.service_hours as typeof prev) }))
-      if (map.weather_surcharge) setWeatherSurcharge(map.weather_surcharge)
-      if (map.night_surcharge)  setNightSurcharge(map.night_surcharge)
       if (map.taxi_pricing) {
         const tp = map.taxi_pricing as Record<string, unknown>
-        if (tp.taxi4)          setTaxiCfg(p => ({ ...p, taxi4: tp.taxi4 as TaxiVehicle }))
-        if (tp.taxi7)          setTaxiCfg(p => ({ ...p, taxi7: tp.taxi7 as TaxiVehicle }))
-        if (tp.nightSurcharge) setTaxiNight(tp.nightSurcharge as typeof taxiNight)
-        if (tp.fixedRoutes)    setTaxiRoutes(tp.fixedRoutes as TaxiRoute[])
-        if (tp.waiting)        setTaxiWaiting(tp.waiting as typeof taxiWaiting)
+        if (tp.taxi4)       setTaxiCfg(p => ({ ...p, taxi4: tp.taxi4 as TaxiVehicle }))
+        if (tp.taxi7)       setTaxiCfg(p => ({ ...p, taxi7: tp.taxi7 as TaxiVehicle }))
+        if (tp.fixedRoutes) setTaxiRoutes(tp.fixedRoutes as TaxiRoute[])
+        if (tp.waiting)     setTaxiWaiting(tp.waiting as typeof taxiWaiting)
+        // migrate old taxiNight into svcTime
+        if (tp.nightSurcharge) setSvcTimeState(p => ({ ...p, taxi: { ...p.taxi, night: tp.nightSurcharge as SvcTime["night"] }, taxi7: { ...p.taxi7, night: tp.nightSurcharge as SvcTime["night"] } }))
+      }
+      if (map.service_time_pricing) {
+        setSvcTimeState(p => ({ ...p, ...(map.service_time_pricing as Record<string, SvcTime>) }))
+      } else {
+        // migrate legacy service_hours
+        if (map.service_hours) {
+          const sh = map.service_hours as Record<string, { open:string; close:string; allDay:boolean }>
+          setSvcTimeState(p => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, sh[k] ? { ...v, hours: sh[k] } : v])))
+        }
       }
     }
     loadSettings()
@@ -319,11 +331,8 @@ export default function AdminSettingsPage() {
         { key: "service_toggles",   value: serviceToggleMap },
         { key: "area",              value: areaSettings },
         { key: "delivery",          value: deliverySettings },
-        { key: "app_hours",         value: appHours },
-        { key: "weather_surcharge", value: weatherSurcharge },
-        { key: "night_surcharge",   value: nightSurcharge },
-        { key: "taxi_pricing",      value: { taxi4: taxiCfg.taxi4, taxi7: taxiCfg.taxi7, nightSurcharge: taxiNight, fixedRoutes: taxiRoutes, waiting: taxiWaiting } },
-        { key: "service_hours",     value: serviceHours },
+        { key: "taxi_pricing",          value: { taxi4: taxiCfg.taxi4, taxi7: taxiCfg.taxi7, fixedRoutes: taxiRoutes, waiting: taxiWaiting } },
+        { key: "service_time_pricing",  value: svcTime },
       ]
       const { error: saveErr } = await supabase.from("app_settings")
         .upsert(upsertRows.map(r => ({ ...r, updated_at: new Date().toISOString() })), { onConflict: "key" })
@@ -412,6 +421,101 @@ export default function AdminSettingsPage() {
     </button>
   )
 
+  const renderSvcTimeBlock = (svc: string) => {
+    const t = svcTime[svc] ?? SVC_TIME_DEFAULT
+    const h = t.hours; const n = t.night; const w = t.weather
+    const toggle = (style: object) => ({ width:48, height:26, borderRadius:13, border:"none", cursor:"pointer", position:"relative" as const, flexShrink:0, transition:"background .2s", ...style })
+    const knob = (on: boolean) => ({ width:20, height:20, borderRadius:"50%", background:"#fff", position:"absolute" as const, top:3, left: on ? 25 : 3, transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,0.4)" })
+    return (
+      <>
+        {/* Giờ hoạt động */}
+        <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 0 8px" }}>
+            <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>🕐 Giờ hoạt động</div>
+            <button onClick={() => setSvcTime(svc, "hours", { allDay: !h.allDay, open:"00:00", close:"23:59" })}
+              style={{ ...toggle({ background: h.allDay ? "#3ecf6e" : "rgba(255,255,255,0.08)" }) }}>
+              <div style={knob(h.allDay)} />
+            </button>
+          </div>
+          {h.allDay ? (
+            <div style={{ color:"#3ecf6e", fontSize:11, paddingBottom:12 }}>✓ 24/24 — Hoạt động liên tục</div>
+          ) : (
+            <div style={{ display:"flex", gap:16, padding:"10px 0" }}>
+              <div style={{ flex:1 }}>
+                <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>Mở cửa</div>
+                <input type="time" value={h.open} onChange={e => setSvcTime(svc, "hours", { open: e.target.value })} style={{ width:"100%", padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark", boxSizing:"border-box" as const }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>Đóng cửa</div>
+                <input type="time" value={h.close} onChange={e => setSvcTime(svc, "hours", { close: e.target.value })} style={{ width:"100%", padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark", boxSizing:"border-box" as const }} />
+              </div>
+            </div>
+          )}
+        </div>
+        {/* Phụ phí đêm khuya */}
+        <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 0 8px" }}>
+            <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>🌙 Phụ phí đêm khuya</div>
+            <button onClick={() => setSvcTime(svc, "night", { enabled: !n.enabled })} style={{ ...toggle({ background: n.enabled ? "#3ecf6e" : "rgba(255,255,255,0.08)" }) }}>
+              <div style={knob(n.enabled)} />
+            </button>
+          </div>
+          {n.enabled && (
+            <>
+              <div style={{ display:"flex", gap:16, padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>Từ</div>
+                  <input type="time" value={n.start} onChange={e => setSvcTime(svc, "night", { start: e.target.value })} style={{ width:"100%", padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark", boxSizing:"border-box" as const }} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>Đến</div>
+                  <input type="time" value={n.end} onChange={e => setSvcTime(svc, "night", { end: e.target.value })} style={{ width:"100%", padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark", boxSizing:"border-box" as const }} />
+                </div>
+              </div>
+              <div style={{ display:"flex", gap:8, padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                {(["percent","fixed"] as const).map(tp => (
+                  <button key={tp} onClick={() => setSvcTime(svc, "night", { type: tp })} style={{ flex:1, padding:"6px 0", borderRadius:8, cursor:"pointer", fontFamily:"Lexend", fontSize:11, fontWeight: n.type===tp ? 700 : 400, background: n.type===tp ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.04)", border:`1px solid ${n.type===tp ? "rgba(255,107,0,0.4)" : "rgba(255,255,255,0.08)"}`, color: n.type===tp ? "#FF8C00" : "#6a5a40" }}>{tp==="percent" ? "% tổng cước" : "Cộng đ/km"}</button>
+                ))}
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 14px", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ color:"#f0eaff", fontSize:12 }}>{n.type==="percent" ? "Phụ thu %" : "Cộng thêm mỗi km"}</div>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <input type="number" value={n.value} step={n.type==="percent" ? 5 : 1000} onChange={e => setSvcTime(svc, "night", { value: Number(e.target.value) })} style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right" as const }} />
+                  <span style={{ color:"#6a5a40", fontSize:11 }}>{n.type==="percent" ? "%" : "đ/km"}</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        {/* Phụ phí thời tiết xấu */}
+        <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 0 8px" }}>
+            <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>⛈️ Phụ phí thời tiết xấu</div>
+            <button onClick={() => setSvcTime(svc, "weather", { enabled: !w.enabled })} style={{ ...toggle({ background: w.enabled ? "#3ecf6e" : "rgba(255,255,255,0.08)" }) }}>
+              <div style={knob(w.enabled)} />
+            </button>
+          </div>
+          {w.enabled && (
+            <>
+              <div style={{ display:"flex", gap:8, padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                {(["percent","fixed"] as const).map(tp => (
+                  <button key={tp} onClick={() => setSvcTime(svc, "weather", { type: tp })} style={{ flex:1, padding:"6px 0", borderRadius:8, cursor:"pointer", fontFamily:"Lexend", fontSize:11, fontWeight: w.type===tp ? 700 : 400, background: w.type===tp ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.04)", border:`1px solid ${w.type===tp ? "rgba(255,107,0,0.4)" : "rgba(255,255,255,0.08)"}`, color: w.type===tp ? "#FF8C00" : "#6a5a40" }}>{tp==="percent" ? "% tổng cước" : "Cộng thêm cố định"}</button>
+                ))}
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 14px", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ color:"#f0eaff", fontSize:12 }}>{w.type==="percent" ? "Phụ thu %" : "Số tiền cộng thêm"}</div>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <input type="number" value={w.value} step={w.type==="percent" ? 5 : 1000} onChange={e => setSvcTime(svc, "weather", { value: Number(e.target.value) })} style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right" as const }} />
+                  <span style={{ color:"#6a5a40", fontSize:11 }}>{w.type==="percent" ? "%" : "đ"}</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </>
+    )
+  }
+
   return (
     <AdminShell
       pageTitle="⚙️ Cài đặt hệ thống"
@@ -497,62 +601,14 @@ export default function AdminSettingsPage() {
                       {ipt("🛣️ Giá mỗi km (trên 30km)", vc.perKmOver30 ?? vc.perKm, "đ/km", 1000, v => setVC("perKmOver30", v))}
                       {ipt("🏦 Hoa hồng app", vc.commissionRate, "%", 1, v => setVC("commissionRate", v))}
                       <div style={{ padding:"10px 20px", background:"rgba(255,107,0,0.04)", borderTop:"1px solid rgba(255,107,0,0.1)", fontSize:11, color:"#6a5a40" }}>
-                        5km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 5, { ...taxiNight, enabled: false }).toLocaleString("vi-VN")}đ</strong>
-                        {" · "}10km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 10, { ...taxiNight, enabled: false }).toLocaleString("vi-VN")}đ</strong>
-                        {" · "}30km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 30, { ...taxiNight, enabled: false }).toLocaleString("vi-VN")}đ</strong>
-                        {" · "}50km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 50, { ...taxiNight, enabled: false }).toLocaleString("vi-VN")}đ</strong>
+                        5km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 5, { ...svcTime[v].night, enabled: false }).toLocaleString("vi-VN")}đ</strong>
+                        {" · "}10km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 10, { ...svcTime[v].night, enabled: false }).toLocaleString("vi-VN")}đ</strong>
+                        {" · "}30km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 30, { ...svcTime[v].night, enabled: false }).toLocaleString("vi-VN")}đ</strong>
+                        {" · "}50km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 50, { ...svcTime[v].night, enabled: false }).toLocaleString("vi-VN")}đ</strong>
                       </div>
                     </div>
 
-                    {/* Night surcharge — TAXI RIÊNG */}
-                    <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 0 8px" }}>
-                        <div>
-                          <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>🌙 Cước đêm khuya (chỉ Taxi)</div>
-                          <div style={{ color:"#6a5a40", fontSize:10, marginTop:2 }}>Riêng biệt — không ảnh hưởng dịch vụ khác</div>
-                        </div>
-                        <button onClick={() => setTaxiNight(p => ({ ...p, enabled: !p.enabled }))}
-                          style={{ width:48, height:26, borderRadius:13, background: taxiNight.enabled ? "#3ecf6e" : "rgba(255,255,255,0.08)", border:"none", cursor:"pointer", position:"relative", flexShrink:0, transition:"background .2s" }}>
-                          <div style={{ width:20, height:20, borderRadius:"50%", background:"#fff", position:"absolute", top:3, left: taxiNight.enabled ? 25 : 3, transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,0.4)" }} />
-                        </button>
-                      </div>
-                      {taxiNight.enabled && (
-                        <>
-                          <div style={{ display:"flex", gap:16, padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
-                            <div style={{ flex:1 }}>
-                              <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>Từ</div>
-                              <input type="time" value={taxiNight.start} onChange={e => setTaxiNight(p => ({ ...p, start: e.target.value }))}
-                                style={{ width:"100%", padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark", boxSizing:"border-box" }} />
-                            </div>
-                            <div style={{ flex:1 }}>
-                              <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>Đến</div>
-                              <input type="time" value={taxiNight.end} onChange={e => setTaxiNight(p => ({ ...p, end: e.target.value }))}
-                                style={{ width:"100%", padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark", boxSizing:"border-box" }} />
-                            </div>
-                          </div>
-                          <div style={{ display:"flex", gap:8, padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
-                            {(["percent","fixed"] as const).map(t => (
-                              <button key={t} onClick={() => setTaxiNight(p => ({ ...p, type: t }))}
-                                style={{ flex:1, padding:"6px 0", borderRadius:8, cursor:"pointer", fontFamily:"Lexend", fontSize:11, fontWeight: taxiNight.type===t ? 700 : 400,
-                                  background: taxiNight.type===t ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.04)",
-                                  border: `1px solid ${taxiNight.type===t ? "rgba(255,107,0,0.4)" : "rgba(255,255,255,0.08)"}`,
-                                  color: taxiNight.type===t ? "#FF8C00" : "#6a5a40" }}>
-                                {t === "percent" ? "% tổng cước" : "Cộng đ/km"}
-                              </button>
-                            ))}
-                          </div>
-                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 14px", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
-                            <div style={{ color:"#f0eaff", fontSize:12 }}>{taxiNight.type === "percent" ? "Phụ thu %" : "Cộng thêm mỗi km"}</div>
-                            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                              <input type="number" value={taxiNight.value} step={taxiNight.type === "percent" ? 5 : 1000}
-                                onChange={e => setTaxiNight(p => ({ ...p, value: Number(e.target.value) }))}
-                                style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right" }} />
-                              <span style={{ color:"#6a5a40", fontSize:11 }}>{taxiNight.type === "percent" ? "%" : "đ/km"}</span>
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                    {renderSvcTimeBlock(v)}
 
                     {/* Thời gian chờ */}
                     <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
@@ -635,22 +691,22 @@ export default function AdminSettingsPage() {
                         <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
                           <thead>
                             <tr style={{ borderBottom:"1px solid rgba(255,255,255,0.08)" }}>
-                              {["Km", "Giá khách", "Tài xế nhận", taxiNight.enabled ? "🌙 Đêm" : ""].filter(Boolean).map(h => (
+                              {["Km", "Giá khách", "Tài xế nhận", svcTime[v].night.enabled ? "🌙 Đêm" : ""].filter(Boolean).map(h => (
                                 <th key={h} style={{ padding:"6px 8px", color:"#6a5a40", fontWeight:600, textAlign: h==="Km" ? "left" : "right" }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {[1,2,3,5,7,10,15,20,25,30,40,50].map((km, i) => {
-                              const fare  = calcTaxiFare(vc, km, { ...taxiNight, enabled: false })
-                              const faren = calcTaxiFare(vc, km, taxiNight)
+                              const fare  = calcTaxiFare(vc, km, { ...svcTime[v].night, enabled: false })
+                              const faren = calcTaxiFare(vc, km, svcTime[v].night)
                               const drv   = Math.round(fare * (1 - vc.commissionRate / 100))
                               return (
                                 <tr key={km} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)", background: km > 30 ? "rgba(255,107,0,0.04)" : i%2===0 ? "rgba(255,255,255,0.01)" : "transparent" }}>
                                   <td style={{ padding:"6px 8px", color: km > 30 ? "#FF8C00" : "#6a5a40", fontWeight:700 }}>{km} km{km > 30 ? " 🛣️" : ""}</td>
                                   <td style={{ padding:"6px 8px", color:"#f5c542", textAlign:"right", fontWeight:700 }}>{fare.toLocaleString("vi-VN")}đ</td>
                                   <td style={{ padding:"6px 8px", color:"#3ecf6e", textAlign:"right" }}>{drv.toLocaleString("vi-VN")}đ</td>
-                                  {taxiNight.enabled && <td style={{ padding:"6px 8px", color:"#9080c0", textAlign:"right" }}>{faren.toLocaleString("vi-VN")}đ</td>}
+                                  {svcTime[v].night.enabled && <td style={{ padding:"6px 8px", color:"#9080c0", textAlign:"right" }}>{faren.toLocaleString("vi-VN")}đ</td>}
                                 </tr>
                               )
                             })}
@@ -748,117 +804,7 @@ export default function AdminSettingsPage() {
                 {renderInput("Rating tài xế tối thiểu", "Điểm đánh giá tối thiểu để nhận đơn",                deliverySettings.minDriverRating,    v => setDeliverySettings(p=>({...p,minDriverRating:v})),    "⭐")}
               </div>
 
-              {/* Giờ hoạt động từng dịch vụ */}
-              <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
-                <div style={{ padding:"12px 0 4px", color:"#f0eaff", fontSize:12, fontWeight:700 }}>🕐 Giờ hoạt động từng dịch vụ</div>
-                <div style={{ color:"#6a5a40", fontSize:10, paddingBottom:10 }}>Mỗi dịch vụ hoạt động độc lập — taxi có thể 24/24, đồ ăn/xe ôm theo giờ.</div>
-                {(Object.keys(SERVICE_META) as ServiceType[]).map((svc, idx) => {
-                  const m = SERVICE_META[svc]
-                  const h = serviceHours[svc] ?? { open: "07:00", close: "21:00", allDay: false }
-                  return (
-                    <div key={svc} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
-                      <span style={{ fontSize:16, width:22, textAlign:"center", flexShrink:0 }}>{m.icon}</span>
-                      <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600, width:90, flexShrink:0 }}>{m.label}</div>
-                      {h.allDay ? (
-                        <span style={{ color:"#3ecf6e", fontSize:11, flex:1 }}>24/24 — Hoạt động liên tục</span>
-                      ) : (
-                        <div style={{ display:"flex", gap:6, flex:1, alignItems:"center" }}>
-                          <input type="time" value={h.open}
-                            onChange={e => setServiceHours(p => ({ ...p, [svc]: { ...p[svc], open: e.target.value } }))}
-                            style={{ padding:"5px 8px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:7, color:"#f0eaff", fontSize:11, fontFamily:"Lexend", colorScheme:"dark" }} />
-                          <span style={{ color:"#6a5a40", fontSize:10 }}>–</span>
-                          <input type="time" value={h.close}
-                            onChange={e => setServiceHours(p => ({ ...p, [svc]: { ...p[svc], close: e.target.value } }))}
-                            style={{ padding:"5px 8px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:7, color:"#f0eaff", fontSize:11, fontFamily:"Lexend", colorScheme:"dark" }} />
-                        </div>
-                      )}
-                      <button onClick={() => setServiceHours(p => ({ ...p, [svc]: { ...p[svc], allDay: !h.allDay, open: "00:00", close: "23:59" } }))}
-                        style={{ padding:"4px 10px", borderRadius:7, border: h.allDay ? "1px solid rgba(62,207,110,0.4)" : "1px solid rgba(255,255,255,0.1)", background: h.allDay ? "rgba(62,207,110,0.1)" : "rgba(255,255,255,0.04)", color: h.allDay ? "#3ecf6e" : "#6a5a40", fontSize:10, cursor:"pointer", fontFamily:"Lexend", whiteSpace:"nowrap" }}>
-                        {h.allDay ? "✓ 24/24" : "24/24"}
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Weather surcharge */}
-              <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 0 8px" }}>
-                  <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>⛈️ Phụ phí thời tiết xấu</div>
-                  <button onClick={() => setWeatherSurcharge(p=>({...p, enabled: !p.enabled}))}
-                    style={{ width:48, height:26, borderRadius:13, background: weatherSurcharge.enabled ? "#3ecf6e" : "rgba(255,255,255,0.08)", border:"none", cursor:"pointer", position:"relative", flexShrink:0, transition:"background .2s" }}>
-                    <div style={{ width:20, height:20, borderRadius:"50%", background:"#fff", position:"absolute", top:3, left: weatherSurcharge.enabled ? 25 : 3, transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,0.4)" }} />
-                  </button>
-                </div>
-                {weatherSurcharge.enabled && (
-                  <>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
-                      <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600 }}>Loại phụ phí</div>
-                      <div style={{ display:"flex", gap:6 }}>
-                        {(["percent","fixed"] as const).map(t => (
-                          <button key={t} onClick={() => setWeatherSurcharge(p=>({...p, type: t}))}
-                            style={{ padding:"5px 14px", borderRadius:8, border: weatherSurcharge.type===t ? "1.5px solid rgba(255,107,0,0.5)" : "1.5px solid rgba(255,255,255,0.1)", background: weatherSurcharge.type===t ? "rgba(255,107,0,0.12)" : "rgba(255,255,255,0.03)", color: weatherSurcharge.type===t ? "#FF8C00" : "#6a5a40", fontSize:11, fontWeight: weatherSurcharge.type===t ? 700 : 400, cursor:"pointer", fontFamily:"Lexend" }}>
-                            {t === "percent" ? "%" : "Tiền cố định"}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 14px", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
-                      <div>
-                        <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600, marginBottom:2 }}>Giá trị phụ phí</div>
-                        <div style={{ color:"#6a5a40", fontSize:10 }}>{weatherSurcharge.type === "percent" ? "Phần trăm cộng thêm vào cước" : "Số tiền cộng thêm cố định"}</div>
-                      </div>
-                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                        <input type="number" value={weatherSurcharge.value} onChange={e => setWeatherSurcharge(p=>({...p, value: e.target.value}))}
-                          style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right" }} />
-                        <span style={{ color:"#6a5a40", fontSize:11, minWidth:24 }}>{weatherSurcharge.type === "percent" ? "%" : "đ"}</span>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Night surcharge */}
-              <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 0 8px" }}>
-                  <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>🌙 Phụ phí đêm khuya</div>
-                  <button onClick={() => setNightSurcharge(p=>({...p, enabled: !p.enabled}))}
-                    style={{ width:48, height:26, borderRadius:13, background: nightSurcharge.enabled ? "#3ecf6e" : "rgba(255,255,255,0.08)", border:"none", cursor:"pointer", position:"relative", flexShrink:0, transition:"background .2s" }}>
-                    <div style={{ width:20, height:20, borderRadius:"50%", background:"#fff", position:"absolute", top:3, left: nightSurcharge.enabled ? 25 : 3, transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,0.4)" }} />
-                  </button>
-                </div>
-                {nightSurcharge.enabled && (
-                  <>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
-                      <div>
-                        <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600, marginBottom:2 }}>Bắt đầu từ</div>
-                        <div style={{ color:"#6a5a40", fontSize:10 }}>Giờ bắt đầu tính phụ phí đêm</div>
-                      </div>
-                      <input type="time" value={nightSurcharge.start} onChange={e => setNightSurcharge(p=>({...p, start: e.target.value}))}
-                        style={{ padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark" }} />
-                    </div>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
-                      <div>
-                        <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600, marginBottom:2 }}>Đến hết</div>
-                        <div style={{ color:"#6a5a40", fontSize:10 }}>Giờ kết thúc phụ phí đêm (hôm sau)</div>
-                      </div>
-                      <input type="time" value={nightSurcharge.end} onChange={e => setNightSurcharge(p=>({...p, end: e.target.value}))}
-                        style={{ padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark" }} />
-                    </div>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 14px", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
-                      <div>
-                        <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600, marginBottom:2 }}>Phụ phí thêm</div>
-                        <div style={{ color:"#6a5a40", fontSize:10 }}>Số tiền cộng thêm vào mỗi đơn trong khung giờ này</div>
-                      </div>
-                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                        <input type="number" value={nightSurcharge.fee} onChange={e => setNightSurcharge(p=>({...p, fee: e.target.value}))}
-                          style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right" }} />
-                        <span style={{ color:"#6a5a40", fontSize:11, minWidth:24 }}>đ</span>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
+              {renderSvcTimeBlock(activeService)}
 
               <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"16px 20px" }}>
                 <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700, marginBottom:12 }}>📊 Ví dụ tính cước</div>
