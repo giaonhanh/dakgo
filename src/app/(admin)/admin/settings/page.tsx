@@ -145,11 +145,11 @@ export default function AdminSettingsPage() {
   }
 
   /* ── Taxi-specific pricing ── */
-  interface TaxiVehicle { baseFare: number; perKm: number; commissionRate: number }
+  interface TaxiVehicle { baseFare: number; perKm: number; perKmOver30: number; commissionRate: number }
   interface TaxiRoute   { id: string; from: string; to: string; oneWay: number; twoWay: number; note: string }
   const [taxiCfg, setTaxiCfg] = useState<{ taxi4: TaxiVehicle; taxi7: TaxiVehicle }>({
-    taxi4: { baseFare: 15000, perKm: 12000, commissionRate: 10 },
-    taxi7: { baseFare: 20000, perKm: 15000, commissionRate: 10 },
+    taxi4: { baseFare: 15000, perKm: 12000, perKmOver30: 10000, commissionRate: 10 },
+    taxi7: { baseFare: 20000, perKm: 15000, perKmOver30: 12000, commissionRate: 10 },
   })
   const [taxiNight, setTaxiNight] = useState({ enabled: false, start: "22:00", end: "05:00", type: "percent" as "percent"|"fixed", value: 20 })
   const [taxiRoutes, setTaxiRoutes] = useState<TaxiRoute[]>([
@@ -158,7 +158,9 @@ export default function AdminSettingsPage() {
   const [taxiWaiting, setTaxiWaiting] = useState({ freeMinutes: 90, extraHourFee: 50000, doubleAfterHours: 3 })
 
   const calcTaxiFare = (v: TaxiVehicle, km: number, night: typeof taxiNight): number => {
-    let total = v.baseFare + Math.max(0, km - 1) * v.perKm
+    const base = Math.min(km - 1, 29)
+    const over = Math.max(0, km - 30)
+    let total = v.baseFare + base * v.perKm + over * (v.perKmOver30 ?? v.perKm)
     if (night.enabled) total = night.type === "percent" ? Math.round(total * (1 + night.value / 100)) : total + km * night.value
     return Math.round(total / 1000) * 1000
   }
@@ -493,12 +495,14 @@ export default function AdminSettingsPage() {
                         CƯỚC CƠ BẢN — {activeService === "taxi" ? "TAXI 4 CHỖ" : "TAXI 7 CHỖ"}
                       </div>
                       {ipt("💰 Giá mở cửa (bao gồm 1km đầu)", vc.baseFare, "đ", 1000, v => setVC("baseFare", v))}
-                      {ipt("📏 Giá mỗi km tiếp theo", vc.perKm, "đ/km", 1000, v => setVC("perKm", v))}
+                      {ipt("📏 Giá mỗi km (1–30km)", vc.perKm, "đ/km", 1000, v => setVC("perKm", v))}
+                      {ipt("🛣️ Giá mỗi km (trên 30km)", vc.perKmOver30 ?? vc.perKm, "đ/km", 1000, v => setVC("perKmOver30", v))}
                       {ipt("🏦 Hoa hồng app", vc.commissionRate, "%", 1, v => setVC("commissionRate", v))}
                       <div style={{ padding:"10px 20px", background:"rgba(255,107,0,0.04)", borderTop:"1px solid rgba(255,107,0,0.1)", fontSize:11, color:"#6a5a40" }}>
-                        Ví dụ 5km: <strong style={{ color:"#FF8C00" }}>{(vc.baseFare + 4 * vc.perKm).toLocaleString("vi-VN")}đ</strong>
-                        {" · "}Tài xế: <strong style={{ color:"#3ecf6e" }}>{Math.round((vc.baseFare + 4 * vc.perKm) * (1 - vc.commissionRate / 100)).toLocaleString("vi-VN")}đ</strong>
-                        {" · "}10km: <strong style={{ color:"#FF8C00" }}>{(vc.baseFare + 9 * vc.perKm).toLocaleString("vi-VN")}đ</strong>
+                        5km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 5, { ...taxiNight, enabled: false }).toLocaleString("vi-VN")}đ</strong>
+                        {" · "}10km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 10, { ...taxiNight, enabled: false }).toLocaleString("vi-VN")}đ</strong>
+                        {" · "}30km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 30, { ...taxiNight, enabled: false }).toLocaleString("vi-VN")}đ</strong>
+                        {" · "}50km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 50, { ...taxiNight, enabled: false }).toLocaleString("vi-VN")}đ</strong>
                       </div>
                     </div>
 
@@ -639,13 +643,13 @@ export default function AdminSettingsPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {[1,2,3,5,7,10,15,20,30,50].map((km, i) => {
+                            {[1,2,3,5,7,10,15,20,25,30,40,50].map((km, i) => {
                               const fare  = calcTaxiFare(vc, km, { ...taxiNight, enabled: false })
                               const faren = calcTaxiFare(vc, km, taxiNight)
                               const drv   = Math.round(fare * (1 - vc.commissionRate / 100))
                               return (
-                                <tr key={km} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)", background: i%2===0 ? "rgba(255,255,255,0.01)" : "transparent" }}>
-                                  <td style={{ padding:"6px 8px", color:"#6a5a40", fontWeight:700 }}>{km} km</td>
+                                <tr key={km} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)", background: km > 30 ? "rgba(255,107,0,0.04)" : i%2===0 ? "rgba(255,255,255,0.01)" : "transparent" }}>
+                                  <td style={{ padding:"6px 8px", color: km > 30 ? "#FF8C00" : "#6a5a40", fontWeight:700 }}>{km} km{km > 30 ? " 🛣️" : ""}</td>
                                   <td style={{ padding:"6px 8px", color:"#f5c542", textAlign:"right", fontWeight:700 }}>{fare.toLocaleString("vi-VN")}đ</td>
                                   <td style={{ padding:"6px 8px", color:"#3ecf6e", textAlign:"right" }}>{drv.toLocaleString("vi-VN")}đ</td>
                                   {taxiNight.enabled && <td style={{ padding:"6px 8px", color:"#9080c0", textAlign:"right" }}>{faren.toLocaleString("vi-VN")}đ</td>}

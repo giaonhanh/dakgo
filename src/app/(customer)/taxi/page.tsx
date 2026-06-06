@@ -16,8 +16,10 @@ const CARS: Record<CarType, { emoji: string; label: string; sub: string; seats: 
   "7cho": { emoji:"🚙", label:"SUV / 7 chỗ",  sub:"Rộng rãi · Gia đình",  seats:7 },
 }
 
-function calcFare(baseFare: number, perKm: number, km: number): number {
-  return Math.round((baseFare + Math.max(0, km - 1) * perKm) / 1000) * 1000
+function calcFare(baseFare: number, perKm: number, km: number, perKmOver30 = perKm): number {
+  const base = Math.min(Math.max(0, km - 1), 29)
+  const over = Math.max(0, km - 30)
+  return Math.round((baseFare + base * perKm + over * perKmOver30) / 1000) * 1000
 }
 
 function isNightTime(start: string, end: string): boolean {
@@ -52,8 +54,8 @@ export default function TaxiPage() {
   const [toast,       setToast]       = useState("")
 
   // Taxi pricing từ admin settings
-  const [taxi4, setTaxi4] = useState({ baseFare: 15000, perKm: 12000, commissionRate: 10 })
-  const [taxi7, setTaxi7] = useState({ baseFare: 20000, perKm: 15000, commissionRate: 10 })
+  const [taxi4, setTaxi4] = useState({ baseFare: 15000, perKm: 12000, perKmOver30: 10000, commissionRate: 10 })
+  const [taxi7, setTaxi7] = useState({ baseFare: 20000, perKm: 15000, perKmOver30: 12000, commissionRate: 10 })
   const [taxiNight, setTaxiNight] = useState({ enabled: false, start: "22:00", end: "05:00", type: "percent" as "percent"|"fixed", value: 20 })
   const [fixedRoutes, setFixedRoutes] = useState<{ id:string; from:string; to:string; oneWay:number; twoWay:number; note:string }[]>([])
 
@@ -125,7 +127,7 @@ export default function TaxiPage() {
 
   const v = carType === "7cho" ? taxi7 : taxi4
   const baseFareDisplay = applyNight(v.baseFare)
-  const estimatedPrice  = dest ? applyNight(calcFare(v.baseFare, v.perKm, Math.max(estimatedKm, 1))) : 0
+  const estimatedPrice  = dest ? applyNight(calcFare(v.baseFare, v.perKm, Math.max(estimatedKm, 1), v.perKmOver30)) : 0
 
   const handleBook = async () => {
     if (!dest.trim()) { fireToast("Vui lòng nhập điểm đến"); return }
