@@ -57,7 +57,7 @@ export default function TaxiPage() {
   // Taxi pricing từ admin settings
   const [taxi4, setTaxi4] = useState({ baseFare: 15000, perKm: 12000, perKmOver30: 10000, commissionRate: 10 })
   const [taxi7, setTaxi7] = useState({ baseFare: 20000, perKm: 15000, perKmOver30: 12000, commissionRate: 10 })
-  const [taxiNight, setTaxiNight] = useState({ enabled: false, start: "22:00", end: "05:00", type: "percent" as "percent"|"fixed", value: 20 })
+  const [taxiNight, setTaxiNight] = useState({ enabled: false, start: "22:00", end: "05:00", type: "percent" as "percent"|"per_km"|"flat", value: 20 })
   const [fixedRoutes, setFixedRoutes] = useState<{ id:string; from:string; to:string; oneWay:number; twoWay:number; note:string }[]>([])
 
   // Service toggles & hours
@@ -141,10 +141,11 @@ export default function TaxiPage() {
   const estimatedKm = distanceKm > 0 ? distanceKm : (dest ? 1 : 0)
   const isNight     = taxiNight.enabled && isNightTime(taxiNight.start, taxiNight.end)
 
-  function applyNight(fare: number): number {
+  function applyNight(fare: number, km = 1): number {
     if (!isNight) return fare
     if (taxiNight.type === "percent") return Math.round(fare * (1 + taxiNight.value / 100) / 1000) * 1000
-    return fare // fixed per km handled separately
+    if (taxiNight.type === "per_km")  return Math.round((fare + km * taxiNight.value) / 1000) * 1000
+    return Math.round((fare + taxiNight.value) / 1000) * 1000 // flat
   }
 
   const v = carType === "7cho" ? taxi7 : taxi4
@@ -255,7 +256,7 @@ export default function TaxiPage() {
               <span style={{ fontSize:14 }}>🌙</span>
               <span style={{ color:"#b090e0",fontSize:11,fontWeight:600 }}>
                 Cước đêm khuya ({taxiNight.start}–{taxiNight.end})
-                {taxiNight.type === "percent" ? ` +${taxiNight.value}%` : ` +${taxiNight.value.toLocaleString("vi-VN")}đ/km`}
+                {taxiNight.type === "percent" ? ` +${taxiNight.value}%` : taxiNight.type === "per_km" ? ` +${taxiNight.value.toLocaleString("vi-VN")}đ/km` : ` +${taxiNight.value.toLocaleString("vi-VN")}đ/chuyến`}
               </span>
             </div>
           )}
@@ -326,7 +327,7 @@ export default function TaxiPage() {
               <div style={{ fontSize:48,lineHeight:1 }}>{car.emoji}</div>
             </div>
             <div style={{ display:"flex",gap:0,borderTop:"1px solid rgba(180,100,255,0.1)" }}>
-              {[[`${formatPrice(baseFareDisplay)}`, "Giá mở cửa"],[`+${formatPrice(isNight && taxiNight.type==="fixed" ? v.perKm + taxiNight.value : v.perKm)}/km`,"Mỗi km tiếp"],["~5 phút","Thời gian đến"]].map(([val,lab],i) => (
+              {[[`${formatPrice(baseFareDisplay)}`, "Giá mở cửa"],[`+${formatPrice(isNight && taxiNight.type==="per_km" ? v.perKm + taxiNight.value : v.perKm)}/km`,"Mỗi km tiếp"],["~5 phút","Thời gian đến"]].map(([val,lab],i) => (
                 <div key={i} style={{ flex:1,padding:"8px 0",textAlign:"center",
                   borderLeft:i>0?"1px solid rgba(180,100,255,0.08)":"none" }}>
                   <div style={{ color:"#b464ff",fontSize: 11,fontWeight:700 }}>{val}</div>

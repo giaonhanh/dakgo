@@ -159,7 +159,7 @@ export default function AdminSettingsPage() {
   /* ── Per-service: giờ hoạt động + đêm khuya + thời tiết xấu ── */
   interface SvcTime {
     hours:   { open: string; close: string; allDay: boolean }
-    night:   { enabled: boolean; start: string; end: string; type: "percent"|"fixed"; value: number }
+    night:   { enabled: boolean; start: string; end: string; type: "percent"|"per_km"|"flat"; value: number }
     weather: { enabled: boolean; type: "percent"|"fixed"; value: number }
   }
   const SVC_TIME_DEFAULT: SvcTime = {
@@ -182,7 +182,11 @@ export default function AdminSettingsPage() {
     const base = Math.min(km - 1, 29)
     const over = Math.max(0, km - 30)
     let total = v.baseFare + base * v.perKm + over * (v.perKmOver30 ?? v.perKm)
-    if (night.enabled) total = night.type === "percent" ? Math.round(total * (1 + night.value / 100)) : total + km * night.value
+    if (night.enabled) {
+      if (night.type === "percent") total = Math.round(total * (1 + night.value / 100))
+      else if (night.type === "per_km") total = total + km * night.value
+      else total = total + night.value
+    }
     return Math.round(total / 1000) * 1000
   }
 
@@ -472,16 +476,20 @@ export default function AdminSettingsPage() {
                   <input type="time" value={n.end} onChange={e => setSvcTime(svc, "night", { end: e.target.value })} style={{ width:"100%", padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark", boxSizing:"border-box" as const }} />
                 </div>
               </div>
-              <div style={{ display:"flex", gap:8, padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
-                {(["percent","fixed"] as const).map(tp => (
-                  <button key={tp} onClick={() => setSvcTime(svc, "night", { type: tp })} style={{ flex:1, padding:"6px 0", borderRadius:8, cursor:"pointer", fontFamily:"Lexend", fontSize:11, fontWeight: n.type===tp ? 700 : 400, background: n.type===tp ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.04)", border:`1px solid ${n.type===tp ? "rgba(255,107,0,0.4)" : "rgba(255,255,255,0.08)"}`, color: n.type===tp ? "#FF8C00" : "#6a5a40" }}>{tp==="percent" ? "% tổng cước" : "Cộng đ/km"}</button>
+              <div style={{ display:"flex", gap:6, padding:"10px 0", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+                {(["percent","per_km","flat"] as const).map(tp => (
+                  <button key={tp} onClick={() => setSvcTime(svc, "night", { type: tp })} style={{ flex:1, padding:"6px 0", borderRadius:8, cursor:"pointer", fontFamily:"Lexend", fontSize:10, fontWeight: n.type===tp ? 700 : 400, background: n.type===tp ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.04)", border:`1px solid ${n.type===tp ? "rgba(255,107,0,0.4)" : "rgba(255,255,255,0.08)"}`, color: n.type===tp ? "#FF8C00" : "#6a5a40" }}>
+                    {tp==="percent" ? "% cước" : tp==="per_km" ? "đ/km" : "Cố định"}
+                  </button>
                 ))}
               </div>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 14px", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
-                <div style={{ color:"#f0eaff", fontSize:12 }}>{n.type==="percent" ? "Phụ thu %" : "Cộng thêm mỗi km"}</div>
+                <div style={{ color:"#f0eaff", fontSize:12 }}>
+                  {n.type==="percent" ? "Phụ thu %" : n.type==="per_km" ? "Cộng thêm mỗi km" : "Tiền cố định/chuyến"}
+                </div>
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                   <input type="number" value={n.value} step={n.type==="percent" ? 5 : 1000} onChange={e => setSvcTime(svc, "night", { value: Number(e.target.value) })} style={{ width:90, padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, textAlign:"right" as const }} />
-                  <span style={{ color:"#6a5a40", fontSize:11 }}>{n.type==="percent" ? "%" : "đ/km"}</span>
+                  <span style={{ color:"#6a5a40", fontSize:11 }}>{n.type==="percent" ? "%" : "đ"}</span>
                 </div>
               </div>
             </>
