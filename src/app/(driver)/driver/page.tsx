@@ -889,10 +889,12 @@ export default function DriverDashboard() {
   const [showTopup,     setShowTopup]     = useState(false)
   const [isApproved,    setIsApproved]    = useState<boolean | null>(null)
   const [unreadNotif,   setUnreadNotif]   = useState(0)
-  const [gpsLat,        setGpsLat]        = useState(0)
-  const [gpsLng,        setGpsLng]        = useState(0)
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-  const gpsWatchRef = useRef<number | null>(null)
+  const channelRef    = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const gpsWatchRef   = useRef<number | null>(null)
+  const gpsRef        = useRef({ lat: 0, lng: 0 })
+  const showOrderRef  = useRef(false)
+  const acceptedRef   = useRef<string | null>(null)
+  const orderQueueRef = useRef<OrderData[]>([])
 
   // ── Load driver profile on mount ──
   useEffect(() => {
@@ -960,7 +962,7 @@ export default function DriverDashboard() {
   useEffect(() => {
     if (online && navigator.geolocation) {
       gpsWatchRef.current = navigator.geolocation.watchPosition(
-        pos => { setGpsLat(pos.coords.latitude); setGpsLng(pos.coords.longitude) },
+        pos => { gpsRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude } },
         () => {},
         { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 },
       )
@@ -1016,33 +1018,33 @@ export default function DriverDashboard() {
   useEffect(() => {
     if (!online || !driverId) return
     async function checkPendingOrders() {
-      if (showOrder || accepted) return
+      if (showOrderRef.current || acceptedRef.current) return
       try {
-        const res = await fetch(`/api/driver/check-pending?driverLat=${gpsLat}&driverLng=${gpsLng}`)
+        const res = await fetch(`/api/driver/check-pending?driverLat=${gpsRef.current.lat}&driverLng=${gpsRef.current.lng}`)
         if (!res.ok) return
         const { order } = await res.json()
-        if (order) { setPendingOrder(order); setShowOrder(true) }
+        if (order) { setPendingOrder(order); setShowOrder(true); showOrderRef.current = true }
       } catch { /* ignore */ }
     }
     checkPendingOrders()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online, driverId, gpsLat, gpsLng])
+  }, [online, driverId])
 
   // ── Poll đơn pending mỗi 20 giây khi online (dự phòng nếu realtime miss) ──
   useEffect(() => {
     if (!online || !driverId) return
     const interval = setInterval(async () => {
-      if (showOrder || accepted) return
+      if (showOrderRef.current || acceptedRef.current) return
       try {
-        const res = await fetch(`/api/driver/check-pending?driverLat=${gpsLat}&driverLng=${gpsLng}`)
+        const res = await fetch(`/api/driver/check-pending?driverLat=${gpsRef.current.lat}&driverLng=${gpsRef.current.lng}`)
         if (!res.ok) return
         const { order } = await res.json()
-        if (order) { setPendingOrder(order); setShowOrder(true) }
+        if (order) { setPendingOrder(order); setShowOrder(true); showOrderRef.current = true }
       } catch { /* ignore */ }
     }, 20_000)
     return () => clearInterval(interval)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online, driverId, showOrder, accepted, gpsLat, gpsLng])
+  }, [online, driverId])
 
   // ── Subscribe to pending orders when online ──
   useEffect(() => {
@@ -1058,14 +1060,16 @@ export default function DriverDashboard() {
         event: "INSERT", schema: "public", table: "orders",
         filter: "status=eq.pending",
       }, async (payload) => {
-        if (showOrder || accepted) return
         const o = payload.new as {
           id: string; shop_id: string; customer_id: string
           delivery_address: string; total: number; ship_fee: number
           total_amount: number; pay_method: string
         }
         const orderData = await buildOrderData(o)
-        if (orderData) { setPendingOrder(orderData); setShowOrder(true) }
+        if (!orderData) return
+        if (acceptedRef.current) return
+        if (showOrderRef.current) { orderQueueRef.current.push(orderData); return }
+        setPendingOrder(orderData); setShowOrder(true); showOrderRef.current = true
       })
       .subscribe()
 
@@ -1076,7 +1080,7 @@ export default function DriverDashboard() {
         event: "INSERT", schema: "public", table: "errands",
         filter: "status=eq.pending",
       }, async (payload) => {
-        if (showOrder || accepted) return
+        if (acceptedRef.current) return
         const e = payload.new as {
           id: string; type: string; customer_id: string
           pickup_address: string; delivery_address: string
@@ -1121,8 +1125,8 @@ export default function DriverDashboard() {
           recipientName:   e.recipient_name ?? undefined,
           recipientPhone:  e.recipient_phone ?? undefined,
         }
-        setPendingOrder(orderData)
-        setShowOrder(true)
+        if (showOrderRef.current) { orderQueueRef.current.push(orderData); return }
+        setPendingOrder(orderData); setShowOrder(true); showOrderRef.current = true
       })
       .subscribe()
 
@@ -1134,35 +1138,48 @@ export default function DriverDashboard() {
         filter: `driver_id=eq.${driverId}`,
       }, async (payload) => {
         const o = payload.new as { id: string; status: string; driver_id: string; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; total_amount: number; pay_method: string }
-        // Chỉ show popup nếu vừa được gán (status vẫn pending) và chưa có popup khác
-        if (o.status !== "pending" || showOrder || accepted) return
+        if (o.status !== "pending" || acceptedRef.current) return
         const orderData = await buildOrderData(o)
-        if (orderData) { setPendingOrder(orderData); setShowOrder(true) }
+        if (!orderData) return
+        if (showOrderRef.current) { orderQueueRef.current.push(orderData); return }
+        setPendingOrder(orderData); setShowOrder(true); showOrderRef.current = true
       })
       .subscribe()
 
     channelRef.current = ch
     return () => { ch.unsubscribe(); chErrands.unsubscribe(); chAssigned.unsubscribe(); channelRef.current = null }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online, driverId, showOrder, accepted])
+  }, [online, driverId])
 
   const handleAccept = async () => {
     if (!pendingOrder || !driverId) return
-    setShowOrder(false)
     const orderId = pendingOrder.fullId
     const table = pendingOrder.orderTable
+    setShowOrder(false)
+    showOrderRef.current = false
+    orderQueueRef.current = []
     await supabase.from(table).update({
       status:      "accepted",
       driver_id:   driverId,
       accepted_at: new Date().toISOString(),
     }).eq("id", orderId)
     setAccepted(orderId)
+    acceptedRef.current = orderId
     router.push(`/driver/navigate/${orderId}`)
   }
 
   const handleReject = () => {
+    showOrderRef.current = false
     setShowOrder(false)
     setPendingOrder(null)
+    const next = orderQueueRef.current.shift()
+    if (next) {
+      setTimeout(() => {
+        setPendingOrder(next)
+        setShowOrder(true)
+        showOrderRef.current = true
+      }, 400)
+    }
   }
 
   return (

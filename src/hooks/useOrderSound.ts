@@ -74,19 +74,28 @@ export function useOrderSound(
     }
 
     if (role === "driver") {
-      const ch = supabase
-        .channel("order-sound-driver")
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "orders" },
-          payload => {
-            const stype = (payload.new as { service_type?: string }).service_type ?? ""
-            const key   = DRIVER_SOUND[stype]
-            if (key) play(key)
-          },
-        )
+      // orders table = food orders only, no service_type column exists
+      const chOrders = supabase
+        .channel("order-sound-driver-orders")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, () => {
+          play("food")
+        })
         .subscribe()
-      return () => { supabase.removeChannel(ch) }
+
+      // errands: map type field to sound key
+      const ERRAND_SOUND: Record<string, string> = {
+        deliver_for_me: "buy_for",
+        buy_for_me:     "buy_for",
+      }
+      const chErrands = supabase
+        .channel("order-sound-driver-errands")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "errands" }, payload => {
+          const etype = (payload.new as { type?: string }).type ?? ""
+          play(ERRAND_SOUND[etype] ?? "food")
+        })
+        .subscribe()
+
+      return () => { supabase.removeChannel(chOrders); supabase.removeChannel(chErrands) }
     }
   }, [role, shopId])
 }

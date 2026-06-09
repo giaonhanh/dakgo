@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     // Gán tài xế cho đơn
     const { error: updateErr } = await admin
       .from("orders")
-      .update({ driver_id: driverId, accepted_at: new Date().toISOString() })
+      .update({ driver_id: driverId })
       .eq("id", order_id)
 
     if (updateErr) return NextResponse.json({ error: "Gán tài xế thất bại" }, { status: 500 })
