@@ -83,7 +83,7 @@ export default function TaxiPage() {
         const { latitude: lat, longitude: lng } = coords
         setPickupCoord({ lat, lng })
         reverseGeocodeStructured(lat, lng).then(({ address }) => {
-          setPickup(address)
+          if (address) setPickup(address)
           setPickupLoading(false)
         })
       },

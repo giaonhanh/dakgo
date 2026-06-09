@@ -46,7 +46,7 @@ export async function reverseGeocodeStructured(lat: number, lng: number): Promis
       }
     }
   } catch { /* fallback */ }
-  return { address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, houseNote: "" }
+  return { address: "", houseNote: "" }
 }
 
 /** Reverse geocode — trả về chuỗi địa chỉ đơn giản */

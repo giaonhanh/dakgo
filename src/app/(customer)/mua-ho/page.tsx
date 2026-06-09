@@ -59,7 +59,7 @@ export default function MuaHoPage() {
         const { latitude: lat, longitude: lng } = coords
         setDeliveryCoord({ lat, lng })
         reverseGeocodeStructured(lat, lng).then(({ address }) => {
-          setDelivery(address)
+          if (address) setDelivery(address)
           setDeliveryLoading(false)
         })
       },
