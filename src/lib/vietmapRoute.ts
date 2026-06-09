@@ -35,14 +35,14 @@ export async function reverseGeocodeStructured(lat: number, lng: number): Promis
       const result = data.results?.[0]
       if (result) {
         const c = parseComponents(result.address_components ?? [])
-        const parts: string[] = []
-        if (c.houseNumber && c.street) parts.push(`${c.houseNumber} ${c.street}`)
-        else if (c.street)             parts.push(c.street)
-        if (c.village)                 parts.push(c.village)
-        if (c.ward)                    parts.push(c.ward)
-        if (c.district)                parts.push(c.district)
-        if (c.city)                    parts.push(c.city)
-        const address = parts.length > 0 ? parts.join(", ") : result.formatted_address
+        // formatted_address từ Google đã đầy đủ nhất — dùng làm base, bỏ ", Việt Nam" thừa
+        const formatted = (result.formatted_address as string ?? "")
+          .replace(/,\s*Việt Nam$/i, "").trim()
+        // Chỉ dùng formatted_address — nó đã có số nhà, tên đường, xã, huyện, tỉnh
+        const address = formatted || [
+          c.houseNumber && c.street ? `${c.houseNumber} ${c.street}` : c.street,
+          c.village, c.ward, c.district, c.city,
+        ].filter(Boolean).join(", ")
         setCachedGeocode(lat, lng, address)
         return { address, houseNote: c.houseNumber ? `Số ${c.houseNumber}` : "" }
       }

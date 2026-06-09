@@ -302,15 +302,12 @@ export default function AddressPickerClient({
         const district = get("administrative_area_level_2")
         const city     = get("administrative_area_level_1")
 
-        const parts: string[] = []
-        if (houseNum && street) parts.push(`${houseNum} ${street}`)
-        else if (street)        parts.push(street)
-        if (village)            parts.push(village)
-        if (ward)               parts.push(ward)
-        if (district)           parts.push(district)
-        if (city)               parts.push(city)
-
-        const finalAddr = parts.length > 0 ? parts.join(", ") : result.formatted_address
+        const formatted = (result.formatted_address as string ?? "")
+          .replace(/,\s*Việt Nam$/i, "").trim()
+        const finalAddr = formatted || [
+          houseNum && street ? `${houseNum} ${street}` : street,
+          village, ward, district, city,
+        ].filter(Boolean).join(", ")
         setCachedGeocode(lat, lng, finalAddr)
         setAddress(finalAddr)
         applyNote(houseNum ? `Số ${houseNum}` : "")
