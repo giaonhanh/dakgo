@@ -58,9 +58,9 @@ const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
 // ─── Google Maps API (session token để gộp billing Autocomplete + PlaceDetail) ──
 
 async function googleSearch(input: string, lat: number, lng: number, sessionToken: string): Promise<PlaceSuggestion[]> {
-  const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+  const res = await fetch("/api/places/autocomplete", {
     method:  "POST",
-    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_KEY },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       input, sessionToken,
       locationBias: { circle: { center: { latitude: lat, longitude: lng }, radius: 50000 } },
@@ -83,13 +83,7 @@ async function googlePlaceDetail(placeId: string, sessionToken: string): Promise
   lat: number; lng: number; address: string; houseNote: string
 }> {
   const res = await fetch(
-    `https://places.googleapis.com/v1/places/${placeId}?languageCode=vi&sessionToken=${sessionToken}`,
-    {
-      headers: {
-        "X-Goog-Api-Key":   GOOGLE_KEY,
-        "X-Goog-FieldMask": "id,location,formattedAddress,addressComponents",
-      },
-    }
+    `/api/places/detail?placeId=${encodeURIComponent(placeId)}&sessionToken=${encodeURIComponent(sessionToken)}`,
   )
   const data = await res.json()
   const lat  = (data.location?.latitude  as number) ?? 0

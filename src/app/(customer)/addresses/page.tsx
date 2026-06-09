@@ -170,9 +170,9 @@ export default function AddressesPage() {
     setSearching(true)
     searchTimer.current = setTimeout(async () => {
       try {
-        const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+        const res = await fetch("/api/places/autocomplete", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_KEY },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             input: q,
             sessionToken: sessionTokenRef.current,
@@ -208,12 +208,7 @@ export default function AddressesPage() {
     setFormAddress(s.fullAddr)
     // Lấy toạ độ chính xác từ Google Place detail
     try {
-      const res  = await fetch(`https://places.googleapis.com/v1/places/${s.refId}?languageCode=vi&sessionToken=${sessionTokenRef.current}`, {
-        headers: {
-          "X-Goog-Api-Key":   GOOGLE_KEY,
-          "X-Goog-FieldMask": "id,location,formattedAddress",
-        },
-      })
+      const res  = await fetch(`/api/places/detail?placeId=${encodeURIComponent(s.refId)}&sessionToken=${encodeURIComponent(sessionTokenRef.current)}`)
       // Reset session token — session tiếp theo billing riêng
       sessionTokenRef.current = crypto.randomUUID()
       const data = await res.json() as { location?: { latitude: number; longitude: number }; formattedAddress?: string }

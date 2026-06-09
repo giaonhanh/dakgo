@@ -75,9 +75,9 @@ function AddrInput({ label, value, onChange, onSelect, placeholder, required = f
     if (q.length < 3) { setSugs([]); setOpen(false); return }
     timer.current = setTimeout(async () => {
       try {
-        const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+        const res = await fetch("/api/places/autocomplete", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_KEY },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             input: q, sessionToken: session.current,
             locationBias: { circle: { center: { latitude: PHUOC_AN_LAT, longitude: PHUOC_AN_LNG }, radius: 50000 } },
@@ -103,8 +103,7 @@ function AddrInput({ label, value, onChange, onSelect, placeholder, required = f
     setOpen(false)
     try {
       const res = await fetch(
-        `https://places.googleapis.com/v1/places/${s.placeId}?languageCode=vi&sessionToken=${session.current}`,
-        { headers: { "X-Goog-Api-Key": GOOGLE_KEY, "X-Goog-FieldMask": "id,location,formattedAddress" } },
+        `/api/places/detail?placeId=${encodeURIComponent(s.placeId)}&sessionToken=${encodeURIComponent(session.current)}`,
       )
       const data = await res.json()
       session.current = crypto.randomUUID()
