@@ -30,7 +30,7 @@ import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/l
 
 // ─── Types ─────────────────────────────────────────────────
 type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null; category?: string; categories?: string[] | null }
-type ProductRow = { id: string; name: string; price: number; original_price?: number | null; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string; is_open?: boolean; status?: string } | { name: string; is_open?: boolean; status?: string }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
+type ProductRow = { id: string; name: string; price: number; original_price?: number | null; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null } | { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null }
 
@@ -51,10 +51,22 @@ const HOME_CATS = SHOP_CATEGORIES.filter(c => c.value !== "khac")
 
 
 // ─── Helpers ────────────────────────────────────────────────
+function shopInHoursFromHours(oh: { open?: string; close?: string } | null | undefined): boolean {
+  if (!oh?.open || !oh?.close) return true  // không có giờ → không giới hạn
+  const now = new Date()
+  const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+  const [oph, opm] = oh.open.split(":").map(Number)
+  const [clh, clm] = oh.close.split(":").map(Number)
+  const o = (oph ?? 0) * 60 + (opm ?? 0)
+  const c = (clh ?? 0) * 60 + (clm ?? 0)
+  return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c
+}
+
 function isShopOpen(p: ProductRow): boolean {
   const s = Array.isArray(p.shops) ? p.shops[0] : p.shops
   if (!s) return false
-  return s.is_open === true && s.status === "approved"
+  if (s.status !== "approved") return false
+  return shopInHoursFromHours(s.opening_hours)
 }
 
 // Tính quán có đang trong giờ mở cửa không (múi giờ VN UTC+7)
@@ -266,7 +278,7 @@ export default function HomePage() {
       // Best sellers — top bán chạy, không lọc theo giờ (sold_count >= 0)
       const { data: bsData } = await supabase
         .from("products")
-        .select("id,name,price,sold_count,shop_id,image_url,shops!inner(name,is_open,status),all_day,start_hour,end_hour")
+        .select("id,name,price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour")
         .eq("is_available", true)
         .eq("shops.status", "approved")
         .order("sold_count", { ascending: false })
@@ -276,7 +288,7 @@ export default function HomePage() {
       // Promos — sản phẩm có giá khuyến mãi (original_price > price)
       const { data: promoData } = await supabase
         .from("products")
-        .select("id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status),all_day,start_hour,end_hour")
+        .select("id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour")
         .eq("is_available", true)
         .eq("shops.status", "approved")
         .not("original_price", "is", null)
@@ -290,7 +302,7 @@ export default function HomePage() {
         // fallback: top sản phẩm từ quán đang mở
         const { data: fallbackPromo } = await supabase
           .from("products")
-          .select("id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status),all_day,start_hour,end_hour")
+          .select("id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour")
           .eq("is_available", true)
           .eq("shops.status", "approved")
           .order("sold_count", { ascending: false })
@@ -310,9 +322,8 @@ export default function HomePage() {
       // Vừa lên menu — quán đang mở, trong khung giờ bán
       const { data: newMenuData } = await supabase
         .from("products")
-        .select("id,name,price,image_url,shop_id,shops!inner(name,is_open,status),created_at,all_day,start_hour,end_hour")
+        .select("id,name,price,image_url,shop_id,shops!inner(name,is_open,status,opening_hours),created_at,all_day,start_hour,end_hour")
         .eq("is_available", true)
-        .eq("shops.is_open", true)
         .eq("shops.status", "approved")
         .order("created_at", { ascending: false })
         .limit(30)
@@ -345,7 +356,7 @@ export default function HomePage() {
         if (shopIds.length > 0) {
           const { data: recFallback } = await supabase
             .from("products")
-            .select("id, name, price, original_price, image_url, sold_count, shop_id, shops!inner(name,is_open,status), all_day, start_hour, end_hour")
+            .select("id, name, price, original_price, image_url, sold_count, shop_id, shops!inner(name,is_open,status,opening_hours), all_day, start_hour, end_hour")
             .in("shop_id", shopIds)
             .eq("is_available", true)
             .eq("shops.is_open", true)

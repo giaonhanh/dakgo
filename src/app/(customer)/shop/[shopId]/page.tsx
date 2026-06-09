@@ -514,6 +514,19 @@ export default function ShopPage() {
   const coverRef = useRef<HTMLInputElement>(null)
   const logoRef  = useRef<HTMLInputElement>(null)
 
+  // Tính trạng thái mở/đóng từ opening_hours (UTC+7), không dùng is_open column vì cron 1 lần/ngày
+  const shopIsOpen = (() => {
+    if (!shop) return false
+    const oh = shop.opening_hours
+    if (!oh?.open || !oh?.close) return shop.is_open
+    const now = new Date()
+    const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+    const [oph, opm] = oh.open.split(":").map(Number)
+    const [clh, clm] = oh.close.split(":").map(Number)
+    const o = (oph ?? 0) * 60 + (opm ?? 0), c = (clh ?? 0) * 60 + (clm ?? 0)
+    return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c
+  })()
+
   const containerRef = useRef<HTMLDivElement>(null)
   const cartBadgeRef = useRef<HTMLElement | null>(null)
   const sectionRefs  = useRef<Record<string, HTMLDivElement | null>>({})
@@ -839,7 +852,7 @@ export default function ShopPage() {
         </div>
 
         {/* ── Closed shop overlay ── */}
-        {!loading && shop && !shop.is_open && (
+        {!loading && shop && !shopIsOpen && (
           <div style={{ position:"absolute", inset:0, zIndex:200,
             background:"rgba(8,8,6,0.96)", backdropFilter:"blur(10px)",
             display:"flex", flexDirection:"column", alignItems:"center",
@@ -913,14 +926,14 @@ export default function ShopPage() {
             {shop && (
               <div style={{ position:"absolute", top:92, right:16,
                 display:"flex", alignItems:"center", gap:5,
-                background: shop.is_open ? "rgba(62,207,110,0.15)" : "rgba(255,64,64,0.15)",
-                border:`1px solid ${shop.is_open ? "rgba(62,207,110,0.35)" : "rgba(255,64,64,0.35)"}`,
+                background: shopIsOpen ? "rgba(62,207,110,0.15)" : "rgba(255,64,64,0.15)",
+                border:`1px solid ${shopIsOpen ? "rgba(62,207,110,0.35)" : "rgba(255,64,64,0.35)"}`,
                 borderRadius:8, padding:"4px 10px", backdropFilter:"blur(8px)" }}>
                 <div style={{ width:6, height:6, borderRadius:"50%",
-                  background: shop.is_open ? "#3ecf6e" : "#ff4040",
+                  background: shopIsOpen ? "#3ecf6e" : "#ff4040",
                   animation:"shopPulse 1.5s infinite" }} />
-                <span style={{ color: shop.is_open ? "#3ecf6e" : "#ff4040", fontSize: 11, fontWeight:600 }}>
-                  {shop.is_open ? "Đang mở cửa" : "Đã đóng cửa"}
+                <span style={{ color: shopIsOpen ? "#3ecf6e" : "#ff4040", fontSize: 11, fontWeight:600 }}>
+                  {shopIsOpen ? "Đang mở cửa" : "Đã đóng cửa"}
                 </span>
               </div>
             )}

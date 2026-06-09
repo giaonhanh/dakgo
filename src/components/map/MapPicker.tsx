@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import type { Map as LeafletMap, Marker, LeafletMouseEvent } from "leaflet"
+import { reverseGeocodeStructured } from "@/lib/vietmapRoute"
 
 type LeafletModule = typeof import("leaflet")
 
@@ -13,20 +14,6 @@ interface MapPickerProps {
   lng:              number
   onLocationChange: (lat: number, lng: number, address?: string) => void
   height?:          number
-}
-
-const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
-
-async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
-  try {
-    const res = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=vi&key=${GOOGLE_KEY}`
-    )
-    const data = await res.json() as { results?: Array<{ formatted_address: string }> }
-    return data.results?.[0]?.formatted_address ?? null
-  } catch {
-    return null
-  }
 }
 
 export default function MapPicker({ lat, lng, onLocationChange, height = 200 }: MapPickerProps) {
@@ -92,14 +79,14 @@ export default function MapPicker({ lat, lng, onLocationChange, height = 200 }: 
 
     marker.on("dragend", async () => {
       const pos  = marker.getLatLng()
-      const addr = await reverseGeocode(pos.lat, pos.lng)
-      onLocationChange(pos.lat, pos.lng, addr ?? undefined)
+      const { address } = await reverseGeocodeStructured(pos.lat, pos.lng)
+      onLocationChange(pos.lat, pos.lng, address || undefined)
     })
 
     map.on("click", async (e: LeafletMouseEvent) => {
       marker.setLatLng(e.latlng)
-      const addr = await reverseGeocode(e.latlng.lat, e.latlng.lng)
-      onLocationChange(e.latlng.lat, e.latlng.lng, addr ?? undefined)
+      const { address } = await reverseGeocodeStructured(e.latlng.lat, e.latlng.lng)
+      onLocationChange(e.latlng.lat, e.latlng.lng, address || undefined)
     })
 
     lMod.control.zoom({ position: "bottomright" }).addTo(map)

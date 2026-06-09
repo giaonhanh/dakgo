@@ -35,14 +35,27 @@ export async function POST(req: NextRequest) {
     // Kiểm tra shop còn mở không
     const { data: shop } = await supabase
       .from("shops")
-      .select("id, is_open, status")
+      .select("id, is_open, status, opening_hours")
       .eq("id", shop_id)
       .single()
 
     if (!shop || shop.status !== "approved") {
       return NextResponse.json({ error: "Cửa hàng không hợp lệ" }, { status: 400 })
     }
-    if (!shop.is_open) {
+
+    // Tính giờ thực tế VN (UTC+7) — không dùng is_open column vì cron chỉ chạy 1 lần/ngày
+    function shopCurrentlyOpen(): boolean {
+      const oh = shop!.opening_hours as { open?: string; close?: string } | null
+      if (!oh?.open || !oh?.close) return !!shop!.is_open
+      const now = new Date()
+      const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+      const [oh2, om] = oh.open.split(":").map(Number)
+      const [ch, cm]  = oh.close.split(":").map(Number)
+      const o = (oh2 ?? 0) * 60 + (om ?? 0)
+      const c = (ch  ?? 0) * 60 + (cm ?? 0)
+      return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c
+    }
+    if (!shopCurrentlyOpen()) {
       return NextResponse.json({ error: "Cửa hàng hiện đang đóng cửa" }, { status: 400 })
     }
 
