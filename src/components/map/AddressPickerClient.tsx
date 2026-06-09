@@ -600,6 +600,7 @@ export default function AddressPickerClient({
             disableDefaultUI
             gestureHandling="greedy"
             maxZoom={20}
+            renderingType="RASTER"
             style={{ width: "100%", height: "100%" }}
           >
             <MapEventHandler

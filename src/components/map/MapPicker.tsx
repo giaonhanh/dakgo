@@ -112,6 +112,7 @@ export default function MapPicker({ lat, lng, onLocationChange, height = 200 }: 
             disableDefaultUI
             gestureHandling="greedy"
             maxZoom={20}
+            renderingType="RASTER"
             style={{ width: "100%", height: "100%" }}
           >
             <CenterTracker
