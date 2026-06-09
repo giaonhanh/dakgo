@@ -40,7 +40,14 @@ interface PlaceSuggestion {
   secondaryText: string
 }
 
-interface GoogleAddressComponent {
+// Geocoding API (classic) dùng long_name/short_name
+interface GeocodingComponent {
+  long_name:  string
+  short_name: string
+  types:      string[]
+}
+// Places API (New) dùng longText/shortText
+interface PlacesComponent {
   longText:  string
   shortText: string
   types:     string[]
@@ -87,7 +94,7 @@ async function googlePlaceDetail(placeId: string, sessionToken: string): Promise
   const data = await res.json()
   const lat  = (data.location?.latitude  as number) ?? 0
   const lng  = (data.location?.longitude as number) ?? 0
-  const components: GoogleAddressComponent[] = data.addressComponents ?? []
+  const components: PlacesComponent[] = data.addressComponents ?? []
   const houseNumber = components.find(c => c.types.includes("street_number"))?.longText ?? ""
   const address = (data.formattedAddress as string) ?? ""
   return { lat, lng, address, houseNote: houseNumber ? `Số ${houseNumber}` : "" }
@@ -285,9 +292,9 @@ export default function AddressPickerClient({
       const data = await res.json()
       const result = data.results?.[0]
       if (result) {
-        const components: GoogleAddressComponent[] = result.address_components ?? []
+        const components: GeocodingComponent[] = result.address_components ?? []
         const get = (...types: string[]) =>
-          components.find((c: GoogleAddressComponent) => types.some(t => c.types.includes(t)))?.longText ?? ""
+          components.find(c => types.some(t => c.types.includes(t)))?.long_name ?? ""
         const houseNum = get("street_number")
         const street   = get("route")
         const ward     = get("sublocality_level_1", "sublocality")

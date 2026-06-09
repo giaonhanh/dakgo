@@ -3,14 +3,14 @@ import { getCachedGeocode, setCachedGeocode } from "./geocodeCache"
 const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
 interface GoogleAddressComponent {
-  longText:  string
-  shortText: string
-  types:     string[]
+  long_name:  string
+  short_name: string
+  types:      string[]
 }
 
 function parseComponents(components: GoogleAddressComponent[]) {
   const get = (...types: string[]) =>
-    components.find(c => types.some(t => c.types.includes(t)))?.longText ?? ""
+    components.find(c => types.some(t => c.types.includes(t)))?.long_name ?? ""
   return {
     houseNumber: get("street_number"),
     street:      get("route"),
