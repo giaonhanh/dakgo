@@ -280,9 +280,7 @@ export default function AddressPickerClient({
     }
 
     try {
-      const res = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=vi&key=${GOOGLE_KEY}`,
-      )
+      const res = await fetch(`/api/geocode?latlng=${lat},${lng}`)
       const data = await res.json()
       const result = data.results?.[0]
       if (result) {

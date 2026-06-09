@@ -28,7 +28,7 @@ export async function reverseGeocodeStructured(lat: number, lng: number): Promis
 
   try {
     const res = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=vi&key=${GOOGLE_KEY}`,
+      `/api/geocode?latlng=${lat},${lng}`,
     )
     if (res.ok) {
       const data = await res.json()
@@ -58,7 +58,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 
   try {
     const res = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=vi&key=${GOOGLE_KEY}`,
+      `/api/geocode?latlng=${lat},${lng}`,
     )
     if (res.ok) {
       const data = await res.json()
@@ -77,13 +77,18 @@ export async function getRouteKm(
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 8000)
-    const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+    const isClient = typeof window !== "undefined"
+    const routeUrl = isClient
+      ? "/api/routes"
+      : "https://routes.googleapis.com/directions/v2:computeRoutes"
+    const routeHeaders: Record<string, string> = { "Content-Type": "application/json" }
+    if (!isClient) {
+      routeHeaders["X-Goog-Api-Key"]   = GOOGLE_KEY ?? ""
+      routeHeaders["X-Goog-FieldMask"] = "routes.distanceMeters"
+    }
+    const res = await fetch(routeUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": GOOGLE_KEY ?? "",
-        "X-Goog-FieldMask": "routes.distanceMeters",
-      },
+      headers: routeHeaders,
       body: JSON.stringify({
         origin:      { location: { latLng: { latitude: fromLat, longitude: fromLng } } },
         destination: { location: { latLng: { latitude: toLat,   longitude: toLng   } } },
