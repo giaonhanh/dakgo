@@ -17,27 +17,6 @@ const SEARCH_MS  = 500
 
 const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
 
-// Dark style — warm dark tones, tên đường / POI hiện rõ
-const DARK_STYLES: google.maps.MapTypeStyle[] = [
-  { elementType: "geometry",              stylers: [{ color: "#1a1208" }] },
-  { elementType: "labels.text.stroke",    stylers: [{ color: "#1a1208" }] },
-  { elementType: "labels.text.fill",      stylers: [{ color: "#c8a97e" }] },
-  { featureType: "administrative",        elementType: "geometry.stroke",   stylers: [{ color: "#2a1c0c" }] },
-  { featureType: "road",                  elementType: "geometry",          stylers: [{ color: "#2e2010" }] },
-  { featureType: "road",                  elementType: "geometry.stroke",   stylers: [{ color: "#3d2a14" }] },
-  { featureType: "road",                  elementType: "labels.text.fill",  stylers: [{ color: "#d4b07a" }] },
-  { featureType: "road.highway",          elementType: "geometry",          stylers: [{ color: "#4a3018" }] },
-  { featureType: "road.highway",          elementType: "geometry.stroke",   stylers: [{ color: "#5a3820" }] },
-  { featureType: "road.highway",          elementType: "labels.text.fill",  stylers: [{ color: "#ffe090" }] },
-  { featureType: "poi",                   elementType: "geometry",          stylers: [{ color: "#1e1a10" }] },
-  { featureType: "poi",                   elementType: "labels.text.fill",  stylers: [{ color: "#a07840" }] },
-  { featureType: "poi.park",              elementType: "geometry",          stylers: [{ color: "#1a2a12" }] },
-  { featureType: "poi.business",          elementType: "labels.text.fill",  stylers: [{ color: "#cc9944" }] },
-  { featureType: "water",                 elementType: "geometry",          stylers: [{ color: "#0a1520" }] },
-  { featureType: "water",                 elementType: "labels.text.fill",  stylers: [{ color: "#3a6080" }] },
-  { featureType: "transit",               stylers: [{ visibility: "off" }] },
-  { featureType: "landscape",             elementType: "geometry",          stylers: [{ color: "#15100a" }] },
-]
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -596,11 +575,10 @@ export default function AddressPickerClient({
             defaultCenter={{ lat: initLat, lng: initLng }}
             defaultZoom={15}
             mapTypeId={mapStyle === "satellite" ? "hybrid" : "roadmap"}
-            styles={mapStyle === "dark" ? DARK_STYLES : []}
+            colorScheme={mapStyle === "dark" ? "DARK" : "LIGHT"}
             disableDefaultUI
             gestureHandling="greedy"
             maxZoom={20}
-            renderingType="RASTER"
             style={{ width: "100%", height: "100%" }}
           >
             <MapEventHandler

@@ -9,19 +9,6 @@ import { reverseGeocodeStructured } from "@/lib/vietmapRoute"
 
 const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
 
-const DARK_STYLES: google.maps.MapTypeStyle[] = [
-  { elementType: "geometry",          stylers: [{ color: "#1a1208" }] },
-  { elementType: "labels.text.stroke",stylers: [{ color: "#1a1208" }] },
-  { elementType: "labels.text.fill",  stylers: [{ color: "#c8a97e" }] },
-  { featureType: "road",              elementType: "geometry",         stylers: [{ color: "#2e2010" }] },
-  { featureType: "road",              elementType: "labels.text.fill", stylers: [{ color: "#d4b07a" }] },
-  { featureType: "road.highway",      elementType: "geometry",         stylers: [{ color: "#4a3018" }] },
-  { featureType: "poi",               elementType: "labels.text.fill", stylers: [{ color: "#a07840" }] },
-  { featureType: "poi.business",      elementType: "labels.text.fill", stylers: [{ color: "#cc9944" }] },
-  { featureType: "water",             elementType: "geometry",         stylers: [{ color: "#0a1520" }] },
-  { featureType: "transit",           stylers: [{ visibility: "off" }] },
-  { featureType: "landscape",         elementType: "geometry",         stylers: [{ color: "#15100a" }] },
-]
 
 interface MapPickerProps {
   lat:              number
@@ -108,11 +95,10 @@ export default function MapPicker({ lat, lng, onLocationChange, height = 200 }: 
             defaultCenter={{ lat, lng }}
             defaultZoom={15}
             mapTypeId="roadmap"
-            styles={DARK_STYLES}
+            colorScheme="DARK"
             disableDefaultUI
             gestureHandling="greedy"
             maxZoom={20}
-            renderingType="RASTER"
             style={{ width: "100%", height: "100%" }}
           >
             <CenterTracker
