@@ -574,8 +574,6 @@ export default function AddressPickerClient({
           <Map
             defaultCenter={{ lat: initLat, lng: initLng }}
             defaultZoom={15}
-            mapTypeId={mapStyle === "satellite" ? "hybrid" : "roadmap"}
-            colorScheme={mapStyle === "dark" ? "DARK" : "LIGHT"}
             disableDefaultUI
             gestureHandling="greedy"
             maxZoom={20}

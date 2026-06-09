@@ -81,8 +81,6 @@ export default function MiniMapPicker({ lat, lng, onPick }: Props) {
         <Map
           defaultCenter={{ lat, lng }}
           defaultZoom={16}
-          mapTypeId="roadmap"
-          colorScheme="DARK"
           disableDefaultUI
           gestureHandling="greedy"
           maxZoom={20}

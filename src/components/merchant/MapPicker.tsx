@@ -170,8 +170,6 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
           <Map
             defaultCenter={{ lat: initLat, lng: initLng }}
             defaultZoom={17}
-            mapTypeId="roadmap"
-            colorScheme="DARK"
             disableDefaultUI
             gestureHandling="greedy"
             maxZoom={20}
