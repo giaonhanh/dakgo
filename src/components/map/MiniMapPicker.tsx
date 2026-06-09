@@ -65,7 +65,7 @@ function FlyTo({ target }: { target: [number, number] | null }) {
 export default function MiniMapPicker({ lat, lng, onPick }: Props) {
   const [floating,  setFloating]  = useState(false)
   const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null)
-  const skipRef = useRef(false)
+  const skipRef = useRef(true)
 
   // Khi lat/lng prop thay đổi từ bên ngoài → flyTo
   const prevProps = useRef({ lat, lng })

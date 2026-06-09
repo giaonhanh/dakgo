@@ -79,7 +79,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
   const [floating,   setFloating]   = useState(false)
   const [mapLoaded,  setMapLoaded]  = useState(false)
   const [flyTarget,  setFlyTarget]  = useState<[number, number] | null>(null)
-  const skipRef      = useRef(false)
+  const skipRef      = useRef(true)
   const geocodeTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const doGeocode = useCallback(async (lat: number, lng: number) => {

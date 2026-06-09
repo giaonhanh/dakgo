@@ -69,7 +69,7 @@ function FlyTo({ target }: { target: [number, number] | null }) {
 export default function MapPicker({ lat, lng, onLocationChange, height = 200 }: MapPickerProps) {
   const [floating,  setFloating]  = useState(false)
   const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null)
-  const skipRef     = useRef(false)
+  const skipRef     = useRef(true)
   const geocodeTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   // Khi lat/lng prop thay đổi từ bên ngoài → pan về đó
