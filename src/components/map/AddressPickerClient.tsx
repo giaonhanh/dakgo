@@ -2,14 +2,12 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MapContainer, TileLayer, useMapEvents, useMap } from "react-leaflet"
-import "leaflet/dist/leaflet.css"
+import { APIProvider, Map, useMap } from "@vis.gl/react-google-maps"
 import type { AddressPickerResult } from "@/types"
 import { getCachedGeocode, setCachedGeocode } from "@/lib/geocodeCache"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-// Tọa độ trung tâm Thị Trấn Phước An, Huyện Krông Pắc, Đắk Lắk
 const DEFAULT_LAT = 12.7107
 const DEFAULT_LNG = 108.3034
 const PANEL_H    = 216
@@ -17,9 +15,29 @@ const SEARCH_H   = 56
 const GEOCODE_MS = 600
 const SEARCH_MS  = 500
 
-const DARK_TILE      = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-const SAT_TILE       = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{x}/{y}"
-const SAT_LABEL_TILE = "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png"
+const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
+
+// Dark style — warm dark tones, tên đường / POI hiện rõ
+const DARK_STYLES: google.maps.MapTypeStyle[] = [
+  { elementType: "geometry",              stylers: [{ color: "#1a1208" }] },
+  { elementType: "labels.text.stroke",    stylers: [{ color: "#1a1208" }] },
+  { elementType: "labels.text.fill",      stylers: [{ color: "#c8a97e" }] },
+  { featureType: "administrative",        elementType: "geometry.stroke",   stylers: [{ color: "#2a1c0c" }] },
+  { featureType: "road",                  elementType: "geometry",          stylers: [{ color: "#2e2010" }] },
+  { featureType: "road",                  elementType: "geometry.stroke",   stylers: [{ color: "#3d2a14" }] },
+  { featureType: "road",                  elementType: "labels.text.fill",  stylers: [{ color: "#d4b07a" }] },
+  { featureType: "road.highway",          elementType: "geometry",          stylers: [{ color: "#4a3018" }] },
+  { featureType: "road.highway",          elementType: "geometry.stroke",   stylers: [{ color: "#5a3820" }] },
+  { featureType: "road.highway",          elementType: "labels.text.fill",  stylers: [{ color: "#ffe090" }] },
+  { featureType: "poi",                   elementType: "geometry",          stylers: [{ color: "#1e1a10" }] },
+  { featureType: "poi",                   elementType: "labels.text.fill",  stylers: [{ color: "#a07840" }] },
+  { featureType: "poi.park",              elementType: "geometry",          stylers: [{ color: "#1a2a12" }] },
+  { featureType: "poi.business",          elementType: "labels.text.fill",  stylers: [{ color: "#cc9944" }] },
+  { featureType: "water",                 elementType: "geometry",          stylers: [{ color: "#0a1520" }] },
+  { featureType: "water",                 elementType: "labels.text.fill",  stylers: [{ color: "#3a6080" }] },
+  { featureType: "transit",               stylers: [{ visibility: "off" }] },
+  { featureType: "landscape",             elementType: "geometry",          stylers: [{ color: "#15100a" }] },
+]
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,22 +58,19 @@ interface PlaceSuggestion {
   secondaryText: string
 }
 
-// Geocoding API (classic) dùng long_name/short_name
 interface GeocodingComponent {
   long_name:  string
   short_name: string
   types:      string[]
 }
-// Places API (New) dùng longText/shortText
+
 interface PlacesComponent {
   longText:  string
   shortText: string
   types:     string[]
 }
 
-const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
-
-// ─── Google Maps API (session token để gộp billing Autocomplete + PlaceDetail) ──
+// ─── Google Places API helpers ────────────────────────────────────────────────
 
 async function googleSearch(input: string, lat: number, lng: number, sessionToken: string): Promise<PlaceSuggestion[]> {
   const res = await fetch("/api/places/autocomplete", {
@@ -73,7 +88,7 @@ async function googleSearch(input: string, lat: number, lng: number, sessionToke
     const fmt  = pred.structuredFormat as Record<string, Record<string, string>> | undefined
     return {
       refId:         pred.placeId as string,
-      mainText:      fmt?.mainText?.text ?? (pred.text as Record<string,string>)?.text ?? "",
+      mainText:      fmt?.mainText?.text ?? (pred.text as Record<string, string>)?.text ?? "",
       secondaryText: fmt?.secondaryText?.text ?? "",
     }
   })
@@ -94,71 +109,59 @@ async function googlePlaceDetail(placeId: string, sessionToken: string): Promise
   return { lat, lng, address, houseNote: houseNumber ? `Số ${houseNumber}` : "" }
 }
 
+// ─── Map Sub-components (phải nằm trong <Map>) ────────────────────────────────
 
-// ─── Map Sub-components ───────────────────────────────────────────────────────
-
-function MapEvents({
-  onMoveStart, onMoveEnd,
+function MapEventHandler({
+  onDragStart, onDragEnd, onIdle, skipRef,
 }: {
-  onMoveStart: () => void
-  onMoveEnd:   (pos: LatLng) => void
-}) {
-  const firstRef = useRef(true)
-  useMapEvents({
-    movestart: () => {
-      if (firstRef.current) { firstRef.current = false; return }
-      onMoveStart()
-    },
-    moveend: e => {
-      const c = e.target.getCenter()
-      onMoveEnd({ lat: c.lat, lng: c.lng })
-    },
-  })
-  return null
-}
-
-function FlyTo({ target }: { target: [number, number] | null }) {
-  const map     = useMap()
-  const prevRef = useRef<string>("")
-  useEffect(() => {
-    if (!target) return
-    const key = `${target[0]},${target[1]}`
-    if (prevRef.current === key) return
-    prevRef.current = key
-    map.flyTo(target, 18, { duration: 0.7 })
-  }, [target, map])
-  return null
-}
-
-function TileReadyWatcher({ onReady }: { onReady: () => void }) {
-  const calledRef = useRef(false)
-  useMapEvents({
-    load: () => { if (!calledRef.current) { calledRef.current = true; onReady() } },
-  })
-  // Fallback: hiển thị sau 800ms dù tiles chưa xong
-  useEffect(() => {
-    const t = setTimeout(() => { if (!calledRef.current) { calledRef.current = true; onReady() } }, 800)
-    return () => clearTimeout(t)
-  }, [onReady])
-  return null
-}
-
-function GpsControl({
-  trigger, onLocated, onError,
-}: {
-  trigger:   number
-  onLocated: (pos: LatLng) => void
-  onError:   () => void
+  onDragStart: () => void
+  onDragEnd:   () => void
+  onIdle:      (pos: LatLng) => void
+  skipRef:     React.MutableRefObject<boolean>
 }) {
   const map = useMap()
   useEffect(() => {
-    if (!trigger) return
-    map.locate({ setView: true, maxZoom: 18, enableHighAccuracy: true })
-  }, [trigger, map])
-  useMapEvents({
-    locationfound: e => onLocated({ lat: e.latlng.lat, lng: e.latlng.lng }),
-    locationerror: () => onError(),
-  })
+    if (!map) return
+    const l1 = map.addListener("dragstart", onDragStart)
+    const l2 = map.addListener("dragend",   onDragEnd)
+    const l3 = map.addListener("idle", () => {
+      const c = map.getCenter()
+      if (!c) return
+      if (skipRef.current) { skipRef.current = false; return }
+      onIdle({ lat: c.lat(), lng: c.lng() })
+    })
+    return () => { l1.remove(); l2.remove(); l3.remove() }
+  }, [map, onDragStart, onDragEnd, onIdle, skipRef])
+  return null
+}
+
+function MapFlyTo({ target }: { target: [number, number] | null }) {
+  const map     = useMap()
+  const prevRef = useRef("")
+  useEffect(() => {
+    if (!map || !target) return
+    const key = `${target[0]},${target[1]}`
+    if (prevRef.current === key) return
+    prevRef.current = key
+    map.panTo({ lat: target[0], lng: target[1] })
+    map.setZoom(18)
+  }, [map, target])
+  return null
+}
+
+function TilesWatcher({ onReady }: { onReady: () => void }) {
+  const map     = useMap()
+  const doneRef = useRef(false)
+  useEffect(() => {
+    if (!map) return
+    const l = map.addListener("tilesloaded", () => {
+      if (!doneRef.current) { doneRef.current = true; onReady() }
+    })
+    const t = setTimeout(() => {
+      if (!doneRef.current) { doneRef.current = true; onReady() }
+    }, 900)
+    return () => { l.remove(); clearTimeout(t) }
+  }, [map, onReady])
   return null
 }
 
@@ -221,15 +224,13 @@ export default function AddressPickerClient({
   onConfirm, onClose, initialLat, initialLng,
   height = "100dvh", className = "",
 }: AddressPickerProps) {
-  const geocodeTimer   = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const searchTimer    = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const autoNoteRef    = useRef("")
-  const searchInputRef = useRef<HTMLInputElement>(null)
-  const skipGeocodeRef = useRef(false)
-  const centerRef      = useRef<LatLng>({ lat: initialLat ?? DEFAULT_LAT, lng: initialLng ?? DEFAULT_LNG })
-  // Ngữ cảnh vùng từ lần geocode gần nhất — dùng để bias search
-  const areaCtxRef     = useRef("Krông Pắc, Đắk Lắk")
-  // Session token gộp billing Autocomplete + PlaceDetail thành 1 đơn vị ($0.005 thay vì $0.02)
+  const geocodeTimer    = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const searchTimer     = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const autoNoteRef     = useRef("")
+  const searchInputRef  = useRef<HTMLInputElement>(null)
+  const skipGeocodeRef  = useRef(false)
+  const centerRef       = useRef<LatLng>({ lat: initialLat ?? DEFAULT_LAT, lng: initialLng ?? DEFAULT_LNG })
+  const areaCtxRef      = useRef("Krông Pắc, Đắk Lắk")
   const sessionTokenRef = useRef<string>(crypto.randomUUID())
 
   const initLat = initialLat ?? DEFAULT_LAT
@@ -247,13 +248,11 @@ export default function AddressPickerClient({
   const [floating,    setFloating]    = useState(false)
   const [pulseKey,    setPulseKey]    = useState(0)
   const [showPulse,   setShowPulse]   = useState(false)
-  // true ngay từ đầu nếu không có initialLat/Lng — báo hiệu đang xin GPS
   const [locating,    setLocating]    = useState(!initialLat && !initialLng)
   const [geocoding,   setGeocoding]   = useState(true)
-  const [gpsTrigger,  setGpsTrigger]  = useState(0)
-  const [mapStyle,      setMapStyle]      = useState<"dark" | "satellite">("dark")
-  const [tilesReady,    setTilesReady]    = useState(false)
-  const [editingAddr,   setEditingAddr]   = useState(false)
+  const [mapStyle,    setMapStyle]    = useState<"dark" | "satellite">("dark")
+  const [tilesReady,  setTilesReady]  = useState(false)
+  const [editingAddr, setEditingAddr] = useState(false)
   const addrInputRef = useRef<HTMLInputElement>(null)
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -272,7 +271,6 @@ export default function AddressPickerClient({
 
   const doGeocode = useCallback(async (lat: number, lng: number) => {
     setGeocoding(true)
-
     const cached = getCachedGeocode(lat, lng)
     if (cached) {
       setAddress(cached)
@@ -280,12 +278,14 @@ export default function AddressPickerClient({
       setGeocoding(false)
       return
     }
-
     try {
       const res = await fetch(`/api/geocode?latlng=${lat},${lng}`)
       const data = await res.json()
-      // Ưu tiên ROOFTOP (chính xác đến số nhà), fallback về results[0]
-      const results: { formatted_address?: string; address_components?: GeocodingComponent[]; geometry?: { location_type?: string } }[] = data.results ?? []
+      const results: {
+        formatted_address?: string
+        address_components?: GeocodingComponent[]
+        geometry?: { location_type?: string }
+      }[] = data.results ?? []
       const result = results.find(r => r.geometry?.location_type === "ROOFTOP") ?? results[0]
       if (result) {
         const components: GeocodingComponent[] = result.address_components ?? []
@@ -297,7 +297,6 @@ export default function AddressPickerClient({
         const ward     = get("sublocality_level_1", "sublocality", "administrative_area_level_3")
         const district = get("administrative_area_level_2")
         const city     = get("administrative_area_level_1")
-
         const formatted = (result.formatted_address ?? "").replace(/,\s*Việt Nam$/i, "").trim()
         const finalAddr = formatted || [
           houseNum && street ? `${houseNum} ${street}` : street,
@@ -306,14 +305,13 @@ export default function AddressPickerClient({
         setCachedGeocode(lat, lng, finalAddr)
         setAddress(finalAddr)
         applyNote(houseNum ? `Số ${houseNum}` : "")
-
         const ctx = [district, city].filter(Boolean).join(", ")
         if (ctx) areaCtxRef.current = ctx
       } else {
         setAddress("")
       }
     } catch {
-      setAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+      setAddress("")
     } finally {
       setGeocoding(false)
     }
@@ -331,8 +329,7 @@ export default function AddressPickerClient({
     if (trimmed.length < 3) { setSuggestions([]); setShowSuggest(false); return }
     setSearching(true)
     try {
-      // Nếu query chưa chứa ngữ cảnh vùng → thêm vào để kết quả bám địa phương
-      const ctx   = areaCtxRef.current
+      const ctx    = areaCtxRef.current
       const hasCtx = ctx.split(",").some(c => trimmed.toLowerCase().includes(c.trim().toLowerCase()))
       const query  = hasCtx ? trimmed : `${trimmed} ${ctx}`
       const items  = await googleSearch(query, centerRef.current.lat, centerRef.current.lng, sessionTokenRef.current)
@@ -383,39 +380,47 @@ export default function AddressPickerClient({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Map Events ────────────────────────────────────────────────────────────
+  // ── Map Event Handlers ────────────────────────────────────────────────────
 
-  const handleMoveStart = useCallback(() => {
+  const handleDragStart = useCallback(() => {
     setFloating(true)
     setShowSuggest(false)
   }, [])
 
-  const handleMoveEnd = useCallback((pos: LatLng) => {
-    centerRef.current = pos
-    setCenter(pos)
+  const handleDragEnd = useCallback(() => {
     setFloating(false)
     setShowPulse(true)
     setPulseKey(k => k + 1)
     setTimeout(() => setShowPulse(false), 800)
-    if (skipGeocodeRef.current) { skipGeocodeRef.current = false; return }
+  }, [])
+
+  const handleIdle = useCallback((pos: LatLng) => {
+    centerRef.current = pos
+    setCenter(pos)
     scheduleGeocode(pos.lat, pos.lng)
   }, [scheduleGeocode])
 
   // ── GPS Button ────────────────────────────────────────────────────────────
 
   const handleGPS = useCallback(() => {
+    if (!navigator.geolocation) return
     setLocating(true)
-    skipGeocodeRef.current = false
-    setGpsTrigger(t => t + 1)
-  }, [])
-
-  const handleLocated = useCallback((pos: LatLng) => {
-    setCenter(pos)
-    setLocating(false)
-    void doGeocode(pos.lat, pos.lng)
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setLocating(false)
+        skipGeocodeRef.current = true
+        const pos = { lat: coords.latitude, lng: coords.longitude }
+        centerRef.current = pos
+        setCenter(pos)
+        setFlyTarget([coords.latitude, coords.longitude])
+        void doGeocode(coords.latitude, coords.longitude)
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+    )
   }, [doGeocode])
 
-  // ── Select Suggestion — fetch chi tiết từ Google Places ─────────────────
+  // ── Select Suggestion ─────────────────────────────────────────────────────
 
   const selectSuggestion = useCallback(async (s: PlaceSuggestion) => {
     setSearchText("")
@@ -425,23 +430,18 @@ export default function AddressPickerClient({
     setGeocoding(true)
     try {
       const detail = await googlePlaceDetail(s.refId, sessionTokenRef.current)
-      // Reset session token sau khi hoàn thành — session tiếp theo sẽ được billing riêng
       sessionTokenRef.current = crypto.randomUUID()
       skipGeocodeRef.current = true
       const pos = { lat: detail.lat, lng: detail.lng }
       centerRef.current = pos
       setCenter(pos)
       setFlyTarget([detail.lat, detail.lng])
-      // Xây địa chỉ đầy đủ từ detail nếu có, fallback về display
-      const addr = detail.address || (s.secondaryText ? `${s.mainText}, ${s.secondaryText}` : s.mainText)
+      const addr      = detail.address || (s.secondaryText ? `${s.mainText}, ${s.secondaryText}` : s.mainText)
       const houseNote = detail.houseNote || ""
       setAddress(addr)
       applyNote(houseNote)
-      // Auto-confirm ngay sau khi chọn từ gợi ý — không cần ấn nút
       onConfirm({ lat: detail.lat, lng: detail.lng, address: addr, note: houseNote })
-    } catch {
-      // fallback: keep current position
-    } finally {
+    } catch { /* giữ vị trí hiện tại */ } finally {
       setGeocoding(false)
     }
   }, [applyNote, onConfirm])
@@ -451,6 +451,8 @@ export default function AddressPickerClient({
   const handleConfirm = useCallback(() => {
     onConfirm({ lat: center.lat, lng: center.lng, address, note })
   }, [center, address, note, onConfirm])
+
+  const tilesReadyCb = useCallback(() => setTilesReady(true), [])
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -466,10 +468,9 @@ export default function AddressPickerClient({
           100% { transform: scale(3.5);  opacity: 0 }
         }
         @keyframes shimmer { 0% { left:-60% } 100% { left:120% } }
-        .leaflet-container { background: #0d0a06 !important; }
-        .leaflet-control-attribution { display: none !important; }
-        .leaflet-control-zoom { display: none !important; }
-        .leaflet-tile-pane { filter: brightness(0.9); }
+        .gm-style iframe + div { border: none !important; }
+        .gm-style-cc { display: none !important; }
+        .gmnoprint a, .gmnoprint span { display: none !important; }
       `}</style>
 
       {/* ── Search Bar ─────────────────────────────────────────────────── */}
@@ -545,7 +546,6 @@ export default function AddressPickerClient({
                   width: "100%", textAlign: "left", border: "none", cursor: "pointer",
                   padding: "11px 14px", background: "transparent",
                   borderBottom: i < suggestions.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-                  transition: "background .12s",
                   display: "flex", alignItems: "flex-start", gap: 10,
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,215,0,0.06)")}
@@ -570,9 +570,11 @@ export default function AddressPickerClient({
 
       {/* ── Map Container ───────────────────────────────────────────────── */}
       <div style={{
-        position: "absolute", top: `calc(${SEARCH_H}px + env(safe-area-inset-top, 0px))`, bottom: PANEL_H, left: 0, right: 0, zIndex: 1,
+        position: "absolute",
+        top: `calc(${SEARCH_H}px + env(safe-area-inset-top, 0px))`,
+        bottom: PANEL_H, left: 0, right: 0, zIndex: 1,
       }}>
-        {/* Skeleton che phần map trắng trong lúc tiles chưa load */}
+        {/* Skeleton loading overlay */}
         {!tilesReady && (
           <div style={{
             position: "absolute", inset: 0, zIndex: 5,
@@ -588,28 +590,28 @@ export default function AddressPickerClient({
             <span style={{ color: "#6a5a40", fontSize: 10, fontFamily: "Lexend" }}>Đang tải bản đồ...</span>
           </div>
         )}
-        <MapContainer
-          center={[initLat, initLng]}
-          zoom={13}
-          style={{ width: "100%", height: "100%", opacity: 1, transition: "opacity 0.4s ease" }}
-          zoomControl={false}
-          attributionControl={false}
-          maxZoom={19}
-          preferCanvas
-        >
-          {mapStyle === "satellite" ? (
-            <>
-              <TileLayer key="sat-base" url={SAT_TILE} maxZoom={19} keepBuffer={4} />
-              <TileLayer key="sat-labels" url={SAT_LABEL_TILE} maxZoom={19} keepBuffer={4} />
-            </>
-          ) : (
-            <TileLayer key="dark" url={DARK_TILE} maxZoom={19} keepBuffer={4} />
-          )}
-          <MapEvents onMoveStart={handleMoveStart} onMoveEnd={handleMoveEnd} />
-          <FlyTo target={flyTarget} />
-          <GpsControl trigger={gpsTrigger} onLocated={handleLocated} onError={() => setLocating(false)} />
-          <TileReadyWatcher onReady={() => setTilesReady(true)} />
-        </MapContainer>
+
+        <APIProvider apiKey={GOOGLE_KEY}>
+          <Map
+            defaultCenter={{ lat: initLat, lng: initLng }}
+            defaultZoom={15}
+            mapTypeId={mapStyle === "satellite" ? "hybrid" : "roadmap"}
+            styles={mapStyle === "dark" ? DARK_STYLES : []}
+            disableDefaultUI
+            gestureHandling="greedy"
+            maxZoom={20}
+            style={{ width: "100%", height: "100%" }}
+          >
+            <MapEventHandler
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onIdle={handleIdle}
+              skipRef={skipGeocodeRef}
+            />
+            <MapFlyTo target={flyTarget} />
+            <TilesWatcher onReady={tilesReadyCb} />
+          </Map>
+        </APIProvider>
       </div>
 
       {/* ── Map Controls — góc phải dưới bản đồ ───────────────────────── */}
@@ -652,7 +654,9 @@ export default function AddressPickerClient({
 
       {/* ── Center Pin Overlay ──────────────────────────────────────────── */}
       <div style={{
-        position: "absolute", top: `calc(${SEARCH_H}px + env(safe-area-inset-top, 0px))`, bottom: PANEL_H, left: 0, right: 0,
+        position: "absolute",
+        top: `calc(${SEARCH_H}px + env(safe-area-inset-top, 0px))`,
+        bottom: PANEL_H, left: 0, right: 0,
         zIndex: 10, pointerEvents: "none",
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
@@ -754,13 +758,10 @@ export default function AddressPickerClient({
                 {address || "Tap để nhập địa chỉ..."}
               </p>
               {address && (
-                <button
-                  type="button"
+                <button type="button"
                   onClick={() => { setEditingAddr(true); setTimeout(() => addrInputRef.current?.focus(), 50) }}
                   style={{ background: "none", border: "none", cursor: "pointer", padding: "0 0 0 6px", color: "rgba(255,215,0,0.6)", fontSize: 10, fontFamily: "Lexend", flexShrink: 0 }}
-                >
-                  Sửa
-                </button>
+                >Sửa</button>
               )}
             </>
           )}
