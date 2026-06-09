@@ -251,8 +251,10 @@ export default function AddressPickerClient({
   const [locating,    setLocating]    = useState(!initialLat && !initialLng)
   const [geocoding,   setGeocoding]   = useState(true)
   const [gpsTrigger,  setGpsTrigger]  = useState(0)
-  const [mapStyle,    setMapStyle]    = useState<"dark" | "satellite">("dark")
-  const [tilesReady,  setTilesReady]  = useState(false)
+  const [mapStyle,      setMapStyle]      = useState<"dark" | "satellite">("dark")
+  const [tilesReady,    setTilesReady]    = useState(false)
+  const [editingAddr,   setEditingAddr]   = useState(false)
+  const addrInputRef = useRef<HTMLInputElement>(null)
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -282,7 +284,9 @@ export default function AddressPickerClient({
     try {
       const res = await fetch(`/api/geocode?latlng=${lat},${lng}`)
       const data = await res.json()
-      const result = data.results?.[0]
+      // Ưu tiên ROOFTOP (chính xác đến số nhà), fallback về results[0]
+      const results: { formatted_address?: string; address_components?: GeocodingComponent[]; geometry?: { location_type?: string } }[] = data.results ?? []
+      const result = results.find(r => r.geometry?.location_type === "ROOFTOP") ?? results[0]
       if (result) {
         const components: GeocodingComponent[] = result.address_components ?? []
         const get = (...types: string[]) =>
@@ -294,8 +298,7 @@ export default function AddressPickerClient({
         const district = get("administrative_area_level_2")
         const city     = get("administrative_area_level_1")
 
-        const formatted = (result.formatted_address as string ?? "")
-          .replace(/,\s*Việt Nam$/i, "").trim()
+        const formatted = (result.formatted_address ?? "").replace(/,\s*Việt Nam$/i, "").trim()
         const finalAddr = formatted || [
           houseNum && street ? `${houseNum} ${street}` : street,
           village, ward, district, city,
@@ -307,7 +310,7 @@ export default function AddressPickerClient({
         const ctx = [district, city].filter(Boolean).join(", ")
         if (ctx) areaCtxRef.current = ctx
       } else {
-        setAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+        setAddress("")
       }
     } catch {
       setAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
@@ -726,12 +729,39 @@ export default function AddressPickerClient({
               <Spinner size={13} />
               <span style={{ color: "#6a5a40", fontSize: 11 }}>Đang xác định địa chỉ...</span>
             </>
+          ) : editingAddr ? (
+            <>
+              <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>📌</span>
+              <input
+                ref={addrInputRef}
+                value={address}
+                onChange={e => setAddress(e.target.value)}
+                onBlur={() => setEditingAddr(false)}
+                style={{
+                  flex: 1, background: "transparent", border: "none", outline: "none",
+                  color: "#FFD700", fontSize: 12, fontWeight: 600, lineHeight: 1.5,
+                  fontFamily: "Lexend", caretColor: "#FFD700",
+                }}
+              />
+            </>
           ) : (
             <>
               <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>📌</span>
-              <p style={{ margin: 0, flex: 1, color: "#f8f0e0", fontSize: 12, fontWeight: 600, lineHeight: 1.5 }}>
-                {address}
+              <p
+                onClick={() => { setEditingAddr(true); setTimeout(() => addrInputRef.current?.focus(), 50) }}
+                style={{ margin: 0, flex: 1, color: address ? "#f8f0e0" : "#6a5a40", fontSize: 12, fontWeight: 600, lineHeight: 1.5, cursor: "text" }}
+              >
+                {address || "Tap để nhập địa chỉ..."}
               </p>
+              {address && (
+                <button
+                  type="button"
+                  onClick={() => { setEditingAddr(true); setTimeout(() => addrInputRef.current?.focus(), 50) }}
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: "0 0 0 6px", color: "rgba(255,215,0,0.6)", fontSize: 10, fontFamily: "Lexend", flexShrink: 0 }}
+                >
+                  Sửa
+                </button>
+              )}
             </>
           )}
         </div>

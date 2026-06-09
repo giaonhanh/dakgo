@@ -32,13 +32,12 @@ export async function reverseGeocodeStructured(lat: number, lng: number): Promis
     )
     if (res.ok) {
       const data = await res.json()
-      const result = data.results?.[0]
+      // Ưu tiên kết quả ROOFTOP (chính xác đến số nhà), fallback về results[0]
+      const results: { formatted_address?: string; address_components?: GoogleAddressComponent[]; geometry?: { location_type?: string } }[] = data.results ?? []
+      const result = results.find(r => r.geometry?.location_type === "ROOFTOP") ?? results[0]
       if (result) {
         const c = parseComponents(result.address_components ?? [])
-        // formatted_address từ Google đã đầy đủ nhất — dùng làm base, bỏ ", Việt Nam" thừa
-        const formatted = (result.formatted_address as string ?? "")
-          .replace(/,\s*Việt Nam$/i, "").trim()
-        // Chỉ dùng formatted_address — nó đã có số nhà, tên đường, xã, huyện, tỉnh
+        const formatted = (result.formatted_address ?? "").replace(/,\s*Việt Nam$/i, "").trim()
         const address = formatted || [
           c.houseNumber && c.street ? `${c.houseNumber} ${c.street}` : c.street,
           c.village, c.ward, c.district, c.city,
