@@ -297,13 +297,15 @@ export default function AddressPickerClient({
           components.find(c => types.some(t => c.types.includes(t)))?.long_name ?? ""
         const houseNum = get("street_number")
         const street   = get("route")
-        const ward     = get("sublocality_level_1", "sublocality")
+        const village  = get("administrative_area_level_4")
+        const ward     = get("sublocality_level_1", "sublocality", "administrative_area_level_3")
         const district = get("administrative_area_level_2")
         const city     = get("administrative_area_level_1")
 
         const parts: string[] = []
         if (houseNum && street) parts.push(`${houseNum} ${street}`)
         else if (street)        parts.push(street)
+        if (village)            parts.push(village)
         if (ward)               parts.push(ward)
         if (district)           parts.push(district)
         if (city)               parts.push(city)

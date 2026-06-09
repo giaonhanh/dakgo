@@ -14,7 +14,8 @@ function parseComponents(components: GoogleAddressComponent[]) {
   return {
     houseNumber: get("street_number"),
     street:      get("route"),
-    ward:        get("sublocality_level_1", "sublocality"),
+    village:     get("administrative_area_level_4"),
+    ward:        get("sublocality_level_1", "sublocality", "administrative_area_level_3"),
     district:    get("administrative_area_level_2"),
     city:        get("administrative_area_level_1"),
   }
@@ -37,6 +38,7 @@ export async function reverseGeocodeStructured(lat: number, lng: number): Promis
         const parts: string[] = []
         if (c.houseNumber && c.street) parts.push(`${c.houseNumber} ${c.street}`)
         else if (c.street)             parts.push(c.street)
+        if (c.village)                 parts.push(c.village)
         if (c.ward)                    parts.push(c.ward)
         if (c.district)                parts.push(c.district)
         if (c.city)                    parts.push(c.city)
