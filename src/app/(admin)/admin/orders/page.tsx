@@ -55,7 +55,9 @@ const PHUOC_AN_LAT = 12.6521
 const PHUOC_AN_LNG = 108.5073
 
 
-interface NominatimResult { display_name: string; lat: string; lon: string }
+const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
+
+interface PlaceSuggestion { placeId: string; mainText: string; secondaryText: string }
 
 function AddrInput({ label, value, onChange, onSelect, placeholder, required = false }: {
   label: string; value: string; required?: boolean
@@ -63,21 +65,55 @@ function AddrInput({ label, value, onChange, onSelect, placeholder, required = f
   onSelect: (addr: string, lat: number, lng: number) => void
   placeholder: string
 }) {
-  const [sugs, setSugs] = useState<NominatimResult[]>([])
+  const [sugs, setSugs]  = useState<PlaceSuggestion[]>([])
   const [open, setOpen]  = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const timer   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const session = useRef<string>(crypto.randomUUID())
 
   const fetchSugs = (q: string) => {
     if (timer.current) clearTimeout(timer.current)
     if (q.length < 3) { setSugs([]); setOpen(false); return }
     timer.current = setTimeout(async () => {
       try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + " Krông Pắc Đắk Lắk")}&format=json&limit=5&countrycodes=vn`
-        const res  = await fetch(url, { headers: { "Accept-Language": "vi" } })
-        const data: NominatimResult[] = await res.json()
-        setSugs(data); setOpen(data.length > 0)
+        const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_KEY },
+          body: JSON.stringify({
+            input: q, sessionToken: session.current,
+            locationBias: { circle: { center: { latitude: PHUOC_AN_LAT, longitude: PHUOC_AN_LNG }, radius: 50000 } },
+            languageCode: "vi", regionCode: "VN",
+          }),
+        })
+        const data = await res.json()
+        const items: PlaceSuggestion[] = (data.suggestions ?? []).slice(0, 5).map((s: Record<string, unknown>) => {
+          const pred = s.placePrediction as Record<string, unknown>
+          const fmt  = pred.structuredFormat as Record<string, Record<string, string>> | undefined
+          return {
+            placeId:       pred.placeId as string,
+            mainText:      fmt?.mainText?.text ?? (pred.text as Record<string,string>)?.text ?? "",
+            secondaryText: fmt?.secondaryText?.text ?? "",
+          }
+        })
+        setSugs(items); setOpen(items.length > 0)
       } catch { /* ignore */ }
     }, 420)
+  }
+
+  const pickSug = async (s: PlaceSuggestion) => {
+    setOpen(false)
+    try {
+      const res = await fetch(
+        `https://places.googleapis.com/v1/places/${s.placeId}?languageCode=vi&sessionToken=${session.current}`,
+        { headers: { "X-Goog-Api-Key": GOOGLE_KEY, "X-Goog-FieldMask": "id,location,formattedAddress" } },
+      )
+      const data = await res.json()
+      session.current = crypto.randomUUID()
+      const lat  = (data.location?.latitude  as number) ?? 0
+      const lng  = (data.location?.longitude as number) ?? 0
+      const addr = (data.formattedAddress as string) || (s.secondaryText ? `${s.mainText}, ${s.secondaryText}` : s.mainText)
+      onChange(addr)
+      onSelect(addr, lat, lng)
+    } catch { /* giữ text hiện tại */ }
   }
 
   return (
@@ -93,15 +129,16 @@ function AddrInput({ label, value, onChange, onSelect, placeholder, required = f
         style={{ width:"100%", padding:"10px 13px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#f0eaff", fontSize:12 }}
       />
       {open && sugs.length > 0 && (
-        <div style={{ position:"absolute", top:"100%", left:0, right:0, marginTop:3, background:"#151210", border:"1px solid rgba(255,107,0,0.25)", borderRadius:10, zIndex:200, maxHeight:180, overflowY:"auto" }}>
+        <div style={{ position:"absolute", top:"100%", left:0, right:0, marginTop:3, background:"#151210", border:"1px solid rgba(255,107,0,0.25)", borderRadius:10, zIndex:200, maxHeight:200, overflowY:"auto" }}>
           {sugs.map((s, i) => (
-            <div key={i}
-              onMouseDown={() => { onSelect(s.display_name, parseFloat(s.lat), parseFloat(s.lon)); onChange(s.display_name); setOpen(false) }}
-              style={{ padding:"9px 13px", borderBottom:i<sugs.length-1?"1px solid rgba(255,255,255,0.04)":"none", cursor:"pointer", color:"#f0eaff", fontSize:9, lineHeight:1.5 }}
+            <div key={s.placeId}
+              onMouseDown={() => void pickSug(s)}
+              style={{ padding:"9px 13px", borderBottom:i<sugs.length-1?"1px solid rgba(255,255,255,0.04)":"none", cursor:"pointer", lineHeight:1.5 }}
               onMouseEnter={e=>(e.currentTarget.style.background="rgba(255,107,0,0.07)")}
               onMouseLeave={e=>(e.currentTarget.style.background="transparent")}
             >
-              {s.display_name}
+              <div style={{ color:"#f0eaff", fontSize:11, fontWeight:600 }}>{s.mainText}</div>
+              {s.secondaryText && <div style={{ color:"#6a5a40", fontSize:9, marginTop:1 }}>{s.secondaryText}</div>}
             </div>
           ))}
         </div>
