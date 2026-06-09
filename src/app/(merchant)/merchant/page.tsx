@@ -88,6 +88,7 @@ export default function MerchantDashboard() {
   const [shopLng, setShopLng] = useState(108.5073)
   const [shopStatus, setShopStatus] = useState<"pending" | "approved" | "suspended" | null>(null)
   const [unreadNotif, setUnreadNotif] = useState(0)
+  const [setupRequired, setSetupRequired] = useState(false)
 
   const { requestPermission } = usePushNotification()
   useOrderSound("merchant", shopId)
@@ -106,7 +107,7 @@ export default function MerchantDashboard() {
       // Get merchant's shop
       const { data: shop } = await supabase
         .from("shops")
-        .select("id, name, is_open, rating_avg, total_reviews, status, commission_rate")
+        .select("id, name, is_open, rating_avg, total_reviews, status, commission_rate, phone, lat, lng")
         .eq("owner_id", user.id)
         .single()
 
@@ -119,6 +120,13 @@ export default function MerchantDashboard() {
       setRating(shop.rating_avg ?? null)
       setCommRate(((shop as { commission_rate?: number }).commission_rate ?? 10) / 100)
 
+      // Kiểm tra shop đã cài đặt đủ thông tin bắt buộc chưa
+      const hasLat   = !!(shop as { lat?: number }).lat
+      const hasLng   = !!(shop as { lng?: number }).lng
+      const hasPhone = !!(shop as { phone?: string }).phone?.trim()
+      const hasName  = !!shop.name?.trim()
+      setSetupRequired(!hasName || !hasPhone || !hasLat || !hasLng)
+
       await fetchOrders(shop.id)
 
       // Unread notifications count
@@ -130,6 +138,21 @@ export default function MerchantDashboard() {
       setLoading(false)
     }
     load()
+
+    // Re-check khi quay lại tab (sau khi shop update profile)
+    const recheck = async () => {
+      if (document.visibilityState !== "visible") return
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: sh } = await supabase
+        .from("shops").select("name, phone, lat, lng").eq("owner_id", user.id).single()
+      if (!sh) return
+      const ok = !!(sh as { lat?: number }).lat && !!(sh as { lng?: number }).lng
+        && !!(sh as { phone?: string }).phone?.trim() && !!sh.name?.trim()
+      if (ok) setSetupRequired(false)
+    }
+    document.addEventListener("visibilitychange", recheck)
+    return () => document.removeEventListener("visibilitychange", recheck)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -419,6 +442,82 @@ export default function MerchantDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Blocking setup modal: hiện cho đến khi shop cập nhật đủ thông tin ── */}
+      {setupRequired && (
+        <div style={{ position:"fixed", inset:0, zIndex:200,
+          background:"rgba(8,8,6,0.97)", backdropFilter:"blur(10px)",
+          display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+          padding:24, fontFamily:"'Lexend',sans-serif" }}>
+          <div style={{ width:"100%", maxWidth:380 }}>
+            {/* Icon */}
+            <div style={{ textAlign:"center", marginBottom:20 }}>
+              <div style={{ width:72, height:72, borderRadius:"50%", margin:"0 auto 14px",
+                background:"linear-gradient(135deg,rgba(255,107,0,0.2),rgba(255,64,64,0.1))",
+                border:"2px solid rgba(255,107,0,0.4)",
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:32 }}>
+                📍
+              </div>
+              <div style={{ color:"#FF6B00", fontSize:18, fontWeight:800, marginBottom:6 }}>
+                Hoàn thành thông tin cửa hàng
+              </div>
+              <div style={{ color:"#6a5a40", fontSize:11, lineHeight:1.6 }}>
+                Cửa hàng của bạn chưa cài đặt đầy đủ thông tin bắt buộc.
+                Điều này ảnh hưởng trực tiếp đến việc nhận đơn và{" "}
+                <strong style={{ color:"#FF8C00" }}>dòng tiền của quán</strong>.
+              </div>
+            </div>
+
+            {/* Danh sách yêu cầu */}
+            <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)",
+              borderRadius:16, padding:"4px 16px", marginBottom:20 }}>
+              {[
+                { icon:"🏪", label:"Tên cửa hàng",        desc:"Hiển thị cho khách đặt đơn" },
+                { icon:"📞", label:"Số điện thoại quán",   desc:"Liên hệ khi cần xác nhận đơn" },
+                { icon:"📍", label:"Vị trí trên bản đồ",  desc:"Tài xế dùng để điều hướng đến quán" },
+              ].map((item, i, arr) => (
+                <div key={item.label} style={{ display:"flex", alignItems:"center", gap:12,
+                  padding:"13px 0",
+                  borderBottom: i < arr.length-1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                  <div style={{ width:38, height:38, borderRadius:10, flexShrink:0,
+                    background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.2)",
+                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>
+                    {item.icon}
+                  </div>
+                  <div>
+                    <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700 }}>{item.label}</div>
+                    <div style={{ color:"#6a5a40", fontSize:9.5, marginTop:2 }}>{item.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Cảnh báo dòng tiền */}
+            <div style={{ background:"rgba(255,64,64,0.06)", border:"1px solid rgba(255,64,64,0.2)",
+              borderRadius:12, padding:"10px 14px", marginBottom:20,
+              display:"flex", gap:10, alignItems:"flex-start" }}>
+              <span style={{ fontSize:16, flexShrink:0 }}>⚠️</span>
+              <span style={{ color:"#ff6060", fontSize:9.5, lineHeight:1.5 }}>
+                Nếu không cập nhật, tài xế không thể tìm thấy quán — đơn hàng bị hủy và{" "}
+                doanh thu của quán sẽ bị ảnh hưởng nghiêm trọng.
+              </span>
+            </div>
+
+            {/* Nút bắt buộc */}
+            <a href="/merchant/profile" style={{ textDecoration:"none", display:"block" }}>
+              <button style={{ width:"100%", height:52, borderRadius:14, border:"none",
+                background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
+                color:"#fff", fontSize:14, fontWeight:800, fontFamily:"Lexend",
+                cursor:"pointer", boxShadow:"0 4px 18px rgba(255,107,0,0.45)" }}>
+                📋 Cập nhật ngay →
+              </button>
+            </a>
+            <div style={{ textAlign:"center", color:"#6a5a40", fontSize:9, marginTop:10 }}>
+              Thông báo này sẽ biến mất sau khi hoàn thành đầy đủ
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ position: "fixed", inset: 0, background: "#080806",
         display: "flex", flexDirection: "column", fontFamily: "'Lexend',sans-serif" }}>

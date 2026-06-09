@@ -5,11 +5,10 @@ import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import AddressPicker from "@/components/map/AddressPicker"
 import { createClient } from "@/lib/supabase/client"
+import { reverseGeocodeStructured } from "@/lib/vietmapRoute"
 import type { AddressPickerResult } from "@/types"
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
-
-const VM_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371
@@ -139,19 +138,8 @@ export default function GiaoHoPage() {
       ({ coords }) => {
         const { latitude: lat, longitude: lng } = coords
         setPickupCoord({ lat, lng })
-        fetch(`https://maps.vietmap.vn/api/reverse/v3?apikey=${VM_KEY}&lat=${lat}&lng=${lng}`)
-          .then(r => r.json())
-          .then((list: Array<{ display?: string; hs_num?: string; street?: string; ward?: string; district?: string; city?: string }>) => {
-            const d = list[0]
-            if (!d) return
-            const parts: string[] = []
-            if (d.hs_num && d.street) parts.push(`${d.hs_num} ${d.street}`)
-            else if (d.street)        parts.push(d.street)
-            if (d.ward)               parts.push(d.ward)
-            if (d.district)           parts.push(d.district)
-            if (d.city)               parts.push(d.city)
-            setPickup(parts.length > 0 ? parts.join(", ") : (d.display ?? ""))
-          })
+        reverseGeocodeStructured(lat, lng)
+          .then(({ address }) => { if (address) setPickup(address) })
           .catch(() => {})
           .finally(() => setPickupLoading(false))
       },

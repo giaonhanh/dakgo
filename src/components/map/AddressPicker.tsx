@@ -27,8 +27,8 @@ function MapSkeleton() {
       <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossOrigin="anonymous" />
       <link rel="preconnect" href="https://b.basemaps.cartocdn.com" crossOrigin="anonymous" />
       <link rel="preconnect" href="https://server.arcgisonline.com" crossOrigin="anonymous" />
-      <link rel="preconnect" href="https://maps.vietmap.vn" crossOrigin="anonymous" />
-      <link rel="dns-prefetch" href="https://nominatim.openstreetmap.org" />
+      <link rel="preconnect" href="https://maps.googleapis.com" crossOrigin="anonymous" />
+      <link rel="preconnect" href="https://places.googleapis.com" crossOrigin="anonymous" />
       <div style={{
         width: "100%", height: "100%", background: "#0d0a06",
         display: "flex", flexDirection: "column", alignItems: "center",

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import AdminShell from "@/components/admin/AdminShell"
+import { getRouteKm, haversineKm } from "@/lib/vietmapRoute"
 
 type OrderStatus  = "pending" | "accepted" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled"
 type PayMethod    = "cash" | "vietqr" | "momo"
@@ -53,34 +54,6 @@ const SVC_META: Record<ServiceType, { label: string; icon: string; color: string
 const PHUOC_AN_LAT = 12.6521
 const PHUOC_AN_LNG = 108.5073
 
-const VM_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
-
-// Fallback: Haversine × 1.3 khi VietMap không có key hoặc lỗi mạng
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLng = (lng2 - lng1) * Math.PI / 180
-  const a = Math.sin(dLat / 2) ** 2 +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
-// VietMap Route API — dữ liệu đường Việt Nam, chính xác nhất
-async function routeDistanceKm(
-  fromLat: number, fromLng: number,
-  toLat: number, toLng: number,
-  signal?: AbortSignal
-): Promise<number> {
-  if (!VM_KEY) return Math.max(0.5, haversineKm(fromLat, fromLng, toLat, toLng) * 1.3)
-  const url = `https://maps.vietmap.vn/api/route?api-version=1.1&apikey=${VM_KEY}` +
-    `&point=${fromLat},${fromLng}&point=${toLat},${toLng}` +
-    `&vehicle=motorbike&locale=vi&calc_points=false&instructions=false`
-  const res  = await fetch(url, { signal })
-  const data = await res.json()
-  const meters: number = data?.paths?.[0]?.distance
-  if (!meters) throw new Error("no route")
-  return Math.max(0.5, meters / 1000)
-}
 
 interface NominatimResult { display_name: string; lat: string; lon: string }
 
@@ -434,8 +407,8 @@ export default function AdminOrdersPage() {
     if (!delivLat || !delivLng) return
     if (service !== "food" && (!fromLat || !fromLng)) return
     const ctrl = new AbortController()
-    routeDistanceKm(fromLat, fromLng, delivLat, delivLng, ctrl.signal)
-      .then(km => { setDistKm(km.toFixed(1)); setFeeOverride("") })
+    getRouteKm(fromLat, fromLng, delivLat, delivLng)
+      .then(km => { setDistKm(Math.max(0.5, km).toFixed(1)); setFeeOverride("") })
       .catch(() => {
         const fb = Math.max(0.5, haversineKm(fromLat, fromLng, delivLat, delivLng) * 1.3)
         setDistKm(fb.toFixed(1))

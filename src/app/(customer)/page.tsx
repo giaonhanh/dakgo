@@ -89,8 +89,6 @@ function isProductInTime(p: { all_day?: boolean | null; start_hour?: string | nu
 const fmt  = (n: number) => n.toLocaleString("vi-VN") + "đ"
 const RANK_ICON = ["🥇","🥈","🥉"]
 
-const VM_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
-
 function getWeatherTip(code: number, temp: number, hour: number): string {
   if (code >= 95) return "⛈️ Bão giông đang đến! Ở nhà an toàn, order ngay về thôi!"
   if (code >= 80) return "🌧️ Đang có mưa rào — đặt đồ ăn giao về, khỏi ướt!"

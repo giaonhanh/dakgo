@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdmin } from "@supabase/supabase-js"
+import { getRouteKm } from "@/lib/vietmapRoute"
 
 function adminDb() {
   return createAdmin(
@@ -9,17 +10,19 @@ function adminDb() {
   )
 }
 
-// Tài xế gọi khi bật online để lấy đơn pending chưa có tài xế
-// Dùng admin DB để bypass RLS (driver không có quyền SELECT orders có driver_id=null)
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const driverLat = parseFloat(searchParams.get("driverLat") ?? "0")
+    const driverLng = parseFloat(searchParams.get("driverLng") ?? "0")
+    const hasDriverPos = driverLat !== 0 && driverLng !== 0
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 })
 
     const db = adminDb()
 
-    // Xác minh user là tài xế đã duyệt
     const { data: driver } = await db
       .from("drivers")
       .select("is_approved, status")
@@ -30,10 +33,9 @@ export async function GET() {
       return NextResponse.json({ order: null })
     }
 
-    // Tìm đơn pending: chưa có tài xế HOẶC đã gán cho tài xế này
     const { data: rows } = await db
       .from("orders")
-      .select("id, shop_id, customer_id, delivery_address, total, ship_fee, total_amount, pay_method")
+      .select("id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng, total, ship_fee, total_amount, pay_method")
       .eq("status", "pending")
       .or(`driver_id.is.null,driver_id.eq.${user.id}`)
       .order("created_at", { ascending: true })
@@ -43,11 +45,27 @@ export async function GET() {
 
     const o = rows[0]
 
-    // Lấy thêm thông tin shop, khách, món
     const [{ data: shop }, { data: customer }, { data: items }] = await Promise.all([
-      db.from("shops").select("name, address, commission_rate").eq("id", o.shop_id).single(),
+      db.from("shops").select("name, address, commission_rate, lat, lng").eq("id", o.shop_id).single(),
       db.from("profiles").select("full_name").eq("id", o.customer_id).single(),
       db.from("order_items").select("name, qty, price").eq("order_id", o.id),
+    ])
+
+    const shopLat = (shop as { lat?: number } | null)?.lat ?? null
+    const shopLng = (shop as { lng?: number } | null)?.lng ?? null
+    const custLat = (o.delivery_lat as number | null) ?? null
+    const custLng = (o.delivery_lng as number | null) ?? null
+
+    const shopNeedsCoords = !shopLat || !shopLng
+
+    // Tính 2 khoảng cách song song — fallback -1 nếu thiếu tọa độ
+    const [distanceToShop, distanceToCustomer] = await Promise.all([
+      hasDriverPos && shopLat && shopLng
+        ? getRouteKm(driverLat, driverLng, shopLat, shopLng)
+        : Promise.resolve(-1),
+      shopLat && shopLng && custLat && custLng
+        ? getRouteKm(shopLat, shopLng, custLat, custLng)
+        : Promise.resolve(-1),
     ])
 
     const commRate  = Number(shop?.commission_rate ?? 15)
@@ -60,10 +78,15 @@ export async function GET() {
         orderTable:         "orders",
         shopName:           shop?.name ?? "Cửa hàng",
         shopAddress:        shop?.address ?? "",
+        shopLat:            shopLat ?? 0,
+        shopLng:            shopLng ?? 0,
         customerName:       customer?.full_name ?? "Khách hàng",
         customerAddress:    o.delivery_address ?? "",
-        distanceToShop:     1.0,
-        distanceToCustomer: 2.0,
+        custLat:            custLat ?? 0,
+        custLng:            custLng ?? 0,
+        distanceToShop,
+        distanceToCustomer,
+        shopNeedsCoords,
         items:              (items ?? []).map(i => ({ name: i.name, qty: i.qty ?? 1, price: i.price })),
         subtotal:           o.total ?? 0,
         deliveryFee:        o.ship_fee ?? 0,

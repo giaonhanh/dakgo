@@ -1,68 +1,73 @@
-const SERVICES_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY
+import { getCachedGeocode, setCachedGeocode } from "./geocodeCache"
 
-interface VietmapReverseItem {
-  display?: string; name?: string; hs_num?: string
-  street?: string; ward?: string; district?: string; city?: string
+const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+
+interface GoogleAddressComponent {
+  longText:  string
+  shortText: string
+  types:     string[]
 }
 
-/** Reverse geocode v3 — trả về địa chỉ đầy đủ (số nhà, đường, phường, huyện, tỉnh) */
+function parseComponents(components: GoogleAddressComponent[]) {
+  const get = (...types: string[]) =>
+    components.find(c => types.some(t => c.types.includes(t)))?.longText ?? ""
+  return {
+    houseNumber: get("street_number"),
+    street:      get("route"),
+    ward:        get("sublocality_level_1", "sublocality"),
+    district:    get("administrative_area_level_2"),
+    city:        get("administrative_area_level_1"),
+  }
+}
+
+/** Reverse geocode — trả về địa chỉ đầy đủ (số nhà, đường, phường, huyện, tỉnh) */
 export async function reverseGeocodeStructured(lat: number, lng: number): Promise<{ address: string; houseNote: string }> {
+  const cached = getCachedGeocode(lat, lng)
+  if (cached) return { address: cached, houseNote: "" }
+
   try {
     const res = await fetch(
-      `https://maps.vietmap.vn/api/reverse/v3?apikey=${SERVICES_KEY}&lat=${lat}&lng=${lng}`,
-      { headers: { Accept: "application/json" } }
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=vi&key=${GOOGLE_KEY}`,
     )
     if (res.ok) {
-      const list = (await res.json()) as VietmapReverseItem[]
-      const d = list[0]
-      if (d) {
+      const data = await res.json()
+      const result = data.results?.[0]
+      if (result) {
+        const c = parseComponents(result.address_components ?? [])
         const parts: string[] = []
-        if (d.hs_num && d.street) parts.push(`${d.hs_num} ${d.street}`)
-        else if (d.street)        parts.push(d.street)
-        if (d.ward)               parts.push(d.ward)
-        if (d.district)           parts.push(d.district)
-        if (d.city)               parts.push(d.city)
-        const address = parts.length > 0 ? parts.join(", ") : (d.display ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`)
-        return { address, houseNote: d.hs_num ? `Số ${d.hs_num}` : "" }
+        if (c.houseNumber && c.street) parts.push(`${c.houseNumber} ${c.street}`)
+        else if (c.street)             parts.push(c.street)
+        if (c.ward)                    parts.push(c.ward)
+        if (c.district)                parts.push(c.district)
+        if (c.city)                    parts.push(c.city)
+        const address = parts.length > 0 ? parts.join(", ") : result.formatted_address
+        setCachedGeocode(lat, lng, address)
+        return { address, houseNote: c.houseNumber ? `Số ${c.houseNumber}` : "" }
       }
     }
   } catch { /* fallback */ }
   return { address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, houseNote: "" }
 }
 
-/** Reverse geocode dùng VietMap, fallback Nominatim */
+/** Reverse geocode — trả về chuỗi địa chỉ đơn giản */
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  // Thử VietMap trước
+  const cached = getCachedGeocode(lat, lng)
+  if (cached) return cached
+
   try {
     const res = await fetch(
-      `https://maps.vietmap.vn/api/reverse?apikey=${SERVICES_KEY}&lat=${lat}&lng=${lng}`,
-      { headers: { Accept: "application/json" } }
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=vi&key=${GOOGLE_KEY}`,
     )
     if (res.ok) {
       const data = await res.json()
-      // VietMap có thể trả array hoặc object
-      const item = Array.isArray(data) ? data[0] : data
-      const addr = item?.display || item?.address || item?.name || ""
-      if (addr) return addr
+      const addr = data.results?.[0]?.formatted_address
+      if (addr) { setCachedGeocode(lat, lng, addr); return addr }
     }
   } catch { /* fallback */ }
-
-  // Fallback Nominatim
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-      { headers: { "Accept-Language": "vi" } }
-    )
-    const data = await res.json()
-    if (data.display_name) {
-      return (data.display_name as string).split(", ").slice(0, -1).join(", ")
-    }
-  } catch { /* ignore */ }
-
   return ""
 }
 
-/** Lấy khoảng cách km theo cung đường thực từ VietMap, fallback haversine */
+/** Lấy khoảng cách km theo cung đường thực — dùng Google Routes API */
 export async function getRouteKm(
   fromLat: number, fromLng: number,
   toLat: number,   toLng: number,
@@ -70,19 +75,27 @@ export async function getRouteKm(
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 8000)
-    const res = await fetch(
-      `https://maps.vietmap.vn/api/route?api-version=1.1&apikey=${SERVICES_KEY}` +
-      `&point=${fromLat},${fromLng}&point=${toLat},${toLng}&vehicle=bike&optimize=false`,
-      { signal: controller.signal }
-    )
+    const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_KEY ?? "",
+        "X-Goog-FieldMask": "routes.distanceMeters",
+      },
+      body: JSON.stringify({
+        origin:      { location: { latLng: { latitude: fromLat, longitude: fromLng } } },
+        destination: { location: { latLng: { latitude: toLat,   longitude: toLng   } } },
+        travelMode:  "DRIVE",
+      }),
+      signal: controller.signal,
+    })
     clearTimeout(timeout)
     if (res.ok) {
       const data = await res.json()
-      const meters = data?.paths?.[0]?.distance
+      const meters: number = data?.routes?.[0]?.distanceMeters
       if (typeof meters === "number" && meters > 0) return meters / 1000
     }
   } catch { /* fallback */ }
-
   return haversineKm(fromLat, fromLng, toLat, toLng)
 }
 

@@ -34,10 +34,9 @@ interface VmSuggestion {
   fullAddr: string   // toàn bộ địa chỉ: số nhà, đường, Kp, xã, huyện, tỉnh
 }
 
-const VM_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
-const VM_CTX = "Phước An, Krông Pắc, Đắk Lắk"
-const VM_LAT = 12.7107
-const VM_LNG = 108.3034
+const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
+const VM_LAT     = 12.7107
+const VM_LNG     = 108.3034
 
 // --- Sub-components ---
 function LabelBadge({ label }: { label: string }) {
@@ -137,7 +136,8 @@ export default function AddressesPage() {
   const [searchQuery,   setSearchQuery]   = useState("")
   const [searchResults, setSearchResults] = useState<VmSuggestion[]>([])
   const [searching,     setSearching]     = useState(false)
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchTimer    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sessionTokenRef = useRef<string>(crypto.randomUUID())
 
   const fireToast = (msg: string) => {
     setToast(msg)
@@ -170,21 +170,27 @@ export default function AddressesPage() {
     setSearching(true)
     searchTimer.current = setTimeout(async () => {
       try {
-        const query = q.toLowerCase().includes("krông pắc") || q.toLowerCase().includes("đắk lắk")
-          ? q : `${q} ${VM_CTX}`
-        const params = new URLSearchParams({
-          apikey: VM_KEY, text: query,
-          "focus.point.lat": VM_LAT.toString(),
-          "focus.point.lon": VM_LNG.toString(),
+        const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_KEY },
+          body: JSON.stringify({
+            input: q,
+            sessionToken: sessionTokenRef.current,
+            locationBias: { circle: { center: { latitude: VM_LAT, longitude: VM_LNG }, radius: 50000 } },
+            languageCode: "vi",
+            regionCode:   "VN",
+          }),
         })
-        const res  = await fetch(`https://maps.vietmap.vn/api/autocomplete/v3?${params}`)
-        const data = await res.json() as Array<{ ref_id: string; display: string; name?: string }>
-        const suggestions: VmSuggestion[] = data.slice(0, 6).map(item => {
-          const parts = item.display.split(", ")
+        const data = await res.json()
+        const suggestions: VmSuggestion[] = (data.suggestions ?? []).slice(0, 6).map((s: Record<string, unknown>) => {
+          const pred = s.placePrediction as Record<string, unknown>
+          const fmt  = pred.structuredFormat as Record<string, Record<string, string>> | undefined
+          const main = fmt?.mainText?.text ?? (pred.text as Record<string,string>)?.text ?? ""
+          const sec  = fmt?.secondaryText?.text ?? ""
           return {
-            refId:    item.ref_id,
-            name:     item.name || parts[0] || item.display,
-            fullAddr: parts.join(", "),
+            refId:    pred.placeId as string,
+            name:     main,
+            fullAddr: sec ? `${main}, ${sec}` : main,
           }
         })
         setSearchResults(suggestions)
@@ -200,17 +206,24 @@ export default function AddressesPage() {
     setSearchResults([])
     setSearchQuery(s.fullAddr)
     setFormAddress(s.fullAddr)
-    // Lấy toạ độ chính xác từ VietMap place detail
+    // Lấy toạ độ chính xác từ Google Place detail
     try {
-      const res  = await fetch(`https://maps.vietmap.vn/api/place/v3?apikey=${VM_KEY}&refid=${s.refId}`)
-      const data = await res.json() as { lat?: number; lng?: number; display?: string }
-      if (data.lat && data.lng) {
-        setFormLat(data.lat)
-        setFormLng(data.lng)
+      const res  = await fetch(`https://places.googleapis.com/v1/places/${s.refId}?languageCode=vi&sessionToken=${sessionTokenRef.current}`, {
+        headers: {
+          "X-Goog-Api-Key":   GOOGLE_KEY,
+          "X-Goog-FieldMask": "id,location,formattedAddress",
+        },
+      })
+      // Reset session token — session tiếp theo billing riêng
+      sessionTokenRef.current = crypto.randomUUID()
+      const data = await res.json() as { location?: { latitude: number; longitude: number }; formattedAddress?: string }
+      if (data.location?.latitude && data.location?.longitude) {
+        setFormLat(data.location.latitude)
+        setFormLng(data.location.longitude)
       }
-      if (data.display) {
-        setFormAddress(data.display)
-        setSearchQuery(data.display)
+      if (data.formattedAddress) {
+        setFormAddress(data.formattedAddress)
+        setSearchQuery(data.formattedAddress)
       }
     } catch { /* giữ nguyên địa chỉ text nếu lỗi */ }
   }

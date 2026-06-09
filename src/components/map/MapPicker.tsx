@@ -15,14 +15,15 @@ interface MapPickerProps {
   height?:          number
 }
 
+const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
+
 async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=vi`,
-      { headers: { "Accept-Language": "vi" } }
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=vi&key=${GOOGLE_KEY}`
     )
-    const data = (await res.json()) as { display_name?: string }
-    return data.display_name ?? null
+    const data = await res.json() as { results?: Array<{ formatted_address: string }> }
+    return data.results?.[0]?.formatted_address ?? null
   } catch {
     return null
   }

@@ -25,8 +25,8 @@ interface OrderData {
   shopAddress:         string
   customerName:        string
   customerAddress:     string
-  distanceToShop:      number
-  distanceToCustomer:  number
+  distanceToShop:      number  // -1 = chưa có tọa độ
+  distanceToCustomer:  number  // -1 = chưa có tọa độ
   items:               { name: string; qty: number; price: number }[]
   subtotal:            number
   deliveryFee:         number
@@ -197,20 +197,26 @@ function OrderPopup({
               </div>
               {/* distances */}
               <div style={{ display:"flex", flexDirection:"column", justifyContent:"space-between", alignItems:"flex-end" }}>
-                <span style={{ color:"#b0956a", fontSize:9, fontWeight:600 }}>{o.distanceToShop}km</span>
-                <span style={{ color:"#b0956a", fontSize:9, fontWeight:600 }}>{o.distanceToCustomer}km</span>
+                <span style={{ color:"#b0956a", fontSize:9, fontWeight:600 }}>
+                  {o.distanceToShop >= 0 ? `${o.distanceToShop.toFixed(1)}km` : "—"}
+                </span>
+                <span style={{ color:"#b0956a", fontSize:9, fontWeight:600 }}>
+                  {o.distanceToCustomer >= 0 ? `${o.distanceToCustomer.toFixed(1)}km` : "—"}
+                </span>
               </div>
             </div>
             {/* total distance badge */}
-            <div style={{
-              marginTop:8, background:"rgba(255,107,0,0.08)", borderRadius:8,
-              padding:"4px 10px", display:"inline-flex", alignItems:"center", gap:6,
-            }}>
-              <span style={{ fontSize:9 }}>🗺</span>
-              <span style={{ color:"#FF8C00", fontSize:9, fontWeight:700 }}>
-                Tổng quãng đường: {(o.distanceToShop + o.distanceToCustomer).toFixed(1)}km
-              </span>
-            </div>
+            {o.distanceToShop >= 0 && o.distanceToCustomer >= 0 && (
+              <div style={{
+                marginTop:8, background:"rgba(255,107,0,0.08)", borderRadius:8,
+                padding:"4px 10px", display:"inline-flex", alignItems:"center", gap:6,
+              }}>
+                <span style={{ fontSize:9 }}>🗺</span>
+                <span style={{ color:"#FF8C00", fontSize:9, fontWeight:700 }}>
+                  Tổng quãng đường: {(o.distanceToShop + o.distanceToCustomer).toFixed(1)}km
+                </span>
+              </div>
+            )}
           </div>
 
           {/* ── items ── */}
@@ -883,7 +889,10 @@ export default function DriverDashboard() {
   const [showTopup,     setShowTopup]     = useState(false)
   const [isApproved,    setIsApproved]    = useState<boolean | null>(null)
   const [unreadNotif,   setUnreadNotif]   = useState(0)
+  const [gpsLat,        setGpsLat]        = useState(0)
+  const [gpsLng,        setGpsLng]        = useState(0)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const gpsWatchRef = useRef<number | null>(null)
 
   // ── Load driver profile on mount ──
   useEffect(() => {
@@ -947,6 +956,26 @@ export default function DriverDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Bật GPS khi online, tắt khi offline ──
+  useEffect(() => {
+    if (online && navigator.geolocation) {
+      gpsWatchRef.current = navigator.geolocation.watchPosition(
+        pos => { setGpsLat(pos.coords.latitude); setGpsLng(pos.coords.longitude) },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 },
+      )
+    } else {
+      if (gpsWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(gpsWatchRef.current)
+        gpsWatchRef.current = null
+      }
+    }
+    return () => {
+      if (gpsWatchRef.current !== null) navigator.geolocation.clearWatch(gpsWatchRef.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online])
+
   // ── Toggle online/offline ──
   const handleToggleOnline = async () => {
     if (!driverId || toggling) return
@@ -976,7 +1005,7 @@ export default function DriverDashboard() {
       id: o.id.slice(0, 8).toUpperCase(), fullId: o.id, orderTable: "orders",
       shopName: shop?.name ?? "Cửa hàng", shopAddress: shop?.address ?? "",
       customerName: customer?.full_name ?? "Khách hàng", customerAddress: o.delivery_address ?? "",
-      distanceToShop: 1.0, distanceToCustomer: 2.0,
+      distanceToShop: -1, distanceToCustomer: -1,
       items: (items ?? []).map(i => ({ name: i.name, qty: i.qty ?? 1, price: i.price })),
       subtotal: o.total ?? 0, deliveryFee: o.ship_fee ?? 0, total: o.total_amount ?? 0,
       earnerFee, payMethod: o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
@@ -989,7 +1018,7 @@ export default function DriverDashboard() {
     async function checkPendingOrders() {
       if (showOrder || accepted) return
       try {
-        const res = await fetch("/api/driver/check-pending")
+        const res = await fetch(`/api/driver/check-pending?driverLat=${gpsLat}&driverLng=${gpsLng}`)
         if (!res.ok) return
         const { order } = await res.json()
         if (order) { setPendingOrder(order); setShowOrder(true) }
@@ -997,7 +1026,7 @@ export default function DriverDashboard() {
     }
     checkPendingOrders()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online, driverId])
+  }, [online, driverId, gpsLat, gpsLng])
 
   // ── Poll đơn pending mỗi 20 giây khi online (dự phòng nếu realtime miss) ──
   useEffect(() => {
@@ -1005,7 +1034,7 @@ export default function DriverDashboard() {
     const interval = setInterval(async () => {
       if (showOrder || accepted) return
       try {
-        const res = await fetch("/api/driver/check-pending")
+        const res = await fetch(`/api/driver/check-pending?driverLat=${gpsLat}&driverLng=${gpsLng}`)
         if (!res.ok) return
         const { order } = await res.json()
         if (order) { setPendingOrder(order); setShowOrder(true) }
@@ -1013,7 +1042,7 @@ export default function DriverDashboard() {
     }, 20_000)
     return () => clearInterval(interval)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online, driverId, showOrder, accepted])
+  }, [online, driverId, showOrder, accepted, gpsLat, gpsLng])
 
   // ── Subscribe to pending orders when online ──
   useEffect(() => {
@@ -1072,8 +1101,8 @@ export default function DriverDashboard() {
           shopAddress:        e.pickup_address ?? "",
           customerName:       e.recipient_name ?? customer?.full_name ?? "Người nhận",
           customerAddress:    e.delivery_address ?? "",
-          distanceToShop:     1.0,
-          distanceToCustomer: 2.0,
+          distanceToShop:     -1,
+          distanceToCustomer: -1,
           items: [{
             name:  isDeliver
               ? (e.package_description ?? "Gói hàng")

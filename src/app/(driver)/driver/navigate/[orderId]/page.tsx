@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import dynamic from "next/dynamic"
 import { useParams } from "next/navigation"
 import { createBrowserClient } from "@supabase/ssr"
 import { createClient } from "@/lib/supabase/client"
 import { ChatDrawer } from "@/components/chat/ChatDrawer"
+import { getRouteKm } from "@/lib/vietmapRoute"
 
 const NavMap = dynamic(() => import("@/components/map/NavMap"), {
   ssr: false,
@@ -44,6 +45,11 @@ interface OrderInfo {
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
+/** Tạo URL mở Google Maps navigation — Google tự dùng GPS hiện tại làm điểm xuất phát */
+function googleNavUrl(destLat: number, destLng: number) {
+  return `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}&travelmode=driving`
+}
+
 function useSpeed() {
   const [speed, setSpeed] = useState(22)
   useEffect(() => {
@@ -62,7 +68,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-function DirectionPill({ phase, order }: { phase: Phase; order: OrderInfo }) {
+function DirectionPill({ phase, order, distKm }: { phase: Phase; order: OrderInfo; distKm: number | null }) {
   const isPickup = phase === "pickup"
   const color    = isPickup ? "#FF8C00" : "#3ecf6e"
   const bg       = isPickup ? "rgba(255,107,0,0.10)" : "rgba(62,207,110,0.08)"
@@ -71,7 +77,7 @@ function DirectionPill({ phase, order }: { phase: Phase; order: OrderInfo }) {
   const arrowClr = isPickup ? "#fff" : "#080806"
   const dir      = isPickup ? "↑" : "↖"
   const dist     = isPickup ? "Đến lấy hàng" : "Giao đến khách"
-  const km       = isPickup ? `~${order.shopLat !== DEFAULT_LAT ? "1.0" : "—"}km` : `~${(Math.abs(order.custLat - DEFAULT_LAT) * 111).toFixed(1)}km`
+  const kmLabel  = distKm !== null && distKm >= 0 ? `~${distKm.toFixed(1)}km` : "—"
 
   return (
     <div style={{ display:"flex", alignItems:"center", gap:10,
@@ -87,12 +93,13 @@ function DirectionPill({ phase, order }: { phase: Phase; order: OrderInfo }) {
         </div>
       </div>
       <div style={{ textAlign:"right" }}>
-        <div style={{ color, fontSize:12, fontWeight:700 }}>{km}</div>
+        <div style={{ color, fontSize:12, fontWeight:700 }}>{kmLabel}</div>
         <div style={{ color:"#6a5a40", fontSize:8 }}>còn lại</div>
       </div>
     </div>
   )
 }
+
 
 function ActionRow({ children }: { children: React.ReactNode }) {
   return <div style={{ display:"flex", gap:8, marginBottom:10 }}>{children}</div>
@@ -110,17 +117,22 @@ function IconBtn({ icon, color, bg, bd, onClick }: {
   )
 }
 
-function MapBtn({ icon, label, color, bg, bd, flex=2, onClick }: {
-  icon:string; label:string; color:string; bg:string; bd:string;
-  flex?:number; onClick?:()=>void
+function NavStartBtn({ destLat, destLng, label, color }: {
+  destLat: number; destLng: number; label: string; color: "orange" | "green"
 }) {
+  const bg     = color === "green" ? "linear-gradient(90deg,#1a8c50,#3ecf6e)" : "linear-gradient(90deg,#FF6B00,#FF8C00)"
+  const shadow = color === "green" ? "0 4px 14px rgba(62,207,110,0.35)" : "0 4px 14px rgba(255,107,0,0.35)"
+  const url    = googleNavUrl(destLat, destLng)
+
   return (
-    <button onClick={onClick} style={{ flex, height:42, borderRadius:11,
-      border:`1px solid ${bd}`, background:bg, cursor:"pointer",
-      display:"flex", alignItems:"center", justifyContent:"center", gap:6,
-      color, fontSize:10.5, fontWeight:700, fontFamily:"Lexend" }}>
-      {icon} {label}
-    </button>
+    <a href={url} target="_blank" rel="noopener noreferrer" style={{ flex:2, textDecoration:"none" }}>
+      <button style={{ width:"100%", height:42, borderRadius:11, border:"none",
+        background:bg, color:"#fff", fontSize:10.5, fontWeight:700, fontFamily:"Lexend",
+        cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+        gap:6, boxShadow:shadow }}>
+        🗺️ {label}
+      </button>
+    </a>
   )
 }
 
@@ -148,9 +160,9 @@ function CTA({ label, color="orange", icon, onClick }: {
   )
 }
 
-function PickupPhase({ onDone, onCall, onChat, fireToast, order }: {
+function PickupPhase({ onDone, onCall, onChat, fireToast, order, distKm }: {
   onDone:()=>void; onCall:()=>void; onChat:()=>void;
-  fireToast:(m:string)=>void; order: OrderInfo
+  fireToast:(m:string)=>void; order: OrderInfo; distKm: number | null
 }) {
   void fireToast
   return (
@@ -158,7 +170,7 @@ function PickupPhase({ onDone, onCall, onChat, fireToast, order }: {
       initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }}
       exit={{ opacity:0, x:-20 }} transition={{ duration:.22 }}>
 
-      <DirectionPill phase="pickup" order={order} />
+      <DirectionPill phase="pickup" order={order} distKm={distKm} />
 
       <div style={{ background:"rgba(74,143,245,0.07)",
         border:"1px solid rgba(74,143,245,0.22)",
@@ -210,11 +222,8 @@ function PickupPhase({ onDone, onCall, onChat, fireToast, order }: {
       </div>
 
       <ActionRow>
-        <a href={`https://maps.google.com/?q=${order.shopLat},${order.shopLng}`}
-          style={{ flex:2, textDecoration:"none" }}>
-          <MapBtn icon="🗺️" label="Google Maps" flex={1} color="#fff"
-            bg="linear-gradient(90deg,#FF6B00,#FF8C00)" bd="transparent" />
-        </a>
+        <NavStartBtn destLat={order.shopLat} destLng={order.shopLng}
+          label="Bắt đầu đi" color="orange" />
         <IconBtn icon="📞" color="#3ecf6e"
           bg="rgba(62,207,110,0.08)" bd="rgba(62,207,110,0.25)"
           onClick={onCall} />
@@ -228,16 +237,16 @@ function PickupPhase({ onDone, onCall, onChat, fireToast, order }: {
   )
 }
 
-function DeliveryPhase({ onDone, onCall, onChat, paymentPaid, order }: {
+function DeliveryPhase({ onDone, onCall, onChat, paymentPaid, order, distKm }: {
   onDone:()=>void; onCall:()=>void; onChat:()=>void;
-  paymentPaid:boolean; order: OrderInfo
+  paymentPaid:boolean; order: OrderInfo; distKm: number | null
 }) {
   return (
     <motion.div key="delivery"
       initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }}
       exit={{ opacity:0, x:-20 }} transition={{ duration:.22 }}>
 
-      <DirectionPill phase="delivery" order={order} />
+      <DirectionPill phase="delivery" order={order} distKm={distKm} />
 
       <div style={{ background:"rgba(62,207,110,0.07)",
         border:"1px solid rgba(62,207,110,0.22)",
@@ -318,11 +327,8 @@ function DeliveryPhase({ onDone, onCall, onChat, paymentPaid, order }: {
       </div>
 
       <ActionRow>
-        <a href={`https://maps.google.com/?q=${order.custLat},${order.custLng}`}
-          style={{ flex:2, textDecoration:"none" }}>
-          <MapBtn icon="🗺️" label="Dẫn đường" flex={1} color="#fff"
-            bg="linear-gradient(90deg,#1a8c50,#3ecf6e)" bd="transparent" />
-        </a>
+        <NavStartBtn destLat={order.custLat} destLng={order.custLng}
+          label="Bắt đầu đi" color="green" />
         <IconBtn icon="📞" color="#FF8C00"
           bg="rgba(255,107,0,0.08)" bd="rgba(255,107,0,0.25)"
           onClick={onCall} />
@@ -348,14 +354,29 @@ export default function DriverNavigatePage() {
   const [currentUserId, setCurrentUserId] = useState("")
   const [driverLat,     setDriverLat]     = useState(DEFAULT_LAT)
   const [driverLng,     setDriverLng]     = useState(DEFAULT_LNG)
+  const [distKm,        setDistKm]        = useState<number | null>(null)
   const speed = useSpeed()
+
+  // Tránh tính lại khoảng cách quá thường xuyên (chỉ khi di chuyển >50m)
+  const lastCalcPos = useRef({ lat: 0, lng: 0 })
 
   const fireToast = (msg: string) => {
     setToast(msg); setTimeout(() => setToast(""), 2400)
   }
 
+  // Tính khoảng cách thật từ vị trí hiện tại đến mục tiêu
+  const calcDist = async (dLat: number, dLng: number, ord: OrderInfo, ph: Phase) => {
+    const target = ph === "pickup"
+      ? { lat: ord.shopLat, lng: ord.shopLng }
+      : { lat: ord.custLat, lng: ord.custLng }
+    if (!target.lat || !target.lng) return
+    try {
+      const km = await getRouteKm(dLat, dLng, target.lat, target.lng)
+      setDistKm(km)
+    } catch { /* giữ giá trị cũ */ }
+  }
+
   useEffect(() => {
-    // GPS watchPosition — cập nhật liên tục + broadcast lên Realtime
     let watchId: number | null = null
     if (navigator.geolocation) {
       watchId = navigator.geolocation.watchPosition(
@@ -364,6 +385,7 @@ export default function DriverNavigatePage() {
           const lng = pos.coords.longitude
           setDriverLat(lat)
           setDriverLng(lng)
+
           // Broadcast vị trí tài xế để tracking page cập nhật realtime
           if (orderId) {
             supabase.channel(`driver-location:${orderId}`).send({
@@ -372,18 +394,24 @@ export default function DriverNavigatePage() {
               payload: { lat, lng, orderId },
             }).catch(() => {})
           }
+
+          // Chỉ tính lại khoảng cách khi di chuyển >0.05 độ (~55m)
+          const moved = Math.abs(lat - lastCalcPos.current.lat) > 0.0005
+            || Math.abs(lng - lastCalcPos.current.lng) > 0.0005
+          if (moved) {
+            lastCalcPos.current = { lat, lng }
+            setOrder(prev => { if (prev) calcDist(lat, lng, prev, phase); return prev })
+          }
         },
         () => {},
         { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 },
       )
     }
 
-    // Auth
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) setCurrentUserId(data.user.id)
     })
 
-    // Load order
     async function load() {
       if (!orderId) return
       const { data: o } = await supabase
@@ -401,26 +429,32 @@ export default function DriverNavigatePage() {
 
       const commRate = Number(shop?.commission_rate ?? 15)
       const earning  = Math.round((o.ship_fee ?? 0) * (1 - commRate / 100))
+      const shopLat  = (shop as { lat?: number } | null)?.lat ?? 0
+      const shopLng  = (shop as { lng?: number } | null)?.lng ?? 0
 
-      setOrder({
+      const ord: OrderInfo = {
         id:       o.id.slice(0, 8).toUpperCase(),
         fullId:   o.id,
         shopName: shop?.name ?? "Cửa hàng",
         shopAddr: shop?.address ?? "—",
-        shopLat:  (shop as { lat?: number } | null)?.lat  ?? DEFAULT_LAT,
-        shopLng:  (shop as { lng?: number } | null)?.lng  ?? DEFAULT_LNG,
+        shopLat,
+        shopLng,
         custName: customer?.full_name ?? "Khách hàng",
         custAddr: o.delivery_address ?? "—",
         custNote: o.note ?? "",
-        custLat:  o.delivery_lat ?? DEFAULT_LAT,
-        custLng:  o.delivery_lng ?? DEFAULT_LNG,
+        custLat:  (o.delivery_lat as number | null) ?? 0,
+        custLng:  (o.delivery_lng as number | null) ?? 0,
         items:    (o.order_items ?? []).map((i: { name: string; qty: number; price: number }) => ({
           name: i.name, qty: i.qty, emoji: "🍜",
         })),
         total:   o.total_amount ?? 0,
         earning,
         payment: o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
-      })
+      }
+      setOrder(ord)
+
+      // Tính khoảng cách lần đầu
+      await calcDist(driverLat, driverLng, ord, "pickup")
     }
     load()
 
@@ -429,6 +463,12 @@ export default function DriverNavigatePage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
+
+  // Tính lại khi đổi phase
+  useEffect(() => {
+    if (order) calcDist(driverLat, driverLng, order, phase)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
 
   // Realtime — payment status
   useEffect(() => {
@@ -451,7 +491,7 @@ export default function DriverNavigatePage() {
 
   const targetLat   = phase === "pickup" ? (order?.shopLat ?? DEFAULT_LAT) : (order?.custLat ?? DEFAULT_LAT)
   const targetLng   = phase === "pickup" ? (order?.shopLng ?? DEFAULT_LNG) : (order?.custLng ?? DEFAULT_LNG)
-  const etaMin      = 10
+  const etaMin      = distKm !== null && distKm > 0 ? Math.round(distKm / 0.4) : null
   const etaColor    = phase === "pickup" ? "#FF8C00" : "#3ecf6e"
   const etaLabel    = phase === "pickup" ? "đến quán" : "đến nơi"
   const statusLabel = phase === "pickup" ? "Đến lấy hàng" : "Đang giao"
@@ -490,26 +530,34 @@ export default function DriverNavigatePage() {
             targetLat={targetLat} targetLng={targetLng}
             phase={phase} height={MAP_HEIGHT} />
 
+          {/* Speed */}
           <div style={{ position:"absolute", bottom:10, left:10, zIndex:10,
             background:"rgba(8,8,6,0.9)", border:"1px solid rgba(255,255,255,0.1)",
             borderRadius:10, padding:"5px 10px", textAlign:"center", backdropFilter:"blur(8px)" }}>
-            <div style={{ color:"#f8f0e0", fontSize:20, fontWeight:800, lineHeight:1 }}>{speed}</div>
+            <div style={{ color:"#f8f0e0", fontSize:20, fontWeight:800, lineHeight:1 }}>
+              {typeof window !== "undefined" ? 22 : 0}
+            </div>
             <div style={{ color:"#6a5a40", fontSize:8 }}>km/h</div>
           </div>
 
+          {/* ETA */}
           <div style={{ position:"absolute", top:10, right:10, zIndex:10,
             background:"rgba(8,8,6,0.9)", border:`1px solid ${etaColor}40`,
             borderRadius:10, padding:"5px 11px", textAlign:"center", backdropFilter:"blur(8px)" }}>
-            <div style={{ color:etaColor, fontSize:20, fontWeight:800, lineHeight:1 }}>{etaMin}&apos;</div>
+            <div style={{ color:etaColor, fontSize:20, fontWeight:800, lineHeight:1 }}>
+              {etaMin !== null ? `${etaMin}` : "—"}
+            </div>
             <div style={{ color:"#6a5a40", fontSize:8 }}>{etaLabel}</div>
           </div>
 
+          {/* Re-center button */}
           <div style={{ position:"absolute", top:10, left:10, zIndex:10,
             width:34, height:34, borderRadius:9,
             background:"rgba(8,8,6,0.88)", border:"1px solid rgba(255,255,255,0.1)",
             display:"flex", alignItems:"center", justifyContent:"center",
             cursor:"pointer", backdropFilter:"blur(8px)", fontSize:16 }}>🎯</div>
 
+          {/* Status badge */}
           <div style={{ position:"absolute", bottom:10, right:10, zIndex:10,
             display:"flex", alignItems:"center", gap:5,
             background:`${statusColor}18`, border:`1px solid ${statusColor}40`,
@@ -519,6 +567,7 @@ export default function DriverNavigatePage() {
             <span style={{ color:statusColor, fontSize:10, fontWeight:600 }}>{statusLabel}</span>
           </div>
 
+          {/* Step indicator */}
           <div style={{ position:"absolute", top:10, left:"50%", transform:"translateX(-50%)", zIndex:10,
             display:"flex", alignItems:"center", gap:5,
             background:"rgba(8,8,6,0.88)", border:"1px solid rgba(255,255,255,0.1)",
@@ -557,6 +606,7 @@ export default function DriverNavigatePage() {
                 <PickupPhase
                   onDone={async () => {
                     setPhase("delivery")
+                    setDistKm(null)
                     fireToast("Đã lấy hàng → bắt đầu giao!")
                     if (orderId) {
                       await supabase.from("orders").update({
@@ -569,6 +619,7 @@ export default function DriverNavigatePage() {
                   onChat={() => setShowChat(true)}
                   fireToast={fireToast}
                   order={order}
+                  distKm={distKm}
                 />
               ) : (
                 <DeliveryPhase
@@ -577,6 +628,7 @@ export default function DriverNavigatePage() {
                   onChat={() => setShowChat(true)}
                   paymentPaid={paymentPaid}
                   order={order}
+                  distKm={distKm}
                 />
               )}
             </AnimatePresence>

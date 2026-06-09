@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { MapContainer, TileLayer, useMapEvents, useMap } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import type { AddressPickerResult } from "@/types"
+import { getCachedGeocode, setCachedGeocode } from "@/lib/geocodeCache"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -39,72 +40,57 @@ interface PlaceSuggestion {
   secondaryText: string
 }
 
-interface VietmapSuggest {
-  ref_id:   string
-  display:  string
-  name?:    string
-  address?: string
+interface GoogleAddressComponent {
+  longText:  string
+  shortText: string
+  types:     string[]
 }
 
-interface VietmapPlace {
-  ref_id:   string
-  display:  string
-  name?:    string
-  lat:      number
-  lng:      number
-  hs_num?:  string
-}
+const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
 
-interface VietmapReverse {
-  display:  string
-  name?:    string
-  hs_num?:  string
-  street?:  string
-  address?: string
-  ward?:    string
-  district?:string
-  city?:    string
-}
+// ─── Google Maps API (session token để gộp billing Autocomplete + PlaceDetail) ──
 
-const VM_SVC = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
-
-// ─── VietMap API ──────────────────────────────────────────────────────────────
-
-async function vietmapSearch(fullQuery: string, rawQuery: string, lat: number, lng: number): Promise<PlaceSuggestion[]> {
-  const params = new URLSearchParams({
-    apikey: VM_SVC,
-    text:   fullQuery,
-    "focus.point.lat": lat.toString(),
-    "focus.point.lon": lng.toString(),
+async function googleSearch(input: string, lat: number, lng: number, sessionToken: string): Promise<PlaceSuggestion[]> {
+  const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_KEY },
+    body: JSON.stringify({
+      input, sessionToken,
+      locationBias: { circle: { center: { latitude: lat, longitude: lng }, radius: 50000 } },
+      languageCode: "vi", regionCode: "VN",
+    }),
   })
-  const res  = await fetch(`https://maps.vietmap.vn/api/autocomplete/v3?${params}`)
-  const data = (await res.json()) as VietmapSuggest[]
-
-  // Ưu tiên kết quả trùng với từ khóa gốc (rawQuery), bỏ qua ngữ cảnh thêm vào
-  const q = rawQuery.toLowerCase().trim()
-  const sorted = [...data].sort((a, b) => {
-    const aName = (a.name ?? a.display).toLowerCase()
-    const bName = (b.name ?? b.display).toLowerCase()
-    const aScore = aName.startsWith(q) ? 0 : aName.includes(q) ? 1 : 2
-    const bScore = bName.startsWith(q) ? 0 : bName.includes(q) ? 1 : 2
-    return aScore - bScore
-  })
-
-  return sorted.slice(0, 6).map(item => {
-    const parts = item.display.split(", ")
-    const name  = item.name && item.name !== item.display ? item.name : parts[0]
-    const rest  = parts.filter((p, i) => i > 0 || p !== name).join(", ")
+  const data = await res.json()
+  return (data.suggestions ?? []).slice(0, 6).map((s: Record<string, unknown>) => {
+    const pred = s.placePrediction as Record<string, unknown>
+    const fmt  = pred.structuredFormat as Record<string, Record<string, string>> | undefined
     return {
-      refId:         item.ref_id,
-      mainText:      name || item.display,
-      secondaryText: rest || item.display,
+      refId:         pred.placeId as string,
+      mainText:      fmt?.mainText?.text ?? (pred.text as Record<string,string>)?.text ?? "",
+      secondaryText: fmt?.secondaryText?.text ?? "",
     }
   })
 }
 
-async function vietmapPlaceDetail(refId: string): Promise<VietmapPlace> {
-  const res  = await fetch(`https://maps.vietmap.vn/api/place/v3?apikey=${VM_SVC}&refid=${refId}`)
-  return (await res.json()) as VietmapPlace
+async function googlePlaceDetail(placeId: string, sessionToken: string): Promise<{
+  lat: number; lng: number; address: string; houseNote: string
+}> {
+  const res = await fetch(
+    `https://places.googleapis.com/v1/places/${placeId}?languageCode=vi&sessionToken=${sessionToken}`,
+    {
+      headers: {
+        "X-Goog-Api-Key":   GOOGLE_KEY,
+        "X-Goog-FieldMask": "id,location,formattedAddress,addressComponents",
+      },
+    }
+  )
+  const data = await res.json()
+  const lat  = (data.location?.latitude  as number) ?? 0
+  const lng  = (data.location?.longitude as number) ?? 0
+  const components: GoogleAddressComponent[] = data.addressComponents ?? []
+  const houseNumber = components.find(c => c.types.includes("street_number"))?.longText ?? ""
+  const address = (data.formattedAddress as string) ?? ""
+  return { lat, lng, address, houseNote: houseNumber ? `Số ${houseNumber}` : "" }
 }
 
 
@@ -242,6 +228,8 @@ export default function AddressPickerClient({
   const centerRef      = useRef<LatLng>({ lat: initialLat ?? DEFAULT_LAT, lng: initialLng ?? DEFAULT_LNG })
   // Ngữ cảnh vùng từ lần geocode gần nhất — dùng để bias search
   const areaCtxRef     = useRef("Krông Pắc, Đắk Lắk")
+  // Session token gộp billing Autocomplete + PlaceDetail thành 1 đơn vị ($0.005 thay vì $0.02)
+  const sessionTokenRef = useRef<string>(crypto.randomUUID())
 
   const initLat = initialLat ?? DEFAULT_LAT
   const initLng = initialLng ?? DEFAULT_LNG
@@ -281,26 +269,44 @@ export default function AddressPickerClient({
 
   const doGeocode = useCallback(async (lat: number, lng: number) => {
     setGeocoding(true)
+
+    const cached = getCachedGeocode(lat, lng)
+    if (cached) {
+      setAddress(cached)
+      applyNote("")
+      setGeocoding(false)
+      return
+    }
+
     try {
       const res = await fetch(
-        `https://maps.vietmap.vn/api/reverse/v3?apikey=${VM_SVC}&lat=${lat}&lng=${lng}`,
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=vi&key=${GOOGLE_KEY}`,
       )
-      const list = (await res.json()) as VietmapReverse[]
-      const data = list[0]
-      if (data) {
-        const houseNum = data.hs_num ?? ""
-        const parts: string[] = []
-        if (houseNum && data.street) parts.push(`${houseNum} ${data.street}`)
-        else if (data.street)        parts.push(data.street)
-        if (data.ward)               parts.push(data.ward)
-        if (data.district)           parts.push(data.district)
-        if (data.city)               parts.push(data.city)
+      const data = await res.json()
+      const result = data.results?.[0]
+      if (result) {
+        const components: GoogleAddressComponent[] = result.address_components ?? []
+        const get = (...types: string[]) =>
+          components.find((c: GoogleAddressComponent) => types.some(t => c.types.includes(t)))?.longText ?? ""
+        const houseNum = get("street_number")
+        const street   = get("route")
+        const ward     = get("sublocality_level_1", "sublocality")
+        const district = get("administrative_area_level_2")
+        const city     = get("administrative_area_level_1")
 
-        setAddress(parts.length > 0 ? parts.join(", ") : data.display)
+        const parts: string[] = []
+        if (houseNum && street) parts.push(`${houseNum} ${street}`)
+        else if (street)        parts.push(street)
+        if (ward)               parts.push(ward)
+        if (district)           parts.push(district)
+        if (city)               parts.push(city)
+
+        const finalAddr = parts.length > 0 ? parts.join(", ") : result.formatted_address
+        setCachedGeocode(lat, lng, finalAddr)
+        setAddress(finalAddr)
         applyNote(houseNum ? `Số ${houseNum}` : "")
 
-        // Cập nhật ngữ cảnh vùng cho search
-        const ctx = [data.district, data.city].filter(Boolean).join(", ")
+        const ctx = [district, city].filter(Boolean).join(", ")
         if (ctx) areaCtxRef.current = ctx
       } else {
         setAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
@@ -328,7 +334,7 @@ export default function AddressPickerClient({
       const ctx   = areaCtxRef.current
       const hasCtx = ctx.split(",").some(c => trimmed.toLowerCase().includes(c.trim().toLowerCase()))
       const query  = hasCtx ? trimmed : `${trimmed} ${ctx}`
-      const items  = await vietmapSearch(query, trimmed, centerRef.current.lat, centerRef.current.lng)
+      const items  = await googleSearch(query, centerRef.current.lat, centerRef.current.lng, sessionTokenRef.current)
       setSuggestions(items)
       setShowSuggest(items.length > 0)
     } catch {
@@ -408,7 +414,7 @@ export default function AddressPickerClient({
     void doGeocode(pos.lat, pos.lng)
   }, [doGeocode])
 
-  // ── Select Suggestion — fetch chi tiết từ VietMap ────────────────────────
+  // ── Select Suggestion — fetch chi tiết từ Google Places ─────────────────
 
   const selectSuggestion = useCallback(async (s: PlaceSuggestion) => {
     setSearchText("")
@@ -417,15 +423,17 @@ export default function AddressPickerClient({
     searchInputRef.current?.blur()
     setGeocoding(true)
     try {
-      const detail = await vietmapPlaceDetail(s.refId)
+      const detail = await googlePlaceDetail(s.refId, sessionTokenRef.current)
+      // Reset session token sau khi hoàn thành — session tiếp theo sẽ được billing riêng
+      sessionTokenRef.current = crypto.randomUUID()
       skipGeocodeRef.current = true
       const pos = { lat: detail.lat, lng: detail.lng }
       centerRef.current = pos
       setCenter(pos)
       setFlyTarget([detail.lat, detail.lng])
       // Xây địa chỉ đầy đủ từ detail nếu có, fallback về display
-      const addr = detail.display || (s.secondaryText ? `${s.mainText}, ${s.secondaryText}` : s.mainText)
-      const houseNote = detail.hs_num ? `Số ${detail.hs_num}` : ""
+      const addr = detail.address || (s.secondaryText ? `${s.mainText}, ${s.secondaryText}` : s.mainText)
+      const houseNote = detail.houseNote || ""
       setAddress(addr)
       applyNote(houseNote)
       // Auto-confirm ngay sau khi chọn từ gợi ý — không cần ấn nút
