@@ -95,14 +95,14 @@ function NoteInput({ value, onChange, autoFilled = false, onEdit }: {
       borderRadius: 12, padding: "0 12px", transition: "border-color .2s",
       boxShadow: focused ? "0 0 0 3px rgba(255,215,0,0.08)" : "none",
     }}>
-      <span style={{ fontSize: 14, flexShrink: 0 }}>&#127968;</span>
+      <span style={{ fontSize: 14, flexShrink: 0 }}>&#128221;</span>
       <input
         id="address-note" name="address-note"
         type="text" value={value}
         onChange={e => { onChange(e.target.value); onEdit?.() }}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        placeholder="So nha / dac diem nhan dien..."
+        placeholder="Ghi chú: Đặc điểm nhận dạng nhà/người cho tài xế"
         style={{
           flex: 1, background: "transparent", border: "none", outline: "none",
           color: "#f8f0e0", fontSize: 11, fontFamily: "Lexend",
@@ -113,7 +113,7 @@ function NoteInput({ value, onChange, autoFilled = false, onEdit }: {
           background: "rgba(255,215,0,0.15)", color: "rgba(255,215,0,0.8)",
           fontSize: 7, fontWeight: 700, borderRadius: 4, padding: "2px 6px",
           flexShrink: 0, letterSpacing: 0.3,
-        }}>tu dong</div>
+        }}>tự động</div>
       )}
     </div>
   )
@@ -386,7 +386,7 @@ export default function AddressPickerClient({
             onChange={e => { setSearchText(e.target.value); scheduleSearch(e.target.value) }}
             onFocus={() => searchText.length >= 3 && setShowSuggest(suggestions.length > 0)}
             onBlur={() => setTimeout(() => setShowSuggest(false), 200)}
-            placeholder="Tim thon, xa, duong, dia diem..."
+            placeholder="Tìm thôn, xã, đường, địa điểm..."
             style={{
               flex: 1, background: "transparent", border: "none", outline: "none",
               color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", fontWeight: 500,
