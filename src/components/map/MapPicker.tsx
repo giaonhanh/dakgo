@@ -1,14 +1,13 @@
 "use client"
 
-// Google Maps JS API — center-pin pattern, kéo map để chọn vị trí
+// MapLibre GL + VietMap tiles — center-pin pattern, kéo map để chọn vị trí
 // Import dynamic (no SSR) từ addresses page
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { APIProvider, Map, useMap } from "@vis.gl/react-google-maps"
 import { reverseGeocodeStructured } from "@/lib/vietmapRoute"
 
-const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
-
+const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
+const STYLE_URL   = `https://maps.vietmap.vn/mt/tm/style.json?apikey=${VIETMAP_KEY}`
 
 interface MapPickerProps {
   lat:              number
@@ -17,99 +16,74 @@ interface MapPickerProps {
   height?:          number
 }
 
-// ─── Inner sub-components ─────────────────────────────────────────────────────
-
-function CenterTracker({ onDragStart, onDragEnd, onIdle }: {
-  onDragStart: () => void
-  onDragEnd:   () => void
-  onIdle:      (lat: number, lng: number) => void
-}) {
-  const map = useMap()
-  useEffect(() => {
-    if (!map) return
-    const l1 = map.addListener("dragstart", onDragStart)
-    const l2 = map.addListener("dragend",   onDragEnd)
-    const l3 = map.addListener("idle", () => {
-      const c = map.getCenter()
-      if (c) onIdle(c.lat(), c.lng())
-    })
-    return () => { l1.remove(); l2.remove(); l3.remove() }
-  }, [map, onDragStart, onDragEnd, onIdle])
-  return null
-}
-
-function FlyTo({ target }: { target: [number, number] | null }) {
-  const map     = useMap()
-  const prevRef = useRef("")
-  useEffect(() => {
-    if (!map || !target) return
-    const key = `${target[0]},${target[1]}`
-    if (prevRef.current === key) return
-    prevRef.current = key
-    map.panTo({ lat: target[0], lng: target[1] })
-  }, [map, target])
-  return null
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
-
 export default function MapPicker({ lat, lng, onLocationChange, height = 200 }: MapPickerProps) {
-  const [floating,  setFloating]  = useState(false)
-  const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null)
-  const skipRef     = useRef(true)
+  const divRef       = useRef<HTMLDivElement>(null)
+  const mapRef       = useRef<any>(null)
+  const skipRef      = useRef(true)
   const geocodeTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const prevProps    = useRef({ lat, lng })
+  const [floating, setFloating] = useState(false)
 
-  // Khi lat/lng prop thay đổi từ bên ngoài → pan về đó
-  const prevProps = useRef({ lat, lng })
+  useEffect(() => {
+    if (!divRef.current) return
+    let map: any
+
+    const init = async () => {
+      const maplibre = (await import("maplibre-gl")).default
+      await import("maplibre-gl/dist/maplibre-gl.css")
+
+      map = new maplibre.Map({
+        container:          divRef.current!,
+        style:              STYLE_URL,
+        center:             [lng, lat],
+        zoom:               15,
+        maxZoom:            20,
+        attributionControl: false,
+        dragRotate:         false,
+      })
+      mapRef.current = map
+
+      map.on("dragstart", () => setFloating(true))
+      map.on("dragend",   () => setFloating(false))
+      map.on("moveend", () => {
+        if (skipRef.current) { skipRef.current = false; return }
+        const c = map.getCenter()
+        clearTimeout(geocodeTimer.current)
+        geocodeTimer.current = setTimeout(async () => {
+          const { address } = await reverseGeocodeStructured(c.lat, c.lng)
+          onLocationChange(c.lat, c.lng, address || undefined)
+        }, 500)
+      })
+    }
+
+    init()
+    return () => {
+      clearTimeout(geocodeTimer.current)
+      if (map) { map.remove(); mapRef.current = null }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     if (prevProps.current.lat === lat && prevProps.current.lng === lng) return
     prevProps.current = { lat, lng }
+    if (!mapRef.current) return
     skipRef.current = true
-    setFlyTarget([lat, lng])
+    mapRef.current.panTo([lng, lat])
   }, [lat, lng])
 
-  const handleDragStart = useCallback(() => setFloating(true),  [])
-  const handleDragEnd   = useCallback(() => setFloating(false), [])
-
-  const handleIdle = useCallback((la: number, ln: number) => {
-    if (skipRef.current) { skipRef.current = false; return }
-    clearTimeout(geocodeTimer.current)
-    geocodeTimer.current = setTimeout(async () => {
-      const { address } = await reverseGeocodeStructured(la, ln)
-      onLocationChange(la, ln, address || undefined)
-    }, 500)
-  }, [onLocationChange])
-
-  useEffect(() => () => clearTimeout(geocodeTimer.current), [])
+  const handleZoom = useCallback((delta: number) => {
+    if (!mapRef.current) return
+    mapRef.current.setZoom((mapRef.current.getZoom() ?? 15) + delta)
+  }, [])
 
   return (
     <div style={{ position: "relative", height }}>
-      <style>{`
-        .gm-style-cc { display: none !important; }
-        .gmnoprint a, .gmnoprint span { display: none !important; }
-      `}</style>
+      <style>{`.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{display:none!important}`}</style>
 
-      <div style={{ width: "100%", height: "100%", borderRadius: 12, overflow: "hidden" }}>
-        <APIProvider apiKey={GOOGLE_KEY}>
-          <Map
-            defaultCenter={{ lat, lng }}
-            defaultZoom={15}
-            disableDefaultUI
-            gestureHandling="greedy"
-            maxZoom={20}
-            style={{ width: "100%", height: "100%" }}
-          >
-            <CenterTracker
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onIdle={handleIdle}
-            />
-            <FlyTo target={flyTarget} />
-          </Map>
-        </APIProvider>
-      </div>
+      <div ref={divRef} style={{ width: "100%", height: "100%", borderRadius: 12, overflow: "hidden" }} />
 
-      {/* Center pin cố định */}
+      {/* Center pin */}
       <div style={{
         position: "absolute", inset: 0, zIndex: 10,
         pointerEvents: "none",
@@ -124,9 +98,7 @@ export default function MapPicker({ lat, lng, onLocationChange, height = 200 }: 
             width: 28, height: 28, borderRadius: "50% 50% 50% 0",
             background: "linear-gradient(135deg,#FF6B1A,#FFB347)",
             transform: "rotate(-45deg)",
-            boxShadow: floating
-              ? "0 10px 24px rgba(255,107,26,0.7)"
-              : "0 3px 10px rgba(255,107,26,0.5)",
+            boxShadow: floating ? "0 10px 24px rgba(255,107,26,0.7)" : "0 3px 10px rgba(255,107,26,0.5)",
             border: "2px solid rgba(255,255,255,0.9)",
             transition: "box-shadow 0.2s",
           }} />
@@ -138,32 +110,21 @@ export default function MapPicker({ lat, lng, onLocationChange, height = 200 }: 
         position: "absolute", right: 8, bottom: 8, zIndex: 15,
         display: "flex", flexDirection: "column", gap: 3,
       }}>
-        {["+", "−"].map(label => (
-          <ZoomBtn key={label} label={label} />
+        {(["+", "−"] as const).map(label => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => handleZoom(label === "+" ? 1 : -1)}
+            style={{
+              width: 28, height: 28, borderRadius: 8,
+              background: "rgba(14,12,9,0.9)",
+              border: "1px solid rgba(255,107,0,0.2)",
+              color: "#FF8C00", fontSize: 18, lineHeight: 1,
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >{label}</button>
         ))}
       </div>
     </div>
-  )
-}
-
-function ZoomBtn({ label }: { label: string }) {
-  const map = useMap()
-  const handleClick = useCallback(() => {
-    if (!map) return
-    const z = map.getZoom() ?? 15
-    map.setZoom(label === "+" ? z + 1 : z - 1)
-  }, [map, label])
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      style={{
-        width: 28, height: 28, borderRadius: 8,
-        background: "rgba(14,12,9,0.9)",
-        border: "1px solid rgba(255,107,0,0.2)",
-        color: "#FF8C00", fontSize: 18, lineHeight: 1,
-        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-      }}
-    >{label}</button>
   )
 }

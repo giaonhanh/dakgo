@@ -1,49 +1,24 @@
 import { getCachedGeocode, setCachedGeocode } from "./geocodeCache"
 
-const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-
-interface GoogleAddressComponent {
-  long_name:  string
-  short_name: string
-  types:      string[]
+interface VietmapReverseResult {
+  display?: string
+  name?:    string
+  ref_id?:  string
 }
 
-function parseComponents(components: GoogleAddressComponent[]) {
-  const get = (...types: string[]) =>
-    components.find(c => types.some(t => c.types.includes(t)))?.long_name ?? ""
-  return {
-    houseNumber: get("street_number"),
-    street:      get("route"),
-    village:     get("administrative_area_level_4"),
-    ward:        get("sublocality_level_1", "sublocality", "administrative_area_level_3"),
-    district:    get("administrative_area_level_2"),
-    city:        get("administrative_area_level_1"),
-  }
-}
-
-/** Reverse geocode — trả về địa chỉ đầy đủ (số nhà, đường, phường, huyện, tỉnh) */
+/** Reverse geocode — trả về địa chỉ đầy đủ */
 export async function reverseGeocodeStructured(lat: number, lng: number): Promise<{ address: string; houseNote: string }> {
   const cached = getCachedGeocode(lat, lng)
   if (cached) return { address: cached, houseNote: "" }
 
   try {
-    const res = await fetch(
-      `/api/geocode?latlng=${lat},${lng}`,
-    )
+    const res = await fetch(`/api/geocode?latlng=${lat},${lng}`)
     if (res.ok) {
-      const data = await res.json()
-      // Ưu tiên kết quả ROOFTOP (chính xác đến số nhà), fallback về results[0]
-      const results: { formatted_address?: string; address_components?: GoogleAddressComponent[]; geometry?: { location_type?: string } }[] = data.results ?? []
-      const result = results.find(r => r.geometry?.location_type === "ROOFTOP") ?? results[0]
-      if (result) {
-        const c = parseComponents(result.address_components ?? [])
-        const formatted = (result.formatted_address ?? "").replace(/,\s*Việt Nam$/i, "").trim()
-        const address = formatted || [
-          c.houseNumber && c.street ? `${c.houseNumber} ${c.street}` : c.street,
-          c.village, c.ward, c.district, c.city,
-        ].filter(Boolean).join(", ")
+      const data: VietmapReverseResult[] = await res.json()
+      const address = data[0]?.display ?? ""
+      if (address) {
         setCachedGeocode(lat, lng, address)
-        return { address, houseNote: c.houseNumber ? `Số ${c.houseNumber}` : "" }
+        return { address, houseNote: "" }
       }
     }
   } catch { /* fallback */ }
@@ -56,19 +31,17 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
   if (cached) return cached
 
   try {
-    const res = await fetch(
-      `/api/geocode?latlng=${lat},${lng}`,
-    )
+    const res = await fetch(`/api/geocode?latlng=${lat},${lng}`)
     if (res.ok) {
-      const data = await res.json()
-      const addr = data.results?.[0]?.formatted_address
-      if (addr) { setCachedGeocode(lat, lng, addr); return addr }
+      const data: VietmapReverseResult[] = await res.json()
+      const address = data[0]?.display ?? ""
+      if (address) { setCachedGeocode(lat, lng, address); return address }
     }
   } catch { /* fallback */ }
   return ""
 }
 
-/** Lấy khoảng cách km theo cung đường thực — dùng Google Routes API */
+/** Lấy khoảng cách km theo cung đường thực — dùng VietMap Route API */
 export async function getRouteKm(
   fromLat: number, fromLng: number,
   toLat: number,   toLng: number,
@@ -76,22 +49,12 @@ export async function getRouteKm(
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 8000)
-    const isClient = typeof window !== "undefined"
-    const routeUrl = isClient
-      ? "/api/routes"
-      : "https://routes.googleapis.com/directions/v2:computeRoutes"
-    const routeHeaders: Record<string, string> = { "Content-Type": "application/json" }
-    if (!isClient) {
-      routeHeaders["X-Goog-Api-Key"]   = GOOGLE_KEY ?? ""
-      routeHeaders["X-Goog-FieldMask"] = "routes.distanceMeters"
-    }
-    const res = await fetch(routeUrl, {
+    const res = await fetch("/api/routes", {
       method: "POST",
-      headers: routeHeaders,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         origin:      { location: { latLng: { latitude: fromLat, longitude: fromLng } } },
         destination: { location: { latLng: { latitude: toLat,   longitude: toLng   } } },
-        travelMode:  "DRIVE",
       }),
       signal: controller.signal,
     })
@@ -121,7 +84,6 @@ export function calcDeliveryFeeFromPricing(
     return 0
   }
 
-  // Tối thiểu 1km — tài xế luôn phải đến quán dù giao gần
   const effectiveKm = Math.max(km, 1)
   const wholeKm = Math.floor(effectiveKm)
   const fracKm  = effectiveKm - wholeKm

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
+const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY ?? ""
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const latlng = searchParams.get("latlng") ?? ""
+  const [lat, lng] = latlng.split(",")
   const res = await fetch(
-    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latlng}&language=vi&key=${GOOGLE_KEY}`,
+    `https://maps.vietmap.vn/api/reverse/v3?apikey=${VIETMAP_KEY}&lat=${lat}&lng=${lng}`,
   )
   const data = await res.json()
   return NextResponse.json(data, { status: res.status })

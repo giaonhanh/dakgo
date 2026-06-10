@@ -18,7 +18,8 @@ interface NavMapProps {
   height?:   number
 }
 
-const DARK_TILE = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
+const DARK_TILE = `https://maps.vietmap.vn/mt/tm/{z}/{x}/{y}.png?apikey=${VIETMAP_KEY}`
 
 export default function NavMap({
   driverLat, driverLng,

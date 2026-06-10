@@ -1,12 +1,9 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { APIProvider, Map, useMap } from "@vis.gl/react-google-maps"
 import type { AddressPickerResult } from "@/types"
 import { getCachedGeocode, setCachedGeocode } from "@/lib/geocodeCache"
-
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const DEFAULT_LAT = 12.7107
 const DEFAULT_LNG = 108.3034
@@ -15,10 +12,8 @@ const SEARCH_H   = 56
 const GEOCODE_MS = 600
 const SEARCH_MS  = 500
 
-const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
-
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
+const STYLE_URL   = `https://maps.vietmap.vn/mt/tm/style.json?apikey=${VIETMAP_KEY}`
 
 interface LatLng { lat: number; lng: number }
 
@@ -37,28 +32,13 @@ interface PlaceSuggestion {
   secondaryText: string
 }
 
-interface GeocodingComponent {
-  long_name:  string
-  short_name: string
-  types:      string[]
-}
-
-interface PlacesComponent {
-  longText:  string
-  shortText: string
-  types:     string[]
-}
-
-// ─── Google Places API helpers ────────────────────────────────────────────────
-
-async function googleSearch(input: string, lat: number, lng: number, sessionToken: string): Promise<PlaceSuggestion[]> {
+async function vietmapSearch(input: string, lat: number, lng: number, sessionToken: string): Promise<PlaceSuggestion[]> {
   const res = await fetch("/api/places/autocomplete", {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       input, sessionToken,
       locationBias: { circle: { center: { latitude: lat, longitude: lng }, radius: 50000 } },
-      languageCode: "vi", regionCode: "VN",
     }),
   })
   const data = await res.json()
@@ -67,88 +47,42 @@ async function googleSearch(input: string, lat: number, lng: number, sessionToke
     const fmt  = pred.structuredFormat as Record<string, Record<string, string>> | undefined
     return {
       refId:         pred.placeId as string,
-      mainText:      fmt?.mainText?.text ?? (pred.text as Record<string, string>)?.text ?? "",
+      mainText:      fmt?.mainText?.text ?? "",
       secondaryText: fmt?.secondaryText?.text ?? "",
     }
   })
 }
 
-async function googlePlaceDetail(placeId: string, sessionToken: string): Promise<{
+async function vietmapPlaceDetail(placeId: string, sessionToken: string): Promise<{
   lat: number; lng: number; address: string; houseNote: string
 }> {
   const res = await fetch(
     `/api/places/detail?placeId=${encodeURIComponent(placeId)}&sessionToken=${encodeURIComponent(sessionToken)}`,
   )
   const data = await res.json()
-  const lat  = (data.location?.latitude  as number) ?? 0
-  const lng  = (data.location?.longitude as number) ?? 0
-  const components: PlacesComponent[] = data.addressComponents ?? []
-  const houseNumber = components.find(c => c.types.includes("street_number"))?.longText ?? ""
-  const address = (data.formattedAddress as string) ?? ""
-  return { lat, lng, address, houseNote: houseNumber ? `Số ${houseNumber}` : "" }
+  return {
+    lat:       (data.location?.latitude  as number) ?? 0,
+    lng:       (data.location?.longitude as number) ?? 0,
+    address:   (data.formattedAddress as string) ?? "",
+    houseNote: "",
+  }
 }
 
-// ─── Map Sub-components (phải nằm trong <Map>) ────────────────────────────────
-
-function MapEventHandler({
-  onDragStart, onDragEnd, onIdle, skipRef,
-}: {
-  onDragStart: () => void
-  onDragEnd:   () => void
-  onIdle:      (pos: LatLng) => void
-  skipRef:     React.MutableRefObject<boolean>
-}) {
-  const map = useMap()
-  useEffect(() => {
-    if (!map) return
-    const l1 = map.addListener("dragstart", onDragStart)
-    const l2 = map.addListener("dragend",   onDragEnd)
-    const l3 = map.addListener("idle", () => {
-      const c = map.getCenter()
-      if (!c) return
-      if (skipRef.current) { skipRef.current = false; return }
-      onIdle({ lat: c.lat(), lng: c.lng() })
-    })
-    return () => { l1.remove(); l2.remove(); l3.remove() }
-  }, [map, onDragStart, onDragEnd, onIdle, skipRef])
-  return null
+async function reverseGeocodeAddr(lat: number, lng: number): Promise<string> {
+  const cached = getCachedGeocode(lat, lng)
+  if (cached) return cached
+  try {
+    const res = await fetch(`/api/geocode?latlng=${lat},${lng}`)
+    if (res.ok) {
+      const data = await res.json()
+      const addr = Array.isArray(data) ? data[0]?.display : undefined
+      if (addr) { setCachedGeocode(lat, lng, addr); return addr }
+    }
+  } catch { /* fallback */ }
+  return ""
 }
 
-function MapFlyTo({ target }: { target: [number, number] | null }) {
-  const map     = useMap()
-  const prevRef = useRef("")
-  useEffect(() => {
-    if (!map || !target) return
-    const key = `${target[0]},${target[1]}`
-    if (prevRef.current === key) return
-    prevRef.current = key
-    map.panTo({ lat: target[0], lng: target[1] })
-    map.setZoom(18)
-  }, [map, target])
-  return null
-}
-
-function TilesWatcher({ onReady }: { onReady: () => void }) {
-  const map     = useMap()
-  const doneRef = useRef(false)
-  useEffect(() => {
-    if (!map) return
-    const l = map.addListener("tilesloaded", () => {
-      if (!doneRef.current) { doneRef.current = true; onReady() }
-    })
-    const t = setTimeout(() => {
-      if (!doneRef.current) { doneRef.current = true; onReady() }
-    }, 900)
-    return () => { l.remove(); clearTimeout(t) }
-  }, [map, onReady])
-  return null
-}
-
-// ─── UI Sub-components ────────────────────────────────────────────────────────
-
-function NoteInput({
-  value, onChange, autoFilled = false, onEdit,
-}: {
+function NoteInput({ value, onChange, autoFilled = false, onEdit }: {
   value: string; onChange: (v: string) => void; autoFilled?: boolean; onEdit?: () => void
 }) {
   const [focused, setFocused] = useState(false)
@@ -160,14 +94,14 @@ function NoteInput({
       borderRadius: 12, padding: "0 12px", transition: "border-color .2s",
       boxShadow: focused ? "0 0 0 3px rgba(255,215,0,0.08)" : "none",
     }}>
-      <span style={{ fontSize: 14, flexShrink: 0 }}>🏠</span>
+      <span style={{ fontSize: 14, flexShrink: 0 }}>&#127968;</span>
       <input
         id="address-note" name="address-note"
         type="text" value={value}
         onChange={e => { onChange(e.target.value); onEdit?.() }}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        placeholder="Số nhà / đặc điểm nhận diện..."
+        placeholder="So nha / dac diem nhan dien..."
         style={{
           flex: 1, background: "transparent", border: "none", outline: "none",
           color: "#f8f0e0", fontSize: 11, fontFamily: "Lexend",
@@ -178,7 +112,7 @@ function NoteInput({
           background: "rgba(255,215,0,0.15)", color: "rgba(255,215,0,0.8)",
           fontSize: 7, fontWeight: 700, borderRadius: 4, padding: "2px 6px",
           flexShrink: 0, letterSpacing: 0.3,
-        }}>tự động</div>
+        }}>tu dong</div>
       )}
     </div>
   )
@@ -197,27 +131,28 @@ function Spinner({ size = 16, color = "#FFD700" }: { size?: number; color?: stri
   )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-
 export default function AddressPickerClient({
   onConfirm, onClose, initialLat, initialLng,
   height = "100dvh", className = "",
 }: AddressPickerProps) {
+  const divRef          = useRef<HTMLDivElement>(null)
+  const mapRef          = useRef<any>(null)
   const geocodeTimer    = useRef<ReturnType<typeof setTimeout>>(undefined)
   const searchTimer     = useRef<ReturnType<typeof setTimeout>>(undefined)
   const autoNoteRef     = useRef("")
   const searchInputRef  = useRef<HTMLInputElement>(null)
   const skipGeocodeRef  = useRef(false)
   const centerRef       = useRef<LatLng>({ lat: initialLat ?? DEFAULT_LAT, lng: initialLng ?? DEFAULT_LNG })
-  const areaCtxRef      = useRef("Krông Pắc, Đắk Lắk")
+  const areaCtxRef      = useRef("Krong Pac, Dak Lak")
   const sessionTokenRef = useRef<string>(crypto.randomUUID())
+  const addrInputRef    = useRef<HTMLInputElement>(null)
 
   const initLat = initialLat ?? DEFAULT_LAT
   const initLng = initialLng ?? DEFAULT_LNG
 
   const [center,      setCenter]      = useState<LatLng>({ lat: initLat, lng: initLng })
   const [flyTarget,   setFlyTarget]   = useState<[number, number] | null>(null)
-  const [address,     setAddress]     = useState("Đang xác định vị trí...")
+  const [address,     setAddress]     = useState("Dang xac dinh vi tri...")
   const [searchText,  setSearchText]  = useState("")
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([])
   const [showSuggest, setShowSuggest] = useState(false)
@@ -229,12 +164,8 @@ export default function AddressPickerClient({
   const [showPulse,   setShowPulse]   = useState(false)
   const [locating,    setLocating]    = useState(!initialLat && !initialLng)
   const [geocoding,   setGeocoding]   = useState(true)
-  const [mapStyle,    setMapStyle]    = useState<"dark" | "satellite">("dark")
   const [tilesReady,  setTilesReady]  = useState(false)
   const [editingAddr, setEditingAddr] = useState(false)
-  const addrInputRef = useRef<HTMLInputElement>(null)
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
 
   const applyNote = useCallback((houseNote: string) => {
     setNote(prev => {
@@ -246,54 +177,12 @@ export default function AddressPickerClient({
     autoNoteRef.current = houseNote
   }, [])
 
-  // ── Reverse Geocode ───────────────────────────────────────────────────────
-
   const doGeocode = useCallback(async (lat: number, lng: number) => {
     setGeocoding(true)
-    const cached = getCachedGeocode(lat, lng)
-    if (cached) {
-      setAddress(cached)
-      applyNote("")
-      setGeocoding(false)
-      return
-    }
-    try {
-      const res = await fetch(`/api/geocode?latlng=${lat},${lng}`)
-      const data = await res.json()
-      const results: {
-        formatted_address?: string
-        address_components?: GeocodingComponent[]
-        geometry?: { location_type?: string }
-      }[] = data.results ?? []
-      const result = results.find(r => r.geometry?.location_type === "ROOFTOP") ?? results[0]
-      if (result) {
-        const components: GeocodingComponent[] = result.address_components ?? []
-        const get = (...types: string[]) =>
-          components.find(c => types.some(t => c.types.includes(t)))?.long_name ?? ""
-        const houseNum = get("street_number")
-        const street   = get("route")
-        const village  = get("administrative_area_level_4")
-        const ward     = get("sublocality_level_1", "sublocality", "administrative_area_level_3")
-        const district = get("administrative_area_level_2")
-        const city     = get("administrative_area_level_1")
-        const formatted = (result.formatted_address ?? "").replace(/,\s*Việt Nam$/i, "").trim()
-        const finalAddr = formatted || [
-          houseNum && street ? `${houseNum} ${street}` : street,
-          village, ward, district, city,
-        ].filter(Boolean).join(", ")
-        setCachedGeocode(lat, lng, finalAddr)
-        setAddress(finalAddr)
-        applyNote(houseNum ? `Số ${houseNum}` : "")
-        const ctx = [district, city].filter(Boolean).join(", ")
-        if (ctx) areaCtxRef.current = ctx
-      } else {
-        setAddress("")
-      }
-    } catch {
-      setAddress("")
-    } finally {
-      setGeocoding(false)
-    }
+    const addr = await reverseGeocodeAddr(lat, lng)
+    if (addr) { setAddress(addr); applyNote("") }
+    else setAddress("")
+    setGeocoding(false)
   }, [applyNote])
 
   const scheduleGeocode = useCallback((lat: number, lng: number) => {
@@ -301,17 +190,12 @@ export default function AddressPickerClient({
     geocodeTimer.current = setTimeout(() => void doGeocode(lat, lng), GEOCODE_MS)
   }, [doGeocode])
 
-  // ── Forward Search ────────────────────────────────────────────────────────
-
   const doSearch = useCallback(async (q: string) => {
     const trimmed = q.trim()
     if (trimmed.length < 3) { setSuggestions([]); setShowSuggest(false); return }
     setSearching(true)
     try {
-      const ctx    = areaCtxRef.current
-      const hasCtx = ctx.split(",").some(c => trimmed.toLowerCase().includes(c.trim().toLowerCase()))
-      const query  = hasCtx ? trimmed : `${trimmed} ${ctx}`
-      const items  = await googleSearch(query, centerRef.current.lat, centerRef.current.lng, sessionTokenRef.current)
+      const items = await vietmapSearch(trimmed, centerRef.current.lat, centerRef.current.lng, sessionTokenRef.current)
       setSuggestions(items)
       setShowSuggest(items.length > 0)
     } catch {
@@ -326,60 +210,83 @@ export default function AddressPickerClient({
     searchTimer.current = setTimeout(() => void doSearch(q), SEARCH_MS)
   }, [doSearch])
 
-  // ── Initial GPS ───────────────────────────────────────────────────────────
-
+  // Init map
   useEffect(() => {
+    if (!divRef.current) return
+    let map: any
+
+    const init = async () => {
+      const maplibre = (await import("maplibre-gl")).default
+      await import("maplibre-gl/dist/maplibre-gl.css")
+
+      map = new maplibre.Map({
+        container:          divRef.current!,
+        style:              STYLE_URL,
+        center:             [initLng, initLat],
+        zoom:               15,
+        maxZoom:            20,
+        attributionControl: false,
+        dragRotate:         false,
+      })
+      mapRef.current = map
+
+      map.on("load", () => setTilesReady(true))
+      map.on("dragstart", () => { setFloating(true); setShowSuggest(false) })
+      map.on("dragend",   () => {
+        setFloating(false)
+        setShowPulse(true)
+        setPulseKey(k => k + 1)
+        setTimeout(() => setShowPulse(false), 800)
+      })
+      map.on("moveend", () => {
+        if (skipGeocodeRef.current) { skipGeocodeRef.current = false; return }
+        const c = map.getCenter()
+        centerRef.current = { lat: c.lat, lng: c.lng }
+        setCenter({ lat: c.lat, lng: c.lng })
+        scheduleGeocode(c.lat, c.lng)
+      })
+
+      // Fallback tiles-ready timeout
+      setTimeout(() => setTilesReady(true), 900)
+    }
+
+    init()
+
+    // Initial GPS or geocode
     if (initialLat && initialLng) {
       void doGeocode(initialLat, initialLng)
-      return
-    }
-    if (!navigator.geolocation) {
+    } else if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          setLocating(false)
+          skipGeocodeRef.current = true
+          const pos = { lat: coords.latitude, lng: coords.longitude }
+          centerRef.current = pos
+          setCenter(pos)
+          setFlyTarget([coords.latitude, coords.longitude])
+          void doGeocode(coords.latitude, coords.longitude)
+        },
+        () => { setLocating(false); void doGeocode(DEFAULT_LAT, DEFAULT_LNG) },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+      )
+    } else {
       setLocating(false)
       void doGeocode(DEFAULT_LAT, DEFAULT_LNG)
-      return
     }
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        setLocating(false)
-        skipGeocodeRef.current = true
-        setFlyTarget([coords.latitude, coords.longitude])
-        setCenter({ lat: coords.latitude, lng: coords.longitude })
-        centerRef.current = { lat: coords.latitude, lng: coords.longitude }
-        void doGeocode(coords.latitude, coords.longitude)
-      },
-      () => {
-        setLocating(false)
-        void doGeocode(DEFAULT_LAT, DEFAULT_LNG)
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
-    )
+
     return () => {
       clearTimeout(geocodeTimer.current)
       clearTimeout(searchTimer.current)
+      if (map) { map.remove(); mapRef.current = null }
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Map Event Handlers ────────────────────────────────────────────────────
-
-  const handleDragStart = useCallback(() => {
-    setFloating(true)
-    setShowSuggest(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleDragEnd = useCallback(() => {
-    setFloating(false)
-    setShowPulse(true)
-    setPulseKey(k => k + 1)
-    setTimeout(() => setShowPulse(false), 800)
-  }, [])
-
-  const handleIdle = useCallback((pos: LatLng) => {
-    centerRef.current = pos
-    setCenter(pos)
-    scheduleGeocode(pos.lat, pos.lng)
-  }, [scheduleGeocode])
-
-  // ── GPS Button ────────────────────────────────────────────────────────────
+  // FlyTo when flyTarget changes
+  useEffect(() => {
+    if (!flyTarget || !mapRef.current) return
+    mapRef.current.flyTo({ center: [flyTarget[1], flyTarget[0]], zoom: 18, animate: true })
+  }, [flyTarget])
 
   const handleGPS = useCallback(() => {
     if (!navigator.geolocation) return
@@ -399,7 +306,10 @@ export default function AddressPickerClient({
     )
   }, [doGeocode])
 
-  // ── Select Suggestion ─────────────────────────────────────────────────────
+  const handleZoom = useCallback((delta: number) => {
+    if (!mapRef.current) return
+    mapRef.current.setZoom((mapRef.current.getZoom() ?? 15) + delta)
+  }, [])
 
   const selectSuggestion = useCallback(async (s: PlaceSuggestion) => {
     setSearchText("")
@@ -408,32 +318,25 @@ export default function AddressPickerClient({
     searchInputRef.current?.blur()
     setGeocoding(true)
     try {
-      const detail = await googlePlaceDetail(s.refId, sessionTokenRef.current)
+      const detail = await vietmapPlaceDetail(s.refId, sessionTokenRef.current)
       sessionTokenRef.current = crypto.randomUUID()
       skipGeocodeRef.current = true
       const pos = { lat: detail.lat, lng: detail.lng }
       centerRef.current = pos
       setCenter(pos)
       setFlyTarget([detail.lat, detail.lng])
-      const addr      = detail.address || (s.secondaryText ? `${s.mainText}, ${s.secondaryText}` : s.mainText)
-      const houseNote = detail.houseNote || ""
+      const addr = detail.address || (s.secondaryText ? `${s.mainText}, ${s.secondaryText}` : s.mainText)
       setAddress(addr)
-      applyNote(houseNote)
-      onConfirm({ lat: detail.lat, lng: detail.lng, address: addr, note: houseNote })
-    } catch { /* giữ vị trí hiện tại */ } finally {
+      applyNote(detail.houseNote)
+      onConfirm({ lat: detail.lat, lng: detail.lng, address: addr, note: detail.houseNote })
+    } catch { /* keep current */ } finally {
       setGeocoding(false)
     }
   }, [applyNote, onConfirm])
 
-  // ── Confirm ───────────────────────────────────────────────────────────────
-
   const handleConfirm = useCallback(() => {
     onConfirm({ lat: center.lat, lng: center.lng, address, note })
   }, [center, address, note, onConfirm])
-
-  const tilesReadyCb = useCallback(() => setTilesReady(true), [])
-
-  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div className={className} style={{
@@ -447,12 +350,10 @@ export default function AddressPickerClient({
           100% { transform: scale(3.5);  opacity: 0 }
         }
         @keyframes shimmer { 0% { left:-60% } 100% { left:120% } }
-        .gm-style iframe + div { border: none !important; }
-        .gm-style-cc { display: none !important; }
-        .gmnoprint a, .gmnoprint span { display: none !important; }
+        .maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{display:none!important}
       `}</style>
 
-      {/* ── Search Bar ─────────────────────────────────────────────────── */}
+      {/* Search Bar */}
       <div style={{
         position: "absolute", top: 0, left: 0, right: 0, zIndex: 30,
         background: "rgba(10,7,4,0.94)",
@@ -484,7 +385,7 @@ export default function AddressPickerClient({
             onChange={e => { setSearchText(e.target.value); scheduleSearch(e.target.value) }}
             onFocus={() => searchText.length >= 3 && setShowSuggest(suggestions.length > 0)}
             onBlur={() => setTimeout(() => setShowSuggest(false), 200)}
-            placeholder="Tìm thôn, xã, đường, địa điểm..."
+            placeholder="Tim thon, xa, duong, dia diem..."
             style={{
               flex: 1, background: "transparent", border: "none", outline: "none",
               color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", fontWeight: 500,
@@ -500,12 +401,12 @@ export default function AddressPickerClient({
                 color: "rgba(255,255,255,0.5)", fontSize: 11,
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}
-            >✕</button>
+            >X</button>
           ) : null}
         </div>
       </div>
 
-      {/* ── Suggestions Dropdown ────────────────────────────────────────── */}
+      {/* Suggestions */}
       <AnimatePresence>
         {showSuggest && suggestions.length > 0 && (
           <motion.div
@@ -530,7 +431,7 @@ export default function AddressPickerClient({
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,215,0,0.06)")}
                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
               >
-                <span style={{ fontSize: 15, flexShrink: 0, marginTop: 2 }}>📍</span>
+                <span style={{ fontSize: 15, flexShrink: 0, marginTop: 2 }}>&#128205;</span>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ color: "#f8f0e0", fontSize: 13, fontWeight: 700, lineHeight: 1.4, wordBreak: "break-word" }}>
                     {s.mainText}
@@ -547,13 +448,12 @@ export default function AddressPickerClient({
         )}
       </AnimatePresence>
 
-      {/* ── Map Container ───────────────────────────────────────────────── */}
+      {/* Map */}
       <div style={{
         position: "absolute",
         top: `calc(${SEARCH_H}px + env(safe-area-inset-top, 0px))`,
         bottom: PANEL_H, left: 0, right: 0, zIndex: 1,
       }}>
-        {/* Skeleton loading overlay */}
         {!tilesReady && (
           <div style={{
             position: "absolute", inset: 0, zIndex: 5,
@@ -565,71 +465,55 @@ export default function AddressPickerClient({
               animate={{ opacity: [0.3, 0.7, 0.3] }}
               transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
               style={{ fontSize: 28 }}
-            >🗺️</motion.div>
-            <span style={{ color: "#6a5a40", fontSize: 10, fontFamily: "Lexend" }}>Đang tải bản đồ...</span>
+            >&#128506;</motion.div>
+            <span style={{ color: "#6a5a40", fontSize: 10, fontFamily: "Lexend" }}>Dang tai ban do...</span>
           </div>
         )}
 
-        <APIProvider apiKey={GOOGLE_KEY}>
-          <Map
-            defaultCenter={{ lat: initLat, lng: initLng }}
-            defaultZoom={15}
-            disableDefaultUI
-            gestureHandling="greedy"
-            maxZoom={20}
-            style={{ width: "100%", height: "100%" }}
-          >
-            <MapEventHandler
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onIdle={handleIdle}
-              skipRef={skipGeocodeRef}
-            />
-            <MapFlyTo target={flyTarget} />
-            <TilesWatcher onReady={tilesReadyCb} />
-          </Map>
-        </APIProvider>
-      </div>
+        <div ref={divRef} style={{ width: "100%", height: "100%" }} />
 
-      {/* ── Map Controls — góc phải dưới bản đồ ───────────────────────── */}
-      <div style={{
-        position: "absolute", right: 12, bottom: PANEL_H + 12, zIndex: 15,
-        display: "flex", flexDirection: "column", gap: 8,
-      }}>
-        <button type="button" onClick={handleGPS} style={{
-          width: 40, height: 40, borderRadius: 10,
-          border: "1px solid rgba(255,215,0,0.35)",
-          background: "rgba(10,7,4,0.88)",
-          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-          cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 2px 12px rgba(0,0,0,0.5)",
+        {/* Map Controls — bottom right */}
+        <div style={{
+          position: "absolute", right: 12, bottom: 12, zIndex: 15,
+          display: "flex", flexDirection: "column", gap: 6,
         }}>
-          {locating ? <Spinner size={14} /> : (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="3" fill="#FFD700" />
-              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#FFD700" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="12" cy="12" r="7" stroke="#FFD700" strokeWidth="1.5" opacity="0.4" />
-            </svg>
-          )}
-        </button>
-        <button type="button"
-          onClick={() => setMapStyle(s => s === "dark" ? "satellite" : "dark")}
-          style={{
+          <button type="button" onClick={handleGPS} style={{
             width: 40, height: 40, borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.15)",
+            border: "1px solid rgba(255,215,0,0.35)",
             background: "rgba(10,7,4,0.88)",
             backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-            cursor: "pointer", fontSize: 18,
+            cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: "0 2px 12px rgba(0,0,0,0.5)",
-          }}
-        >
-          {mapStyle === "dark" ? "🛰️" : "🗺️"}
-        </button>
+          }}>
+            {locating ? <Spinner size={14} /> : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="3" fill="#FFD700" />
+                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#FFD700" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="7" stroke="#FFD700" strokeWidth="1.5" opacity="0.4" />
+              </svg>
+            )}
+          </button>
+          {(["+", "-"] as const).map(label => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => handleZoom(label === "+" ? 1 : -1)}
+              style={{
+                width: 40, height: 40, borderRadius: 10,
+                border: "1px solid rgba(255,215,0,0.25)",
+                background: "rgba(10,7,4,0.88)",
+                backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+                cursor: "pointer", fontSize: 22,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#FFD700", boxShadow: "0 2px 12px rgba(0,0,0,0.5)",
+              }}
+            >{label}</button>
+          ))}
+        </div>
       </div>
 
-      {/* ── Center Pin Overlay ──────────────────────────────────────────── */}
+      {/* Center Pin Overlay */}
       <div style={{
         position: "absolute",
         top: `calc(${SEARCH_H}px + env(safe-area-inset-top, 0px))`,
@@ -685,7 +569,7 @@ export default function AddressPickerClient({
         />
       </div>
 
-      {/* ── Address Panel ───────────────────────────────────────────────── */}
+      {/* Address Panel */}
       <div style={{
         position: "absolute", bottom: 0, left: 0, right: 0, height: PANEL_H, zIndex: 20,
         background: "rgba(10,7,4,0.97)",
@@ -708,11 +592,11 @@ export default function AddressPickerClient({
           {geocoding ? (
             <>
               <Spinner size={13} />
-              <span style={{ color: "#6a5a40", fontSize: 11 }}>Đang xác định địa chỉ...</span>
+              <span style={{ color: "#6a5a40", fontSize: 11 }}>Dang xac dinh dia chi...</span>
             </>
           ) : editingAddr ? (
             <>
-              <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>📌</span>
+              <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>&#128204;</span>
               <input
                 ref={addrInputRef}
                 value={address}
@@ -727,18 +611,18 @@ export default function AddressPickerClient({
             </>
           ) : (
             <>
-              <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>📌</span>
+              <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>&#128204;</span>
               <p
                 onClick={() => { setEditingAddr(true); setTimeout(() => addrInputRef.current?.focus(), 50) }}
                 style={{ margin: 0, flex: 1, color: address ? "#f8f0e0" : "#6a5a40", fontSize: 12, fontWeight: 600, lineHeight: 1.5, cursor: "text" }}
               >
-                {address || "Tap để nhập địa chỉ..."}
+                {address || "Tap de nhap dia chi..."}
               </p>
               {address && (
                 <button type="button"
                   onClick={() => { setEditingAddr(true); setTimeout(() => addrInputRef.current?.focus(), 50) }}
                   style={{ background: "none", border: "none", cursor: "pointer", padding: "0 0 0 6px", color: "rgba(255,215,0,0.6)", fontSize: 10, fontFamily: "Lexend", flexShrink: 0 }}
-                >Sửa</button>
+                >Sua</button>
               )}
             </>
           )}
@@ -760,7 +644,7 @@ export default function AddressPickerClient({
             background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent)",
             animation: "shimmer 3s infinite",
           }} />
-          <span style={{ position: "relative", zIndex: 1 }}>XÁC NHẬN VỊ TRÍ</span>
+          <span style={{ position: "relative", zIndex: 1 }}>XAC NHAN VI TRI</span>
         </motion.button>
       </div>
     </div>
