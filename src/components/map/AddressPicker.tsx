@@ -23,12 +23,8 @@ const AddressPicker = dynamic(
 function MapSkeleton() {
   return (
     <>
-      {/* Preconnect tile CDNs — React 19 tự hoist lên <head> */}
-      <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossOrigin="anonymous" />
-      <link rel="preconnect" href="https://b.basemaps.cartocdn.com" crossOrigin="anonymous" />
-      <link rel="preconnect" href="https://server.arcgisonline.com" crossOrigin="anonymous" />
-      <link rel="preconnect" href="https://maps.googleapis.com" crossOrigin="anonymous" />
-      <link rel="preconnect" href="https://places.googleapis.com" crossOrigin="anonymous" />
+      {/* Preconnect VietMap CDN */}
+      <link rel="preconnect" href="https://maps.vietmap.vn" crossOrigin="anonymous" />
       <div style={{
         width: "100%", height: "100%", background: "#0d0a06",
         display: "flex", flexDirection: "column", alignItems: "center",

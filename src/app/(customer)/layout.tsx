@@ -8,7 +8,6 @@ import { useLocationStore } from '@/store/locationStore'
 import MaintenanceGate from '@/components/MaintenanceGate'
 import PushPermissionPrompt from '@/components/PushPermissionPrompt'
 
-const GOOGLE_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
 const REFRESH_MS    = 5 * 60 * 1000   // 5 phút — tự cập nhật lại vị trí
 
 // ── Lấy GPS + reverse geocode → lưu vào store ──────────────────────────────
@@ -22,16 +21,10 @@ async function fetchGps(
     async ({ coords }) => {
       const { latitude: lat, longitude: lng } = coords
       try {
-        const res  = await fetch(
-          `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=vi&key=${GOOGLE_KEY}`
-        )
+        const res  = await fetch(`/api/geocode?latlng=${lat},${lng}`)
         const data = await res.json()
-        const components: Array<{ longText: string; types: string[] }> = data.results?.[0]?.address_components ?? []
-        const get = (...types: string[]) => components.find(c => types.some(t => c.types.includes(t)))?.longText ?? ""
-        const ward     = get("sublocality_level_1", "sublocality")
-        const district = get("administrative_area_level_2")
-        const parts = [ward, district].filter(Boolean)
-        const address = parts.length > 0 ? parts.join(", ") : (data.results?.[0]?.formatted_address ?? "Vị trí hiện tại")
+        // VietMap trả về mảng, lấy display của phần tử đầu tiên
+        const address = (Array.isArray(data) ? data[0]?.display : null) ?? "Vị trí hiện tại"
         setLocation(lat, lng, address)
       } catch {
         setLocation(lat, lng, "Vị trí hiện tại")
