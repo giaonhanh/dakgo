@@ -13,7 +13,7 @@ const GEOCODE_MS = 600
 const SEARCH_MS  = 500
 
 const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
-const STYLE_URL   = `https://maps.vietmap.vn/mt/tm/style.json?apikey=${VIETMAP_KEY}`
+const STYLE_URL   = `https://maps.vietmap.vn/api/maps/light/styles.json?apikey=${VIETMAP_KEY}`
 
 interface LatLng { lat: number; lng: number }
 
