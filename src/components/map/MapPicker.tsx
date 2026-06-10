@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { reverseGeocodeStructured } from "@/lib/vietmapRoute"
+import { applyBrandStyle } from "@/lib/mapStyle"
 
 const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
 const STYLE_URL   = `https://maps.vietmap.vn/mt/tm/style.json?apikey=${VIETMAP_KEY}`
@@ -43,6 +44,7 @@ export default function MapPicker({ lat, lng, onLocationChange, height = 200 }: 
       })
       mapRef.current = map
 
+      map.on("load", () => applyBrandStyle(map))
       map.on("dragstart", () => setFloating(true))
       map.on("dragend",   () => setFloating(false))
       map.on("moveend", () => {

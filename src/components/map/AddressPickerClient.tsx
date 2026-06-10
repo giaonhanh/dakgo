@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { AddressPickerResult } from "@/types"
 import { getCachedGeocode, setCachedGeocode } from "@/lib/geocodeCache"
+import { applyBrandStyle } from "@/lib/mapStyle"
 
 const DEFAULT_LAT = 12.7107
 const DEFAULT_LNG = 108.3034
@@ -230,7 +231,7 @@ export default function AddressPickerClient({
       })
       mapRef.current = map
 
-      map.on("load", () => setTilesReady(true))
+      map.on("load", () => { applyBrandStyle(map); setTilesReady(true) })
       map.on("dragstart", () => { setFloating(true); setShowSuggest(false) })
       map.on("dragend",   () => {
         setFloating(false)
