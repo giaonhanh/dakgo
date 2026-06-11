@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import Badge from "@/components/ui/Badge"
 
 type VoucherType = "percent" | "fixed" | "freeship"
 
@@ -75,9 +76,10 @@ function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () =
             </div>
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:2, flexWrap:"wrap" }}>
-                <span style={{ fontSize: 10, fontWeight:700, padding:"1px 6px", borderRadius:4, background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}` }}>
-                  {cfg.label}
-                </span>
+                <Badge
+                  variant={v.isCombo ? "voucher-combo" : v.type === "percent" ? "voucher-percent" : v.type === "fixed" ? "voucher-cash" : "voucher-ship"}
+                  size="sm"
+                />
                 {v.shopName && (
                   <span style={{ fontSize: 10, color:"#6a5a40", background:"rgba(255,255,255,0.04)", padding:"1px 6px", borderRadius:4, border:"1px solid rgba(255,255,255,0.07)" }}>
                     {v.shopName}
@@ -137,14 +139,15 @@ function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () =
                     📋
                   </button>
                 </div>
-                <div style={{ textAlign:"right" }}>
-                  <div style={{ fontSize: 11, color:countdown.urgent?"#ff4040":countdown.expired?"#6a5a40":"#6a5a40", fontWeight:countdown.urgent?700:400 }}>
-                    {countdown.text}
-                  </div>
+                <div style={{ textAlign:"right", display:"flex", flexDirection:"column", alignItems:"flex-end", gap:3 }}>
+                  {countdown.urgent
+                    ? <Badge variant="expire-urgent" size="sm" label={countdown.text} />
+                    : <div style={{ fontSize: 11, color:"#6a5a40" }}>{countdown.text}</div>
+                  }
                   {totalLeft !== null && !countdown.expired && (
-                    <div style={{ fontSize: 10, color: totalLeft<=5?"#ff4040":"#6a5a40", fontWeight: totalLeft<=5?700:400 }}>
-                      Còn {totalLeft} lượt
-                    </div>
+                    totalLeft <= 5
+                      ? <Badge variant="low-usage" size="sm" label={`Còn ${totalLeft} lượt`} />
+                      : <div style={{ fontSize: 10, color:"#6a5a40" }}>Còn {totalLeft} lượt</div>
                   )}
                 </div>
               </div>

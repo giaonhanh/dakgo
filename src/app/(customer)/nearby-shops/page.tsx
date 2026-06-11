@@ -6,6 +6,7 @@ import { motion } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/lib/categories"
 import { useCartStore } from "@/store/cartStore"
+import Badge from "@/components/ui/Badge"
 
 interface Shop {
   id: string; name: string; address: string
@@ -238,9 +239,7 @@ export default function NearbyShopsPage() {
                     {!s.isOpen && (
                       <div style={{ position:"absolute", inset:0, background:"rgba(8,8,6,0.65)",
                         display:"flex", alignItems:"center", justifyContent:"center" }}>
-                        <span style={{ color:"#ff6060", fontSize:10, fontWeight:800,
-                          background:"rgba(255,64,64,0.2)", padding:"2px 5px",
-                          borderRadius:4, border:"1px solid rgba(255,64,64,0.3)" }}>Đóng</span>
+                        <Badge variant="closed" size="sm" label="Đóng" />
                       </div>
                     )}
                   </div>
@@ -252,16 +251,7 @@ export default function NearbyShopsPage() {
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>
                         {s.name}
                       </div>
-                      <div style={{ flexShrink:0, display:"flex", alignItems:"center", gap:3,
-                        background: s.isOpen ? "rgba(62,207,110,0.12)" : "rgba(255,64,64,0.1)",
-                        border:`1px solid ${s.isOpen ? "rgba(62,207,110,0.3)" : "rgba(255,64,64,0.25)"}`,
-                        borderRadius:5, padding:"1px 6px" }}>
-                        <div style={{ width:5, height:5, borderRadius:"50%",
-                          background: s.isOpen ? "#3ecf6e" : "#ff6060" }} />
-                        <span style={{ color: s.isOpen ? "#3ecf6e" : "#ff6060", fontSize:10, fontWeight:700 }}>
-                          {s.isOpen ? "Mở" : "Đóng"}
-                        </span>
-                      </div>
+                      <Badge variant={s.isOpen ? "open" : "closed"} size="sm" label={s.isOpen ? "Mở" : "Đóng"} />
                     </div>
                     <div style={{ color:"#6a5a40", fontSize:10,
                       whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", marginBottom:4 }}>
@@ -269,16 +259,10 @@ export default function NearbyShopsPage() {
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                       {s.rating > 0 && (
-                        <span style={{ background:"rgba(255,179,71,0.1)", border:"1px solid rgba(255,179,71,0.2)",
-                          borderRadius:6, padding:"2px 7px", color:"#FFB347", fontSize:10, fontWeight:700 }}>
-                          ★ {s.rating.toFixed(1)}
-                        </span>
+                        <Badge variant="rating" size="sm" label={s.rating.toFixed(1)} />
                       )}
                       {s.distanceKm !== null && (
-                        <span style={{ background:"rgba(74,143,245,0.08)", border:"1px solid rgba(74,143,245,0.2)",
-                          borderRadius:6, padding:"2px 7px", color:"#4a8ff5", fontSize:10, fontWeight:600 }}>
-                          📍 {formatDist(s.distanceKm)}
-                        </span>
+                        <Badge variant="distance" size="sm" label={formatDist(s.distanceKm)} />
                       )}
                       {/* Category tags */}
                       {s.categories.slice(0, 2).map(v => {

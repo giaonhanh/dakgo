@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
+import Badge from "@/components/ui/Badge"
 
 interface BestProduct {
   rank:    number
@@ -103,7 +104,7 @@ export default function BestsellersPage() {
               <div style={{ color: "#6a5a40", fontSize: 10, marginTop: 2 }}>{b.shopName}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>
                 <span style={{ background: "linear-gradient(135deg,#FF6B00,#FFB347)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", fontSize: 13, fontWeight: 700 }}>{fmt(b.price)}</span>
-                <span style={{ background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.2)", borderRadius: 5, padding: "1px 7px", color: "#3ecf6e", fontSize: 11, fontWeight: 600 }}>🔥 {b.sold.toLocaleString("vi-VN")} đã bán</span>
+                <Badge variant="sold-count" size="sm" label={`${b.sold.toLocaleString("vi-VN")} đã bán`} />
               </div>
             </div>
 

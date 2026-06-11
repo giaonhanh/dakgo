@@ -27,6 +27,8 @@ import { useCartStore } from "@/store/cartStore"
 import { useLocationStore } from "@/store/locationStore"
 import { createClient } from "@/lib/supabase/client"
 import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/lib/categories"
+import Badge from "@/components/ui/Badge"
+import NotifDot from "@/components/ui/NotifDot"
 
 // ─── Types ─────────────────────────────────────────────────
 type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null; category?: string; categories?: string[] | null }
@@ -656,16 +658,7 @@ export default function HomePage() {
                   background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)",
                   display:"flex", alignItems:"center", justifyContent:"center",
                   fontSize:15 }}>🔔</div>
-                {notifCount > 0 && (
-                  <div style={{ position:"absolute", top:3, right:3,
-                    width:14, height:14, borderRadius:"50%",
-                    background:"#ff4040", border:"1.5px solid #080806",
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    color:"#fff", fontSize: 10, fontWeight:700,
-                    boxShadow:"0 0 4px #ff4040", animation:"pulse 1.5s infinite" }}>
-                    {notifCount > 9 ? "9+" : notifCount}
-                  </div>
-                )}
+                <NotifDot count={notifCount} />
               </a>
               <a href="/profile" style={{ textDecoration:"none" }}>
                 <div style={{ width:32, height:32, borderRadius:10,
@@ -1014,10 +1007,8 @@ export default function HomePage() {
                   position:"relative",
                 }}>
                   {s.badge && (
-                    <div style={{ position:"absolute", top:-3, right:4,
-                      background:"#ff4040", color:"#fff",
-                      fontSize:10, fontWeight:700, padding:"1px 5px", borderRadius:4 }}>
-                      {s.badge}
+                    <div style={{ position:"absolute", top:-3, right:4 }}>
+                      <Badge variant="hot" size="sm" label={s.badge} />
                     </div>
                   )}
                   <div style={{ width:38, height:38, borderRadius:11,
@@ -1207,17 +1198,13 @@ export default function HomePage() {
                       ? <Image src={p.image_url} alt={p.name} fill sizes="120px" style={{ objectFit:"cover" }} />
                       : <span style={{ zIndex:1 }}>🍽️</span>}
                     {discountPct > 0 && (
-                      <div style={{ position:"absolute", top:5, left:5, zIndex:2,
-                        background:"#ff4040", color:"#fff",
-                        fontSize:9, fontWeight:800, padding:"2px 5px", borderRadius:5 }}>
-                        -{discountPct}%
+                      <div style={{ position:"absolute", top:5, left:5, zIndex:2 }}>
+                        <Badge variant="discount" size="sm" label={`-${discountPct}%`} />
                       </div>
                     )}
                     {discountPct === 0 && p.sold_count > 0 && (
-                      <div style={{ position:"absolute", top:5, left:5, zIndex:2,
-                        background:"linear-gradient(90deg,#FF6B00,#FFB347)", color:"#fff",
-                        fontSize:9, fontWeight:800, padding:"2px 5px", borderRadius:5 }}>
-                        🔥 HOT
+                      <div style={{ position:"absolute", top:5, left:5, zIndex:2 }}>
+                        <Badge variant="hot" size="sm" />
                       </div>
                     )}
                   </div>
@@ -1284,9 +1271,7 @@ export default function HomePage() {
                         <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600,
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</div>
                         <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:3 }}>
-                          {s.is_open
-                            ? <span style={{ color:"#3ecf6e", fontSize: 11 }}>🟢 Mở cửa</span>
-                            : <span style={{ color:"#ff6060", fontSize: 11 }}>🔴 Đóng cửa</span>}
+                          <Badge variant={s.is_open ? "open" : "closed"} size="sm" label={s.is_open ? "Mở" : "Đóng"} />
                           <span style={{ color:"#6a5a40", fontSize: 11 }}>· ★ {s.rating_avg?.toFixed(1) ?? "Mới"}</span>
                         </div>
                       </div>
@@ -1420,48 +1405,16 @@ export default function HomePage() {
                       {/* ⭐ rating + 📍 km + trạng thái — cùng 1 hàng */}
                       <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
                         {/* Stars */}
-                        {rating && (
-                          <div style={{ display:"flex", alignItems:"center", gap:3,
-                            background:"rgba(255,179,71,0.1)", border:"1px solid rgba(255,179,71,0.25)",
-                            borderRadius:6, padding:"2px 7px" }}>
-                            <span style={{ color:"#FFB347", fontSize: 11 }}>★</span>
-                            <span style={{ color:"#FFB347", fontSize: 11, fontWeight:700 }}>{rating}</span>
-                          </div>
-                        )}
+                        {rating && <Badge variant="rating" size="sm" label={rating} />}
                         {/* Distance */}
-                        {distLabel && (
-                          <div style={{ display:"flex", alignItems:"center", gap:3,
-                            background:"rgba(74,143,245,0.08)", border:"1px solid rgba(74,143,245,0.2)",
-                            borderRadius:6, padding:"2px 7px" }}>
-                            <span style={{ fontSize: 11 }}>📍</span>
-                            <span style={{ color:"#4a8ff5", fontSize: 11, fontWeight:600 }}>{distLabel}</span>
-                          </div>
-                        )}
+                        {distLabel && <Badge variant="distance" size="sm" label={distLabel} />}
                         {/* Open/closed */}
-                        {shopOpen ? (
-                          <div style={{ display:"flex", alignItems:"center", gap:3,
-                            background:"rgba(62,207,110,0.08)", border:"1px solid rgba(62,207,110,0.2)",
-                            borderRadius:6, padding:"2px 7px" }}>
-                            <div style={{ width:5, height:5, borderRadius:"50%", background:"#3ecf6e",
-                              animation:"pulse 1.5s infinite" }} />
-                            <span style={{ color:"#3ecf6e", fontSize: 11, fontWeight:600 }}>Đang mở</span>
-                          </div>
-                        ) : (
-                          <div style={{ display:"flex", alignItems:"center", gap:3,
-                            background:"rgba(255,64,64,0.07)", border:"1px solid rgba(255,64,64,0.18)",
-                            borderRadius:6, padding:"2px 7px" }}>
-                            <span style={{ color:"#ff6060", fontSize: 11 }}>🔴 {nextOpenLabel(s)}</span>
-                          </div>
-                        )}
+                        {shopOpen
+                          ? <Badge variant="open" size="sm" label="Đang mở" />
+                          : <Badge variant="closed" size="sm" label={nextOpenLabel(s)} icon={false} />
+                        }
                         {/* Combo badge */}
-                        {comboShopIds.has(s.id) && (
-                          <div style={{ display:"flex", alignItems:"center", gap:3,
-                            background:"rgba(168,85,247,0.1)", border:"1px solid rgba(168,85,247,0.3)",
-                            borderRadius:6, padding:"2px 7px" }}>
-                            <span style={{ fontSize:10 }}>🎁</span>
-                            <span style={{ color:"#a855f7", fontSize:10, fontWeight:700 }}>Có Combo</span>
-                          </div>
-                        )}
+                        {comboShopIds.has(s.id) && <Badge variant="has-combo" size="sm" />}
                       </div>
                     </div>
                   </div>

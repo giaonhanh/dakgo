@@ -9,6 +9,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { useCartStore } from "@/store/cartStore"
 import { createClient } from "@/lib/supabase/client"
+import Badge from "@/components/ui/Badge"
 
 // ─── Types ────────────────────────────────────────────────
 interface Product {
@@ -393,43 +394,26 @@ function ProductCard({
             : "🍽️"}
         </div>
         {discount && (
-          <div style={{ position:"absolute", top:-4, left:-4,
-            background:"#ff4040", color:"#fff",
-            borderRadius:6, padding:"1px 6px",
-            fontSize: 11, fontWeight:800 }}>
-            -{discount}%
+          <div style={{ position:"absolute", top:-4, left:-4 }}>
+            <Badge variant="discount" size="sm" label={`-${discount}%`} />
           </div>
         )}
         {product.badge && (
-          <div style={{ position:"absolute", bottom:-4, right:-4,
-            borderRadius:6, padding:"2px 7px", fontSize: 10, fontWeight:800,
-            ...(product.badge === "hot"
-              ? { background:"linear-gradient(90deg,#ff4040,#ff6b00)", color:"#fff" }
-              : product.badge === "bigsale"
-              ? { background:"linear-gradient(90deg,#FFD700,#FF8C00)", color:"#fff" }
-              : product.badge === "new"
-              ? { background:"linear-gradient(90deg,#4a8ff5,#2ECC71)", color:"#fff" }
-              : { background:"linear-gradient(90deg,#3ecf6e,#2ea855)", color:"#fff" }) }}>
-            {product.badge === "hot" ? "🔥 HOT"
-              : product.badge === "bigsale" ? "💸 SALE"
-              : product.badge === "new" ? "✨ MỚI"
-              : "📈 BÁN CHẠY"}
+          <div style={{ position:"absolute", bottom:-4, right:-4 }}>
+            <Badge
+              variant={product.badge === "hot" ? "hot" : product.badge === "bigsale" ? "sale" : product.badge === "new" ? "new" : "bestseller"}
+              size="sm"
+            />
           </div>
         )}
         {!product.badge && product.hot && (
-          <div style={{ position:"absolute", bottom:-4, right:-4,
-            background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
-            color:"#fff", borderRadius:6, padding:"1px 6px",
-            fontSize: 10, fontWeight:700 }}>
-            🔥 Hot
+          <div style={{ position:"absolute", bottom:-4, right:-4 }}>
+            <Badge variant="hot" size="sm" />
           </div>
         )}
         {isInCombo && (
-          <div style={{ position:"absolute", top:-4, right:-4,
-            background:"linear-gradient(135deg,#2ECC71,#1a9e54)",
-            color:"#fff", borderRadius:6, padding:"1px 6px",
-            fontSize: 10, fontWeight:800 }}>
-            🎁 Combo
+          <div style={{ position:"absolute", top:-4, right:-4 }}>
+            <Badge variant="combo" size="sm" />
           </div>
         )}
       </div>
@@ -1028,17 +1012,8 @@ export default function ShopPage() {
             <div style={{ position:"absolute", inset:0,
               background:"linear-gradient(to top,rgba(8,8,6,0.85) 0%,transparent 60%)" }} />
             {shop && (
-              <div style={{ position:"absolute", top:92, right:16,
-                display:"flex", alignItems:"center", gap:5,
-                background: shopIsOpen ? "rgba(62,207,110,0.15)" : "rgba(255,64,64,0.15)",
-                border:`1px solid ${shopIsOpen ? "rgba(62,207,110,0.35)" : "rgba(255,64,64,0.35)"}`,
-                borderRadius:8, padding:"4px 10px", backdropFilter:"blur(8px)" }}>
-                <div style={{ width:6, height:6, borderRadius:"50%",
-                  background: shopIsOpen ? "#3ecf6e" : "#ff4040",
-                  animation:"shopPulse 1.5s infinite" }} />
-                <span style={{ color: shopIsOpen ? "#3ecf6e" : "#ff4040", fontSize: 11, fontWeight:600 }}>
-                  {shopIsOpen ? "Đang mở cửa" : "Đã đóng cửa"}
-                </span>
+              <div style={{ position:"absolute", top:92, right:16, backdropFilter:"blur(8px)" }}>
+                <Badge variant={shopIsOpen ? "open" : "closed"} size="md" />
               </div>
             )}
           </div>
@@ -1073,20 +1048,7 @@ export default function ShopPage() {
                       {shop.name}
                     </span>
                     {shop.shop_type && (
-                      <span style={{
-                        display:"inline-flex", alignItems:"center",
-                        background: shop.shop_type === "delivery"
-                          ? "linear-gradient(135deg,#FF6B00,#FF9500)"
-                          : "linear-gradient(135deg,#1aab5c,#2ecc71)",
-                        borderRadius: 99, padding: "3px 9px",
-                        fontSize: 9.5, fontWeight: 800, color: "#fff",
-                        letterSpacing: 0.3, whiteSpace: "nowrap", flexShrink: 0,
-                        boxShadow: shop.shop_type === "delivery"
-                          ? "0 2px 8px rgba(255,107,0,0.45)"
-                          : "0 2px 8px rgba(46,204,113,0.4)",
-                      }}>
-                        {shop.shop_type === "delivery" ? "🛒 Mua hộ" : "✅ Đối tác"}
-                      </span>
+                      <Badge variant={shop.shop_type === "delivery" ? "proxy" : "partner"} size="sm" />
                     )}
                   </div>
                   {/* Mô tả */}
