@@ -2,20 +2,20 @@
 
 // ============================================================
 // src/app/(customer)/page.tsx
-// Trang ch?  12 Sections ?y ? theo mockup d approved
-// S0  HomeHeader        GPS Radar + Bell + Avatar
-// S1  AIGreeting        Cho theo gi? + AI g?i 
-// S2  SearchBar         Tm ki?m + Filter
-// S3  LiveStatusBanner  on dang giao (hi?n c di?u ki?n)
-// S4  FlashSaleBanner   Banner khuy?n mi + countdown
-// S5  ServiceGrid       4 d?ch v? nhanh
-// S6  VoucherStrip      Voucher s?p h?t h?n
-// S7  CategoryCarousel  L?c lo?i mn an
-// S8  PromoSection      Khuy?n mi hm nay
-// S9  NearbyShops       Qun g?n b?n
-// S10 BestSellers       Bn ch?y tu?n ny
-// S11 LoyaltyPoints     i?m tch luy
-// S12 ReorderSection    ?t l?i nhanh
+// Trang ch? — 12 Sections Đ?y Đ? theo mockup dă approved
+// S0  HomeHeader       — GPS Radar + Bell + Avatar
+// S1  AIGreeting       — Chào theo giờ + AI gợi ý
+// S2  SearchBar        — Tìm kiếm + Filter
+// S3  LiveStatusBanner — Đơn đang giao (hiện có điều kiện)
+// S4  FlashSaleBanner  — Banner khuyến mãi + countdown
+// S5  ServiceGrid      — 4 dịch vụ nhanh
+// S6  VoucherStrip     — Voucher sắp hết hạn
+// S7  CategoryCarousel — Lọc loại món ăn
+// S8  PromoSection     — Khuyến mãi hôm nay
+// S9  NearbyShops      — Quán gần bạn
+// S10 BestSellers      — Bán chạy tuần này
+// S11 LoyaltyPoints    — Điểm tích lũy
+// S12 ReorderSection   — Đặt lại nhanh
 // + BottomNav floating capsule
 // ============================================================
 
@@ -46,15 +46,15 @@ type RecoRow    = { id: string; name: string; price: number; original_price: num
 type BannerRow  = { id: string; title: string; subtitle: string | null; image_url: string | null; link_url: string | null; sort_order: number }
 type NewMenuRow = { id: string; name: string; price: number; image_url: string | null; shop_id: string; created_at: string; shops: { name: string } | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 
-// Danh m?c hi?n th? trn trang ch?  l?y t? SHOP_CATEGORIES (b? "Khc")
+// Danh mục hiển thị trên trang chủ — lấy từ SHOP_CATEGORIES (bỏ "Khác")
 const HOME_CATS = SHOP_CATEGORIES.filter(c => c.value !== "khac")
 
-// --- Khng cn mock data  dng Supabase th?t -------------
+// --- Không c̣n mock data — dùng Supabase th?t -------------
 
 
 // --- Helpers ------------------------------------------------
 function shopInHoursFromHours(oh: { open?: string; close?: string } | null | undefined): boolean {
-  if (!oh?.open || !oh?.close) return true  // khng c gi? ? khng gi?i h?n
+  if (!oh?.open || !oh?.close) return true  // không có giờ → không giới hạn
   const now = new Date()
   const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
   const [oph, opm] = oh.open.split(":").map(Number)
@@ -71,7 +71,7 @@ function isShopOpen(p: ProductRow): boolean {
   return shopInHoursFromHours(s.opening_hours)
 }
 
-// Tnh qun c dang trong gi? m? c?a khng (mi gi? VN UTC+7)
+// Tính quán có đang trong giờ mở cửa không (múi giờ VN UTC+7)
 function isShopInHours(shop: ShopRow): boolean {
   if (!shop.is_open) return false
   const oh = shop.opening_hours
@@ -83,10 +83,10 @@ function isShopInHours(shop: ShopRow): boolean {
     const o = toMin(from), c = toMin(to)
     return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c
   }
-  // Format m?i: DayHours[]  m?i ngy c slots ring
+  // Format mới: DayHours[] — mỗi ngày có slots riêng
   if (Array.isArray(oh)) {
     const vnDate  = new Date(now.getTime() + 7 * 3600 * 1000)
-    const dayNames = ["Ch? nh?t","Th? 2","Th? 3","Th? 4","Th? 5","Th? 6","Th? 7"]
+    const dayNames = ["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"]
     const today   = dayNames[vnDate.getUTCDay()]
     const entry   = (oh as Array<{day:string;open:boolean;slots:{from:string;to:string}[]}>).find(d => d.day === today)
     if (!entry?.open) return false
@@ -98,11 +98,11 @@ function isShopInHours(shop: ShopRow): boolean {
   return inSlot(old.open, old.close)
 }
 
-// Gi? m? c?a ti?p theo d? hi?n th? "M? lc HH:mm"
+// Giờ mở cửa tiếp theo để hiển thị "Mở lúc HH:mm"
 function nextOpenLabel(shop: ShopRow): string {
   const oh = shop.opening_hours
-  if (oh?.open) return `M? lc ${oh.open}`
-  return "ang dng c?a"
+  if (oh?.open) return `M? lúc ${oh.open}`
+  return "Đang đóng cửa"
 }
 
 function isProductInTime(p: { all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }): boolean {
@@ -119,18 +119,18 @@ const fmt  = (n: number) => n.toLocaleString("vi-VN") + "d"
 const RANK_ICON = ["??","??","??"]
 
 function getWeatherTip(code: number, temp: number, hour: number): string {
-  if (code >= 95) return "?? Bo ging dang d?n! ? nh an ton, order ngay v? thi!"
-  if (code >= 80) return "??? ang c mua ro  d?t d? an giao v?, kh?i u?t!"
-  if (code >= 51) return "? Tr?i mua r?i, d?ng ra ngoi  order v? nh ?m cng hon!"
-  if (code >= 45) return "??? Suong m dy, h?n ch? di chuy?n  d?t v? nh nh!"
-  if (temp >= 35) return `??? Nng ${Math.round(temp)}C r?i! Sinh t?, nu?c p l?nh gi?i nhi?t ngay!`
-  if (temp >= 30) return `?? Tr?i ${Math.round(temp)}C  tr d, tr s?a d cho mt nh!`
-  if (temp <= 20) return `?? Mt ${Math.round(temp)}C  bn b, ph? nng h?p th?i ti?t l?m!`
-  if (hour < 10) return "? Sng mt, u?ng c ph hay an bnh m nng nh!"
-  if (hour < 12) return "? G?n trua r?i, d?t com tru?c d? khng ch? lu!"
-  if (hour < 14) return "?? Gi? com trua  d?t ngay k?o h?t su?t nh!"
-  if (hour < 18) return "?? Chi?u mt, u?ng g cho t?nh ngu?i di no!"
-  return "?? T?i r?i, bn b hay cho an l ngon nh?t!"
+  if (code >= 95) return "⛈️ Bão giông đang đến! Ở nhà an toàn, order ngay về thôi!"
+  if (code >= 80) return "🌧️ Đang có mưa rào — đặt để ăn giao về, khỏi ướt!"
+  if (code >= 51) return "🌦️ Trời mưa rồi, đừng ra ngoài — order về nhà ấm cúng hơn!"
+  if (code >= 45) return "🌫️ Sương mù dày, hạn chế di chuyển — đặt về nhà nhé!"
+  if (temp >= 35) return `🥵 Nóng ${Math.round(temp)}°C rồi! Sinh tố, nước ép lạnh giải nhiệt ngay!`
+  if (temp >= 30) return `☀️ Trời ${Math.round(temp)}°C — trà đá, trà sữa đá cho mát nhé!`
+  if (temp <= 20) return `🌤️ Mát ${Math.round(temp)}°C — bún bò, phở nóng hợp thời tiết lắm!`
+  if (hour < 10) return "☕ Sáng mát, uống cà phê hay ăn bánh mì nóng nhé!"
+  if (hour < 12) return "🍱 Gần trưa rồi, đặt cơm trước để không chờ lâu!"
+  if (hour < 14) return "🍜 Giờ cơm trưa — đặt ngay kẻo hết suất nhé!"
+  if (hour < 18) return "🧋 Chiều mát, uống gì cho tỉnh người đi nào!"
+  return "🍲 Tối rồi, bún bò hay cháo ăn là ngon nhất!"
 }
 
 // --- Sub-components -----------------------------------------
@@ -182,14 +182,14 @@ export default function HomePage() {
   const [conflictItem,  setConflictItem]  = useState<PendingItem | null>(null)
   const [weatherTip,    setWeatherTip]    = useState<string | null>(null)
 
-  // ?c d?a ch? t? locationStore (d du?c GpsInit trong layout l?y s?n)
+  // Đọc địa chỉ từ locationStore (đã được GpsInit trong layout lấy sẵn)
   const locationData = useLocationStore()
-  const location = locationData.address || "Phu?c An, Krng P?c"
+  const location = locationData.address || "Phước An, Krông Pắc"
   const containerRef = useRef<HTMLDivElement>(null)
   const cartIconRef  = useRef<HTMLDivElement>(null)
 
   // --- Real data state ---------------------------------------
-  const [userName,      setUserName]      = useState("b?n")
+  const [userName,      setUserName]      = useState("bạn")
   const [notifCount,    setNotifCount]    = useState(0)
   const [liveOrders,    setLiveOrders]    = useState<LiveOrderRow[]>([])
   const [liveIdx,       setLiveIdx]       = useState(0)
@@ -224,7 +224,7 @@ export default function HomePage() {
         .eq("user_id", user.id).eq("is_read", false)
       setNotifCount(count ?? 0)
 
-      // Live orders: don d? an dang x? l
+      // Live orders: don d? an dang x? lư
       const { data: liveFood } = await supabase
         .from("orders")
         .select("id, status, shops(name)")
@@ -233,7 +233,7 @@ export default function HomePage() {
         .order("created_at", { ascending: false })
         .limit(5)
 
-      // Live rides (xe m / taxi dang tm xe / dang di)
+      // Live rides (xe ôm / taxi dang t́m xe / dang di)
       const { data: liveRides } = await supabase
         .from("rides")
         .select("id, status, vehicle_type")
@@ -242,7 +242,7 @@ export default function HomePage() {
         .order("created_at", { ascending: false })
         .limit(3)
 
-      // Live errands (giao h? / mua h? dang x? l)
+      // Live errands (giao h? / mua h? dang x? lư)
       const { data: liveErrands } = await supabase
         .from("errands")
         .select("id, status, type")
@@ -254,14 +254,14 @@ export default function HomePage() {
       const ridesMapped = (liveRides ?? []).map(r => ({
         id: r.id,
         status: r.status === "searching" ? "pending" : r.status,
-        shops: { name: r.vehicle_type === "motorbike" ? "?? Xe m" : r.vehicle_type === "car_7" ? "?? Taxi 7 ch?" : "?? Taxi 4 ch?" },
+        shops: { name: r.vehicle_type === "motorbike" ? "?? Xe ôm" : r.vehicle_type === "car_7" ? "🚐 Taxi 7 chỗ" : "🚗 Taxi 4 chỗ" },
         _href: "/orders",
         _type: "ride" as const,
       }))
       const errandsMapped = (liveErrands ?? []).map(e => ({
         id: e.id,
         status: e.status === "pending" ? "pending" : e.status,
-        shops: { name: e.type === "buy_for_me" ? "?? Mua h?" : "?? Giao h?" },
+        shops: { name: e.type === "buy_for_me" ? "🛒 Mua hộ" : "📦 Giao hộ" },
         _href: "/orders",
         _type: "errand" as const,
       }))
@@ -278,14 +278,14 @@ export default function HomePage() {
         .limit(6)
       setVouchers((voucherData ?? []) as VoucherRow[])
 
-      // Nearby shops: fetch c? dng l?n m?, tnh gi? client-side
+      // Nearby shops: fetch cả đóng lẫn mở, tính giờ client-side
       const { data: shopData } = await supabase
         .from("shops")
         .select("id,name,is_open,rating_avg,address,logo_url,location,opening_hours,category,categories")
         .eq("status", "approved")
         .order("rating_avg", { ascending: false })
         .limit(30)
-      // Sort: dang m? ln tru?c, dng xu?ng du?i
+      // Sort: đang mở lên trước, đóng xuống dưới
       const sorted = (shopData ?? [] as ShopRow[]).sort((a, b) => {
         const aOpen = isShopInHours(a as ShopRow) ? 1 : 0
         const bOpen = isShopInHours(b as ShopRow) ? 1 : 0
@@ -293,7 +293,7 @@ export default function HomePage() {
       })
       setNearbyShops(sorted as ShopRow[])
 
-      // Combo vouchers dang active  dnh d?u qun no c combo
+      // Combo vouchers đang active — đánh dấu quán nào có combo
       if (shopData && shopData.length > 0) {
         const shopIds = (shopData as ShopRow[]).map(s => s.id)
         const now = new Date().toISOString()
@@ -307,7 +307,7 @@ export default function HomePage() {
         if (comboData) setComboShopIds(new Set(comboData.map((v: { shop_id: string }) => v.shop_id)))
       }
 
-      // Best sellers  top bn ch?y, khng l?c theo gi? (sold_count >= 0)
+      // Best sellers — top bán chạy, không lọc theo giờ (sold_count >= 0)
       const { data: bsData } = await supabase
         .from("products")
         .select("id,name,price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour")
@@ -317,7 +317,7 @@ export default function HomePage() {
         .limit(20)
       setBestSellers(((bsData ?? []) as ProductRow[]).filter(p => isShopOpen(p)).slice(0, 8))
 
-      // Promos  s?n ph?m c gi khuy?n mi (original_price > price)
+      // Promos — sản phẩm có giá khuyến mãi (original_price > price)
       const { data: promoData } = await supabase
         .from("products")
         .select("id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour")
@@ -326,12 +326,12 @@ export default function HomePage() {
         .not("original_price", "is", null)
         .order("sold_count", { ascending: false })
         .limit(20)
-      // Fallback: n?u khng c s?n ph?m KM, l?y s?n ph?m bn ch?y nh?t
+      // Fallback: nếu không có sản phẩm KM, lấy sản phẩm bán chạy nhất
       const promoFiltered = ((promoData ?? []) as ProductRow[]).filter(p => isShopOpen(p))
       if (promoFiltered.length > 0) {
         setPromos(promoFiltered.slice(0, 8))
       } else {
-        // fallback: top s?n ph?m t? qun dang m?
+        // fallback: top sản phẩm từ quán đang mở
         const { data: fallbackPromo } = await supabase
           .from("products")
           .select("id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour")
@@ -351,7 +351,7 @@ export default function HomePage() {
         .limit(5)
       setAdminBanners((bannerData ?? []) as BannerRow[])
 
-      // V?a ln menu  qun dang m?, trong khung gi? bn
+      // V?a lên menu — quán đang mở, trong khung giờ bán
       const { data: newMenuData } = await supabase
         .from("products")
         .select("id,name,price,image_url,shop_id,shops!inner(name,is_open,status,opening_hours),created_at,all_day,start_hour,end_hour")
@@ -465,7 +465,7 @@ export default function HomePage() {
     })
   }
 
-  // Weather tip  dng t?a d? t? locationStore (GPS d du?c layout l?y s?n)
+  // Weather tip — dùng tọa độ từ locationStore (GPS đã được layout lấy sẵn)
   useEffect(() => {
     const { lat, lng } = useLocationStore.getState()
     if (!lat || !lng) return
@@ -480,14 +480,14 @@ export default function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationData.ready])
 
-  // Banner auto-slide  cycle through real vouchers
+  // Banner auto-slide — cycle through real vouchers
   useEffect(() => {
     if (vouchers.length <= 1) return
     const t = setInterval(() => setBannerIdx(i => (i + 1) % vouchers.length), 3500)
     return () => clearInterval(t)
   }, [vouchers])
 
-  // Countdown  computed from current deal's valid_to
+  // Countdown — computed from current deal's valid_to
   useEffect(() => {
     if (!vouchers.length) return
     const update = () => {
@@ -569,18 +569,18 @@ export default function HomePage() {
 
   const greet = () => {
     const h = new Date().getHours()
-    if (h < 12) return "Bu?i sng t?t lnh"
-    if (h < 18) return "Bu?i chi?u t?t lnh"
-    return "Bu?i t?i t?t lnh"
+    if (h < 12) return "Buổi sáng tốt lành"
+    if (h < 18) return "Buổi chiều tốt lành"
+    return "Buổi tối tốt lành"
   }
 
   const aiTip = () => {
     const h = new Date().getHours()
-    if (h < 10) return "? Sng mt, u?ng c ph hay an bnh m nng nh!"
-    if (h < 12) return "? G?n trua r?i, d?t com tru?c d? khng ch? lu!"
-    if (h < 14) return "?? N?ng nng, b? sung nu?c  tr s?a ho?c sinh t??"
-    if (h < 18) return "?? Bu?i chi?u, an nh? ho?c u?ng tr s?a di!"
-    return "?? T?i r?i, bn b hay cho an l ngon nh?t!"
+    if (h < 10) return "☕ Sáng mát, uống cà phê hay ăn bánh mì nóng nhé!"
+    if (h < 12) return "🍱 Gần trưa rồi, đặt cơm trước để không chờ lâu!"
+    if (h < 14) return "☀️ Nóng nóng, bổ sung nước — trà sữa hoặc sinh tố!"
+    if (h < 18) return "🧋 Buổi chiều, ăn nhẹ hoặc uống trà sữa đi!"
+    return "🍲 Tối rồi, bún bò hay cháo ăn là ngon nhất!"
   }
 
   const padZ = (n:number) => String(n).padStart(2,"0")
@@ -621,7 +621,7 @@ export default function HomePage() {
           paddingBottom:80, WebkitOverflowScrolling:"touch" } as React.CSSProperties}>
 
           {/* --------------------------------------
-              S0  HomeHeader
+              S0 — HomeHeader
           -------------------------------------- */}
           <div style={{ padding:"8px 16px 6px", display:"flex",
             justifyContent:"space-between", alignItems:"center" }}>
@@ -640,7 +640,7 @@ export default function HomePage() {
                 ))}
               </div>
               <div>
-                <div style={{ color:"#6a5a40", fontSize: 11 }}>V? tr c?a b?n</div>
+                <div style={{ color:"#6a5a40", fontSize: 11 }}>Vị trí của bạn</div>
                 <div onClick={() => router.push("/addresses")}
                   style={{ color:"#f8f0e0", fontSize:12, fontWeight:600, cursor:"pointer",
                     display:"flex", alignItems:"center", gap:4 }}>
@@ -671,19 +671,19 @@ export default function HomePage() {
           </div>
 
           {/* --------------------------------------
-              S1  AIGreeting
+              S1 — AIGreeting
           -------------------------------------- */}
           <div style={{ padding:"2px 16px 12px" }}>
             <div style={{ color:"#6a5a40", fontSize:10, marginBottom:2 }}>
               {greet()}, {userName} ??
             </div>
             <div style={{ fontSize:18, fontWeight:700, lineHeight:1.2, marginBottom:8 }}>
-              Hm nay b?n{" "}
+              Hôm nay bạn{" "}
               <span style={{
                 background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
                 WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
                 backgroundClip:"text",
-              }}>mu?n d?t g?</span>
+              }}>muốn đặt gì?</span>
             </div>
             {/* AI tip card */}
             <div style={{
@@ -694,15 +694,15 @@ export default function HomePage() {
             }}>
               <span style={{ fontSize:14 }}>??</span>
               <div style={{ color:"#b464ff", fontSize: 11, lineHeight:1.4, flex:1 }}>
-                <strong style={{ color:"#c87aff" }}>G?i  AI:</strong>{" "}
+                <strong style={{ color:"#c87aff" }}>Gợi ý AI:</strong>{" "}
                 {weatherTip ?? aiTip()}
               </div>
-              <span style={{ color:"rgba(180,100,255,0.5)", fontSize:12 }}></span>
+              <span style={{ color:"rgba(180,100,255,0.5)", fontSize:12 }}>›</span>
             </div>
           </div>
 
           {/* --------------------------------------
-              S2  SearchBar
+              S2 — SearchBar
           -------------------------------------- */}
           <div style={{ margin:"0 16px 12px",
             background:"rgba(255,255,255,0.07)",
@@ -711,7 +711,7 @@ export default function HomePage() {
             borderRadius:13, padding:"9px 13px",
             display:"flex", alignItems:"center", gap:8 }}>
             <span style={{ color:"#6a5a40", fontSize:15 }}>??</span>
-            <input readOnly placeholder="Tm mn an, c?a hng, d?ch v?..."
+            <input readOnly placeholder="Tìm món ăn, cửa hàng, dịch vụ..."
               onClick={() => { window.location.href="/search" }}
               style={{ flex:1, background:"transparent", border:"none", outline:"none",
                 color:"#6a5a40", fontSize:11, fontFamily:"Lexend", cursor:"pointer" }} />
@@ -725,7 +725,7 @@ export default function HomePage() {
           </div>
 
           {/* --------------------------------------
-              S3  LiveStatusBanner (carousel da don)
+              S3 — LiveStatusBanner (carousel da don)
           -------------------------------------- */}
           <AnimatePresence>
             {liveOrders.length > 0 && (
@@ -734,7 +734,7 @@ export default function HomePage() {
                 exit={{ opacity:0, y:-8 }}
                 style={{ margin:"0 16px 12px" }}>
 
-                {/* Header row n?u c nhi?u don */}
+                {/* Header row nếu có nhiều đơn */}
                 {liveOrders.length > 1 && (
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
                     marginBottom:6 }}>
@@ -743,7 +743,7 @@ export default function HomePage() {
                         background:"#3ecf6e", boxShadow:"0 0 5px #3ecf6e",
                         animation:"pulse 1.5s infinite" }} />
                       <span style={{ color:"#3ecf6e", fontSize: 11, fontWeight:600 }}>
-                        {liveOrders.length} don dang x? l
+                        {liveOrders.length} don dang x? lư
                       </span>
                     </div>
                     {/* Dots */}
@@ -770,21 +770,21 @@ export default function HomePage() {
                     willChange:"transform",
                   }}>
                     {liveOrders.map(order => {
-                      const shopName = (order.shops as {name:string}|null)?.name ?? "Qun dang chu?n b?"
+                      const shopName = (order.shops as {name:string}|null)?.name ?? "Quán đang chuẩn bị"
                       const isRide   = order._type === "ride"
                       const isErrand = order._type === "errand"
                       const statusLabel = isRide
-                        ? (order.status === "pending" ? "ang tm ti x?..." :
-                           order.status === "accepted" ? "Ti x? dang d?n" :
-                           order.status === "delivering" ? "ang trn du?ng" : "ang x? l")
+                        ? (order.status === "pending" ? "Đang t́m tài x?..." :
+                           order.status === "accepted" ? "Tài xế đang đến" :
+                           order.status === "delivering" ? "Đang trên đường" : "Đang xử lý")
                         : isErrand
-                        ? (order.status === "pending" ? "ang tm ti x?..." :
-                           order.status === "accepted" ? "Ti x? dang x? l" :
-                           order.status === "delivering" ? "ang giao" : "ang x? l")
-                        : (order.status === "pending"    ? "Ch? qun xc nh?n" :
-                           order.status === "accepted" || order.status === "preparing" ? " xc nh?n  ang lm" :
-                           order.status === "ready"      ? "ang tm ti x?" :
-                           order.status === "delivering" ? "ang giao hng" : "ang x? l")
+                        ? (order.status === "pending" ? "Đang t́m tài x?..." :
+                           order.status === "accepted" ? "Tài x? dang x? lư" :
+                           order.status === "delivering" ? "Đang giao" : "Đang xử lý")
+                        : (order.status === "pending"    ? "Chờ quán xác nhận" :
+                           order.status === "accepted" || order.status === "preparing" ? "Đã xác nhận · Đang làm" :
+                           order.status === "ready"      ? "Đang tìm tài xế" :
+                           order.status === "delivering" ? "Đang giao hàng" : "Đang xử lý")
                       const statusColor =
                         order.status === "delivering" ? "#FF8C00" :
                         order.status === "ready"      ? "#FFB347" : "#3ecf6e"
@@ -823,10 +823,10 @@ export default function HomePage() {
                                 </span>
                               </div>
                               <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginTop:2 }}>
-                                {shopName}  #{order.id.slice(0,8).toUpperCase()}
+                                {shopName} · #{order.id.slice(0,8).toUpperCase()}
                               </div>
                               <div style={{ color:"rgba(255,255,255,0.35)", fontSize: 11, marginTop:1 }}>
-                                Nh?n d? theo di don hng
+                                Nhấn để theo dõi đơn hàng
                               </div>
                             </div>
                             <div style={{
@@ -847,16 +847,16 @@ export default function HomePage() {
           </AnimatePresence>
 
           {/* --------------------------------------
-              S4  FlashSaleBanner / AdminBanner / InviteFriend
+              S4 — FlashSaleBanner / AdminBanner / InviteFriend
           -------------------------------------- */}
           {vouchers.length > 0 ? (() => {
             const DEAL_EMOJI: Record<string, string> = { percent:"??", fixed:"??", freeship:"??" }
             const deal = vouchers[bannerIdx % vouchers.length]
             const dealEmoji   = DEAL_EMOJI[deal.discount_type] ?? "?"
             const dealTitle   = deal.title
-            const dealSubLine = deal.discount_type === "percent"  ? `Gi?m ${deal.discount_value}%  p d?ng ngay`
-              : deal.discount_type === "fixed"    ? `Gi?m ${fmt(deal.discount_value)}  ?t ngay`
-              : "Mi?n ph giao hng  on t? b?t k?"
+            const dealSubLine = deal.discount_type === "percent"  ? `Giảm ${deal.discount_value}% · Áp dụng ngay`
+              : deal.discount_type === "fixed"    ? `Giảm ${fmt(deal.discount_value)} · Đặt ngay`
+              : "Miễn phí giao hàng · Đơn từ bất kỳ"
             return (
               <div style={{ margin:"0 16px 8px" }}>
                 <div style={{
@@ -877,7 +877,7 @@ export default function HomePage() {
                       background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
                       borderRadius:8, padding:"3px 11px", marginBottom:8,
                       color:"#000", fontSize:10, fontWeight:700, letterSpacing:.4 }}>
-                      ? FLASH SALE  {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
+                      ? FLASH SALE · {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
                     </div>
                     <div style={{ color:"#fff", fontSize:18, fontWeight:700, lineHeight:1.25, maxWidth:"62%", wordBreak:"break-word" }}>
                       {dealTitle}
@@ -889,7 +889,7 @@ export default function HomePage() {
                       style={{ display:"inline-block", marginTop:10, cursor:"pointer",
                         background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)",
                         borderRadius:8, padding:"5px 14px", color:"#fff", fontSize:11, fontWeight:600 }}>
-                      ?t ngay ?
+                      Đ?t ngay ?
                     </div>
                   </div>
                   <div style={{ position:"absolute", right:18, top:"50%", transform:"translateY(-50%)",
@@ -950,7 +950,7 @@ export default function HomePage() {
           )}
 
           {/* --------------------------------------
-              S4.5  M?i b?n b (lun hi?n th?)
+              S4.5 — Mời bạn bè (luôn hiển thị)
           -------------------------------------- */}
           <div style={{ margin:"0 16px 14px" }}>
               <div style={{ height:110, borderRadius:16, overflow:"hidden",
@@ -964,13 +964,13 @@ export default function HomePage() {
                     background:"linear-gradient(135deg,#3ecf6e,#27ae60)",
                     borderRadius:8, padding:"2px 9px", marginBottom:5,
                     color:"#000", fontSize: 11, fontWeight:700, letterSpacing:.4 }}>
-                    ?? M?I B?N B
+                    🎉 MỜI BẠN BÈ
                   </div>
                   <div style={{ color:"#fff", fontSize:13, fontWeight:700, lineHeight:1.3, maxWidth:"62%", wordBreak:"break-word" }}>
-                    M?i b?n b, nh?n 5.000 XU!
+                    Mời bạn bè, nhận 5.000 XU!
                   </div>
                   <div style={{ color:"rgba(255,255,255,0.45)", fontSize: 11, marginTop:3 }}>
-                    C? hai nh?n 5.000 xu  on d?u t? 50.000d
+                    Cả hai nhận 5.000 xu · Đơn đầu từ 50.000đ
                   </div>
                   <div style={{ display:"inline-block", marginTop:6,
                     background:"rgba(62,207,110,0.15)", border:"1px solid rgba(62,207,110,0.35)",
@@ -984,17 +984,17 @@ export default function HomePage() {
           </div>
 
           {/* --------------------------------------
-              S5  ServiceGrid (4 d?ch v? nhanh)
+              S5 — ServiceGrid (4 dịch vụ nhanh)
           -------------------------------------- */}
-          <SectionHeader title="D?ch v? nhanh" />
+          <SectionHeader title="Dịch vụ nhanh" />
           <div style={{
             display:"grid", gridTemplateColumns:"repeat(4,1fr)",
             gap:7, padding:"0 16px", marginBottom:14,
           }}>
             {[
-              { icon:"??", label:"Giao h?",  href:"/giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00", badge:"HOT" },
-              { icon:"??", label:"Mua h?",   href:"/mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e", badge:"" },
-              { icon:"??", label:"Xe m",    href:"/xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5", badge:"" },
+              { icon:"??", label:"Giao hộ",  href:"/giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00", badge:"HOT" },
+              { icon:"??", label:"Mua hộ",   href:"/mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e", badge:"" },
+              { icon:"??", label:"Xe ôm",    href:"/xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5", badge:"" },
               { icon:"??", label:"Taxi",     href:"/taxi",    bg:"rgba(180,100,255,0.10)",ic:"#b464ff", badge:"" },
             ].map((s,i) => (
               <a key={i} href={s.href} style={{ textDecoration:"none" }}>
@@ -1024,9 +1024,9 @@ export default function HomePage() {
           </div>
 
           {/* --------------------------------------
-              S6  Voucher (khm ph t?t c?)
+              S6 — Voucher (khám phá tất cả)
           -------------------------------------- */}
-          <SectionHeader title="??? Voucher" more="Xem t?t c? ?" href="/vouchers" />
+          <SectionHeader title="??? Voucher" more="Xem tất cả →" href="/vouchers" />
           {vouchers.length === 0 ? (
             <div style={{ margin:"0 16px 14px",
               background:"rgba(255,107,0,0.04)",
@@ -1045,18 +1045,18 @@ export default function HomePage() {
               </div>
               <div style={{ textAlign:"center" }}>
                 <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700, marginBottom:5 }}>
-                  Chua c voucher no
+                  Chua có voucher nào
                 </div>
                 <div style={{ color:"#6a5a40", fontSize:10, lineHeight:1.7 }}>
-                  ?t don d?u tin d? nh?n ngay<br/>
-                  <span style={{ color:"#FFB347", fontWeight:600 }}>uu di h?p d?n t? Giao Nhanh!</span>
+                  Đặt đơn đầu tiên để nhận ngay<br/>
+                  <span style={{ color:"#FFB347", fontWeight:600 }}>ưu đãi hấp dẫn từ Giao Nhanh!</span>
                 </div>
               </div>
               <a href="/nearby-shops" style={{ textDecoration:"none" }}>
                 <div style={{ background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.25)",
                   borderRadius:10, padding:"7px 18px",
                   color:"#FF8C00", fontSize:10, fontWeight:700 }}>
-                  Khm ph qun ngay ?
+                  Khám phá quán ngay ?
                 </div>
               </a>
             </div>
@@ -1068,7 +1068,7 @@ export default function HomePage() {
                 const expDate = new Date(v.valid_to)
                 const daysLeft = Math.ceil((expDate.getTime() - Date.now()) / 86400000)
                 const urgent = daysLeft <= 1
-                const expiryLabel = daysLeft <= 0 ? "H?t h?n HM NAY!" : daysLeft === 1 ? "Cn 1 ngy" : `Cn ${daysLeft} ngy`
+                const expiryLabel = daysLeft <= 0 ? "Hết hạn HÔM NAY!" : daysLeft === 1 ? "Còn 1 ngày" : `Còn ${daysLeft} ngày`
                 const valueLabel = v.discount_type === "percent" ? `-${v.discount_value}%`
                   : v.discount_type === "freeship" ? "Free ship"
                   : `-${v.discount_value.toLocaleString("vi-VN")}d`
@@ -1101,7 +1101,7 @@ export default function HomePage() {
                     {v.min_order && v.min_order > 0 && (
                       <div style={{ marginBottom:6 }}>
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
-                          <span style={{ fontSize: 10, color:"#6a5a40" }}>?t t?</span>
+                          <span style={{ fontSize: 10, color:"#6a5a40" }}>Đặt từ</span>
                           <span style={{ fontSize: 10, color: isShop ? "#4a8ff5" : "#FF8C00", fontWeight:700 }}>
                             {v.min_order.toLocaleString("vi-VN")}d
                           </span>
@@ -1126,7 +1126,7 @@ export default function HomePage() {
                           background: saved ? "rgba(62,207,110,0.15)" : "rgba(255,107,0,0.15)",
                           color: saved ? "#3ecf6e" : "#FF8C00", transition:"all .2s",
                         }}>
-                        {saved ? "?  luu" : "?? Luu"}
+                        {saved ? "✓ Đã lưu" : "🔖 Lưu"}
                       </button>
                     </div>
                   </div>
@@ -1136,9 +1136,9 @@ export default function HomePage() {
           )}
 
           {/* --------------------------------------
-              S7  Danh m?c theo lo?i mn
+              S7 — Danh mục theo loại món
           -------------------------------------- */}
-          <SectionHeader title="Danh m?c" more="T?t c? ?" href="/danh-muc" />
+          <SectionHeader title="Danh mục" more="Tất cả →" href="/danh-muc" />
           <div style={{ overflowX:"auto", display:"flex", gap:8, padding:"0 16px 4px", marginBottom:10,
             scrollbarWidth:"none", msOverflowStyle:"none" }}>
             {HOME_CATS.map((m, i) => (
@@ -1174,10 +1174,10 @@ export default function HomePage() {
           </div>
 
           {/* --------------------------------------
-              S8  PromoSection
+              S8 — PromoSection
           -------------------------------------- */}
           {promos.length > 0 && (<>
-          <SectionHeader title="?? Khuy?n mi hm nay" more="Xem t?t c? ?" href="/promo-items" />
+          <SectionHeader title="?? Khuyến mãi hôm nay" more="Xem tất cả →" href="/promo-items" />
             <HScroll>
             {promos.map(p => {
               const shopName = (p.shops as {name:string}|null)?.name ?? ""
@@ -1225,7 +1225,7 @@ export default function HomePage() {
                     </div>
                     <div style={{ display:"flex", alignItems:"center",
                       justifyContent:"space-between", marginTop:4 }}>
-                      <span style={{ color:"#6a5a40", fontSize:9 }}>?? {p.sold_count} d bn</span>
+                      <span style={{ color:"#6a5a40", fontSize:9 }}>?? {p.sold_count} dă bán</span>
                       <button
                         onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:p.id, name:p.name, price:p.price, shop:shopName, shopId:p.shop_id }) }}
                         style={{ width:22, height:22, borderRadius:7,
@@ -1243,11 +1243,11 @@ export default function HomePage() {
           </>)}
 
           {/* --------------------------------------
-              S8.5  C?a hng yu thch
+              S8.5 — Cửa hàng yêu thích
           -------------------------------------- */}
           {favoriteShops.length > 0 && (
             <>
-              <SectionHeader title="?? C?a hng yu thch" />
+              <SectionHeader title="❤️ Cửa hàng yêu thích" />
               <HScroll>
                 {favoriteShops.map(s => (
                   <a key={s.id} href={`/shop/${s.id}`} style={{ textDecoration:"none", flexShrink:0 }}>
@@ -1271,8 +1271,8 @@ export default function HomePage() {
                         <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600,
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</div>
                         <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:3 }}>
-                          <Badge layer={3} variant={s.is_open ? "open" : "closed"} size="sm" label={s.is_open ? "M?" : "ng"} />
-                          <span style={{ color:"#6a5a40", fontSize: 11 }}> ? {s.rating_avg?.toFixed(1) ?? "M?i"}</span>
+                          <Badge layer={3} variant={s.is_open ? "open" : "closed"} size="sm" label={s.is_open ? "Mở" : "Đóng"} />
+                          <span style={{ color:"#6a5a40", fontSize: 11 }}>· ? {s.rating_avg?.toFixed(1) ⭐ "Mới"}</span>
                         </div>
                       </div>
                     </div>
@@ -1283,11 +1283,11 @@ export default function HomePage() {
           )}
 
           {/* --------------------------------------
-              S9  NearbyShops
+              S9 — NearbyShops
           -------------------------------------- */}
-          <SectionHeader title="?? Qun g?n b?n" more="Xem t?t c? ?" href="/nearby-shops" />
+          <SectionHeader title="?? Quán gần bạn" more="Xem tất cả →" href="/nearby-shops" />
 
-          {/* Filter chips  danh m?c c qun */}
+          {/* Filter chips — danh mục có quán */}
           {(() => {
             const usedCats = [...new Set(nearbyShops.flatMap(s => {
               const cats = Array.isArray(s.categories) && s.categories.length > 0 ? s.categories : s.category ? [s.category] : []
@@ -1316,7 +1316,7 @@ export default function HomePage() {
                         border: active ? `1px solid ${cat.color.replace(/[\d.]+\)$/, "0.5)")}` : "1px solid rgba(255,255,255,0.08)",
                         color: active ? "#f8f0e0" : "#6a5a40", transition:"all .15s",
                         display:"flex", alignItems:"center", gap:4 }}>
-                      {cat.emoji} {cat.label.split("  ")[0]}
+                      {cat.emoji} {cat.label.split(" · ")[0]}
                     </button>
                   )
                 })}
@@ -1334,7 +1334,7 @@ export default function HomePage() {
             gap:9, marginBottom:14 }}>
             {filteredShops.length === 0 ? (
               <div style={{ textAlign:"center", padding:"20px 0", color:"#6a5a40", fontSize:11 }}>
-                Chua c qun no{nearbyFilter !== "all" ? " trong danh m?c ny" : " trong khu v?c"}
+                Chưa có quán nào{nearbyFilter !== "all" ? " trong danh mục này" : " trong khu vực"}
               </div>
             ) : filteredShops.map(s => {
               const isFav    = favoriteIds.includes(s.id)
@@ -1350,7 +1350,7 @@ export default function HomePage() {
               const shopOpen = isShopInHours(s)
               return (
               <div key={s.id} style={{ position:"relative", opacity: shopOpen ? 1 : 0.55 }}>
-                {/* Qun dng: ch?n click, hi?n toast */}
+                {/* Quán đóng: chọn click, hiện toast */}
                 {!shopOpen && (
                   <div onClick={() => {
                     const el = document.getElementById(`closed-toast-${s.id}`)
@@ -1358,7 +1358,7 @@ export default function HomePage() {
                   }}
                   style={{ position:"absolute", inset:0, zIndex:2, cursor:"not-allowed", borderRadius:14 }} />
                 )}
-                {/* Toast dng c?a */}
+                {/* Toast đóng cửa */}
                 {!shopOpen && (
                   <div id={`closed-toast-${s.id}`} style={{
                     position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)",
@@ -1395,14 +1395,14 @@ export default function HomePage() {
 
                     {/* Info */}
                     <div style={{ flex:1, minWidth:0 }}>
-                      {/* Tn qun */}
+                      {/* Tên quán */}
                       <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700,
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
                         marginBottom:5 }}>
                         {s.name}
                       </div>
 
-                      {/* ? rating + ?? km + tr?ng thi  cng 1 hng */}
+                      {/* ⭐ rating + 📍 km + trạng thái — cùng 1 hàng */}
                       <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
                         {/* Stars */}
                         {rating && <Badge layer={2} variant="rating" size="sm" label={rating} />}
@@ -1410,7 +1410,7 @@ export default function HomePage() {
                         {distLabel && <Badge layer={2} variant="distance" size="sm" label={distLabel} />}
                         {/* Open/closed */}
                         {shopOpen
-                          ? <Badge layer={3} variant="open" size="sm" label="ang m?" />
+                          ? <Badge layer={3} variant="open" size="sm" label="Đang mở" />
                           : <Badge layer={3} variant="closed" size="sm" label={nextOpenLabel(s)} icon={false} />
                         }
                         {/* Combo badge */}
@@ -1437,11 +1437,11 @@ export default function HomePage() {
           })()}
 
           {/* --------------------------------------
-              S9.5  V?a ln menu (s?n ph?m m?i nh?t)
+              S9.5 — Vừa lên menu (sản phẩm mới nhất)
           -------------------------------------- */}
           {newMenuItems.length > 0 && (
             <>
-              <SectionHeader title="?? V?a ln menu" more="Xem thm ?" href="/search?sort=newest" />
+              <SectionHeader title="🆕 Vừa lên menu" more="Xem thêm →" href="/search?sort=newest" />
               <HScroll>
                 {newMenuItems.map(p => {
                   const shopName = (p.shops as {name:string}|null)?.name ?? ""
@@ -1462,7 +1462,7 @@ export default function HomePage() {
                           ???
                           <div style={{ position:"absolute", top:5, left:5,
                             background:"rgba(62,207,110,0.85)", color:"#000",
-                            fontSize: 10, fontWeight:700, padding:"2px 5px", borderRadius:5 }}>M?I</div>
+                            fontSize: 10, fontWeight:700, padding:"2px 5px", borderRadius:5 }}>MỚI</div>
                         </div>
                       )}
                       <div style={{ padding:"7px 8px 8px" }}>
@@ -1490,11 +1490,11 @@ export default function HomePage() {
           )}
 
           {/* --------------------------------------
-              S9.6  Mn an g?i  (theo l?ch s? tm ki?m)
+              S9.6 — Món ăn gợi ý (theo lịch sử tìm kiếm)
           -------------------------------------- */}
           {searchSuggest.length > 0 && (
             <>
-              <SectionHeader title="?? Mn an g?i " more="Tm ki?m ?" href="/search" />
+              <SectionHeader title="🍽️ Món ăn gợi ý" more="Tìm kiếm →" href="/search" />
               <HScroll>
                 {searchSuggest.map(p => {
                   const shopName = (p.shops as {name:string}|null)?.name ?? ""
@@ -1522,7 +1522,7 @@ export default function HomePage() {
                           backgroundClip:"text", fontSize:11, fontWeight:700, marginTop:3 }}>{fmt(p.price)}</div>
                         <div style={{ display:"flex", alignItems:"center",
                           justifyContent:"space-between", marginTop:4 }}>
-                          <span style={{ color:"#6a5a40", fontSize: 10 }}>?? {p.sold_count} d bn</span>
+                          <span style={{ color:"#6a5a40", fontSize: 10 }}>?? {p.sold_count} dă bán</span>
                           <button
                             onClick={e => { e.preventDefault(); e.stopPropagation();
                               handleAdd(e.currentTarget as HTMLElement,
@@ -1542,11 +1542,11 @@ export default function HomePage() {
           )}
 
           {/* --------------------------------------
-              S10a  Smart Recommendations
+              S10a — Smart Recommendations
           -------------------------------------- */}
           {recos.length > 0 && (
             <>
-              <SectionHeader title="? G?i  cho b?n" more="Xem thm ?" href="/search" />
+              <SectionHeader title="✨ Gợi ý cho bạn" more="Xem thêm →" href="/search" />
               <HScroll>
                 {recos.map(p => (
                   <a key={p.id} href={`/shop/${p.shop_id}`}
@@ -1587,10 +1587,10 @@ export default function HomePage() {
           )}
 
           {/* --------------------------------------
-              S10  BestSellers
+              S10 — BestSellers
           -------------------------------------- */}
           {bestSellers.length > 0 && (<>
-          <SectionHeader title="?? Bn ch?y tu?n ny" more="Xem t?t c? ?" href="/bestsellers" />
+          <SectionHeader title="?? Bán chạy tuần này" more="Xem tất cả →" href="/bestsellers" />
             <HScroll>
               {bestSellers.map((b, idx) => {
                 const rank = idx + 1
@@ -1628,7 +1628,7 @@ export default function HomePage() {
                       <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
                       <div style={{ color:"#3ecf6e", fontSize: 10, fontWeight:600, marginTop:3 }}>
-                        ?? {b.sold_count.toLocaleString("vi-VN")} d bn
+                        ?? {b.sold_count.toLocaleString("vi-VN")} dă bán
                       </div>
                       <div style={{ display:"flex", justifyContent:"space-between",
                         alignItems:"center", marginTop:4 }}>
@@ -1652,27 +1652,27 @@ export default function HomePage() {
             </HScroll>
           </>)}
 
-          {/* S11  LoyaltyPoints removed: di?m ch? hi?n th? trong Profile c nhn */}
+          {/* S11 — LoyaltyPoints removed: điểm chỉ hiển thị trong Profile cá nhân */}
 
-          {/* S11  C?a hng yu thch: s? hi?n khi c b?ng favorites */}
+          {/* S11 — Cửa hàng yêu thích: sẽ hiện khi có bảng favorites */}
 
           {/* --------------------------------------
-              S12  ReorderSection
+              S12 — ReorderSection
           -------------------------------------- */}
-          <SectionHeader title="?? ?t l?i nhanh" more="L?ch s? ?" href="/orders" />
+          <SectionHeader title="?? Đặt lại nhanh" more="Lịch sử →" href="/orders" />
           {reorders.length === 0 ? (
             <div style={{ padding:"0 16px 14px" }}>
               <div style={{ background:"rgba(255,255,255,0.03)", border:"1px dashed rgba(255,255,255,0.07)",
                 borderRadius:12, padding:"16px", textAlign:"center" }}>
                 <div style={{ fontSize:28, marginBottom:6 }}>???</div>
-                <div style={{ color:"#6a5a40", fontSize:10 }}>?t don d?u tin d? th?y<br/>l?ch s? d?t l?i nhanh ? dy</div>
+                <div style={{ color:"#6a5a40", fontSize:10 }}>Đặt đơn đầu tiên để thấy<br/>lịch sử đặt lại nhanh ở đây</div>
               </div>
             </div>
           ) : (
             <HScroll>
               {reorders.map(r => {
-                const shopName = (r.shops as {name:string}|null)?.name ?? "Qun"
-                const firstItem = (r.order_items as {name:string}[])?.[0]?.name ?? "on hng"
+                const shopName = (r.shops as {name:string}|null)?.name ?? "Quán"
+                const firstItem = (r.order_items as {name:string}[])?.[0]?.name ?? "Đon hàng"
                 return (
                   <div key={r.id} style={{
                     minWidth:132, flexShrink:0,
@@ -1702,7 +1702,7 @@ export default function HomePage() {
                         display:"flex", alignItems:"center", justifyContent:"center", gap:4,
                         transition:"background .15s",
                       }}>
-                        ?? ?t l?i  {Math.round(r.total_amount/1000)}k
+                        🔁 Đặt lại · {Math.round(r.total_amount/1000)}k
                       </div>
                     </a>
                   </div>
@@ -1729,10 +1729,10 @@ export default function HomePage() {
           boxShadow:"0 0 20px rgba(255,107,0,0.1)",
         }}>
           {[
-            { icon:"??", label:"Trang ch?", key:"home",     href:"/"         },
-            { icon:"??", label:"on hng",  key:"orders",   href:"/orders"   },
-            { icon:"??", label:"Gi? hng",  key:"cart",     href:"/cart",  cart:true },
-            { icon:"??", label:"Ci d?t",   key:"settings", href:"/settings" },
+            { icon:"??", label:"Trang chủ", key:"home",     href:"/"         },
+            { icon:"??", label:"Đơn hàng",  key:"orders",   href:"/orders"   },
+            { icon:"??", label:"Giỏ hàng",  key:"cart",     href:"/cart",  cart:true },
+            { icon:"??", label:"Cài đặt",   key:"settings", href:"/settings" },
           ].map(tab => (
             <button key={tab.key}
               onClick={() => { setActiveTab(tab.key); router.push(tab.href) }}
@@ -1788,7 +1788,7 @@ export default function HomePage() {
 
       </div>
 
-      {/* -- Conflict Modal  d?i qun -- */}
+      {/* -- Conflict Modal — đổi quán -- */}
       <AnimatePresence>
         {conflictItem && (
           <motion.div
@@ -1807,13 +1807,13 @@ export default function HomePage() {
               <div style={{ fontSize:32, textAlign:"center", marginBottom:8 }}>??</div>
               <div style={{ color:"#f8f0e0", fontSize:15, fontWeight:700,
                 textAlign:"center", marginBottom:10 }}>
-                Thay d?i qun?
+                Thay đổi quán?
               </div>
               <div style={{ color:"#b0956a", fontSize:12, textAlign:"center",
                 lineHeight:1.7, marginBottom:20 }}>
-                Gi? hng dang c mn t?{" "}
+                Giỏ hàng đang có món từ{" "}
                 <span style={{ color:"#FF8C00", fontWeight:700 }}>{storeShopName}</span>.
-                <br />Thm mn m?i s? <strong style={{ color:"#ff6060" }}>xa gi? hng hi?n t?i</strong>.
+                <br />Thêm món mới sẽ <strong style={{ color:"#ff6060" }}>xóa giỏ hàng hiện tại</strong>.
               </div>
               <div style={{ display:"flex", gap:10 }}>
                 <button
@@ -1832,7 +1832,7 @@ export default function HomePage() {
                     color:"#fff", fontSize:13, fontWeight:700,
                     cursor:"pointer", fontFamily:"Lexend",
                     boxShadow:"0 4px 16px rgba(255,107,0,0.4)" }}>
-                  Xa &amp; thm m?i
+                  Xóa &amp; thêm m?i
                 </button>
               </div>
             </motion.div>
