@@ -664,7 +664,9 @@ export default function MerchantMenuPage() {
   const openEditProduct = (p: Product) => { setPModal({...p}); setPEditing(true) }
 
   const saveProduct = async () => {
-    if (!pModal?.name.trim() || pModal.price <= 0) { fire("❌ Vui lòng nhập tên món và giá bán", false); return }
+    if (!pModal?.name.trim()) { fire("❌ Vui lòng nhập tên món", false); return }
+    if (pModal.price <= 0)    { fire("❌ Vui lòng nhập giá bán", false); return }
+    if (!pModal.menuGroupId)  { fire("❌ Vui lòng chọn nhóm menu cho món này", false); return }
     const category = pModal.menuGroupId || null
 
     // Upload image if new file selected
@@ -1168,10 +1170,11 @@ export default function MerchantMenuPage() {
                   <div>
                     <FLabel>Nhóm menu nội bộ</FLabel>
                     <select value={pModal.menuGroupId} onChange={e => setPModal(m => m ? {...m,menuGroupId:e.target.value} : m)}
-                      style={{width:"100%",height:42,borderRadius:11,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:pModal.menuGroupId?"#f8f0e0":"#6a5a40",fontSize:11,padding:"0 10px",marginBottom:10,colorScheme:"dark",fontFamily:"Lexend"} as React.CSSProperties}>
+                      style={{width:"100%",height:42,borderRadius:11,border:`1px solid ${!pModal.menuGroupId?"rgba(255,100,0,0.55)":"rgba(255,255,255,0.08)"}`,background:"rgba(255,255,255,0.04)",color:pModal.menuGroupId?"#f8f0e0":"#6a5a40",fontSize:11,padding:"0 10px",marginBottom:4,colorScheme:"dark",fontFamily:"Lexend"} as React.CSSProperties}>
                       <option value="" style={{background:"#0e0c09"}}>-- Không chọn --</option>
                       {groups.map(g => <option key={g.id} value={g.id} style={{background:"#0e0c09"}}>{g.name}</option>)}
                     </select>
+                    {!pModal.menuGroupId && <div style={{color:"#FF8C00",fontSize:9,marginBottom:6}}>⚠️ Bắt buộc chọn nhóm menu</div>}
                   </div>
                 </div>
 
@@ -1289,8 +1292,8 @@ export default function MerchantMenuPage() {
 
               {/* Save button */}
               <div style={{padding:"10px 18px 32px",flexShrink:0,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-                <button onClick={saveProduct} disabled={!pModal.name.trim() || pModal.price <= 0}
-                  style={{width:"100%",height:48,borderRadius:13,border:"none",background:"linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"Lexend",boxShadow:"0 4px 20px rgba(255,107,0,0.4)",position:"relative",overflow:"hidden",opacity:!pModal.name.trim()||pModal.price<=0?0.5:1}}>
+                <button onClick={saveProduct} disabled={!pModal.name.trim() || pModal.price <= 0 || !pModal.menuGroupId}
+                  style={{width:"100%",height:48,borderRadius:13,border:"none",background:"linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"Lexend",boxShadow:"0 4px 20px rgba(255,107,0,0.4)",position:"relative",overflow:"hidden",opacity:!pModal.name.trim()||pModal.price<=0||!pModal.menuGroupId?0.5:1}}>
                   <ShimmerBar />
                   <span style={{position:"relative",zIndex:1}}>{pEditing ? "💾 Lưu thay đổi" : "✅ Thêm vào menu"}</span>
                 </button>
