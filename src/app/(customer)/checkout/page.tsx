@@ -13,6 +13,10 @@ import type { AddressPickerResult } from "@/types"
 import { formatPrice } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { getRouteKm, calcDeliveryFee, calcDeliveryFeeFromPricing } from "@/lib/vietmapRoute"
+import SmartVoucherPicker from "@/components/ui/SmartVoucherPicker"
+import VoucherNudgeBar, { findNextThreshold } from "@/components/ui/VoucherNudgeBar"
+import VoucherInlineHint from "@/components/ui/VoucherInlineHint"
+import type { VoucherItem } from "@/components/ui/VoucherCard"
 
 const supabase = createClient()
 
@@ -41,6 +45,30 @@ interface DbVoucher {
   per_person_limit: number | null
   is_combo: boolean
   combo_items: ComboRequirement[] | null
+}
+
+function dbVoucherToVoucherItem(v: DbVoucher, appliedCodes: string[], userUsageMap: Record<string, number>): VoucherItem {
+  const type: VoucherItem["type"] = v.is_combo ? "combo"
+    : v.discount_type === "fixed"    ? "cash"
+    : v.discount_type === "freeship" ? "freeship"
+    : "percent"
+  const perLimit      = v.per_person_limit
+  const usedByUser    = userUsageMap[v.id] ?? 0
+  const remainingUses = perLimit !== null ? Math.max(0, perLimit - usedByUser) : 999
+  return {
+    id: v.id, type,
+    value:          v.discount_value,
+    maxDiscount:    v.max_discount ?? undefined,
+    minOrder:       v.min_order,
+    title:          v.title,
+    description:    "",
+    expiresAt:      v.valid_to,
+    remainingUses,
+    totalUses:      perLimit ?? 999,
+    isSaved:        false,
+    isApplied:      appliedCodes.includes(v.code),
+    shopId:         v.shop_id ?? undefined,
+  }
 }
 
 function calcVoucherDiscount(v: DbVoucher, sub: number, fee: number): number {
@@ -1167,6 +1195,7 @@ export default function CheckoutPage() {
   const [feeLoading,     setFeeLoading]     = useState(false)
   const [foodPricing,    setFoodPricing]    = useState<{ rows: string[]; extra: string } | null>(null)
   const [comboHint,      setComboHint]      = useState<string | null>(null)
+  const [smartDismissed, setSmartDismissed] = useState(false)
 
   // ── Load user, saved addresses, xu balance ──
   useEffect(() => {
@@ -2038,8 +2067,37 @@ export default function CheckoutPage() {
             )
           })()}
 
-          {/* 4. Voucher */}
+          {/* 4. Voucher — SmartVoucherPicker banner */}
+          {!smartDismissed && (() => {
+            const voucherItems = dbVouchers.map(v => dbVoucherToVoucherItem(v, appliedVouchers.map(av => av.code), userUsageMap))
+            return (
+              <div style={{ marginBottom: 10 }}>
+                <SmartVoucherPicker
+                  cartTotal={subtotal}
+                  shippingFee={deliveryFee}
+                  vouchers={voucherItems}
+                  appliedVoucherId={appliedVouchers[0]?.code}
+                  onSuggest={() => setShowVoucherPicker(true)}
+                  onDismiss={() => setSmartDismissed(true)}
+                />
+              </div>
+            )
+          })()}
+
           <SectionCard title="Mã giảm giá" icon="🏷️">
+            {/* VoucherNudgeBar — nudge mua thêm để đạt ngưỡng */}
+            {appliedVouchers.length === 0 && (() => {
+              const voucherItems = dbVouchers.map(v => dbVoucherToVoucherItem(v, [], userUsageMap))
+              return (
+                <div style={{ marginBottom: 10 }}>
+                  <VoucherNudgeBar
+                    cartTotal={subtotal}
+                    vouchers={voucherItems}
+                    onPickVoucher={() => setShowVoucherPicker(true)}
+                  />
+                </div>
+              )
+            })()}
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
               <button type="button" onClick={() => setShowVoucherPicker(true)} style={{
                 width: "100%", height: 36, borderRadius: 10, border: "none", cursor: "pointer",
@@ -2271,6 +2329,22 @@ export default function CheckoutPage() {
                   {remaining === 0 ? "Miễn phí 🎉" : fmt(remaining)}
                 </span>
               </div>
+              {/* VoucherInlineHint — dưới total */}
+              {(() => {
+                const voucherItems = dbVouchers.map(v => dbVoucherToVoucherItem(v, appliedVouchers.map(av => av.code), userUsageMap))
+                const appliedItem  = appliedVouchers[0] ? voucherItems.find(vi => vi.isApplied) : null
+                const nudgeResult  = !appliedItem ? findNextThreshold(subtotal, voucherItems) : null
+                return (
+                  <div style={{ marginTop: 8 }}>
+                    <VoucherInlineHint
+                      appliedVoucher={appliedItem ?? null}
+                      nudgeVoucher={nudgeResult && !nudgeResult.reached ? nudgeResult.voucher : null}
+                      cartTotal={subtotal}
+                      onClick={() => setShowVoucherPicker(true)}
+                    />
+                  </div>
+                )
+              })()}
             </div>
           </SectionCard>
         </div>

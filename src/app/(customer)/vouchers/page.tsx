@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import Badge from "@/components/ui/Badge"
+import NewVoucherCard from "@/components/ui/VoucherCard"
+import type { VoucherItem } from "@/components/ui/VoucherCard"
 
 type VoucherType = "percent" | "fixed" | "freeship"
 
@@ -30,6 +32,33 @@ interface Voucher {
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
+
+function voucherToItem(v: Voucher): VoucherItem {
+  const type: VoucherItem["type"] = v.isCombo ? "combo"
+    : v.type === "fixed"    ? "cash"
+    : v.type === "freeship" ? "freeship"
+    : "percent"
+  const totalUses     = v.usageLimit ?? 999
+  const remainingUses = v.usageLimit !== null ? Math.max(0, v.usageLimit - v.usedCount) : 999
+  const comboDesc     = v.isCombo && v.comboItems.length > 0
+    ? "Cần: " + v.comboItems.map(ci => `${ci.products?.name ?? "Món"}${ci.min_quantity > 1 ? ` ×${ci.min_quantity}` : ""}`).join(", ")
+    : ""
+  return {
+    id:             v.id,
+    type,
+    value:          v.value,
+    maxDiscount:    v.maxDiscount ?? undefined,
+    minOrder:       v.minOrder,
+    title:          v.title,
+    description:    comboDesc || (v.minOrder > 0 ? `Đơn tối thiểu ${fmt(v.minOrder)}` : ""),
+    expiresAt:      v.validTo,
+    remainingUses,
+    totalUses,
+    isSaved:        v.saved,
+    isApplied:      false,
+    shopId:         v.shopId ?? undefined,
+  }
+}
 
 const TYPE_CFG: Record<VoucherType, { label: string; icon: string; color: string; bg: string; border: string }> = {
   percent:  { label:"Giảm %",    icon:"🏷️", color:"#FF8C00", bg:"rgba(255,140,0,0.1)",  border:"rgba(255,140,0,0.3)"  },
@@ -409,7 +438,14 @@ export default function VouchersPage() {
                     <div style={{ fontSize:12 }}>{vouchers.length===0 ? "Chưa có voucher nào" : "Không có voucher phù hợp"}</div>
                   </motion.div>
                 ) : filtered.map(v => (
-                  <VoucherCard key={v.id} v={v} onSave={() => handleSave(v.id)} onCopy={() => handleCopy(v.code)} onUseNow={() => handleUseNow(v)} />
+                  <motion.div key={v.id} layout initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }}>
+                    <NewVoucherCard
+                      voucher={voucherToItem(v)}
+                      onSave={(id) => handleSave(id)}
+                      onApply={(id) => { const found = vouchers.find(x => x.id === id); if (found) handleUseNow(found) }}
+                      onViewCombo={v.isCombo && v.shopId ? () => handleUseNow(v) : undefined}
+                    />
+                  </motion.div>
                 ))}
               </AnimatePresence>
             </div>
