@@ -1,6 +1,8 @@
 /**
- * FilterChip — BADGE_SYSTEM_SPEC.md Phase 4
- * Toggle chip dùng cho filter bars (danh-muc, nearby-shops, vouchers…)
+ * FilterChip — BADGE_SYSTEM_SPEC.md v2.0 Phase 4
+ * Toggle chip dùng cho filter bars.
+ * active state: --chip-on-* + ti-check icon
+ * inactive state: --chip-off-*
  */
 
 import { IconCheck } from "@tabler/icons-react"
@@ -12,27 +14,27 @@ export default function FilterChip({ label, active = false, onClick, className =
       onClick={onClick}
       className={className}
       style={{
-        display:        "inline-flex",
-        alignItems:     "center",
-        gap:            3,
-        height:         "var(--badge-height-md, 22px)",
-        padding:        `var(--badge-py-md, 3px) var(--badge-px-md, 9px)`,
-        borderRadius:   "var(--badge-radius, 9999px)",
-        border:         `1px solid ${active ? "var(--badge-filter-active-border)" : "var(--badge-filter-inactive-border)"}`,
-        background:     active ? "var(--badge-filter-active-bg)" : "var(--badge-filter-inactive-bg)",
-        color:          active ? "var(--badge-filter-active-text)" : "var(--badge-filter-inactive-text)",
-        fontSize:       "var(--badge-font-md, 11px)",
-        fontWeight:     "var(--badge-font-weight, 500)",
-        fontFamily:     "'Lexend', sans-serif",
-        lineHeight:     1,
-        whiteSpace:     "nowrap",
-        flexShrink:     0,
-        cursor:         "pointer",
-        transition:     "background 0.15s, border-color 0.15s, color 0.15s",
-        outline:        "none",
+        display:       "inline-flex",
+        alignItems:    "center",
+        gap:           3,
+        padding:       "4px 10px",
+        borderRadius:  "99px",
+        border:        `0.5px solid ${active ? "var(--chip-on-bdr)" : "var(--chip-off-bdr)"}`,
+        background:    active ? "var(--chip-on-bg)"   : "var(--chip-off-bg)",
+        color:         active ? "var(--chip-on-text)"  : "var(--chip-off-text)",
+        fontSize:      "11px",
+        fontWeight:    500,
+        fontFamily:    "'Lexend', sans-serif",
+        lineHeight:    1,
+        whiteSpace:    "nowrap",
+        flexShrink:    0,
+        cursor:        "pointer",
+        transition:    "background 0.15s, border-color 0.15s, color 0.15s",
+        outline:       "none",
+        userSelect:    "none",
       }}
     >
-      {active && <IconCheck size={12} strokeWidth={2.5} style={{ flexShrink: 0 }} />}
+      {active && <IconCheck size={10} strokeWidth={2.5} style={{ flexShrink: 0 }} />}
       <span>{label}</span>
     </button>
   )

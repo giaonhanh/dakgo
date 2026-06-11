@@ -2,6 +2,7 @@ import { FC } from "react"
 
 export interface NotifDotProps {
   count?: number
+  type?: "notification" | "cart"
   className?: string
 }
 
