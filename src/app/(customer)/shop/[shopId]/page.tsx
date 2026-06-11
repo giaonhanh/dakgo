@@ -708,11 +708,11 @@ export default function ShopPage() {
 
     // TODO: XÓA HARDCODE — mock thêm data khi bấm Xem thêm
     const MOCK_MORE: ShopReview[] = [
-      { id:"m6", food_rating:4, comment:"Giao nhanh, thức ăn còn nóng. Sẽ ủng hộ dài dài.", food_tags:["Giao nhanh","Món ngon"], created_at: new Date(Date.now()-86400000*9).toISOString(), reviewer:{ full_name:"Đinh Thị Thu" } },
-      { id:"m7", food_rating:5, comment:"Quán phục vụ rất nhiệt tình, món ăn đậm đà.", food_tags:["Món ngon","Giá hợp lý"], created_at: new Date(Date.now()-86400000*11).toISOString(), reviewer:{ full_name:"Hoàng Văn Nam" } },
-      { id:"m8", food_rating:3, comment:null, food_tags:["Đúng mô tả"], created_at: new Date(Date.now()-86400000*14).toISOString(), reviewer:{ full_name:"Ngô Thị Bích" } },
-      { id:"m9", food_rating:5, comment:"Ngon hơn mình tưởng, đặt lần 2 rồi vẫn thấy ổn!", food_tags:["Món ngon","Phần nhiều","Đóng gói đẹp"], created_at: new Date(Date.now()-86400000*18).toISOString(), reviewer:{ full_name:"Lý Văn Đức" } },
-      { id:"m10", food_rating:4, comment:"Giá cả phải chăng, phù hợp bữa trưa.", food_tags:["Giá hợp lý"], created_at: new Date(Date.now()-86400000*21).toISOString(), reviewer:{ full_name:"Trịnh Thị Hoa" } },
+      { id:"m6", food_rating:4, comment:"Giao nhanh, thức ăn còn nóng. Sẽ ủng hộ dài dài.", food_tags:["Giao nhanh","Món ngon"], images:null, created_at: new Date(Date.now()-86400000*9).toISOString(), reviewer:{ full_name:"Đinh Thị Thu" } },
+      { id:"m7", food_rating:5, comment:"Quán phục vụ rất nhiệt tình, món ăn đậm đà.", food_tags:["Món ngon","Giá hợp lý"], images:null, created_at: new Date(Date.now()-86400000*11).toISOString(), reviewer:{ full_name:"Hoàng Văn Nam" } },
+      { id:"m8", food_rating:3, comment:null, food_tags:["Đúng mô tả"], images:null, created_at: new Date(Date.now()-86400000*14).toISOString(), reviewer:{ full_name:"Ngô Thị Bích" } },
+      { id:"m9", food_rating:5, comment:"Ngon hơn mình tưởng, đặt lần 2 rồi vẫn thấy ổn!", food_tags:["Món ngon","Phần nhiều","Đóng gói đẹp"], images:null, created_at: new Date(Date.now()-86400000*18).toISOString(), reviewer:{ full_name:"Lý Văn Đức" } },
+      { id:"m10", food_rating:4, comment:"Giá cả phải chăng, phù hợp bữa trưa.", food_tags:["Giá hợp lý"], images:null, created_at: new Date(Date.now()-86400000*21).toISOString(), reviewer:{ full_name:"Trịnh Thị Hoa" } },
     ]
     setReviews(prev => {
       const merged = [...prev, ...MOCK_MORE]
