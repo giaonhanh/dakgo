@@ -215,6 +215,10 @@ export default function ProfilePage() {
   const handlePwNext = async () => {
     if (pwStep === "current") {
       if (!curPw) return
+      // Xác minh mật khẩu hiện tại trước khi cho đổi
+      const { data: { user } } = await supabase.auth.getUser()
+      const { error } = await supabase.auth.signInWithPassword({ email: user?.email ?? "", password: curPw })
+      if (error) { fireToast("Mật khẩu hiện tại không đúng"); return }
       setPwStep("new")
     } else if (pwStep === "new") {
       if (newPw.length < 8) { fireToast("Mật khẩu phải có ít nhất 8 ký tự"); return }

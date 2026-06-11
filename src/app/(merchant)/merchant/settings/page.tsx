@@ -55,7 +55,17 @@ function PwSheet({ onClose }: { onClose: () => void }) {
   const setVal = (v: string) => setVals(a => { const n = [...a]; n[step - 1] = v; return n })
   const next = async () => {
     setErr("")
-    if (step === 1 && !vals[0]) return setErr("Vui lòng nhập mật khẩu hiện tại")
+    if (step === 1) {
+      if (!vals[0]) return setErr("Vui lòng nhập mật khẩu hiện tại")
+      // Xác minh mật khẩu hiện tại với Supabase
+      setSaving(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      const email = user?.email ?? ""
+      const { error } = await supabase.auth.signInWithPassword({ email, password: vals[0] })
+      setSaving(false)
+      if (error) return setErr("Mật khẩu hiện tại không đúng")
+      setStep(2); return
+    }
     if (step === 2 && vals[1].length < 6) return setErr("Tối thiểu 6 ký tự")
     if (step === 3) {
       if (vals[1] !== vals[2]) return setErr("Mật khẩu không khớp")
