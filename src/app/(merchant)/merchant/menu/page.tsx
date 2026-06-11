@@ -1162,8 +1162,8 @@ export default function MerchantMenuPage() {
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                   <div>
                     <FLabel>Giá bán *</FLabel>
-                    <FInput value={pModal.price > 0 ? String(pModal.price) : ""} type="number"
-                      onChange={v => setPModal(m => m ? {...m,price:parseInt(v)||0} : m)} placeholder="VD: 45000" />
+                    <PriceInput value={pModal.price || null}
+                      onChange={n => setPModal(m => m ? {...m,price:n??0} : m)} placeholder="VD: 45.000" />
                   </div>
                   <div>
                     <FLabel>Nhóm menu nội bộ</FLabel>
@@ -1227,9 +1227,7 @@ export default function MerchantMenuPage() {
                     <div key={s.id} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
                       <input value={s.label} onChange={e => setSize(i,"label",e.target.value)} placeholder="Tên size (S/M/L...)"
                         style={{flex:1,height:36,borderRadius:9,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:11,padding:"0 10px"}} />
-                      <input value={s.priceDiff > 0 ? String(s.priceDiff) : ""} type="number"
-                        onChange={e => setSize(i,"priceDiff",e.target.value)} placeholder="+giá (đ)"
-                        style={{width:90,height:36,borderRadius:9,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:11,padding:"0 10px"}} />
+                      <InlinePriceInput value={s.priceDiff} onChange={n => setSize(i,"priceDiff",String(n))} placeholder="+giá" />
                       <button onClick={() => removeSize(i)}
                         style={{width:30,height:30,borderRadius:7,background:"rgba(255,64,64,0.07)",border:"1px solid rgba(255,64,64,0.2)",color:"#ff4040",fontSize:14,cursor:"pointer"}}>×</button>
                     </div>
@@ -1242,9 +1240,7 @@ export default function MerchantMenuPage() {
                     <div key={t.id} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
                       <input value={t.name} onChange={e => setTopping(i,"name",e.target.value)} placeholder="Tên topping"
                         style={{flex:1,height:36,borderRadius:9,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:11,padding:"0 10px"}} />
-                      <input value={t.price > 0 ? String(t.price) : ""} type="number"
-                        onChange={e => setTopping(i,"price",e.target.value)} placeholder="Giá thêm (đ)"
-                        style={{width:90,height:36,borderRadius:9,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",color:"#f8f0e0",fontSize:11,padding:"0 10px"}} />
+                      <InlinePriceInput value={t.price} onChange={n => setTopping(i,"price",String(n))} placeholder="Giá thêm" />
                       <button onClick={() => removeTopping(i)}
                         style={{width:30,height:30,borderRadius:7,background:"rgba(255,64,64,0.07)",border:"1px solid rgba(255,64,64,0.2)",color:"#ff4040",fontSize:14,cursor:"pointer"}}>×</button>
                     </div>
@@ -1263,8 +1259,8 @@ export default function MerchantMenuPage() {
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                         <div>
                           <FLabel>Giá khuyến mãi *</FLabel>
-                          <FInput value={pModal.promoPrice ? String(pModal.promoPrice) : ""} type="number"
-                            onChange={v => setPModal(m => m ? {...m,promoPrice:parseInt(v)||null} : m)} placeholder="VD: 35000" />
+                          <PriceInput value={pModal.promoPrice}
+                            onChange={n => setPModal(m => m ? {...m,promoPrice:n} : m)} placeholder="VD: 35.000" />
                         </div>
                         <div>
                           <FLabel>Giới hạn / người</FLabel>
@@ -1308,6 +1304,57 @@ export default function MerchantMenuPage() {
 }
 
 // ── Helper components ──────────────────────────────────────────────────────
+function PriceInput({ value, onChange, placeholder }: {
+  value: number | null; onChange: (n: number | null) => void; placeholder?: string
+}) {
+  const [focused, setFocused] = useState(false)
+  const [raw, setRaw] = useState("")
+
+  useEffect(() => {
+    if (!focused) setRaw(value && value > 0 ? value.toLocaleString("vi-VN") : "")
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, focused])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, "")
+    const num = digits ? parseInt(digits) : null
+    setRaw(digits ? parseInt(digits).toLocaleString("vi-VN") : "")
+    onChange(num)
+  }
+
+  return (
+    <div style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${focused?"rgba(255,107,0,0.45)":"rgba(255,255,255,0.08)"}`,borderRadius:11,padding:"0 12px",height:42,marginBottom:10,transition:"all .2s",boxShadow:focused?"0 0 0 3px rgba(255,107,0,0.09)":"none",display:"flex",alignItems:"center",gap:4}}>
+      <input inputMode="numeric" value={raw} placeholder={placeholder ?? "VD: 45.000"}
+        onChange={handleChange}
+        onFocus={() => { setFocused(true); setRaw(value && value > 0 ? String(value) : "") }}
+        onBlur={() => { setFocused(false); setRaw(value && value > 0 ? value.toLocaleString("vi-VN") : "") }}
+        style={{flex:1,background:"transparent",border:"none",color:"#f8f0e0",fontSize:12}} />
+      <span style={{color:"#6a5a40",fontSize:11,flexShrink:0}}>đ</span>
+    </div>
+  )
+}
+
+function InlinePriceInput({ value, onChange, placeholder }: {
+  value: number; onChange: (n: number) => void; placeholder?: string
+}) {
+  const [focused, setFocused] = useState(false)
+  const [raw, setRaw] = useState("")
+  useEffect(() => {
+    if (!focused) setRaw(value > 0 ? value.toLocaleString("vi-VN") : "")
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, focused])
+  return (
+    <div style={{width:90,height:36,borderRadius:9,border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.04)",display:"flex",alignItems:"center",padding:"0 8px",gap:2}}>
+      <input inputMode="numeric" value={raw} placeholder={placeholder}
+        onChange={e => { const d=e.target.value.replace(/\D/g,""); setRaw(d?parseInt(d).toLocaleString("vi-VN"):""); onChange(d?parseInt(d):0) }}
+        onFocus={() => { setFocused(true); setRaw(value>0?String(value):"") }}
+        onBlur={() => { setFocused(false); setRaw(value>0?value.toLocaleString("vi-VN"):"") }}
+        style={{flex:1,background:"transparent",border:"none",color:"#f8f0e0",fontSize:11,minWidth:0}} />
+      <span style={{color:"#6a5a40",fontSize:10,flexShrink:0}}>đ</span>
+    </div>
+  )
+}
+
 function FLabel({ children }: { children: React.ReactNode }) {
   return <div style={{color:"rgba(176,149,106,0.75)",fontSize:9.5,marginBottom:5}}>{children}</div>
 }
