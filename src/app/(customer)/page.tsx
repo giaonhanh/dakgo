@@ -1272,7 +1272,7 @@ export default function HomePage() {
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</div>
                         <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:3 }}>
                           <Badge layer={3} variant={s.is_open ? "open" : "closed"} size="sm" label={s.is_open ? "Mở" : "Đóng"} />
-                          <span style={{ color:"#6a5a40", fontSize: 11 }}>· ? {s.rating_avg?.toFixed(1) ⭐ "Mới"}</span>
+                          <span style={{ color:"#6a5a40", fontSize: 11 }}>· ⭐ {s.rating_avg?.toFixed(1) ?? "Mới"}</span>
                         </div>
                       </div>
                     </div>
