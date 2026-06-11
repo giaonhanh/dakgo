@@ -1330,16 +1330,15 @@ export default function ShopPage() {
                           <div style={{ display:"flex", gap:5, marginTop:8 }}>
                             {(r.images ?? []).slice(0,3).map((url, imgIdx) => (
                               <div key={imgIdx} onClick={() => setLightbox({ urls: r.images!, idx: imgIdx })}
-                                style={{ position:"relative", width:56, height:56, borderRadius:8,
+                                style={{ position:"relative", width:40, height:40, borderRadius:7,
                                   overflow:"hidden", flexShrink:0, cursor:"zoom-in",
                                   border:"1px solid rgba(255,255,255,0.08)" }}>
                                 <Image src={url} alt="" fill sizes="56px" style={{ objectFit:"cover" }} />
-                                {/* Badge +N nếu còn nhiều ảnh hơn */}
                                 {imgIdx === 2 && (r.images ?? []).length > 3 && (
                                   <div style={{ position:"absolute", inset:0,
                                     background:"rgba(0,0,0,0.55)",
                                     display:"flex", alignItems:"center", justifyContent:"center",
-                                    color:"#fff", fontSize:12, fontWeight:800 }}>
+                                    color:"#fff", fontSize:11, fontWeight:800 }}>
                                     +{(r.images ?? []).length - 3}
                                   </div>
                                 )}
