@@ -943,76 +943,93 @@ export default function ShopPage() {
           {shop && (
             <div style={{ padding:"0 16px" }}>
 
-              {/* Avatar + Name row — avatar overlaps banner bottom */}
-              <div style={{ display:"flex", alignItems:"flex-end", gap:12,
-                marginTop:-40, marginBottom:14,
-                position:"relative", zIndex:10 }}>
+              {/* Avatar + Info — avatar overlaps banner */}
+              <div style={{ display:"flex", alignItems:"flex-start", gap:14,
+                marginTop:-44, marginBottom:16, position:"relative", zIndex:10 }}>
 
-                {/* Logo circle + shop_type corner badge */}
-                <div style={{ position:"relative", flexShrink:0 }}>
-                  <div style={{ width:78, height:78, borderRadius:"50%",
+                {/* Avatar column */}
+                <div style={{ flexShrink:0, display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+                  {/* Avatar circle */}
+                  <div style={{ width:84, height:84, borderRadius:22,
                     border:"3px solid #080806", overflow:"hidden",
-                    background:"rgba(255,255,255,0.06)",
-                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:34,
-                    boxShadow:"0 0 0 1px rgba(255,107,0,0.25),0 4px 20px rgba(0,0,0,0.6)" }}>
+                    background:"linear-gradient(135deg,rgba(255,107,0,0.15),rgba(255,107,0,0.04))",
+                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:38,
+                    boxShadow:"0 0 0 1.5px rgba(255,107,0,0.3), 0 8px 28px rgba(0,0,0,0.7)" }}>
                     {shop.avatar_url
                       ? <Image src={shop.avatar_url} alt={shop.name} fill
-                          sizes="80px" style={{ objectFit:"cover" }} />
+                          sizes="84px" style={{ objectFit:"cover" }} />
                       : "🏪"}
                   </div>
-                  {/* Corner badge */}
+                  {/* Nhãn loại — pill nổi dưới avatar */}
                   {shop.shop_type && (
                     <div style={{
-                      position:"absolute", bottom:-4, right:-6,
+                      display:"flex", alignItems:"center", gap:4,
                       background: shop.shop_type === "delivery"
-                        ? "linear-gradient(135deg,#FF6B00,#FF8C00)"
-                        : "linear-gradient(135deg,#3ecf6e,#27ae60)",
-                      borderRadius:7, padding:"2px 6px",
-                      border:"2px solid #080806",
-                      fontSize: 10, fontWeight:700, color:"#fff",
-                      whiteSpace:"nowrap",
+                        ? "linear-gradient(135deg,#FF6B00,#FF9500)"
+                        : "linear-gradient(135deg,#1aab5c,#3ecf6e)",
+                      borderRadius: 99, padding: "4px 11px",
+                      border: "2px solid #080806",
+                      fontSize: 10.5, fontWeight: 800, color: "#fff",
+                      letterSpacing: 0.4, whiteSpace: "nowrap",
+                      boxShadow: shop.shop_type === "delivery"
+                        ? "0 3px 12px rgba(255,107,0,0.5)"
+                        : "0 3px 12px rgba(62,207,110,0.45)",
                     }}>
-                      {shop.shop_type === "delivery" ? "🛒 Mua hộ" : "🤝 Đối tác"}
+                      {shop.shop_type === "delivery" ? "🛒 Mua hộ" : "✅ Đối tác"}
                     </div>
                   )}
                 </div>
 
-                {/* Name + description + label */}
-                <div style={{ flex:1, minWidth:0, paddingBottom:6 }}>
-                  <div style={{ color:"#f8f0e0", fontSize:18, fontWeight:800, lineHeight:1.2,
-                    marginBottom:4,
+                {/* Tên + mô tả + stats inline */}
+                <div style={{ flex:1, minWidth:0, paddingTop:48 }}>
+                  <div style={{ color:"#f8f0e0", fontSize:19, fontWeight:800, lineHeight:1.2,
+                    marginBottom:3,
                     overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                     {shop.name}
                   </div>
-                  {/* Mô tả quán */}
                   {shop.description && (
-                    <span style={{ color:"#6a5a40", fontSize: 11, lineHeight:1.5,
+                    <div style={{ color:"#6a5a40", fontSize:11, lineHeight:1.5,
                       overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
-                      maxWidth:180, display:"block" }}>
+                      marginBottom:8 }}>
                       {shop.description}
-                    </span>
+                    </div>
                   )}
+                  {/* Stat pills inline */}
+                  <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                    <span style={{ display:"flex", alignItems:"center", gap:3,
+                      background:"rgba(255,255,255,0.06)", borderRadius:20, padding:"3px 9px",
+                      fontSize:10, color:"#b0956a", fontWeight:600 }}>
+                      ⭐ {shop.rating?.toFixed(1) ?? "Mới"}
+                      <span style={{ color:"#4a4030" }}>·</span>
+                      <span style={{ color:"#6a5a40" }}>{shop.rating_count ?? 0} đánh giá</span>
+                    </span>
+                    <span style={{ display:"flex", alignItems:"center", gap:3,
+                      background:"rgba(255,255,255,0.06)", borderRadius:20, padding:"3px 9px",
+                      fontSize:10, color:"#b0956a", fontWeight:600 }}>
+                      ⏱ {shop.prep_time ? `${shop.prep_time} phút` : "10–15 phút"}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Stats row: chuẩn bị → giờ mở → đánh giá */}
+              {/* Stats row: giờ mở cửa */}
               <div style={{ display:"flex", gap:8, marginBottom:4 }}>
                 {[
-                  { icon:"⏱️", val: shop.prep_time ? `${shop.prep_time} phút` : "10–15 phút", sub:"Thời gian chuẩn bị" },
                   { icon:"🕐", val: (() => {
-                      if (!shop.opening_hours) return "07:00–21:00"
+                      if (!shop.opening_hours) return "07:00 – 21:00"
                       const hours = shop.opening_hours as { open?: string; close?: string } | null
-                      if (hours?.open && hours?.close) return `${hours.open}–${hours.close}`
-                      return "07:00–21:00"
-                    })(), sub:"Thời gian mở cửa" },
-                  { icon:"⭐", val: shop.rating?.toFixed(1) ?? "Mới", sub:`${shop.rating_count ?? 0} đánh giá` },
+                      if (hours?.open && hours?.close) return `${hours.open} – ${hours.close}`
+                      return "07:00 – 21:00"
+                    })(), sub:"Giờ mở cửa hôm nay" },
+                  { icon:"📦", val: shop.total_orders ? `${shop.total_orders} đơn` : "Mới khai trương", sub:"Tổng đơn hàng" },
+                  { icon:"💬", val: shop.rating_count ? `${shop.rating_count}` : "–", sub:"Lượt đánh giá" },
                 ].map(s => (
                   <div key={s.icon} style={{ flex:1, textAlign:"center",
-                    background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)",
-                    borderRadius:10, padding:"8px 4px" }}>
-                    <div style={{ fontSize:15, marginBottom:2 }}>{s.icon}</div>
-                    <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:700, lineHeight:1.2 }}>{s.val}</div>
-                    <div style={{ color:"#6a5a40", fontSize: 10 }}>{s.sub}</div>
+                    background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)",
+                    borderRadius:12, padding:"9px 4px" }}>
+                    <div style={{ fontSize:16, marginBottom:3 }}>{s.icon}</div>
+                    <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:700, lineHeight:1.2 }}>{s.val}</div>
+                    <div style={{ color:"#6a5a40", fontSize:9.5, marginTop:2 }}>{s.sub}</div>
                   </div>
                 ))}
               </div>
