@@ -1337,7 +1337,10 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!dbVouchers.length || !cartItems.length) { setComboHint(null); return }
     const cartMap: Record<string, number> = {}
-    for (const item of cartItems) cartMap[item.id] = (cartMap[item.id] ?? 0) + item.qty
+    for (const item of cartItems) {
+      const pid = item.id.split("__")[0]
+      cartMap[pid] = (cartMap[pid] ?? 0) + item.qty
+    }
 
     for (const v of dbVouchers) {
       if (!v.is_combo || !v.combo_items?.length) continue
@@ -1379,7 +1382,10 @@ export default function CheckoutPage() {
     // Validate combo: phải có đúng các sản phẩm yêu cầu trong giỏ
     if (found.is_combo && found.combo_items?.length) {
       const cartMap: Record<string, number> = {}
-      for (const item of cartItems) cartMap[item.id] = (cartMap[item.id] ?? 0) + item.qty
+      for (const item of cartItems) {
+        const pid = item.id.split("__")[0]
+        cartMap[pid] = (cartMap[pid] ?? 0) + item.qty
+      }
       const unmet = found.combo_items.filter(ci => (cartMap[ci.product_id] ?? 0) < ci.min_quantity)
       if (unmet.length > 0) {
         const names = unmet.map(ci => ci.products?.name ?? "món cần thiết").join(", ")
@@ -2000,7 +2006,10 @@ export default function CheckoutPage() {
             // Tính % tiến trình: đếm số món đã có / tổng món cần
             const comboV = dbVouchers.find(v => v.is_combo && v.combo_items?.length && !appliedVouchers.some(av => av.code === v.code))
             const cartMap: Record<string, number> = {}
-            for (const item of cartItems) cartMap[item.id] = (cartMap[item.id] ?? 0) + item.qty
+            for (const item of cartItems) {
+              const pid = item.id.split("__")[0]
+              cartMap[pid] = (cartMap[pid] ?? 0) + item.qty
+            }
             const total = comboV?.combo_items?.length ?? 1
             const done  = comboV?.combo_items?.filter(ci => (cartMap[ci.product_id] ?? 0) >= ci.min_quantity).length ?? 0
             const pct   = Math.round((done / total) * 100)
