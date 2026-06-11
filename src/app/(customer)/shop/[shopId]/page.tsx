@@ -647,16 +647,26 @@ export default function ShopPage() {
         })))
       }
 
-      // Load reviews
-      const { data: rvData, count: rvCount } = await supabase
-        .from("reviews")
-        .select("id,food_rating,comment,food_tags,created_at,reviewer:profiles(full_name)", { count: "exact" })
-        .eq("shop_id", shopId)
-        .not("food_rating", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(5)
-      if (rvData) setReviews(rvData as unknown as ShopReview[])
-      setReviewsTotal(rvCount ?? 0)
+      // TODO: XÓA HARDCODE — chỉ dùng để kiểm tra UI reviews
+      const MOCK_REVIEWS: ShopReview[] = [
+        { id:"m1", food_rating:5, comment:"Món ăn ngon lắm, giao nhanh, đóng gói cẩn thận. Lần sau sẽ đặt tiếp!", food_tags:["Món ngon","Giao nhanh","Đóng gói đẹp"], created_at: new Date(Date.now()-86400000*0).toISOString(), reviewer:{ full_name:"Nguyễn Thị Hương" } },
+        { id:"m2", food_rating:4, comment:"Phần ăn nhiều, giá hợp lý. Hơi muộn một chút nhưng chấp nhận được.", food_tags:["Phần nhiều","Giá hợp lý"], created_at: new Date(Date.now()-86400000*1).toISOString(), reviewer:{ full_name:"Trần Văn Minh" } },
+        { id:"m3", food_rating:5, comment:"Quán này ổn lắm, thức ăn đúng mô tả, lần đầu thử mà rất hài lòng.", food_tags:["Đúng mô tả","Món ngon"], created_at: new Date(Date.now()-86400000*3).toISOString(), reviewer:{ full_name:"Lê Thị Lan" } },
+        { id:"m4", food_rating:3, comment:"Bình thường, không có gì đặc biệt lắm.", food_tags:[], created_at: new Date(Date.now()-86400000*5).toISOString(), reviewer:{ full_name:"Phạm Quốc Bảo" } },
+        { id:"m5", food_rating:5, comment:null, food_tags:["Món ngon","Giao nhanh"], created_at: new Date(Date.now()-86400000*7).toISOString(), reviewer:{ full_name:"Võ Thị Mai" } },
+      ]
+      setReviews(MOCK_REVIEWS)
+      setReviewsTotal(MOCK_REVIEWS.length)
+      // TODO: XÓA HARDCODE ↑ và bật lại đoạn dưới
+      // const { data: rvData, count: rvCount } = await supabase
+      //   .from("reviews")
+      //   .select("id,food_rating,comment,food_tags,created_at,reviewer:profiles(full_name)", { count: "exact" })
+      //   .eq("shop_id", shopId)
+      //   .not("food_rating", "is", null)
+      //   .order("created_at", { ascending: false })
+      //   .limit(5)
+      // if (rvData) setReviews(rvData as unknown as ShopReview[])
+      // setReviewsTotal(rvCount ?? 0)
 
       setLoading(false)
     }
