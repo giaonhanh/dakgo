@@ -153,7 +153,7 @@ export default function AddressPickerClient({
 
   const [center,      setCenter]      = useState<LatLng>({ lat: initLat, lng: initLng })
   const [flyTarget,   setFlyTarget]   = useState<[number, number] | null>(null)
-  const [address,     setAddress]     = useState("Dang xac dinh vi tri...")
+  const [address,     setAddress]     = useState("Đang xác định vị trí...")
   const [searchText,  setSearchText]  = useState("")
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([])
   const [showSuggest, setShowSuggest] = useState(false)
@@ -467,7 +467,7 @@ export default function AddressPickerClient({
               transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
               style={{ fontSize: 28 }}
             >&#128506;</motion.div>
-            <span style={{ color: "#6a5a40", fontSize: 10, fontFamily: "Lexend" }}>Dang tai ban do...</span>
+            <span style={{ color: "#6a5a40", fontSize: 10, fontFamily: "Lexend" }}>Đang tải bản đồ...</span>
           </div>
         )}
 
@@ -593,7 +593,7 @@ export default function AddressPickerClient({
           {geocoding ? (
             <>
               <Spinner size={13} />
-              <span style={{ color: "#6a5a40", fontSize: 11 }}>Dang xac dinh dia chi...</span>
+              <span style={{ color: "#6a5a40", fontSize: 11 }}>Đang xác định địa chỉ...</span>
             </>
           ) : editingAddr ? (
             <>
@@ -617,13 +617,13 @@ export default function AddressPickerClient({
                 onClick={() => { setEditingAddr(true); setTimeout(() => addrInputRef.current?.focus(), 50) }}
                 style={{ margin: 0, flex: 1, color: address ? "#f8f0e0" : "#6a5a40", fontSize: 12, fontWeight: 600, lineHeight: 1.5, cursor: "text" }}
               >
-                {address || "Tap de nhap dia chi..."}
+                {address || "Nhấn để nhập địa chỉ..."}
               </p>
               {address && (
                 <button type="button"
                   onClick={() => { setEditingAddr(true); setTimeout(() => addrInputRef.current?.focus(), 50) }}
                   style={{ background: "none", border: "none", cursor: "pointer", padding: "0 0 0 6px", color: "rgba(255,215,0,0.6)", fontSize: 10, fontFamily: "Lexend", flexShrink: 0 }}
-                >Sua</button>
+                >Sửa</button>
               )}
             </>
           )}
@@ -645,7 +645,7 @@ export default function AddressPickerClient({
             background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent)",
             animation: "shimmer 3s infinite",
           }} />
-          <span style={{ position: "relative", zIndex: 1 }}>XAC NHAN VI TRI</span>
+          <span style={{ position: "relative", zIndex: 1 }}>XÁC NHẬN VỊ TRÍ</span>
         </motion.button>
       </div>
     </div>

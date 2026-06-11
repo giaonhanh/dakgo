@@ -131,8 +131,8 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
             fontFamily: "Lexend", flexShrink: 0,
           }}>&#8592;</button>
           <div style={{ flex: 1 }}>
-            <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700 }}>Chon vi tri cua hang</div>
-            <div style={{ color: "#6a5a40", fontSize: 9.5, marginTop: 1 }}>Keo ban do de dat ghim vao dung vi tri</div>
+            <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700 }}>Chọn vị trí cửa hàng</div>
+            <div style={{ color: "#6a5a40", fontSize: 9.5, marginTop: 1 }}>Kéo bản đồ để đặt ghim vào đúng vị trí</div>
           </div>
           <button onClick={handleGPS} disabled={gpsLoading} style={{
             display: "flex", alignItems: "center", gap: 5,
@@ -145,7 +145,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
             fontFamily: "Lexend",
           }}>
             <span>{gpsLoading ? "..." : "GPS"}</span>
-            <span>{gpsLoading ? "Dang lay..." : "Vi tri cua toi"}</span>
+            <span>{gpsLoading ? "Đang lấy..." : "Vị trí của tôi"}</span>
           </button>
         </div>
       </div>
@@ -157,7 +157,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
             display: "flex", alignItems: "center", justifyContent: "center",
             background: "#080806",
           }}>
-            <div style={{ color: "#6a5a40", fontSize: 12 }}>Dang tai ban do...</div>
+            <div style={{ color: "#6a5a40", fontSize: 12 }}>Đang tải bản đồ...</div>
           </div>
         )}
 
@@ -215,9 +215,9 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
           background: "rgba(255,107,0,0.06)", border: "1px solid rgba(255,107,0,0.2)",
           borderRadius: 12, padding: "10px 12px", marginBottom: 10,
         }}>
-          <div style={{ color: "#6a5a40", fontSize: 9, marginBottom: 3 }}>Dia chi tim duoc:</div>
+          <div style={{ color: "#6a5a40", fontSize: 9, marginBottom: 3 }}>Địa chỉ tìm được:</div>
           <div style={{ color: geocoding ? "#6a5a40" : "#f8f0e0", fontSize: 11, lineHeight: 1.5, minHeight: 16 }}>
-            {geocoding ? "Dang tra cuu..." : geocoded || "Chua co dia chi"}
+            {geocoding ? "Đang tra cứu..." : geocoded || "Chưa có địa chỉ"}
           </div>
           <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 4 }}>
             {pickedLat.toFixed(6)}, {pickedLng.toFixed(6)}
@@ -231,7 +231,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
             color: "#fff", fontSize: 13, fontWeight: 800,
             cursor: "pointer", fontFamily: "Lexend",
           }}
-        >Xac nhan vi tri nay</button>
+        >Xác nhận vị trí này</button>
       </div>
     </div>
   )
