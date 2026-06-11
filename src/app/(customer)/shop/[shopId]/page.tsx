@@ -66,6 +66,15 @@ interface ShopInfo {
 interface Topping { id: string; name: string; price: number }
 interface SizeOpt { id: string; label: string; priceDiff: number }
 
+interface ShopReview {
+  id:          string
+  food_rating: number
+  comment:     string | null
+  food_tags:   string[] | null
+  created_at:  string
+  reviewer:    { full_name: string | null } | null
+}
+
 interface ComboVoucher {
   id:           string
   code:         string
@@ -511,6 +520,11 @@ export default function ShopPage() {
   const [selTops,       setSelTops]       = useState<string[]>([])
   const [optQty,        setOptQty]        = useState(1)
   const [optNote,       setOptNote]       = useState("")
+  const [reviews,       setReviews]       = useState<ShopReview[]>([])
+  const [reviewsPage,   setReviewsPage]   = useState(1)
+  const [reviewsTotal,  setReviewsTotal]  = useState(0)
+  const REVIEWS_PER_PAGE = 5
+  const reviewScrollRef = useRef<HTMLDivElement>(null)
   const coverRef = useRef<HTMLInputElement>(null)
   const logoRef  = useRef<HTMLInputElement>(null)
 
@@ -633,6 +647,17 @@ export default function ShopPage() {
         })))
       }
 
+      // Load reviews
+      const { data: rvData, count: rvCount } = await supabase
+        .from("reviews")
+        .select("id,food_rating,comment,food_tags,created_at,reviewer:profiles(full_name)", { count: "exact" })
+        .eq("shop_id", shopId)
+        .not("food_rating", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(5)
+      if (rvData) setReviews(rvData as unknown as ShopReview[])
+      setReviewsTotal(rvCount ?? 0)
+
       setLoading(false)
     }
     load()
@@ -648,9 +673,37 @@ export default function ShopPage() {
     return () => el.removeEventListener("scroll", onScroll)
   }, [])
 
+  // Auto-scroll reviews mỗi 3 giây
+  useEffect(() => {
+    if (reviews.length < 2) return
+    const el = reviewScrollRef.current
+    if (!el) return
+    const CARD_W = 250 // minWidth + gap
+    let idx = 0
+    const timer = setInterval(() => {
+      idx = (idx + 1) % reviews.length
+      el.scrollTo({ left: idx * CARD_W, behavior: "smooth" })
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [reviews.length])
+
   const fireToast = (msg: string) => {
     setToast(msg); setTimeout(() => setToast(""), 1800)
   }
+
+  const loadMoreReviews = useCallback(async () => {
+    const nextPage = reviewsPage + 1
+    const from = reviewsPage * REVIEWS_PER_PAGE
+    const to   = from + REVIEWS_PER_PAGE - 1
+    const { data } = await supabase
+      .from("reviews")
+      .select("id,food_rating,comment,food_tags,created_at,reviewer:profiles(full_name)")
+      .eq("shop_id", shopId)
+      .not("food_rating", "is", null)
+      .order("created_at", { ascending: false })
+      .range(from, to)
+    if (data) { setReviews(prev => [...prev, ...data as unknown as ShopReview[]]); setReviewsPage(nextPage) }
+  }, [shopId, reviewsPage, supabase])
 
   const uploadImage = async (file: File, type: "cover" | "logo") => {
     setUploading(type)
@@ -1153,6 +1206,120 @@ export default function ShopPage() {
                   )
                 })()
             }
+
+            {/* ── Reviews section ── */}
+            {reviews.length > 0 && (
+              <div style={{ padding:"0 16px", marginTop:10, marginBottom:4 }}>
+                {/* Header */}
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+                    <span style={{ fontSize:15 }}>⭐</span>
+                    <span style={{ color:"#f8f0e0", fontSize:13, fontWeight:800 }}>Đánh giá từ khách</span>
+                    {reviewsTotal > 0 && (
+                      <span style={{ background:"rgba(255,179,71,0.15)", color:"#FFB347",
+                        borderRadius:99, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
+                        {reviewsTotal}
+                      </span>
+                    )}
+                  </div>
+                  {shop?.rating && (
+                    <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                      <span style={{ color:"#FFB347", fontSize:13, fontWeight:800 }}>{shop.rating.toFixed(1)}</span>
+                      <span style={{ color:"#6a5a40", fontSize:10 }}>/5</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Review cards — horizontal scroll tự động */}
+                <div ref={reviewScrollRef}
+                  style={{ display:"flex", gap:10, overflowX:"auto", paddingBottom:6,
+                  scrollSnapType:"x mandatory", WebkitOverflowScrolling:"touch",
+                  scrollbarWidth:"none", msOverflowStyle:"none" } as React.CSSProperties}>
+                  {reviews.map(r => {
+                    const stars  = Math.round(r.food_rating)
+                    const name   = (r.reviewer as {full_name?:string}|null)?.full_name
+                    const initials = name ? name.split(" ").map((w:string)=>w[0]).join("").slice(0,2).toUpperCase() : "K"
+                    const daysAgo  = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 86400000)
+                    const timeStr  = daysAgo === 0 ? "Hôm nay" : daysAgo === 1 ? "Hôm qua" : `${daysAgo} ngày trước`
+                    return (
+                      <div key={r.id} style={{
+                        minWidth: 240, maxWidth: 260, flexShrink: 0,
+                        background:"rgba(255,255,255,0.04)",
+                        border:"1px solid rgba(255,255,255,0.07)",
+                        borderRadius:14, padding:"12px 14px",
+                        scrollSnapAlign:"start",
+                      }}>
+                        {/* Avatar + tên + ngày */}
+                        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                          <div style={{
+                            width:30, height:30, borderRadius:"50%", flexShrink:0,
+                            background:"linear-gradient(135deg,rgba(255,107,0,0.3),rgba(255,179,71,0.2))",
+                            display:"flex", alignItems:"center", justifyContent:"center",
+                            fontSize:11, fontWeight:800, color:"#FFB347",
+                          }}>{initials}</div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:700,
+                              overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                              {name ?? "Khách hàng"}
+                            </div>
+                            <div style={{ color:"#4a4030", fontSize:9.5 }}>{timeStr}</div>
+                          </div>
+                          {/* Stars */}
+                          <div style={{ display:"flex", gap:1.5, flexShrink:0 }}>
+                            {[1,2,3,4,5].map(i => (
+                              <span key={i} style={{ fontSize:11, opacity: i <= stars ? 1 : 0.2 }}>⭐</span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Tags */}
+                        {(r.food_tags ?? []).length > 0 && (
+                          <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:7 }}>
+                            {(r.food_tags ?? []).slice(0,3).map((tag:string) => (
+                              <span key={tag} style={{
+                                background:"rgba(255,179,71,0.1)", border:"1px solid rgba(255,179,71,0.2)",
+                                borderRadius:99, padding:"2px 8px",
+                                fontSize:9.5, color:"#FFB347", fontWeight:600,
+                              }}>{tag}</span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Comment */}
+                        {r.comment && (
+                          <div style={{ color:"#b0956a", fontSize:11, lineHeight:1.55,
+                            display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical",
+                            overflow:"hidden" } as React.CSSProperties}>
+                            "{r.comment}"
+                          </div>
+                        )}
+                        {!r.comment && !r.food_tags?.length && (
+                          <div style={{ color:"#4a4030", fontSize:10, fontStyle:"italic" }}>Không có nhận xét</div>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  {/* Nút xem thêm — nếu còn review */}
+                  {reviews.length < reviewsTotal && (
+                    <div style={{
+                      minWidth:100, flexShrink:0, scrollSnapAlign:"start",
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                    }}>
+                      <button onClick={loadMoreReviews} style={{
+                        background:"rgba(255,179,71,0.08)", border:"1px solid rgba(255,179,71,0.2)",
+                        borderRadius:12, padding:"10px 14px", cursor:"pointer",
+                        display:"flex", flexDirection:"column", alignItems:"center", gap:5,
+                      }}>
+                        <span style={{ fontSize:18 }}>💬</span>
+                        <span style={{ color:"#FFB347", fontSize:10, fontWeight:700 }}>Xem thêm</span>
+                        <span style={{ color:"#6a5a40", fontSize:9 }}>{reviewsTotal - reviews.length} đánh giá</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Bottom breathing room */}
             <div style={{ height:12 }} />
