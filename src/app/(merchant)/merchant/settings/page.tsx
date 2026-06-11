@@ -100,7 +100,6 @@ function PwSheet({ onClose }: { onClose: () => void }) {
 }
 
 /* ── hours sheet ── */
-const HOURS_KEY = "merchant_shop_hours"
 const DAYS_LABEL = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"]
 
 export type TimeSlot  = { from: string; to: string }
@@ -110,20 +109,36 @@ const DEFAULT_HOURS: DayHours[] = DAYS_LABEL.map(d => ({
   day: d, open: true, slots: [{ from: "07:00", to: "21:00" }],
 }))
 
-function loadHours(): DayHours[] {
-  try {
-    const s = typeof window !== "undefined" ? localStorage.getItem(HOURS_KEY) : null
-    if (s) {
-      const parsed = JSON.parse(s)
-      // backward compat: old format used {from, to} directly
-      return parsed.map((d: DayHours & { from?: string; to?: string }) => ({
-        day:   d.day,
-        open:  d.open,
-        slots: d.slots ?? [{ from: d.from ?? "07:00", to: d.to ?? "21:00" }],
-      }))
-    }
-  } catch { /* ignore */ }
+/** Chuẩn hoá opening_hours từ DB (cả format cũ lẫn mới) thành DayHours[] */
+function normalizeHours(raw: unknown): DayHours[] {
+  if (!raw) return DEFAULT_HOURS
+  // Mảng DayHours[] — format mới
+  if (Array.isArray(raw)) {
+    return (raw as DayHours[]).map(d => ({
+      day:   d.day,
+      open:  d.open ?? true,
+      slots: d.slots?.length ? d.slots : [{ from: "07:00", to: "21:00" }],
+    }))
+  }
+  // Format cũ: { open: "HH:mm", close: "HH:mm", days?: [] }
+  const obj = raw as Record<string, unknown>
+  if (obj.open && obj.close) {
+    return DAYS_LABEL.map(d => ({
+      day: d, open: true,
+      slots: [{ from: obj.open as string, to: obj.close as string }],
+    }))
+  }
   return DEFAULT_HOURS
+}
+
+/** Tóm tắt giờ để hiển thị trên Row */
+function summarizeHours(hours: DayHours[]): string {
+  const open = hours.filter(h => h.open)
+  if (!open.length) return "Nghỉ tất cả các ngày"
+  const first = open[0].slots[0]
+  const allSame = open.every(h => h.slots[0]?.from === first?.from && h.slots[0]?.to === first?.to)
+  if (allSame && first) return `${open.map(h => h.day.replace("Thứ ", "T")).join("·")}: ${first.from}–${first.to}`
+  return `${open.length}/7 ngày · ${first?.from ?? ""}–${first?.to ?? ""}`
 }
 
 const timeInputStyle: React.CSSProperties = {
@@ -133,26 +148,35 @@ const timeInputStyle: React.CSSProperties = {
 }
 
 /* ── hours sheet ── */
-function HoursSheet({ onClose }: { onClose: () => void }) {
-  const [hours, setHours] = useState<DayHours[]>(loadHours)
+function HoursSheet({ onClose, shopId, initialHours, onSaved }: {
+  onClose: () => void; shopId: string | null
+  initialHours: DayHours[]; onSaved: (h: DayHours[]) => void
+}) {
+  const supabase = createClient()
+  const [hours,   setHours]   = useState<DayHours[]>(initialHours)
+  const [saving,  setSaving]  = useState(false)
 
-  const toggle    = (i: number) =>
+  const toggle     = (i: number) =>
     setHours(h => h.map((x, j) => j === i ? { ...x, open: !x.open } : x))
-
-  const addSlot   = (i: number) =>
+  const addSlot    = (i: number) =>
     setHours(h => h.map((x, j) => j === i
       ? { ...x, slots: [...x.slots, { from: "14:00", to: "21:00" }] } : x))
-
   const removeSlot = (i: number, si: number) =>
     setHours(h => h.map((x, j) => j === i
       ? { ...x, slots: x.slots.filter((_, k) => k !== si) } : x))
-
   const updateSlot = (i: number, si: number, field: keyof TimeSlot, val: string) =>
     setHours(h => h.map((x, j) => j === i
       ? { ...x, slots: x.slots.map((s, k) => k === si ? { ...s, [field]: val } : s) } : x))
 
-  const handleSave = () => {
-    localStorage.setItem(HOURS_KEY, JSON.stringify(hours))
+  const handleSave = async () => {
+    if (!shopId) return
+    setSaving(true)
+    const { error } = await supabase.from("shops")
+      .update({ opening_hours: hours, updated_at: new Date().toISOString() })
+      .eq("id", shopId)
+    setSaving(false)
+    if (error) { alert("Lỗi lưu: " + error.message); return }
+    onSaved(hours)
     onClose()
   }
 
@@ -220,11 +244,13 @@ function HoursSheet({ onClose }: { onClose: () => void }) {
           </div>
         ))}
 
-        <button onClick={handleSave}
+        <button onClick={handleSave} disabled={saving}
           style={{ width: "100%", height: 48, borderRadius: 14, border: "none",
-            background: "linear-gradient(90deg,#FF6B00,#FF8C00)", color: "#fff",
-            fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "Lexend", marginTop: 16 }}>
-          ✓ Lưu giờ hoạt động
+            background: saving ? "rgba(255,255,255,0.08)" : "linear-gradient(90deg,#FF6B00,#FF8C00)",
+            color: saving ? "#6a5a40" : "#fff",
+            fontSize: 13, fontWeight: 800, cursor: saving ? "not-allowed" : "pointer",
+            fontFamily: "Lexend", marginTop: 16 }}>
+          {saving ? "Đang lưu..." : "✓ Lưu giờ hoạt động"}
         </button>
       </div>
     </motion.div>
@@ -295,6 +321,9 @@ export default function MerchantSettingsPage() {
     analytics:      true,
   })
 
+  /* hours */
+  const [hours, setHours] = useState<DayHours[]>(DEFAULT_HOURS)
+
   /* sheets */
   const [prepTime,      setPrepTime]      = useState(() => {
     try { return localStorage.getItem("merchant_prep_time") ?? "10–15" } catch { return "10–15" }
@@ -323,10 +352,11 @@ export default function MerchantSettingsPage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       supabase.from("shops")
-        .select("id, name, address, is_open, rating_avg, commission_rate, is_negotiated_commission, prep_time, auto_accept, busy_mode, preorder_allow, show_rating, show_sold_count")
+        .select("id,name,address,is_open,rating_avg,commission_rate,is_negotiated_commission,prep_time,auto_accept,busy_mode,preorder_allow,show_rating,show_sold_count,opening_hours,notif_settings,privacy_settings")
         .eq("owner_id", user.id).maybeSingle()
         .then(({ data }) => {
           if (!data) return
+          const d = data as Record<string, unknown>
           setShopId(data.id)
           setShopName(data.name ?? "")
           setShopAddress(data.address ?? "")
@@ -334,8 +364,6 @@ export default function MerchantSettingsPage() {
           setShopRating(data.rating_avg ?? null)
           setShopCommission(data.commission_rate ?? 15)
           setIsNegotiated(data.is_negotiated_commission ?? false)
-          // Load shop operation settings từ DB (ưu tiên DB hơn localStorage)
-          const d = data as Record<string, unknown>
           if (d.auto_accept != null || d.busy_mode != null) {
             setShop({
               autoAccept:    (d.auto_accept    as boolean) ?? false,
@@ -346,6 +374,12 @@ export default function MerchantSettingsPage() {
             })
           }
           if (d.prep_time) setPrepTime(d.prep_time as string)
+          // Giờ hoạt động từ DB
+          setHours(normalizeHours(d.opening_hours))
+          // Thông báo từ DB
+          if (d.notif_settings) setNotif(prev => ({ ...prev, ...(d.notif_settings as object) }))
+          // Quyền riêng tư từ DB
+          if (d.privacy_settings) setPriv(prev => ({ ...prev, ...(d.privacy_settings as object) }))
         })
     })
   }, [])
@@ -372,8 +406,20 @@ export default function MerchantSettingsPage() {
     try { localStorage.setItem("merchant_shop_settings", JSON.stringify(next)) } catch { /* ignore */ }
     return next
   })
-  const sn = (k: keyof typeof notif) => setNotif(p => ({ ...p, [k]: !p[k] }))
-  const sp = (k: keyof typeof priv)  => setPriv(p => ({ ...p, [k]: !p[k] }))
+  const sn = (k: keyof typeof notif) => {
+    setNotif(p => {
+      const next = { ...p, [k]: !p[k] }
+      if (shopId) createClient().from("shops").update({ notif_settings: next }).eq("id", shopId).then()
+      return next
+    })
+  }
+  const sp = (k: keyof typeof priv) => {
+    setPriv(p => {
+      const next = { ...p, [k]: !p[k] }
+      if (shopId) createClient().from("shops").update({ privacy_settings: next }).eq("id", shopId).then()
+      return next
+    })
+  }
 
   return (
     <>
@@ -463,7 +509,7 @@ export default function MerchantSettingsPage() {
 
           {/* hours */}
           <Section title="Lịch hoạt động">
-            <Row icon="🕐" label="Giờ mở cửa từng ngày" sub="T2-T6: 07:00–21:00 · T7-CN: 07:00–22:00" onClick={() => setShowHours(true)} arrow last />
+            <Row icon="🕐" label="Giờ mở cửa từng ngày" sub={summarizeHours(hours)} onClick={() => setShowHours(true)} arrow last />
           </Section>
 
           {/* quick links */}
@@ -534,7 +580,7 @@ export default function MerchantSettingsPage() {
       {/* sheets */}
       <AnimatePresence>
         {showPw        && <PwSheet      onClose={() => setShowPw(false)}        />}
-        {showHours     && <HoursSheet   onClose={() => setShowHours(false)}     />}
+        {showHours     && <HoursSheet   onClose={() => setShowHours(false)} shopId={shopId} initialHours={hours} onSaved={h => { setHours(h); fire("✅ Đã lưu giờ hoạt động") }} />}
         {showPrepSheet && <PrepTimeSheet value={prepTime} onSelect={v => {
           setPrepTime(v)
           try { localStorage.setItem("merchant_prep_time", v) } catch { /* ignore */ }
