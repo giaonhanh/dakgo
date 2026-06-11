@@ -109,11 +109,24 @@ export default function MerchantProfilePage() {
 
   const handleStartEdit = () => { setErrors({ name:"", phone:"", address:"" }); setEditing(true) }
 
-  const handleMapConfirm = (pickedLat: number, pickedLng: number, geocodedAddr: string) => {
+  const handleMapConfirm = async (pickedLat: number, pickedLng: number, geocodedAddr: string) => {
     setLat(pickedLat)
     setLng(pickedLng)
     if (geocodedAddr) setAddress(geocodedAddr)
     setShowMapPicker(false)
+
+    // Lưu tọa độ ngay lập tức — không cần chờ nút "Lưu"
+    if (shopId) {
+      const { error } = await supabase.from("shops").update({
+        location:   `SRID=4326;POINT(${pickedLng} ${pickedLat})`,
+        lat:        pickedLat,
+        lng:        pickedLng,
+        ...(geocodedAddr ? { address: geocodedAddr } : {}),
+        updated_at: new Date().toISOString(),
+      }).eq("id", shopId)
+      if (error) addToast("❌ Lỗi lưu tọa độ: " + error.message, "error")
+      else addToast("📍 Đã lưu vị trí trên bản đồ")
+    }
   }
 
   const handleSave = async () => {
@@ -354,9 +367,9 @@ export default function MerchantProfilePage() {
             <div style={{ background:"rgba(74,143,245,0.06)",border:"1px solid rgba(74,143,245,0.18)",borderRadius:12,padding:"10px 13px",marginBottom:10 }}>
               <div style={{ color:"#4a8ff5",fontSize:10,fontWeight:600,marginBottom:4 }}>💡 Hướng dẫn nhập địa chỉ</div>
               <div style={{ color:"#6a5a40",fontSize:9.5,lineHeight:1.6 }}>
-                1. Nhấn <strong style={{ color:"#4a8ff5" }}>Chọn trên bản đồ</strong> để ghim vị trí — app sẽ tự điền địa chỉ cơ bản.<br />
-                2. Chỉnh sửa thêm <strong style={{ color:"#f8f0e0" }}>số nhà, tên đường, khu phố, phường/xã</strong> nếu bản đồ chưa đầy đủ.<br />
-                3. Bấm <strong style={{ color:"#FF8C00" }}>Lưu</strong> — tọa độ và địa chỉ cùng được cập nhật.
+                1. Nhấn <strong style={{ color:"#4a8ff5" }}>Chọn trên bản đồ</strong> → ghim vị trí → nhấn <strong style={{ color:"#FF8C00" }}>Xác nhận</strong> — tọa độ lưu ngay.<br />
+                2. Chỉnh sửa thêm <strong style={{ color:"#f8f0e0" }}>số nhà, tên đường, khu phố, phường/xã</strong> nếu cần.<br />
+                3. Bấm <strong style={{ color:"#FF8C00" }}>Lưu</strong> để cập nhật tên, SĐT, địa chỉ văn bản.
               </div>
             </div>
           )}
