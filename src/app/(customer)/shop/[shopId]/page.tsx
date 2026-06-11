@@ -71,6 +71,7 @@ interface ShopReview {
   food_rating: number
   comment:     string | null
   food_tags:   string[] | null
+  images:      string[] | null
   created_at:  string
   reviewer:    { full_name: string | null } | null
 }
@@ -523,6 +524,7 @@ export default function ShopPage() {
   const [reviews,       setReviews]       = useState<ShopReview[]>([])
   const [reviewsPage,   setReviewsPage]   = useState(1)
   const [reviewsTotal,  setReviewsTotal]  = useState(0)
+  const [lightbox,      setLightbox]      = useState<{ urls: string[]; idx: number } | null>(null)
   const REVIEWS_PER_PAGE = 5
   const reviewScrollRef = useRef<HTMLDivElement>(null)
   const coverRef = useRef<HTMLInputElement>(null)
@@ -649,11 +651,11 @@ export default function ShopPage() {
 
       // TODO: XÓA HARDCODE — chỉ dùng để kiểm tra UI reviews
       const MOCK_REVIEWS: ShopReview[] = [
-        { id:"m1", food_rating:5, comment:"Món ăn ngon lắm, giao nhanh, đóng gói cẩn thận. Lần sau sẽ đặt tiếp!", food_tags:["Món ngon","Giao nhanh","Đóng gói đẹp"], created_at: new Date(Date.now()-86400000*0).toISOString(), reviewer:{ full_name:"Nguyễn Thị Hương" } },
-        { id:"m2", food_rating:4, comment:"Phần ăn nhiều, giá hợp lý. Hơi muộn một chút nhưng chấp nhận được.", food_tags:["Phần nhiều","Giá hợp lý"], created_at: new Date(Date.now()-86400000*1).toISOString(), reviewer:{ full_name:"Trần Văn Minh" } },
-        { id:"m3", food_rating:5, comment:"Quán này ổn lắm, thức ăn đúng mô tả, lần đầu thử mà rất hài lòng.", food_tags:["Đúng mô tả","Món ngon"], created_at: new Date(Date.now()-86400000*3).toISOString(), reviewer:{ full_name:"Lê Thị Lan" } },
-        { id:"m4", food_rating:3, comment:"Bình thường, không có gì đặc biệt lắm.", food_tags:[], created_at: new Date(Date.now()-86400000*5).toISOString(), reviewer:{ full_name:"Phạm Quốc Bảo" } },
-        { id:"m5", food_rating:5, comment:null, food_tags:["Món ngon","Giao nhanh"], created_at: new Date(Date.now()-86400000*7).toISOString(), reviewer:{ full_name:"Võ Thị Mai" } },
+        { id:"m1", food_rating:5, comment:"Món ăn ngon lắm, giao nhanh, đóng gói cẩn thận. Lần sau sẽ đặt tiếp!", food_tags:["Món ngon","Giao nhanh","Đóng gói đẹp"], images:["https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400","https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400"], created_at: new Date(Date.now()-86400000*0).toISOString(), reviewer:{ full_name:"Nguyễn Thị Hương" } },
+        { id:"m2", food_rating:4, comment:"Phần ăn nhiều, giá hợp lý. Hơi muộn một chút nhưng chấp nhận được.", food_tags:["Phần nhiều","Giá hợp lý"], images:["https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400"], created_at: new Date(Date.now()-86400000*1).toISOString(), reviewer:{ full_name:"Trần Văn Minh" } },
+        { id:"m3", food_rating:5, comment:"Quán này ổn lắm, thức ăn đúng mô tả, lần đầu thử mà rất hài lòng.", food_tags:["Đúng mô tả","Món ngon"], images:null, created_at: new Date(Date.now()-86400000*3).toISOString(), reviewer:{ full_name:"Lê Thị Lan" } },
+        { id:"m4", food_rating:3, comment:"Bình thường, không có gì đặc biệt lắm.", food_tags:[], images:null, created_at: new Date(Date.now()-86400000*5).toISOString(), reviewer:{ full_name:"Phạm Quốc Bảo" } },
+        { id:"m5", food_rating:5, comment:null, food_tags:["Món ngon","Giao nhanh"], images:["https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400","https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400","https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400"], created_at: new Date(Date.now()-86400000*7).toISOString(), reviewer:{ full_name:"Võ Thị Mai" } },
       ]
       setReviews(MOCK_REVIEWS)
       setReviewsTotal(12) // mock: giả lập còn 7 review nữa chưa load
@@ -1322,6 +1324,29 @@ export default function ShopPage() {
                         {!r.comment && !r.food_tags?.length && (
                           <div style={{ color:"#4a4030", fontSize:10, fontStyle:"italic" }}>Không có nhận xét</div>
                         )}
+
+                        {/* Ảnh thumbnail */}
+                        {(r.images ?? []).length > 0 && (
+                          <div style={{ display:"flex", gap:5, marginTop:8 }}>
+                            {(r.images ?? []).slice(0,3).map((url, imgIdx) => (
+                              <div key={imgIdx} onClick={() => setLightbox({ urls: r.images!, idx: imgIdx })}
+                                style={{ position:"relative", width:56, height:56, borderRadius:8,
+                                  overflow:"hidden", flexShrink:0, cursor:"zoom-in",
+                                  border:"1px solid rgba(255,255,255,0.08)" }}>
+                                <Image src={url} alt="" fill sizes="56px" style={{ objectFit:"cover" }} />
+                                {/* Badge +N nếu còn nhiều ảnh hơn */}
+                                {imgIdx === 2 && (r.images ?? []).length > 3 && (
+                                  <div style={{ position:"absolute", inset:0,
+                                    background:"rgba(0,0,0,0.55)",
+                                    display:"flex", alignItems:"center", justifyContent:"center",
+                                    color:"#fff", fontSize:12, fontWeight:800 }}>
+                                    +{(r.images ?? []).length - 3}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -1351,6 +1376,83 @@ export default function ShopPage() {
             <div style={{ height:12 }} />
           </div>
         </div>
+
+        {/* ── Lightbox xem ảnh đánh giá ── */}
+        <AnimatePresence>
+          {lightbox && (
+            <motion.div
+              initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+              onClick={() => setLightbox(null)}
+              style={{ position:"fixed", inset:0, zIndex:500,
+                background:"rgba(0,0,0,0.92)", backdropFilter:"blur(12px)",
+                display:"flex", flexDirection:"column",
+                alignItems:"center", justifyContent:"center" }}>
+              {/* Ảnh chính */}
+              <motion.div
+                initial={{ scale:0.88, opacity:0 }} animate={{ scale:1, opacity:1 }}
+                exit={{ scale:0.88, opacity:0 }} transition={{ type:"spring", damping:22, stiffness:260 }}
+                onClick={e => e.stopPropagation()}
+                style={{ position:"relative", width:"90vw", maxWidth:400,
+                  height:"60vw", maxHeight:320, borderRadius:16, overflow:"hidden",
+                  boxShadow:"0 24px 80px rgba(0,0,0,0.8)" }}>
+                <Image src={lightbox.urls[lightbox.idx]} alt="" fill sizes="90vw" style={{ objectFit:"cover" }} />
+              </motion.div>
+              {/* Thumbnails strip */}
+              {lightbox.urls.length > 1 && (
+                <div onClick={e => e.stopPropagation()}
+                  style={{ display:"flex", gap:8, marginTop:14 }}>
+                  {lightbox.urls.map((url, i) => (
+                    <div key={i} onClick={() => setLightbox({ urls: lightbox.urls, idx: i })}
+                      style={{ position:"relative", width:52, height:52, borderRadius:8,
+                        overflow:"hidden", cursor:"pointer", flexShrink:0,
+                        border: i === lightbox.idx
+                          ? "2px solid #FFD700"
+                          : "2px solid rgba(255,255,255,0.15)",
+                        opacity: i === lightbox.idx ? 1 : 0.6,
+                        transition:"all .15s" }}>
+                      <Image src={url} alt="" fill sizes="52px" style={{ objectFit:"cover" }} />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Counter + close */}
+              <div style={{ display:"flex", alignItems:"center", gap:12, marginTop:14 }}>
+                <span style={{ color:"rgba(255,255,255,0.5)", fontSize:11 }}>
+                  {lightbox.idx + 1} / {lightbox.urls.length}
+                </span>
+                <button onClick={() => setLightbox(null)}
+                  style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)",
+                    borderRadius:99, padding:"5px 16px", color:"#fff", fontSize:11,
+                    fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
+                  Đóng
+                </button>
+              </div>
+              {/* Swipe arrows nếu có nhiều ảnh */}
+              {lightbox.urls.length > 1 && (
+                <>
+                  {lightbox.idx > 0 && (
+                    <button onClick={e => { e.stopPropagation(); setLightbox({ urls:lightbox.urls, idx:lightbox.idx-1 }) }}
+                      style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)",
+                        background:"rgba(0,0,0,0.5)", border:"1px solid rgba(255,255,255,0.15)",
+                        borderRadius:"50%", width:40, height:40, color:"#fff", fontSize:18,
+                        cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      ‹
+                    </button>
+                  )}
+                  {lightbox.idx < lightbox.urls.length - 1 && (
+                    <button onClick={e => { e.stopPropagation(); setLightbox({ urls:lightbox.urls, idx:lightbox.idx+1 }) }}
+                      style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
+                        background:"rgba(0,0,0,0.5)", border:"1px solid rgba(255,255,255,0.15)",
+                        borderRadius:"50%", width:40, height:40, color:"#fff", fontSize:18,
+                        cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      ›
+                    </button>
+                  )}
+                </>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ── Cart bar (slides up when cart not empty) ── */}
         <AnimatePresence>
