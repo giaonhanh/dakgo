@@ -268,30 +268,38 @@ export default function HomePage() {
 
       setLiveOrders([...(liveFood ?? []), ...ridesMapped, ...errandsMapped] as LiveOrderRow[])
 
-      // Vouchers
-      const { data: voucherData } = await supabase
-        .from("vouchers")
-        .select("id,code,title,discount_type,discount_value,valid_to,shop_id,min_order")
-        .eq("is_active", true)
-        .gt("valid_to", new Date().toISOString())
-        .order("valid_to", { ascending: true })
-        .limit(6)
-      setVouchers((voucherData ?? []) as VoucherRow[])
+      // Vouchers + Nearby shops — fetch song song
+      const [{ data: voucherData }, { data: shopData }] = await Promise.all([
+        supabase
+          .from("vouchers")
+          .select("id,code,title,discount_type,discount_value,valid_to,shop_id,min_order")
+          .eq("is_active", true)
+          .gt("valid_to", new Date().toISOString())
+          .order("valid_to", { ascending: true })
+          .limit(10),
+        supabase
+          .from("shops")
+          .select("id,name,is_open,rating_avg,address,logo_url,location,opening_hours,category,categories")
+          .eq("status", "approved")
+          .order("rating_avg", { ascending: false })
+          .limit(30),
+      ])
 
-      // Nearby shops: fetch cả đóng lẫn mở, tính giờ client-side
-      const { data: shopData } = await supabase
-        .from("shops")
-        .select("id,name,is_open,rating_avg,address,logo_url,location,opening_hours,category,categories")
-        .eq("status", "approved")
-        .order("rating_avg", { ascending: false })
-        .limit(30)
-      // Sort: đang mở lên trước, đóng xuống dưới
+      // Sort shops: đang mở lên trước, đóng xuống dưới
       const sorted = (shopData ?? [] as ShopRow[]).sort((a, b) => {
         const aOpen = isShopInHours(a as ShopRow) ? 1 : 0
         const bOpen = isShopInHours(b as ShopRow) ? 1 : 0
         return bOpen - aOpen
       })
       setNearbyShops(sorted as ShopRow[])
+
+      // Chỉ giữ voucher toàn hệ thống (không có shop_id)
+      // hoặc voucher của quán đang mở — ẩn voucher của quán đóng cửa
+      const openShopIds = new Set(sorted.filter(s => isShopInHours(s as ShopRow)).map(s => s.id))
+      const filteredVouchers = (voucherData ?? []).filter(v =>
+        !v.shop_id || openShopIds.has(v.shop_id)
+      ).slice(0, 6)
+      setVouchers(filteredVouchers as VoucherRow[])
 
       // Combo vouchers đang active — đánh dấu quán nào có combo
       if (shopData && shopData.length > 0) {
