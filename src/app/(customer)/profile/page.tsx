@@ -131,7 +131,7 @@ export default function ProfilePage() {
       { data: orderCount },
       { data: activeCount },
     ] = await Promise.all([
-      supabase.from("profiles").select("full_name, phone, avatar_url, created_at").eq("id", user.id).single(),
+      supabase.from("profiles").select("full_name, phone, avatar_url, created_at, notif_settings").eq("id", user.id).single(),
       supabase.from("loyalty_points").select("total_points, tier").eq("user_id", user.id).maybeSingle(),
       supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
       supabase.from("orders").select("id", { count: "exact", head: true }).eq("customer_id", user.id).neq("status", "cancelled"),
@@ -148,6 +148,10 @@ export default function ProfilePage() {
     setWalletXu(wallet?.balance ?? 0)
     setTotalOrders((orderCount as { count?: number } | null)?.count ?? 0)
     setActiveOrderCount((activeCount as { count?: number } | null)?.count ?? 0)
+    if (profile?.notif_settings) {
+      const saved = profile.notif_settings as Partial<NotifSettings>
+      setNotif(prev => ({ ...prev, ...saved }))
+    }
     setLoading(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -189,8 +193,23 @@ export default function ProfilePage() {
   const handleSave = async () => {
     if (!userId) return
     await supabase.from("profiles").update({ full_name: name }).eq("id", userId)
+    // Cập nhật email nếu thay đổi (Supabase gửi link xác nhận về email mới)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (email && email !== user?.email) {
+      const { error } = await supabase.auth.updateUser({ email })
+      if (error) { fireToast("Lỗi cập nhật email: " + error.message); return }
+      fireToast("Đã lưu! Kiểm tra email mới để xác nhận")
+    } else {
+      fireToast("Đã lưu thông tin cá nhân")
+    }
     setEditMode(false)
-    fireToast("Đã lưu thông tin cá nhân")
+  }
+
+  const handleNotifChange = async (key: keyof NotifSettings, val: boolean) => {
+    const updated = { ...notif, [key]: val }
+    setNotif(updated)
+    if (!userId) return
+    await supabase.from("profiles").update({ notif_settings: updated }).eq("id", userId)
   }
 
   const handlePwNext = async () => {
@@ -497,7 +516,7 @@ export default function ProfilePage() {
           <SectionLabel>Thông báo</SectionLabel>
           <div style={CARD_STYLE}>
             {NOTIF_ROWS.map(n => (
-              <SettingRow key={n.key} icon={n.icon} label={n.label} sub={n.sub} right={<Toggle on={notif[n.key]} onChange={v => setNotif(prev => ({ ...prev, [n.key]: v }) as NotifSettings)} />} />
+              <SettingRow key={n.key} icon={n.icon} label={n.label} sub={n.sub} right={<Toggle on={notif[n.key]} onChange={v => handleNotifChange(n.key, v)} />} />
             ))}
           </div>
 
