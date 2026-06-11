@@ -25,18 +25,23 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
   const mapRef       = useRef<any>(null)
   const skipRef      = useRef(true)
   const geocodeTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const geocodeIdRef = useRef(0)
 
   const [pickedLat,  setPickedLat]  = useState(initLat)
   const [pickedLng,  setPickedLng]  = useState(initLng)
   const [geocoded,   setGeocoded]   = useState("")
   const [geocoding,  setGeocoding]  = useState(false)
   const [gpsLoading, setGpsLoading] = useState(false)
+  const [gpsError,   setGpsError]   = useState(false)
   const [floating,   setFloating]   = useState(false)
   const [mapLoaded,  setMapLoaded]  = useState(false)
+  const [mapError,   setMapError]   = useState(false)
 
   const doGeocode = useCallback(async (lat: number, lng: number) => {
+    const myId = ++geocodeIdRef.current
     setGeocoding(true)
     const addr = await reverseGeocode(lat, lng)
+    if (myId !== geocodeIdRef.current) return
     setGeocoded(addr)
     setGeocoding(false)
   }, [])
@@ -67,6 +72,8 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
       mapRef.current = map
 
       map.on("load", () => { applyBrandStyle(map); setMapLoaded(true) })
+      map.on("error", () => { setMapLoaded(true); setMapError(true) })
+      setTimeout(() => setMapLoaded(true), 3000)
       map.on("dragstart", () => setFloating(true))
       map.on("dragend",   () => setFloating(false))
       map.on("moveend", () => {
@@ -100,7 +107,11 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
         mapRef.current.flyTo({ center: [coords.longitude, coords.latitude], zoom: 18 })
         void doGeocode(coords.latitude, coords.longitude)
       },
-      () => setGpsLoading(false),
+      () => {
+        setGpsLoading(false)
+        setGpsError(true)
+        setTimeout(() => setGpsError(false), 4000)
+      },
       { enableHighAccuracy: true, timeout: 10000 },
     )
   }, [doGeocode])
@@ -155,13 +166,41 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
           <div style={{
             position: "absolute", inset: 0, zIndex: 5,
             display: "flex", alignItems: "center", justifyContent: "center",
-            background: "#080806",
+            flexDirection: "column", gap: 8, background: "#080806",
           }}>
+            <span style={{ fontSize: 28, opacity: 0.5 }}>🗺️</span>
             <div style={{ color: "#6a5a40", fontSize: 12 }}>Đang tải bản đồ...</div>
           </div>
         )}
 
-        <div ref={divRef} style={{ width: "100%", height: "100%" }} />
+        {mapError && (
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 6,
+            background: "rgba(8,8,6,0.93)", backdropFilter: "blur(8px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexDirection: "column", gap: 10,
+          }}>
+            <span style={{ fontSize: 30 }}>🗺️</span>
+            <span style={{ color: "#ff4040", fontSize: 12, fontFamily: "Lexend", fontWeight: 600 }}>Không thể tải bản đồ</span>
+            <button onClick={() => window.location.reload()}
+              style={{ padding: "7px 18px", borderRadius: 10, background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.35)", color: "#FF8C00", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {gpsError && (
+          <div style={{
+            position: "absolute", top: 12, left: 12, right: 12, zIndex: 20,
+            background: "rgba(255,100,0,0.14)", border: "1px solid rgba(255,100,0,0.3)",
+            borderRadius: 10, padding: "9px 13px",
+            color: "#FF8C00", fontSize: 10.5, fontWeight: 600, fontFamily: "Lexend",
+          }}>
+            📍 GPS không khả dụng — kéo bản đồ để đặt ghim thủ công
+          </div>
+        )}
+
+        <div ref={divRef} style={{ width: "100%", height: "100%", touchAction: "none" }} />
 
         <div style={{
           position: "absolute", inset: 0, zIndex: 10,

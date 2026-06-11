@@ -131,6 +131,13 @@ function GpsManager() {
   const { ready, denied, promptShown, lastUpdated, setLocation, setDenied, setPromptShown } =
     useLocationStore()
   const [showModal, setShowModal] = useState(false)
+  const [gpsFailedMsg, setGpsFailedMsg] = useState(false)
+
+  const handleGpsFail = useCallback(() => {
+    setDenied()
+    setGpsFailedMsg(true)
+    setTimeout(() => setGpsFailedMsg(false), 4000)
+  }, [setDenied])
 
   // Lần đầu vào app — hiện custom UI trước khi gọi browser permission
   useEffect(() => {
@@ -138,7 +145,7 @@ function GpsManager() {
       setShowModal(true)
     } else if (!denied) {
       // Đã đồng ý trước đó → lấy GPS ngay không hỏi lại
-      fetchGps(setLocation, setDenied)
+      fetchGps(setLocation, handleGpsFail)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -147,7 +154,7 @@ function GpsManager() {
   useEffect(() => {
     if (denied || !ready) return
     const interval = setInterval(() => {
-      fetchGps(setLocation, setDenied)
+      fetchGps(setLocation, handleGpsFail)
     }, REFRESH_MS)
     return () => clearInterval(interval)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -169,7 +176,7 @@ function GpsManager() {
   const handleAllow = () => {
     setShowModal(false)
     setPromptShown()
-    fetchGps(setLocation, setDenied)
+    fetchGps(setLocation, handleGpsFail)
   }
 
   const handleDeny = () => {
@@ -178,8 +185,21 @@ function GpsManager() {
     setDenied()
   }
 
-  if (!showModal) return null
-  return <GpsPermissionModal onAllow={handleAllow} onDeny={handleDeny} />
+  return (
+    <>
+      {showModal && <GpsPermissionModal onAllow={handleAllow} onDeny={handleDeny} />}
+      {gpsFailedMsg && (
+        <div style={{
+          position: 'fixed', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16,
+          zIndex: 9999, background: 'rgba(255,100,0,0.14)', border: '1px solid rgba(255,100,0,0.3)',
+          borderRadius: 12, padding: '10px 14px',
+          color: '#FF8C00', fontSize: 11.5, fontWeight: 600, fontFamily: "'Lexend',sans-serif",
+        }}>
+          📍 Không lấy được GPS — vui lòng tự nhập địa chỉ khi đặt hàng
+        </div>
+      )}
+    </>
+  )
 }
 
 // ── Các trang đã có inline bottom nav riêng ────────────────────────────────

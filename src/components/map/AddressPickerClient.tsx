@@ -83,8 +83,8 @@ async function reverseGeocodeAddr(lat: number, lng: number): Promise<string> {
   return ""
 }
 
-function NoteInput({ value, onChange, autoFilled = false, onEdit }: {
-  value: string; onChange: (v: string) => void; autoFilled?: boolean; onEdit?: () => void
+function NoteInput({ value, onChange, autoFilled = false, onEdit, onFocus: onFocusProp }: {
+  value: string; onChange: (v: string) => void; autoFilled?: boolean; onEdit?: () => void; onFocus?: () => void
 }) {
   const [focused, setFocused] = useState(false)
   return (
@@ -100,7 +100,7 @@ function NoteInput({ value, onChange, autoFilled = false, onEdit }: {
         id="address-note" name="address-note"
         type="text" value={value}
         onChange={e => { onChange(e.target.value); onEdit?.() }}
-        onFocus={() => setFocused(true)}
+        onFocus={() => { setFocused(true); onFocusProp?.() }}
         onBlur={() => setFocused(false)}
         placeholder="Ghi chú: Đặc điểm nhận dạng nhà/người cho tài xế"
         style={{
@@ -147,6 +147,7 @@ export default function AddressPickerClient({
   const areaCtxRef      = useRef("Krong Pac, Dak Lak")
   const sessionTokenRef = useRef<string>(crypto.randomUUID())
   const addrInputRef    = useRef<HTMLInputElement>(null)
+  const geocodeIdRef    = useRef(0)
 
   const initLat = initialLat ?? DEFAULT_LAT
   const initLng = initialLng ?? DEFAULT_LNG
@@ -166,7 +167,9 @@ export default function AddressPickerClient({
   const [locating,    setLocating]    = useState(!initialLat && !initialLng)
   const [geocoding,   setGeocoding]   = useState(true)
   const [tilesReady,  setTilesReady]  = useState(false)
+  const [mapError,    setMapError]    = useState(false)
   const [editingAddr, setEditingAddr] = useState(false)
+  const [gpsDeniedMsg, setGpsDeniedMsg] = useState(false)
 
   const applyNote = useCallback((houseNote: string) => {
     setNote(prev => {
@@ -179,8 +182,10 @@ export default function AddressPickerClient({
   }, [])
 
   const doGeocode = useCallback(async (lat: number, lng: number) => {
+    const myId = ++geocodeIdRef.current
     setGeocoding(true)
     const addr = await reverseGeocodeAddr(lat, lng)
+    if (myId !== geocodeIdRef.current) return // stale — có request mới hơn
     if (addr) { setAddress(addr); applyNote("") }
     else setAddress("")
     setGeocoding(false)
@@ -232,6 +237,7 @@ export default function AddressPickerClient({
       mapRef.current = map
 
       map.on("load", () => { applyBrandStyle(map); setTilesReady(true) })
+      map.on("error", () => { setTilesReady(true); setMapError(true) })
       map.on("dragstart", () => { setFloating(true); setShowSuggest(false) })
       map.on("dragend",   () => {
         setFloating(false)
@@ -247,8 +253,8 @@ export default function AddressPickerClient({
         scheduleGeocode(c.lat, c.lng)
       })
 
-      // Fallback tiles-ready timeout
-      setTimeout(() => setTilesReady(true), 900)
+      // Fallback tiles-ready timeout (3s cho mạng chậm)
+      setTimeout(() => setTilesReady(true), 3000)
     }
 
     init()
@@ -267,7 +273,12 @@ export default function AddressPickerClient({
           setFlyTarget([coords.latitude, coords.longitude])
           void doGeocode(coords.latitude, coords.longitude)
         },
-        () => { setLocating(false); void doGeocode(DEFAULT_LAT, DEFAULT_LNG) },
+        () => {
+          setLocating(false)
+          setGpsDeniedMsg(true)
+          setTimeout(() => setGpsDeniedMsg(false), 4000)
+          void doGeocode(DEFAULT_LAT, DEFAULT_LNG)
+        },
         { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
       )
     } else {
@@ -302,7 +313,11 @@ export default function AddressPickerClient({
         setFlyTarget([coords.latitude, coords.longitude])
         void doGeocode(coords.latitude, coords.longitude)
       },
-      () => setLocating(false),
+      () => {
+        setLocating(false)
+        setGpsDeniedMsg(true)
+        setTimeout(() => setGpsDeniedMsg(false), 4000)
+      },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
     )
   }, [doGeocode])
@@ -330,7 +345,10 @@ export default function AddressPickerClient({
       setAddress(addr)
       applyNote(detail.houseNote)
       onConfirm({ lat: detail.lat, lng: detail.lng, address: addr, note: detail.houseNote })
-    } catch { /* keep current */ } finally {
+    } catch {
+      setSuggestions([])
+      setShowSuggest(false)
+    } finally {
       setGeocoding(false)
     }
   }, [applyNote, onConfirm])
@@ -471,7 +489,34 @@ export default function AddressPickerClient({
           </div>
         )}
 
-        <div ref={divRef} style={{ width: "100%", height: "100%" }} />
+        {mapError && (
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 6,
+            background: "rgba(8,8,6,0.92)", backdropFilter: "blur(8px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexDirection: "column", gap: 10,
+          }}>
+            <span style={{ fontSize: 30 }}>🗺️</span>
+            <span style={{ color: "#ff4040", fontSize: 12, fontFamily: "Lexend", fontWeight: 600 }}>Không thể tải bản đồ</span>
+            <button onClick={() => { setMapError(false); setTilesReady(false); window.location.reload() }}
+              style={{ padding: "7px 18px", borderRadius: 10, background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.35)", color: "#FF8C00", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {gpsDeniedMsg && (
+          <div style={{
+            position: "absolute", top: 12, left: 12, right: 12, zIndex: 20,
+            background: "rgba(255,100,0,0.15)", border: "1px solid rgba(255,100,0,0.35)",
+            borderRadius: 10, padding: "9px 13px",
+            color: "#FF8C00", fontSize: 10.5, fontWeight: 600, fontFamily: "Lexend",
+          }}>
+            📍 GPS không khả dụng — vui lòng kéo bản đồ hoặc tìm địa chỉ thủ công
+          </div>
+        )}
+
+        <div ref={divRef} style={{ width: "100%", height: "100%", touchAction: "none" }} />
 
         {/* Map Controls — bottom right */}
         <div style={{
@@ -571,7 +616,7 @@ export default function AddressPickerClient({
       </div>
 
       {/* Address Panel */}
-      <div style={{
+      <div data-panel="1" style={{
         position: "absolute", bottom: 0, left: 0, right: 0, height: PANEL_H, zIndex: 20,
         background: "rgba(10,7,4,0.97)",
         backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)",
@@ -601,7 +646,7 @@ export default function AddressPickerClient({
               <input
                 ref={addrInputRef}
                 value={address}
-                onChange={e => setAddress(e.target.value)}
+                onChange={e => setAddress(e.target.value.replace(/<[^>]*>/g, "").slice(0, 300))}
                 onBlur={() => setEditingAddr(false)}
                 style={{
                   flex: 1, background: "transparent", border: "none", outline: "none",
@@ -628,7 +673,8 @@ export default function AddressPickerClient({
             </>
           )}
         </div>
-        <NoteInput value={note} onChange={setNote} autoFilled={noteIsAuto} onEdit={() => setNoteIsAuto(false)} />
+        <NoteInput value={note} onChange={setNote} autoFilled={noteIsAuto} onEdit={() => setNoteIsAuto(false)}
+          onFocus={() => setTimeout(() => addrInputRef.current?.closest("[data-panel]")?.scrollIntoView({ behavior: "smooth", block: "end" }), 150)} />
         <motion.button
           type="button" onClick={handleConfirm} whileTap={{ scale: 0.97 }}
           style={{
