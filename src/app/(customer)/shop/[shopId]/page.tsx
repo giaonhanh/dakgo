@@ -943,93 +943,75 @@ export default function ShopPage() {
           {shop && (
             <div style={{ padding:"0 16px" }}>
 
-              {/* Avatar + Info — avatar overlaps banner */}
-              <div style={{ display:"flex", alignItems:"flex-start", gap:14,
-                marginTop:-44, marginBottom:16, position:"relative", zIndex:10 }}>
+              {/* Avatar + Info row — avatar overlaps banner bottom */}
+              <div style={{ display:"flex", alignItems:"flex-end", gap:12,
+                marginTop:-36, marginBottom:12, position:"relative", zIndex:10 }}>
 
-                {/* Avatar column */}
-                <div style={{ flexShrink:0, display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
-                  {/* Avatar circle */}
-                  <div style={{ width:84, height:84, borderRadius:22,
-                    border:"3px solid #080806", overflow:"hidden",
-                    background:"linear-gradient(135deg,rgba(255,107,0,0.15),rgba(255,107,0,0.04))",
-                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:38,
-                    boxShadow:"0 0 0 1.5px rgba(255,107,0,0.3), 0 8px 28px rgba(0,0,0,0.7)" }}>
-                    {shop.avatar_url
-                      ? <Image src={shop.avatar_url} alt={shop.name} fill
-                          sizes="84px" style={{ objectFit:"cover" }} />
-                      : "🏪"}
-                  </div>
-                  {/* Nhãn loại — pill nổi dưới avatar */}
-                  {shop.shop_type && (
-                    <div style={{
-                      display:"flex", alignItems:"center", gap:4,
-                      background: shop.shop_type === "delivery"
-                        ? "linear-gradient(135deg,#FF6B00,#FF9500)"
-                        : "linear-gradient(135deg,#1aab5c,#3ecf6e)",
-                      borderRadius: 99, padding: "4px 11px",
-                      border: "2px solid #080806",
-                      fontSize: 10.5, fontWeight: 800, color: "#fff",
-                      letterSpacing: 0.4, whiteSpace: "nowrap",
-                      boxShadow: shop.shop_type === "delivery"
-                        ? "0 3px 12px rgba(255,107,0,0.5)"
-                        : "0 3px 12px rgba(62,207,110,0.45)",
-                    }}>
-                      {shop.shop_type === "delivery" ? "🛒 Mua hộ" : "✅ Đối tác"}
-                    </div>
-                  )}
+                {/* Avatar */}
+                <div style={{ flexShrink:0, width:80, height:80, borderRadius:20,
+                  border:"3px solid #080806", overflow:"hidden",
+                  background:"linear-gradient(135deg,rgba(255,107,0,0.15),rgba(255,107,0,0.04))",
+                  display:"flex", alignItems:"center", justifyContent:"center", fontSize:36,
+                  boxShadow:"0 0 0 1.5px rgba(255,107,0,0.3), 0 6px 24px rgba(0,0,0,0.65)",
+                  position:"relative" }}>
+                  {shop.avatar_url
+                    ? <Image src={shop.avatar_url} alt={shop.name} fill
+                        sizes="80px" style={{ objectFit:"cover" }} />
+                    : "🏪"}
                 </div>
 
-                {/* Tên + mô tả + stats inline */}
-                <div style={{ flex:1, minWidth:0, paddingTop:48 }}>
-                  <div style={{ color:"#f8f0e0", fontSize:19, fontWeight:800, lineHeight:1.2,
-                    marginBottom:3,
-                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                    {shop.name}
+                {/* Tên + nhãn + mô tả */}
+                <div style={{ flex:1, minWidth:0, paddingBottom:2 }}>
+                  {/* Tên + badge nhãn loại cùng hàng */}
+                  <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:4, flexWrap:"wrap" }}>
+                    <span style={{ color:"#f8f0e0", fontSize:17, fontWeight:800, lineHeight:1.2,
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:160 }}>
+                      {shop.name}
+                    </span>
+                    {shop.shop_type && (
+                      <span style={{
+                        display:"inline-flex", alignItems:"center",
+                        background: shop.shop_type === "delivery"
+                          ? "linear-gradient(135deg,#FF6B00,#FF9500)"
+                          : "linear-gradient(135deg,#1aab5c,#2ecc71)",
+                        borderRadius: 99, padding: "3px 9px",
+                        fontSize: 9.5, fontWeight: 800, color: "#fff",
+                        letterSpacing: 0.3, whiteSpace: "nowrap", flexShrink: 0,
+                        boxShadow: shop.shop_type === "delivery"
+                          ? "0 2px 8px rgba(255,107,0,0.45)"
+                          : "0 2px 8px rgba(46,204,113,0.4)",
+                      }}>
+                        {shop.shop_type === "delivery" ? "🛒 Mua hộ" : "✅ Đối tác"}
+                      </span>
+                    )}
                   </div>
+                  {/* Mô tả */}
                   {shop.description && (
-                    <div style={{ color:"#6a5a40", fontSize:11, lineHeight:1.5,
-                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
-                      marginBottom:8 }}>
+                    <div style={{ color:"#6a5a40", fontSize:10.5, lineHeight:1.4,
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                       {shop.description}
                     </div>
                   )}
-                  {/* Stat pills inline */}
-                  <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                    <span style={{ display:"flex", alignItems:"center", gap:3,
-                      background:"rgba(255,255,255,0.06)", borderRadius:20, padding:"3px 9px",
-                      fontSize:10, color:"#b0956a", fontWeight:600 }}>
-                      ⭐ {shop.rating?.toFixed(1) ?? "Mới"}
-                      <span style={{ color:"#4a4030" }}>·</span>
-                      <span style={{ color:"#6a5a40" }}>{shop.rating_count ?? 0} đánh giá</span>
-                    </span>
-                    <span style={{ display:"flex", alignItems:"center", gap:3,
-                      background:"rgba(255,255,255,0.06)", borderRadius:20, padding:"3px 9px",
-                      fontSize:10, color:"#b0956a", fontWeight:600 }}>
-                      ⏱ {shop.prep_time ? `${shop.prep_time} phút` : "10–15 phút"}
-                    </span>
-                  </div>
                 </div>
               </div>
 
-              {/* Stats row: giờ mở cửa */}
-              <div style={{ display:"flex", gap:8, marginBottom:4 }}>
+              {/* Stats row */}
+              <div style={{ display:"flex", gap:7, marginBottom:4 }}>
                 {[
+                  { icon:"⭐", val: shop.rating?.toFixed(1) ?? "Mới", sub:`${shop.rating_count ?? 0} đánh giá` },
+                  { icon:"⏱️", val: shop.prep_time ? `${shop.prep_time} phút` : "10–15 phút", sub:"Chuẩn bị" },
                   { icon:"🕐", val: (() => {
-                      if (!shop.opening_hours) return "07:00 – 21:00"
-                      const hours = shop.opening_hours as { open?: string; close?: string } | null
-                      if (hours?.open && hours?.close) return `${hours.open} – ${hours.close}`
-                      return "07:00 – 21:00"
-                    })(), sub:"Giờ mở cửa hôm nay" },
-                  { icon:"📦", val: shop.prep_time ? `${shop.prep_time} phút` : "10–15 phút", sub:"Thời gian chuẩn bị" },
-                  { icon:"💬", val: shop.rating_count ? `${shop.rating_count}` : "–", sub:"Lượt đánh giá" },
+                      if (!shop.opening_hours) return "07:00–21:00"
+                      const h = shop.opening_hours as { open?: string; close?: string } | null
+                      return h?.open && h?.close ? `${h.open}–${h.close}` : "07:00–21:00"
+                    })(), sub:"Mở cửa" },
                 ].map(s => (
                   <div key={s.icon} style={{ flex:1, textAlign:"center",
                     background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)",
-                    borderRadius:12, padding:"9px 4px" }}>
-                    <div style={{ fontSize:16, marginBottom:3 }}>{s.icon}</div>
+                    borderRadius:12, padding:"8px 4px" }}>
+                    <div style={{ fontSize:15, marginBottom:2 }}>{s.icon}</div>
                     <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:700, lineHeight:1.2 }}>{s.val}</div>
-                    <div style={{ color:"#6a5a40", fontSize:9.5, marginTop:2 }}>{s.sub}</div>
+                    <div style={{ color:"#6a5a40", fontSize:9.5, marginTop:1 }}>{s.sub}</div>
                   </div>
                 ))}
               </div>
