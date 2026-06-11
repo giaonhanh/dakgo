@@ -116,7 +116,7 @@ function isProductInTime(p: { all_day?: boolean | null; start_hour?: string | nu
 }
 
 const fmt  = (n: number) => n.toLocaleString("vi-VN") + "d"
-const RANK_ICON = ["??","??","??"]
+const RANK_ICON = ["🥇","🥈","🥉"]
 
 function getWeatherTip(code: number, temp: number, hour: number): string {
   if (code >= 95) return "⛈️ Bão giông đang đến! Ở nhà an toàn, order ngay về thôi!"
@@ -254,7 +254,7 @@ export default function HomePage() {
       const ridesMapped = (liveRides ?? []).map(r => ({
         id: r.id,
         status: r.status === "searching" ? "pending" : r.status,
-        shops: { name: r.vehicle_type === "motorbike" ? "?? Xe ôm" : r.vehicle_type === "car_7" ? "🚐 Taxi 7 chỗ" : "🚗 Taxi 4 chỗ" },
+        shops: { name: r.vehicle_type === "motorbike" ? "🛵 Xe ôm" : r.vehicle_type === "car_7" ? "🚐 Taxi 7 chỗ" : "🚗 Taxi 4 chỗ" },
         _href: "/orders",
         _type: "ride" as const,
       }))
@@ -657,14 +657,14 @@ export default function HomePage() {
                 <div style={{ width:32, height:32, borderRadius:"50%",
                   background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)",
                   display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:15 }}>??</div>
+                  fontSize:15 }}>🔔</div>
                 <NotifDot count={notifCount} />
               </a>
               <a href="/profile" style={{ textDecoration:"none" }}>
                 <div style={{ width:32, height:32, borderRadius:10,
                   background:"rgba(255,107,0,0.12)", border:"1px solid rgba(255,107,0,0.25)",
                   display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>
-                  ??
+                  👤
                 </div>
               </a>
             </div>
@@ -675,7 +675,7 @@ export default function HomePage() {
           -------------------------------------- */}
           <div style={{ padding:"2px 16px 12px" }}>
             <div style={{ color:"#6a5a40", fontSize:10, marginBottom:2 }}>
-              {greet()}, {userName} ??
+              {greet()}, {userName} 👋
             </div>
             <div style={{ fontSize:18, fontWeight:700, lineHeight:1.2, marginBottom:8 }}>
               Hôm nay bạn{" "}
@@ -692,7 +692,7 @@ export default function HomePage() {
               border:"1px solid rgba(180,100,255,0.2)",
               borderRadius:10, padding:"7px 11px",
             }}>
-              <span style={{ fontSize:14 }}>??</span>
+              <span style={{ fontSize:14 }}>✨</span>
               <div style={{ color:"#b464ff", fontSize: 11, lineHeight:1.4, flex:1 }}>
                 <strong style={{ color:"#c87aff" }}>Gợi ý AI:</strong>{" "}
                 {weatherTip ?? aiTip()}
@@ -710,7 +710,7 @@ export default function HomePage() {
             border:"1px solid rgba(255,255,255,0.08)",
             borderRadius:13, padding:"9px 13px",
             display:"flex", alignItems:"center", gap:8 }}>
-            <span style={{ color:"#6a5a40", fontSize:15 }}>??</span>
+            <span style={{ color:"#6a5a40", fontSize:15 }}>🔍</span>
             <input readOnly placeholder="Tìm món ăn, cửa hàng, dịch vụ..."
               onClick={() => { window.location.href="/search" }}
               style={{ flex:1, background:"transparent", border:"none", outline:"none",
@@ -719,7 +719,7 @@ export default function HomePage() {
               <div style={{ width:26, height:26, borderRadius:8,
                 background:"rgba(255,107,0,0.10)", border:"1px solid rgba(255,107,0,0.25)",
                 display:"flex", alignItems:"center", justifyContent:"center", fontSize:13 }}>
-                ??
+                ⚙️
               </div>
             </a>
           </div>
@@ -809,9 +809,9 @@ export default function HomePage() {
                             <div style={{ position:"absolute", right:-10, top:-10, width:70, height:70,
                               background:`radial-gradient(circle,${statusColor}33 0%,transparent 65%)` }} />
                             <span style={{ fontSize:20, position:"relative", zIndex:1 }}>
-                              {order.status === "delivering" ? "??" :
-                               order.status === "ready"      ? "??" :
-                               order.status === "pending"    ? "?" : "?????"}
+                              {order.status === "delivering" ? "🚀" :
+                               order.status === "ready"      ? "✅" :
+                               order.status === "pending"    ? "⏳" : "✅"}
                             </span>
                             <div style={{ flex:1, position:"relative", zIndex:1 }}>
                               <div style={{ display:"flex", alignItems:"center", gap:5 }}>
@@ -850,7 +850,7 @@ export default function HomePage() {
               S4 — FlashSaleBanner / AdminBanner / InviteFriend
           -------------------------------------- */}
           {vouchers.length > 0 ? (() => {
-            const DEAL_EMOJI: Record<string, string> = { percent:"??", fixed:"??", freeship:"??" }
+            const DEAL_EMOJI: Record<string, string> = { percent:"🏷️", fixed:"💵", freeship:"🚚" }
             const deal = vouchers[bannerIdx % vouchers.length]
             const dealEmoji   = DEAL_EMOJI[deal.discount_type] ?? "?"
             const dealTitle   = deal.title
@@ -975,11 +975,11 @@ export default function HomePage() {
                   <div style={{ display:"inline-block", marginTop:6,
                     background:"rgba(62,207,110,0.15)", border:"1px solid rgba(62,207,110,0.35)",
                     borderRadius:6, padding:"3px 9px", color:"#3ecf6e", fontSize: 11, fontWeight:600 }}>
-                    Chia s? ngay ?
+                    Chia sẻ ngay →
                   </div>
                 </div>
                 <div style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)",
-                  fontSize:52, zIndex:1, filter:"drop-shadow(0 0 14px rgba(62,207,110,0.4))" }}>??</div>
+                  fontSize:52, zIndex:1, filter:"drop-shadow(0 0 14px rgba(62,207,110,0.4))" }}>🎁</div>
               </div>
           </div>
 
@@ -992,10 +992,10 @@ export default function HomePage() {
             gap:7, padding:"0 16px", marginBottom:14,
           }}>
             {[
-              { icon:"??", label:"Giao hộ",  href:"/giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00", badge:"HOT" },
-              { icon:"??", label:"Mua hộ",   href:"/mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e", badge:"" },
-              { icon:"??", label:"Xe ôm",    href:"/xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5", badge:"" },
-              { icon:"??", label:"Taxi",     href:"/taxi",    bg:"rgba(180,100,255,0.10)",ic:"#b464ff", badge:"" },
+              { icon:"📦", label:"Giao hộ",  href:"/giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00", badge:"HOT" },
+              { icon:"🛒", label:"Mua hộ",   href:"/mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e", badge:"" },
+              { icon:"🛵", label:"Xe ôm",    href:"/xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5", badge:"" },
+              { icon:"🚗", label:"Taxi",     href:"/taxi",    bg:"rgba(180,100,255,0.10)",ic:"#b464ff", badge:"" },
             ].map((s,i) => (
               <a key={i} href={s.href} style={{ textDecoration:"none" }}>
                 <div className="svc-card" style={{
@@ -1026,7 +1026,7 @@ export default function HomePage() {
           {/* --------------------------------------
               S6 — Voucher (khám phá tất cả)
           -------------------------------------- */}
-          <SectionHeader title="??? Voucher" more="Xem tất cả →" href="/vouchers" />
+          <SectionHeader title="🎟️ Voucher" more="Xem tất cả →" href="/vouchers" />
           {vouchers.length === 0 ? (
             <div style={{ margin:"0 16px 14px",
               background:"rgba(255,107,0,0.04)",
@@ -1036,7 +1036,7 @@ export default function HomePage() {
             }}>
               <div style={{ position:"relative" }}>
                 <div style={{ fontSize:44, lineHeight:1,
-                  filter:"drop-shadow(0 0 12px rgba(255,179,71,0.3))" }}>???</div>
+                  filter:"drop-shadow(0 0 12px rgba(255,179,71,0.3))" }}>🎟️</div>
                 <motion.div
                   animate={{ scale:[1,1.15,1], opacity:[0.5,1,0.5] }}
                   transition={{ duration:2.5, repeat:Infinity, ease:"easeInOut" }}
@@ -1090,7 +1090,7 @@ export default function HomePage() {
                         background: isShop ? "rgba(74,143,245,0.12)" : "rgba(255,107,0,0.12)",
                         border: `1px solid ${isShop ? "rgba(74,143,245,0.25)" : "rgba(255,107,0,0.25)"}`,
                         display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
-                        {isShop ? "??" : "??"}
+                        {isShop ? "🏪" : "🍜"}
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ color: isShop ? "#4a8ff5" : "#FF8C00", fontSize:12, fontWeight:700 }}>{valueLabel}</div>
@@ -1177,7 +1177,7 @@ export default function HomePage() {
               S8 — PromoSection
           -------------------------------------- */}
           {promos.length > 0 && (<>
-          <SectionHeader title="?? Khuyến mãi hôm nay" more="Xem tất cả →" href="/promo-items" />
+          <SectionHeader title="🏷️ Khuyến mãi hôm nay" more="Xem tất cả →" href="/promo-items" />
             <HScroll>
             {promos.map(p => {
               const shopName = (p.shops as {name:string}|null)?.name ?? ""
@@ -1196,7 +1196,7 @@ export default function HomePage() {
                     background:"rgba(255,107,0,0.04)", overflow:"hidden" }}>
                     {p.image_url
                       ? <Image src={p.image_url} alt={p.name} fill sizes="120px" style={{ objectFit:"cover" }} />
-                      : <span style={{ zIndex:1 }}>???</span>}
+                      : <span style={{ zIndex:1 }}>🍽️</span>}
                     {discountPct > 0 && (
                       <div style={{ position:"absolute", top:5, left:5, zIndex:2 }}>
                         <Badge layer={2} variant="discount" size="sm" label={`-${discountPct}%`} />
@@ -1225,7 +1225,7 @@ export default function HomePage() {
                     </div>
                     <div style={{ display:"flex", alignItems:"center",
                       justifyContent:"space-between", marginTop:4 }}>
-                      <span style={{ color:"#6a5a40", fontSize:9 }}>?? {p.sold_count} dă bán</span>
+                      <span style={{ color:"#6a5a40", fontSize:9 }}>🔥 {p.sold_count} dă bán</span>
                       <button
                         onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:p.id, name:p.name, price:p.price, shop:shopName, shopId:p.shop_id }) }}
                         style={{ width:22, height:22, borderRadius:7,
@@ -1260,12 +1260,12 @@ export default function HomePage() {
                         fontSize:36, position:"relative" }}>
                         {s.logo_url
                           ? <Image src={s.logo_url} alt={s.name} fill sizes="64px" style={{ objectFit:"cover" }} />
-                          : "??"}
+                          : "🤍"}
                         <button onClick={e => { e.preventDefault(); e.stopPropagation(); toggleFavorite(s.id) }}
                           style={{ position:"absolute", top:5, right:5, width:24, height:24, borderRadius:7,
                             background:"rgba(255,64,64,0.15)", border:"1px solid rgba(255,64,64,0.3)",
                             color:"#ff6060", fontSize:12, cursor:"pointer", display:"flex",
-                            alignItems:"center", justifyContent:"center" }}>??</button>
+                            alignItems:"center", justifyContent:"center" }}>+</button>
                       </div>
                       <div style={{ padding:"8px 9px" }}>
                         <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600,
@@ -1285,7 +1285,7 @@ export default function HomePage() {
           {/* --------------------------------------
               S9 — NearbyShops
           -------------------------------------- */}
-          <SectionHeader title="?? Quán gần bạn" more="Xem tất cả →" href="/nearby-shops" />
+          <SectionHeader title="📍 Quán gần bạn" more="Xem tất cả →" href="/nearby-shops" />
 
           {/* Filter chips — danh mục có quán */}
           {(() => {
@@ -1367,7 +1367,7 @@ export default function HomePage() {
                     color:"#f8f0e0", fontSize:11, fontWeight:700, pointerEvents:"none",
                     opacity:0, transition:"opacity 0.2s",
                   }}>
-                    ?? {nextOpenLabel(s)}
+                    🕐 {nextOpenLabel(s)}
                   </div>
                 )}
                 <a href={shopOpen ? `/shop/${s.id}` : "#"} onClick={e => !shopOpen && e.preventDefault()} style={{ textDecoration:"none" }}>
@@ -1383,12 +1383,12 @@ export default function HomePage() {
                       display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, overflow:"hidden" }}>
                       {s.logo_url
                         ? <Image src={s.logo_url} alt={s.name} fill sizes="56px" style={{ objectFit:"cover" }} />
-                        : "??"}
+                        : "🏪"}
                       {/* Closed overlay */}
                       {!shopOpen && (
                         <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.52)",
                           display:"flex", alignItems:"center", justifyContent:"center", borderRadius:13 }}>
-                          <span style={{ fontSize:16 }}>??</span>
+                          <span style={{ fontSize:16 }}>📍</span>
                         </div>
                       )}
                     </div>
@@ -1428,7 +1428,7 @@ export default function HomePage() {
                     color: isFav ? "#ff4040" : "#6a5a40", fontSize:14, cursor:"pointer",
                     display:"flex", alignItems:"center", justifyContent:"center",
                     transition:"all .2s", zIndex:1 }}>
-                  {isFav ? "??" : "??"}
+                  {isFav ? "❤️" : "🤍"}
                 </button>
               </div>
             )})}
@@ -1459,7 +1459,7 @@ export default function HomePage() {
                           background:"linear-gradient(135deg,rgba(62,207,110,0.07),rgba(62,207,110,0.03))",
                           display:"flex", alignItems:"center", justifyContent:"center",
                           fontSize:30, position:"relative" }}>
-                          ???
+                          🍽️
                           <div style={{ position:"absolute", top:5, left:5,
                             background:"rgba(62,207,110,0.85)", color:"#000",
                             fontSize: 10, fontWeight:700, padding:"2px 5px", borderRadius:5 }}>MỚI</div>
@@ -1510,7 +1510,7 @@ export default function HomePage() {
                         background:"rgba(180,100,255,0.04)" }}>
                         <div style={{ position:"absolute", inset:0,
                           background:"radial-gradient(circle at 50% 65%,rgba(180,100,255,0.1) 0%,transparent 65%)" }} />
-                        ???
+                        🍽️
                       </div>
                       <div style={{ padding:"7px 9px 8px" }}>
                         <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600,
@@ -1522,7 +1522,7 @@ export default function HomePage() {
                           backgroundClip:"text", fontSize:11, fontWeight:700, marginTop:3 }}>{fmt(p.price)}</div>
                         <div style={{ display:"flex", alignItems:"center",
                           justifyContent:"space-between", marginTop:4 }}>
-                          <span style={{ color:"#6a5a40", fontSize: 10 }}>?? {p.sold_count} dă bán</span>
+                          <span style={{ color:"#6a5a40", fontSize: 10 }}>🔥 {p.sold_count} dă bán</span>
                           <button
                             onClick={e => { e.preventDefault(); e.stopPropagation();
                               handleAdd(e.currentTarget as HTMLElement,
@@ -1561,7 +1561,7 @@ export default function HomePage() {
                       <div style={{ width:110, height:78,
                         background:"linear-gradient(135deg,rgba(255,107,0,0.07),rgba(255,179,71,0.04))",
                         display:"flex", alignItems:"center", justifyContent:"center",
-                        fontSize:30 }}>???</div>
+                        fontSize:30 }}>✨</div>
                     )}
                     <div style={{ padding:"7px 8px 8px" }}>
                       <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600,
@@ -1590,7 +1590,7 @@ export default function HomePage() {
               S10 — BestSellers
           -------------------------------------- */}
           {bestSellers.length > 0 && (<>
-          <SectionHeader title="?? Bán chạy tuần này" more="Xem tất cả →" href="/bestsellers" />
+          <SectionHeader title="🔥 Bán chạy tuần này" more="Xem tất cả →" href="/bestsellers" />
             <HScroll>
               {bestSellers.map((b, idx) => {
                 const rank = idx + 1
@@ -1610,7 +1610,7 @@ export default function HomePage() {
                         : <>
                             <div style={{ position:"absolute", inset:0,
                               background:"radial-gradient(circle at 50% 60%,rgba(255,107,0,0.09) 0%,transparent 65%)" }} />
-                            <span style={{ position:"relative", zIndex:1 }}>???</span>
+                            <span style={{ position:"relative", zIndex:1 }}>🔥</span>
                           </>
                       }
                       <div style={{ position:"absolute", top:6, left:6,
@@ -1628,7 +1628,7 @@ export default function HomePage() {
                       <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
                       <div style={{ color:"#3ecf6e", fontSize: 10, fontWeight:600, marginTop:3 }}>
-                        ?? {b.sold_count.toLocaleString("vi-VN")} dă bán
+                        🔥 {b.sold_count.toLocaleString("vi-VN")} dă bán
                       </div>
                       <div style={{ display:"flex", justifyContent:"space-between",
                         alignItems:"center", marginTop:4 }}>
@@ -1659,12 +1659,12 @@ export default function HomePage() {
           {/* --------------------------------------
               S12 — ReorderSection
           -------------------------------------- */}
-          <SectionHeader title="?? Đặt lại nhanh" more="Lịch sử →" href="/orders" />
+          <SectionHeader title="🔄 Đặt lại nhanh" more="Lịch sử →" href="/orders" />
           {reorders.length === 0 ? (
             <div style={{ padding:"0 16px 14px" }}>
               <div style={{ background:"rgba(255,255,255,0.03)", border:"1px dashed rgba(255,255,255,0.07)",
                 borderRadius:12, padding:"16px", textAlign:"center" }}>
-                <div style={{ fontSize:28, marginBottom:6 }}>???</div>
+                <div style={{ fontSize:28, marginBottom:6 }}>🛒</div>
                 <div style={{ color:"#6a5a40", fontSize:10 }}>Đặt đơn đầu tiên để thấy<br/>lịch sử đặt lại nhanh ở đây</div>
               </div>
             </div>
@@ -1672,7 +1672,7 @@ export default function HomePage() {
             <HScroll>
               {reorders.map(r => {
                 const shopName = (r.shops as {name:string}|null)?.name ?? "Quán"
-                const firstItem = (r.order_items as {name:string}[])?.[0]?.name ?? "Đon hàng"
+                const firstItem = (r.order_items as {name:string}[])?.[0]?.name ?? "Đơn hàng"
                 return (
                   <div key={r.id} style={{
                     minWidth:132, flexShrink:0,
@@ -1681,7 +1681,7 @@ export default function HomePage() {
                     borderRadius:12, padding:"10px 11px", cursor:"pointer",
                   }}>
                     <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:7 }}>
-                      <span style={{ fontSize:20 }}>??</span>
+                      <span style={{ fontSize:20 }}>🍜</span>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ color:"#f8f0e0", fontSize: 11, fontWeight:600,
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
@@ -1729,10 +1729,10 @@ export default function HomePage() {
           boxShadow:"0 0 20px rgba(255,107,0,0.1)",
         }}>
           {[
-            { icon:"??", label:"Trang chủ", key:"home",     href:"/"         },
-            { icon:"??", label:"Đơn hàng",  key:"orders",   href:"/orders"   },
-            { icon:"??", label:"Giỏ hàng",  key:"cart",     href:"/cart",  cart:true },
-            { icon:"??", label:"Cài đặt",   key:"settings", href:"/settings" },
+            { icon:"🏠", label:"Trang chủ", key:"home",     href:"/"         },
+            { icon:"📋", label:"Đơn hàng",  key:"orders",   href:"/orders"   },
+            { icon:"🛒", label:"Giỏ hàng",  key:"cart",     href:"/cart",  cart:true },
+            { icon:"⚙️", label:"Cài đặt",   key:"settings", href:"/settings" },
           ].map(tab => (
             <button key={tab.key}
               onClick={() => { setActiveTab(tab.key); router.push(tab.href) }}
@@ -1804,7 +1804,7 @@ export default function HomePage() {
               onClick={e => e.stopPropagation()}
               style={{ background:"#151210", border:"1px solid rgba(255,107,0,0.28)",
                 borderRadius:22, padding:"22px 18px 18px", width:"100%", maxWidth:420 }}>
-              <div style={{ fontSize:32, textAlign:"center", marginBottom:8 }}>??</div>
+              <div style={{ fontSize:32, textAlign:"center", marginBottom:8 }}>⚠️</div>
               <div style={{ color:"#f8f0e0", fontSize:15, fontWeight:700,
                 textAlign:"center", marginBottom:10 }}>
                 Thay đổi quán?
