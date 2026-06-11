@@ -19,6 +19,7 @@
     "@payos/node": "^2.0.5",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
+    "@tabler/icons-react": "^3.44.0",
     "@vis.gl/react-google-maps": "^1.8.3",
     "autoprefixer": "^10",
     "clsx": "^2.1.1",

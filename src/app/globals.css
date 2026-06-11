@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import "../styles/badge-tokens.css";
+
 /* ─── CSS Custom Properties (CLAUDE.md Section 2.1) ─── */
 :root {
   --bg-primary:    #080806;
