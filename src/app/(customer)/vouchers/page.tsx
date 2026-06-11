@@ -77,7 +77,8 @@ function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () =
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:2, flexWrap:"wrap" }}>
                 <Badge
-                  variant={v.isCombo ? "voucher-combo" : v.type === "percent" ? "voucher-percent" : v.type === "fixed" ? "voucher-cash" : "voucher-ship"}
+                  layer={1}
+                  variant={v.isCombo ? "combo" : v.type === "percent" ? "sale" : v.type === "fixed" ? "fire" : "partner"}
                   size="sm"
                 />
                 {v.shopName && (
@@ -141,12 +142,12 @@ function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () =
                 </div>
                 <div style={{ textAlign:"right", display:"flex", flexDirection:"column", alignItems:"flex-end", gap:3 }}>
                   {countdown.urgent
-                    ? <Badge variant="expire-urgent" size="sm" label={countdown.text} />
+                    ? <Badge layer={2} variant="expire-urgent" size="sm" label={countdown.text} />
                     : <div style={{ fontSize: 11, color:"#6a5a40" }}>{countdown.text}</div>
                   }
                   {totalLeft !== null && !countdown.expired && (
                     totalLeft <= 5
-                      ? <Badge variant="low-usage" size="sm" label={`Còn ${totalLeft} lượt`} />
+                      ? <Badge layer={2} variant="low-usage" size="sm" label={`Còn ${totalLeft} lượt`} />
                       : <div style={{ fontSize: 10, color:"#6a5a40" }}>Còn {totalLeft} lượt</div>
                   )}
                 </div>

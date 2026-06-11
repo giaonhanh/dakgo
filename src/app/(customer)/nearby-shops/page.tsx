@@ -239,7 +239,7 @@ export default function NearbyShopsPage() {
                     {!s.isOpen && (
                       <div style={{ position:"absolute", inset:0, background:"rgba(8,8,6,0.65)",
                         display:"flex", alignItems:"center", justifyContent:"center" }}>
-                        <Badge variant="closed" size="sm" label="Đóng" />
+                        <Badge layer={3} variant="closed" size="sm" label="Đóng" />
                       </div>
                     )}
                   </div>
@@ -251,7 +251,7 @@ export default function NearbyShopsPage() {
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>
                         {s.name}
                       </div>
-                      <Badge variant={s.isOpen ? "open" : "closed"} size="sm" label={s.isOpen ? "Mở" : "Đóng"} />
+                      <Badge layer={3} variant={s.isOpen ? "open" : "closed"} size="sm" label={s.isOpen ? "Mở" : "Đóng"} />
                     </div>
                     <div style={{ color:"#6a5a40", fontSize:10,
                       whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", marginBottom:4 }}>
@@ -259,10 +259,10 @@ export default function NearbyShopsPage() {
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                       {s.rating > 0 && (
-                        <Badge variant="rating" size="sm" label={s.rating.toFixed(1)} />
+                        <Badge layer={2} variant="rating" size="sm" label={s.rating.toFixed(1)} />
                       )}
                       {s.distanceKm !== null && (
-                        <Badge variant="distance" size="sm" label={formatDist(s.distanceKm)} />
+                        <Badge layer={2} variant="distance" size="sm" label={formatDist(s.distanceKm)} />
                       )}
                       {/* Category tags */}
                       {s.categories.slice(0, 2).map(v => {

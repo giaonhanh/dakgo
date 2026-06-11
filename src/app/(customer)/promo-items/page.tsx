@@ -117,7 +117,7 @@ export default function PromoItemsPage() {
                 : <span>🍽️</span>
               }
               <div style={{ position: "absolute", top: 6, left: 6 }}>
-                <Badge variant="discount" size="sm" label={`-${p.disc}%`} />
+                <Badge layer={2} variant="discount" size="sm" label={`-${p.disc}%`} />
               </div>
             </div>
             {/* Info */}

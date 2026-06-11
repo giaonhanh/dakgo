@@ -1,21 +1,21 @@
-﻿"use client"
+"use client"
 
 // ============================================================
 // src/app/(customer)/page.tsx
-// Trang chủ — 12 Sections Đầy Đủ theo mockup đã approved
-// S0  HomeHeader       — GPS Radar + Bell + Avatar
-// S1  AIGreeting       — Chào theo giờ + AI gợi ý
-// S2  SearchBar        — Tìm kiếm + Filter
-// S3  LiveStatusBanner — Đơn đang giao (hiện có điều kiện)
-// S4  FlashSaleBanner  — Banner khuyến mãi + countdown
-// S5  ServiceGrid      — 4 dịch vụ nhanh
-// S6  VoucherStrip     — Voucher sắp hết hạn
-// S7  CategoryCarousel — Lọc loại món ăn
-// S8  PromoSection     — Khuyến mãi hôm nay
-// S9  NearbyShops      — Quán gần bạn
-// S10 BestSellers      — Bán chạy tuần này
-// S11 LoyaltyPoints    — Điểm tích lũy
-// S12 ReorderSection   — Đặt lại nhanh
+// Trang ch? � 12 Sections �?y �? theo mockup d� approved
+// S0  HomeHeader       � GPS Radar + Bell + Avatar
+// S1  AIGreeting       � Ch�o theo gi? + AI g?i �
+// S2  SearchBar        � T�m ki?m + Filter
+// S3  LiveStatusBanner � �on dang giao (hi?n c� di?u ki?n)
+// S4  FlashSaleBanner  � Banner khuy?n m�i + countdown
+// S5  ServiceGrid      � 4 d?ch v? nhanh
+// S6  VoucherStrip     � Voucher s?p h?t h?n
+// S7  CategoryCarousel � L?c lo?i m�n an
+// S8  PromoSection     � Khuy?n m�i h�m nay
+// S9  NearbyShops      � Qu�n g?n b?n
+// S10 BestSellers      � B�n ch?y tu?n n�y
+// S11 LoyaltyPoints    � �i?m t�ch luy
+// S12 ReorderSection   � �?t l?i nhanh
 // + BottomNav floating capsule
 // ============================================================
 
@@ -30,7 +30,7 @@ import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/l
 import Badge from "@/components/ui/Badge"
 import NotifDot from "@/components/ui/NotifDot"
 
-// ─── Types ─────────────────────────────────────────────────
+// --- Types -------------------------------------------------
 type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null; category?: string; categories?: string[] | null }
 type ProductRow = { id: string; name: string; price: number; original_price?: number | null; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null } | { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
@@ -46,15 +46,15 @@ type RecoRow    = { id: string; name: string; price: number; original_price: num
 type BannerRow  = { id: string; title: string; subtitle: string | null; image_url: string | null; link_url: string | null; sort_order: number }
 type NewMenuRow = { id: string; name: string; price: number; image_url: string | null; shop_id: string; created_at: string; shops: { name: string } | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 
-// Danh mục hiển thị trên trang chủ — lấy từ SHOP_CATEGORIES (bỏ "Khác")
+// Danh m?c hi?n th? tr�n trang ch? � l?y t? SHOP_CATEGORIES (b? "Kh�c")
 const HOME_CATS = SHOP_CATEGORIES.filter(c => c.value !== "khac")
 
-// ─── Không còn mock data — dùng Supabase thật ─────────────
+// --- Kh�ng c�n mock data � d�ng Supabase th?t -------------
 
 
-// ─── Helpers ────────────────────────────────────────────────
+// --- Helpers ------------------------------------------------
 function shopInHoursFromHours(oh: { open?: string; close?: string } | null | undefined): boolean {
-  if (!oh?.open || !oh?.close) return true  // không có giờ → không giới hạn
+  if (!oh?.open || !oh?.close) return true  // kh�ng c� gi? ? kh�ng gi?i h?n
   const now = new Date()
   const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
   const [oph, opm] = oh.open.split(":").map(Number)
@@ -71,7 +71,7 @@ function isShopOpen(p: ProductRow): boolean {
   return shopInHoursFromHours(s.opening_hours)
 }
 
-// Tính quán có đang trong giờ mở cửa không (múi giờ VN UTC+7)
+// T�nh qu�n c� dang trong gi? m? c?a kh�ng (m�i gi? VN UTC+7)
 function isShopInHours(shop: ShopRow): boolean {
   if (!shop.is_open) return false
   const oh = shop.opening_hours
@@ -83,26 +83,26 @@ function isShopInHours(shop: ShopRow): boolean {
     const o = toMin(from), c = toMin(to)
     return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c
   }
-  // Format mới: DayHours[] — mỗi ngày có slots riêng
+  // Format m?i: DayHours[] � m?i ng�y c� slots ri�ng
   if (Array.isArray(oh)) {
     const vnDate  = new Date(now.getTime() + 7 * 3600 * 1000)
-    const dayNames = ["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"]
+    const dayNames = ["Ch? nh?t","Th? 2","Th? 3","Th? 4","Th? 5","Th? 6","Th? 7"]
     const today   = dayNames[vnDate.getUTCDay()]
     const entry   = (oh as Array<{day:string;open:boolean;slots:{from:string;to:string}[]}>).find(d => d.day === today)
     if (!entry?.open) return false
     return entry.slots.some(s => inSlot(s.from, s.to))
   }
-  // Format cũ: { open: "HH:mm", close: "HH:mm" }
+  // Format cu: { open: "HH:mm", close: "HH:mm" }
   const old = oh as { open?: string; close?: string }
   if (!old.open || !old.close) return true
   return inSlot(old.open, old.close)
 }
 
-// Giờ mở cửa tiếp theo để hiển thị "Mở lúc HH:mm"
+// Gi? m? c?a ti?p theo d? hi?n th? "M? l�c HH:mm"
 function nextOpenLabel(shop: ShopRow): string {
   const oh = shop.opening_hours
-  if (oh?.open) return `Mở lúc ${oh.open}`
-  return "Đang đóng cửa"
+  if (oh?.open) return `M? l�c ${oh.open}`
+  return "�ang d�ng c?a"
 }
 
 function isProductInTime(p: { all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }): boolean {
@@ -115,25 +115,25 @@ function isProductInTime(p: { all_day?: boolean | null; start_hour?: string | nu
   return start <= end ? cur >= start && cur < end : cur >= start || cur < end
 }
 
-const fmt  = (n: number) => n.toLocaleString("vi-VN") + "đ"
-const RANK_ICON = ["🥇","🥈","🥉"]
+const fmt  = (n: number) => n.toLocaleString("vi-VN") + "d"
+const RANK_ICON = ["??","??","??"]
 
 function getWeatherTip(code: number, temp: number, hour: number): string {
-  if (code >= 95) return "⛈️ Bão giông đang đến! Ở nhà an toàn, order ngay về thôi!"
-  if (code >= 80) return "🌧️ Đang có mưa rào — đặt đồ ăn giao về, khỏi ướt!"
-  if (code >= 51) return "☔ Trời mưa rồi, đừng ra ngoài — order về nhà ấm cúng hơn!"
-  if (code >= 45) return "🌫️ Sương mù dày, hạn chế di chuyển — đặt về nhà nhé!"
-  if (temp >= 35) return `🌡️ Nóng ${Math.round(temp)}°C rồi! Sinh tố, nước ép lạnh giải nhiệt ngay!`
-  if (temp >= 30) return `☀️ Trời ${Math.round(temp)}°C — trà đá, trà sữa đá cho mát nhé!`
-  if (temp <= 20) return `🧥 Mát ${Math.round(temp)}°C — bún bò, phở nóng hợp thời tiết lắm!`
-  if (hour < 10) return "☕ Sáng mát, uống cà phê hay ăn bánh mì nóng nhé!"
-  if (hour < 12) return "⏰ Gần trưa rồi, đặt cơm trước để không chờ lâu!"
-  if (hour < 14) return "🍱 Giờ cơm trưa — đặt ngay kẻo hết suất nhé!"
-  if (hour < 18) return "🥤 Chiều mát, uống gì cho tỉnh người đi nào!"
-  return "🌙 Tối rồi, bún bò hay cháo ăn là ngon nhất!"
+  if (code >= 95) return "?? B�o gi�ng dang d?n! ? nh� an to�n, order ngay v? th�i!"
+  if (code >= 80) return "??? �ang c� mua r�o � d?t d? an giao v?, kh?i u?t!"
+  if (code >= 51) return "? Tr?i mua r?i, d?ng ra ngo�i � order v? nh� ?m c�ng hon!"
+  if (code >= 45) return "??? Suong m� d�y, h?n ch? di chuy?n � d?t v? nh� nh�!"
+  if (temp >= 35) return `??? N�ng ${Math.round(temp)}�C r?i! Sinh t?, nu?c �p l?nh gi?i nhi?t ngay!`
+  if (temp >= 30) return `?? Tr?i ${Math.round(temp)}�C � tr� d�, tr� s?a d� cho m�t nh�!`
+  if (temp <= 20) return `?? M�t ${Math.round(temp)}�C � b�n b�, ph? n�ng h?p th?i ti?t l?m!`
+  if (hour < 10) return "? S�ng m�t, u?ng c� ph� hay an b�nh m� n�ng nh�!"
+  if (hour < 12) return "? G?n trua r?i, d?t com tru?c d? kh�ng ch? l�u!"
+  if (hour < 14) return "?? Gi? com trua � d?t ngay k?o h?t su?t nh�!"
+  if (hour < 18) return "?? Chi?u m�t, u?ng g� cho t?nh ngu?i di n�o!"
+  return "?? T?i r?i, b�n b� hay ch�o an l� ngon nh?t!"
 }
 
-// ─── Sub-components ─────────────────────────────────────────
+// --- Sub-components -----------------------------------------
 
 function SectionHeader({ title, more, href }: { title:string; more?:string; href?:string }) {
   return (
@@ -160,7 +160,7 @@ function HScroll({ children, px=16 }: { children:React.ReactNode; px?:number }) 
   )
 }
 
-// ────────────────────────────────────────────────────────────
+// ------------------------------------------------------------
 export default function HomePage() {
 
   const router        = useRouter()
@@ -182,14 +182,14 @@ export default function HomePage() {
   const [conflictItem,  setConflictItem]  = useState<PendingItem | null>(null)
   const [weatherTip,    setWeatherTip]    = useState<string | null>(null)
 
-  // Đọc địa chỉ từ locationStore (đã được GpsInit trong layout lấy sẵn)
+  // �?c d?a ch? t? locationStore (d� du?c GpsInit trong layout l?y s?n)
   const locationData = useLocationStore()
-  const location = locationData.address || "Phước An, Krông Pắc"
+  const location = locationData.address || "Phu?c An, Kr�ng P?c"
   const containerRef = useRef<HTMLDivElement>(null)
   const cartIconRef  = useRef<HTMLDivElement>(null)
 
-  // ─── Real data state ───────────────────────────────────────
-  const [userName,      setUserName]      = useState("bạn")
+  // --- Real data state ---------------------------------------
+  const [userName,      setUserName]      = useState("b?n")
   const [notifCount,    setNotifCount]    = useState(0)
   const [liveOrders,    setLiveOrders]    = useState<LiveOrderRow[]>([])
   const [liveIdx,       setLiveIdx]       = useState(0)
@@ -207,7 +207,7 @@ export default function HomePage() {
   const [newMenuItems,   setNewMenuItems]   = useState<NewMenuRow[]>([])
   const [searchSuggest,  setSearchSuggest]  = useState<ProductRow[]>([])
 
-  // ─── Fetch real data from Supabase ────────────────────────
+  // --- Fetch real data from Supabase ------------------------
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -224,7 +224,7 @@ export default function HomePage() {
         .eq("user_id", user.id).eq("is_read", false)
       setNotifCount(count ?? 0)
 
-      // Live orders: đơn đồ ăn đang xử lý
+      // Live orders: don d? an dang x? l�
       const { data: liveFood } = await supabase
         .from("orders")
         .select("id, status, shops(name)")
@@ -233,7 +233,7 @@ export default function HomePage() {
         .order("created_at", { ascending: false })
         .limit(5)
 
-      // Live rides (xe ôm / taxi đang tìm xe / đang đi)
+      // Live rides (xe �m / taxi dang t�m xe / dang di)
       const { data: liveRides } = await supabase
         .from("rides")
         .select("id, status, vehicle_type")
@@ -242,7 +242,7 @@ export default function HomePage() {
         .order("created_at", { ascending: false })
         .limit(3)
 
-      // Live errands (giao hộ / mua hộ đang xử lý)
+      // Live errands (giao h? / mua h? dang x? l�)
       const { data: liveErrands } = await supabase
         .from("errands")
         .select("id, status, type")
@@ -254,14 +254,14 @@ export default function HomePage() {
       const ridesMapped = (liveRides ?? []).map(r => ({
         id: r.id,
         status: r.status === "searching" ? "pending" : r.status,
-        shops: { name: r.vehicle_type === "motorbike" ? "🛵 Xe ôm" : r.vehicle_type === "car_7" ? "🚙 Taxi 7 chỗ" : "🚕 Taxi 4 chỗ" },
+        shops: { name: r.vehicle_type === "motorbike" ? "?? Xe �m" : r.vehicle_type === "car_7" ? "?? Taxi 7 ch?" : "?? Taxi 4 ch?" },
         _href: "/orders",
         _type: "ride" as const,
       }))
       const errandsMapped = (liveErrands ?? []).map(e => ({
         id: e.id,
         status: e.status === "pending" ? "pending" : e.status,
-        shops: { name: e.type === "buy_for_me" ? "🛒 Mua hộ" : "📦 Giao hộ" },
+        shops: { name: e.type === "buy_for_me" ? "?? Mua h?" : "?? Giao h?" },
         _href: "/orders",
         _type: "errand" as const,
       }))
@@ -278,14 +278,14 @@ export default function HomePage() {
         .limit(6)
       setVouchers((voucherData ?? []) as VoucherRow[])
 
-      // Nearby shops: fetch cả đóng lẫn mở, tính giờ client-side
+      // Nearby shops: fetch c? d�ng l?n m?, t�nh gi? client-side
       const { data: shopData } = await supabase
         .from("shops")
         .select("id,name,is_open,rating_avg,address,logo_url,location,opening_hours,category,categories")
         .eq("status", "approved")
         .order("rating_avg", { ascending: false })
         .limit(30)
-      // Sort: đang mở lên trước, đóng xuống dưới
+      // Sort: dang m? l�n tru?c, d�ng xu?ng du?i
       const sorted = (shopData ?? [] as ShopRow[]).sort((a, b) => {
         const aOpen = isShopInHours(a as ShopRow) ? 1 : 0
         const bOpen = isShopInHours(b as ShopRow) ? 1 : 0
@@ -293,7 +293,7 @@ export default function HomePage() {
       })
       setNearbyShops(sorted as ShopRow[])
 
-      // Combo vouchers đang active — đánh dấu quán nào có combo
+      // Combo vouchers dang active � d�nh d?u qu�n n�o c� combo
       if (shopData && shopData.length > 0) {
         const shopIds = (shopData as ShopRow[]).map(s => s.id)
         const now = new Date().toISOString()
@@ -307,7 +307,7 @@ export default function HomePage() {
         if (comboData) setComboShopIds(new Set(comboData.map((v: { shop_id: string }) => v.shop_id)))
       }
 
-      // Best sellers — top bán chạy, không lọc theo giờ (sold_count >= 0)
+      // Best sellers � top b�n ch?y, kh�ng l?c theo gi? (sold_count >= 0)
       const { data: bsData } = await supabase
         .from("products")
         .select("id,name,price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour")
@@ -317,7 +317,7 @@ export default function HomePage() {
         .limit(20)
       setBestSellers(((bsData ?? []) as ProductRow[]).filter(p => isShopOpen(p)).slice(0, 8))
 
-      // Promos — sản phẩm có giá khuyến mãi (original_price > price)
+      // Promos � s?n ph?m c� gi� khuy?n m�i (original_price > price)
       const { data: promoData } = await supabase
         .from("products")
         .select("id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour")
@@ -326,12 +326,12 @@ export default function HomePage() {
         .not("original_price", "is", null)
         .order("sold_count", { ascending: false })
         .limit(20)
-      // Fallback: nếu không có sản phẩm KM, lấy sản phẩm bán chạy nhất
+      // Fallback: n?u kh�ng c� s?n ph?m KM, l?y s?n ph?m b�n ch?y nh?t
       const promoFiltered = ((promoData ?? []) as ProductRow[]).filter(p => isShopOpen(p))
       if (promoFiltered.length > 0) {
         setPromos(promoFiltered.slice(0, 8))
       } else {
-        // fallback: top sản phẩm từ quán đang mở
+        // fallback: top s?n ph?m t? qu�n dang m?
         const { data: fallbackPromo } = await supabase
           .from("products")
           .select("id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour")
@@ -351,7 +351,7 @@ export default function HomePage() {
         .limit(5)
       setAdminBanners((bannerData ?? []) as BannerRow[])
 
-      // Vừa lên menu — quán đang mở, trong khung giờ bán
+      // V?a l�n menu � qu�n dang m?, trong khung gi? b�n
       const { data: newMenuData } = await supabase
         .from("products")
         .select("id,name,price,image_url,shop_id,shops!inner(name,is_open,status,opening_hours),created_at,all_day,start_hour,end_hour")
@@ -465,7 +465,7 @@ export default function HomePage() {
     })
   }
 
-  // Weather tip — dùng tọa độ từ locationStore (GPS đã được layout lấy sẵn)
+  // Weather tip � d�ng t?a d? t? locationStore (GPS d� du?c layout l?y s?n)
   useEffect(() => {
     const { lat, lng } = useLocationStore.getState()
     if (!lat || !lng) return
@@ -480,14 +480,14 @@ export default function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationData.ready])
 
-  // Banner auto-slide — cycle through real vouchers
+  // Banner auto-slide � cycle through real vouchers
   useEffect(() => {
     if (vouchers.length <= 1) return
     const t = setInterval(() => setBannerIdx(i => (i + 1) % vouchers.length), 3500)
     return () => clearInterval(t)
   }, [vouchers])
 
-  // Countdown — computed from current deal's valid_to
+  // Countdown � computed from current deal's valid_to
   useEffect(() => {
     if (!vouchers.length) return
     const update = () => {
@@ -569,23 +569,23 @@ export default function HomePage() {
 
   const greet = () => {
     const h = new Date().getHours()
-    if (h < 12) return "Buổi sáng tốt lành"
-    if (h < 18) return "Buổi chiều tốt lành"
-    return "Buổi tối tốt lành"
+    if (h < 12) return "Bu?i s�ng t?t l�nh"
+    if (h < 18) return "Bu?i chi?u t?t l�nh"
+    return "Bu?i t?i t?t l�nh"
   }
 
   const aiTip = () => {
     const h = new Date().getHours()
-    if (h < 10) return "☕ Sáng mát, uống cà phê hay ăn bánh mì nóng nhé!"
-    if (h < 12) return "⏰ Gần trưa rồi, đặt cơm trước để không chờ lâu!"
-    if (h < 14) return "☀️ Nắng nóng, bổ sung nước — trà sữa hoặc sinh tố?"
-    if (h < 18) return "🤤 Buổi chiều, ăn nhẹ hoặc uống trà sữa đi!"
-    return "🌙 Tối rồi, bún bò hay cháo ăn là ngon nhất!"
+    if (h < 10) return "? S�ng m�t, u?ng c� ph� hay an b�nh m� n�ng nh�!"
+    if (h < 12) return "? G?n trua r?i, d?t com tru?c d? kh�ng ch? l�u!"
+    if (h < 14) return "?? N?ng n�ng, b? sung nu?c � tr� s?a ho?c sinh t??"
+    if (h < 18) return "?? Bu?i chi?u, an nh? ho?c u?ng tr� s?a di!"
+    return "?? T?i r?i, b�n b� hay ch�o an l� ngon nh?t!"
   }
 
   const padZ = (n:number) => String(n).padStart(2,"0")
 
-  // ──────────────────────────────────────────────────────────
+  // ----------------------------------------------------------
   return (
     <>
       <style>{`
@@ -607,7 +607,7 @@ export default function HomePage() {
         .reorder-btn:hover{ background:rgba(255,107,0,0.15)!important; }
       `}</style>
 
-      {/* ── ROOT ── */}
+      {/* -- ROOT -- */}
       <div ref={containerRef} style={{
         position:"fixed", inset:0, background:"#080806",
         display:"flex", flexDirection:"column", overflow:"hidden",
@@ -615,14 +615,14 @@ export default function HomePage() {
       }}>
 
 
-        {/* ── SCROLLABLE BODY ── */}
+        {/* -- SCROLLABLE BODY -- */}
         <div style={{ flex:1, overflowY:"auto", overflowX:"hidden",
           paddingTop:"env(safe-area-inset-top, 0px)",
           paddingBottom:80, WebkitOverflowScrolling:"touch" } as React.CSSProperties}>
 
-          {/* ──────────────────────────────────────
-              S0 — HomeHeader
-          ────────────────────────────────────── */}
+          {/* --------------------------------------
+              S0 � HomeHeader
+          -------------------------------------- */}
           <div style={{ padding:"8px 16px 6px", display:"flex",
             justifyContent:"space-between", alignItems:"center" }}>
             {/* GPS + location */}
@@ -640,14 +640,14 @@ export default function HomePage() {
                 ))}
               </div>
               <div>
-                <div style={{ color:"#6a5a40", fontSize: 11 }}>Vị trí của bạn</div>
+                <div style={{ color:"#6a5a40", fontSize: 11 }}>V? tr� c?a b?n</div>
                 <div onClick={() => router.push("/addresses")}
                   style={{ color:"#f8f0e0", fontSize:12, fontWeight:600, cursor:"pointer",
                     display:"flex", alignItems:"center", gap:4 }}>
                   <span style={{ maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                     {location}
                   </span>
-                  <span style={{ color:"#FF8C00", fontSize:10 }}>▾</span>
+                  <span style={{ color:"#FF8C00", fontSize:10 }}>?</span>
                 </div>
               </div>
             </div>
@@ -657,33 +657,33 @@ export default function HomePage() {
                 <div style={{ width:32, height:32, borderRadius:"50%",
                   background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)",
                   display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:15 }}>🔔</div>
+                  fontSize:15 }}>??</div>
                 <NotifDot count={notifCount} />
               </a>
               <a href="/profile" style={{ textDecoration:"none" }}>
                 <div style={{ width:32, height:32, borderRadius:10,
                   background:"rgba(255,107,0,0.12)", border:"1px solid rgba(255,107,0,0.25)",
                   display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>
-                  👤
+                  ??
                 </div>
               </a>
             </div>
           </div>
 
-          {/* ──────────────────────────────────────
-              S1 — AIGreeting
-          ────────────────────────────────────── */}
+          {/* --------------------------------------
+              S1 � AIGreeting
+          -------------------------------------- */}
           <div style={{ padding:"2px 16px 12px" }}>
             <div style={{ color:"#6a5a40", fontSize:10, marginBottom:2 }}>
-              {greet()}, {userName} 👋
+              {greet()}, {userName} ??
             </div>
             <div style={{ fontSize:18, fontWeight:700, lineHeight:1.2, marginBottom:8 }}>
-              Hôm nay bạn{" "}
+              H�m nay b?n{" "}
               <span style={{
                 background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
                 WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
                 backgroundClip:"text",
-              }}>muốn đặt gì?</span>
+              }}>mu?n d?t g�?</span>
             </div>
             {/* AI tip card */}
             <div style={{
@@ -692,26 +692,26 @@ export default function HomePage() {
               border:"1px solid rgba(180,100,255,0.2)",
               borderRadius:10, padding:"7px 11px",
             }}>
-              <span style={{ fontSize:14 }}>🤖</span>
+              <span style={{ fontSize:14 }}>??</span>
               <div style={{ color:"#b464ff", fontSize: 11, lineHeight:1.4, flex:1 }}>
-                <strong style={{ color:"#c87aff" }}>Gợi ý AI:</strong>{" "}
+                <strong style={{ color:"#c87aff" }}>G?i � AI:</strong>{" "}
                 {weatherTip ?? aiTip()}
               </div>
-              <span style={{ color:"rgba(180,100,255,0.5)", fontSize:12 }}>›</span>
+              <span style={{ color:"rgba(180,100,255,0.5)", fontSize:12 }}>�</span>
             </div>
           </div>
 
-          {/* ──────────────────────────────────────
-              S2 — SearchBar
-          ────────────────────────────────────── */}
+          {/* --------------------------------------
+              S2 � SearchBar
+          -------------------------------------- */}
           <div style={{ margin:"0 16px 12px",
             background:"rgba(255,255,255,0.07)",
             backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
             border:"1px solid rgba(255,255,255,0.08)",
             borderRadius:13, padding:"9px 13px",
             display:"flex", alignItems:"center", gap:8 }}>
-            <span style={{ color:"#6a5a40", fontSize:15 }}>🔍</span>
-            <input readOnly placeholder="Tìm món ăn, cửa hàng, dịch vụ..."
+            <span style={{ color:"#6a5a40", fontSize:15 }}>??</span>
+            <input readOnly placeholder="T�m m�n an, c?a h�ng, d?ch v?..."
               onClick={() => { window.location.href="/search" }}
               style={{ flex:1, background:"transparent", border:"none", outline:"none",
                 color:"#6a5a40", fontSize:11, fontFamily:"Lexend", cursor:"pointer" }} />
@@ -719,14 +719,14 @@ export default function HomePage() {
               <div style={{ width:26, height:26, borderRadius:8,
                 background:"rgba(255,107,0,0.10)", border:"1px solid rgba(255,107,0,0.25)",
                 display:"flex", alignItems:"center", justifyContent:"center", fontSize:13 }}>
-                ⚙️
+                ??
               </div>
             </a>
           </div>
 
-          {/* ──────────────────────────────────────
-              S3 — LiveStatusBanner (carousel đa đơn)
-          ────────────────────────────────────── */}
+          {/* --------------------------------------
+              S3 � LiveStatusBanner (carousel da don)
+          -------------------------------------- */}
           <AnimatePresence>
             {liveOrders.length > 0 && (
               <motion.div key="live-banner-wrap"
@@ -734,7 +734,7 @@ export default function HomePage() {
                 exit={{ opacity:0, y:-8 }}
                 style={{ margin:"0 16px 12px" }}>
 
-                {/* Header row nếu có nhiều đơn */}
+                {/* Header row n?u c� nhi?u don */}
                 {liveOrders.length > 1 && (
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
                     marginBottom:6 }}>
@@ -743,7 +743,7 @@ export default function HomePage() {
                         background:"#3ecf6e", boxShadow:"0 0 5px #3ecf6e",
                         animation:"pulse 1.5s infinite" }} />
                       <span style={{ color:"#3ecf6e", fontSize: 11, fontWeight:600 }}>
-                        {liveOrders.length} đơn đang xử lý
+                        {liveOrders.length} don dang x? l�
                       </span>
                     </div>
                     {/* Dots */}
@@ -770,21 +770,21 @@ export default function HomePage() {
                     willChange:"transform",
                   }}>
                     {liveOrders.map(order => {
-                      const shopName = (order.shops as {name:string}|null)?.name ?? "Quán đang chuẩn bị"
+                      const shopName = (order.shops as {name:string}|null)?.name ?? "Qu�n dang chu?n b?"
                       const isRide   = order._type === "ride"
                       const isErrand = order._type === "errand"
                       const statusLabel = isRide
-                        ? (order.status === "pending" ? "Đang tìm tài xế..." :
-                           order.status === "accepted" ? "Tài xế đang đến" :
-                           order.status === "delivering" ? "Đang trên đường" : "Đang xử lý")
+                        ? (order.status === "pending" ? "�ang t�m t�i x?..." :
+                           order.status === "accepted" ? "T�i x? dang d?n" :
+                           order.status === "delivering" ? "�ang tr�n du?ng" : "�ang x? l�")
                         : isErrand
-                        ? (order.status === "pending" ? "Đang tìm tài xế..." :
-                           order.status === "accepted" ? "Tài xế đang xử lý" :
-                           order.status === "delivering" ? "Đang giao" : "Đang xử lý")
-                        : (order.status === "pending"    ? "Chờ quán xác nhận" :
-                           order.status === "accepted" || order.status === "preparing" ? "Đã xác nhận · Đang làm" :
-                           order.status === "ready"      ? "Đang tìm tài xế" :
-                           order.status === "delivering" ? "Đang giao hàng" : "Đang xử lý")
+                        ? (order.status === "pending" ? "�ang t�m t�i x?..." :
+                           order.status === "accepted" ? "T�i x? dang x? l�" :
+                           order.status === "delivering" ? "�ang giao" : "�ang x? l�")
+                        : (order.status === "pending"    ? "Ch? qu�n x�c nh?n" :
+                           order.status === "accepted" || order.status === "preparing" ? "�� x�c nh?n � �ang l�m" :
+                           order.status === "ready"      ? "�ang t�m t�i x?" :
+                           order.status === "delivering" ? "�ang giao h�ng" : "�ang x? l�")
                       const statusColor =
                         order.status === "delivering" ? "#FF8C00" :
                         order.status === "ready"      ? "#FFB347" : "#3ecf6e"
@@ -809,9 +809,9 @@ export default function HomePage() {
                             <div style={{ position:"absolute", right:-10, top:-10, width:70, height:70,
                               background:`radial-gradient(circle,${statusColor}33 0%,transparent 65%)` }} />
                             <span style={{ fontSize:20, position:"relative", zIndex:1 }}>
-                              {order.status === "delivering" ? "🛵" :
-                               order.status === "ready"      ? "🔍" :
-                               order.status === "pending"    ? "⏳" : "👨‍🍳"}
+                              {order.status === "delivering" ? "??" :
+                               order.status === "ready"      ? "??" :
+                               order.status === "pending"    ? "?" : "?????"}
                             </span>
                             <div style={{ flex:1, position:"relative", zIndex:1 }}>
                               <div style={{ display:"flex", alignItems:"center", gap:5 }}>
@@ -823,10 +823,10 @@ export default function HomePage() {
                                 </span>
                               </div>
                               <div style={{ color:"#f8f0e0", fontSize:11, fontWeight:600, marginTop:2 }}>
-                                {shopName} · #{order.id.slice(0,8).toUpperCase()}
+                                {shopName} � #{order.id.slice(0,8).toUpperCase()}
                               </div>
                               <div style={{ color:"rgba(255,255,255,0.35)", fontSize: 11, marginTop:1 }}>
-                                Nhấn để theo dõi đơn hàng
+                                Nh?n d? theo d�i don h�ng
                               </div>
                             </div>
                             <div style={{
@@ -835,7 +835,7 @@ export default function HomePage() {
                               borderRadius:8, padding:"4px 9px",
                               color:statusColor, fontSize: 11, fontWeight:600,
                               position:"relative", zIndex:1, flexShrink:0,
-                            }}>Xem →</div>
+                            }}>Xem ?</div>
                           </div>
                         </a>
                       )
@@ -846,17 +846,17 @@ export default function HomePage() {
             )}
           </AnimatePresence>
 
-          {/* ──────────────────────────────────────
-              S4 — FlashSaleBanner / AdminBanner / InviteFriend
-          ────────────────────────────────────── */}
+          {/* --------------------------------------
+              S4 � FlashSaleBanner / AdminBanner / InviteFriend
+          -------------------------------------- */}
           {vouchers.length > 0 ? (() => {
-            const DEAL_EMOJI: Record<string, string> = { percent:"🔥", fixed:"💰", freeship:"🛵" }
+            const DEAL_EMOJI: Record<string, string> = { percent:"??", fixed:"??", freeship:"??" }
             const deal = vouchers[bannerIdx % vouchers.length]
-            const dealEmoji   = DEAL_EMOJI[deal.discount_type] ?? "⚡"
+            const dealEmoji   = DEAL_EMOJI[deal.discount_type] ?? "?"
             const dealTitle   = deal.title
-            const dealSubLine = deal.discount_type === "percent"  ? `Giảm ${deal.discount_value}% · Áp dụng ngay`
-              : deal.discount_type === "fixed"    ? `Giảm ${fmt(deal.discount_value)} · Đặt ngay`
-              : "Miễn phí giao hàng · Đơn từ bất kỳ"
+            const dealSubLine = deal.discount_type === "percent"  ? `Gi?m ${deal.discount_value}% � �p d?ng ngay`
+              : deal.discount_type === "fixed"    ? `Gi?m ${fmt(deal.discount_value)} � �?t ngay`
+              : "Mi?n ph� giao h�ng � �on t? b?t k?"
             return (
               <div style={{ margin:"0 16px 8px" }}>
                 <div style={{
@@ -877,7 +877,7 @@ export default function HomePage() {
                       background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
                       borderRadius:8, padding:"3px 11px", marginBottom:8,
                       color:"#000", fontSize:10, fontWeight:700, letterSpacing:.4 }}>
-                      ⚡ FLASH SALE · {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
+                      ? FLASH SALE � {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
                     </div>
                     <div style={{ color:"#fff", fontSize:18, fontWeight:700, lineHeight:1.25, maxWidth:"62%", wordBreak:"break-word" }}>
                       {dealTitle}
@@ -889,7 +889,7 @@ export default function HomePage() {
                       style={{ display:"inline-block", marginTop:10, cursor:"pointer",
                         background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)",
                         borderRadius:8, padding:"5px 14px", color:"#fff", fontSize:11, fontWeight:600 }}>
-                      Đặt ngay →
+                      �?t ngay ?
                     </div>
                   </div>
                   <div style={{ position:"absolute", right:18, top:"50%", transform:"translateY(-50%)",
@@ -949,9 +949,9 @@ export default function HomePage() {
             <div style={{ height: 8 }} />
           )}
 
-          {/* ──────────────────────────────────────
-              S4.5 — Mời bạn bè (luôn hiển thị)
-          ────────────────────────────────────── */}
+          {/* --------------------------------------
+              S4.5 � M?i b?n b� (lu�n hi?n th?)
+          -------------------------------------- */}
           <div style={{ margin:"0 16px 14px" }}>
               <div style={{ height:110, borderRadius:16, overflow:"hidden",
                 border:"1px solid rgba(62,207,110,0.3)", position:"relative",
@@ -964,38 +964,38 @@ export default function HomePage() {
                     background:"linear-gradient(135deg,#3ecf6e,#27ae60)",
                     borderRadius:8, padding:"2px 9px", marginBottom:5,
                     color:"#000", fontSize: 11, fontWeight:700, letterSpacing:.4 }}>
-                    🎁 MỜI BẠN BÈ
+                    ?? M?I B?N B�
                   </div>
                   <div style={{ color:"#fff", fontSize:13, fontWeight:700, lineHeight:1.3, maxWidth:"62%", wordBreak:"break-word" }}>
-                    Mời bạn bè, nhận 5.000 XU!
+                    M?i b?n b�, nh?n 5.000 XU!
                   </div>
                   <div style={{ color:"rgba(255,255,255,0.45)", fontSize: 11, marginTop:3 }}>
-                    Cả hai nhận 5.000 xu · Đơn đầu từ 50.000đ
+                    C? hai nh?n 5.000 xu � �on d?u t? 50.000d
                   </div>
                   <div style={{ display:"inline-block", marginTop:6,
                     background:"rgba(62,207,110,0.15)", border:"1px solid rgba(62,207,110,0.35)",
                     borderRadius:6, padding:"3px 9px", color:"#3ecf6e", fontSize: 11, fontWeight:600 }}>
-                    Chia sẻ ngay →
+                    Chia s? ngay ?
                   </div>
                 </div>
                 <div style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)",
-                  fontSize:52, zIndex:1, filter:"drop-shadow(0 0 14px rgba(62,207,110,0.4))" }}>🎁</div>
+                  fontSize:52, zIndex:1, filter:"drop-shadow(0 0 14px rgba(62,207,110,0.4))" }}>??</div>
               </div>
           </div>
 
-          {/* ──────────────────────────────────────
-              S5 — ServiceGrid (4 dịch vụ nhanh)
-          ────────────────────────────────────── */}
-          <SectionHeader title="Dịch vụ nhanh" />
+          {/* --------------------------------------
+              S5 � ServiceGrid (4 d?ch v? nhanh)
+          -------------------------------------- */}
+          <SectionHeader title="D?ch v? nhanh" />
           <div style={{
             display:"grid", gridTemplateColumns:"repeat(4,1fr)",
             gap:7, padding:"0 16px", marginBottom:14,
           }}>
             {[
-              { icon:"📦", label:"Giao hộ",  href:"/giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00", badge:"HOT" },
-              { icon:"🛒", label:"Mua hộ",   href:"/mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e", badge:"" },
-              { icon:"🛵", label:"Xe ôm",    href:"/xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5", badge:"" },
-              { icon:"🚗", label:"Taxi",     href:"/taxi",    bg:"rgba(180,100,255,0.10)",ic:"#b464ff", badge:"" },
+              { icon:"??", label:"Giao h?",  href:"/giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00", badge:"HOT" },
+              { icon:"??", label:"Mua h?",   href:"/mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e", badge:"" },
+              { icon:"??", label:"Xe �m",    href:"/xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5", badge:"" },
+              { icon:"??", label:"Taxi",     href:"/taxi",    bg:"rgba(180,100,255,0.10)",ic:"#b464ff", badge:"" },
             ].map((s,i) => (
               <a key={i} href={s.href} style={{ textDecoration:"none" }}>
                 <div className="svc-card" style={{
@@ -1008,7 +1008,7 @@ export default function HomePage() {
                 }}>
                   {s.badge && (
                     <div style={{ position:"absolute", top:-3, right:4 }}>
-                      <Badge variant="hot" size="sm" label={s.badge} />
+                      <Badge layer={1} variant="hot" size="sm" label={s.badge} />
                     </div>
                   )}
                   <div style={{ width:38, height:38, borderRadius:11,
@@ -1023,10 +1023,10 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* ──────────────────────────────────────
-              S6 — Voucher (khám phá tất cả)
-          ────────────────────────────────────── */}
-          <SectionHeader title="🎟️ Voucher" more="Xem tất cả →" href="/vouchers" />
+          {/* --------------------------------------
+              S6 � Voucher (kh�m ph� t?t c?)
+          -------------------------------------- */}
+          <SectionHeader title="??? Voucher" more="Xem t?t c? ?" href="/vouchers" />
           {vouchers.length === 0 ? (
             <div style={{ margin:"0 16px 14px",
               background:"rgba(255,107,0,0.04)",
@@ -1036,7 +1036,7 @@ export default function HomePage() {
             }}>
               <div style={{ position:"relative" }}>
                 <div style={{ fontSize:44, lineHeight:1,
-                  filter:"drop-shadow(0 0 12px rgba(255,179,71,0.3))" }}>🎟️</div>
+                  filter:"drop-shadow(0 0 12px rgba(255,179,71,0.3))" }}>???</div>
                 <motion.div
                   animate={{ scale:[1,1.15,1], opacity:[0.5,1,0.5] }}
                   transition={{ duration:2.5, repeat:Infinity, ease:"easeInOut" }}
@@ -1045,18 +1045,18 @@ export default function HomePage() {
               </div>
               <div style={{ textAlign:"center" }}>
                 <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700, marginBottom:5 }}>
-                  Chưa có voucher nào
+                  Chua c� voucher n�o
                 </div>
                 <div style={{ color:"#6a5a40", fontSize:10, lineHeight:1.7 }}>
-                  Đặt đơn đầu tiên để nhận ngay<br/>
-                  <span style={{ color:"#FFB347", fontWeight:600 }}>ưu đãi hấp dẫn từ Giao Nhanh!</span>
+                  �?t don d?u ti�n d? nh?n ngay<br/>
+                  <span style={{ color:"#FFB347", fontWeight:600 }}>uu d�i h?p d?n t? Giao Nhanh!</span>
                 </div>
               </div>
               <a href="/nearby-shops" style={{ textDecoration:"none" }}>
                 <div style={{ background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.25)",
                   borderRadius:10, padding:"7px 18px",
                   color:"#FF8C00", fontSize:10, fontWeight:700 }}>
-                  Khám phá quán ngay →
+                  Kh�m ph� qu�n ngay ?
                 </div>
               </a>
             </div>
@@ -1068,10 +1068,10 @@ export default function HomePage() {
                 const expDate = new Date(v.valid_to)
                 const daysLeft = Math.ceil((expDate.getTime() - Date.now()) / 86400000)
                 const urgent = daysLeft <= 1
-                const expiryLabel = daysLeft <= 0 ? "Hết hạn HÔM NAY!" : daysLeft === 1 ? "Còn 1 ngày" : `Còn ${daysLeft} ngày`
+                const expiryLabel = daysLeft <= 0 ? "H?t h?n H�M NAY!" : daysLeft === 1 ? "C�n 1 ng�y" : `C�n ${daysLeft} ng�y`
                 const valueLabel = v.discount_type === "percent" ? `-${v.discount_value}%`
                   : v.discount_type === "freeship" ? "Free ship"
-                  : `-${v.discount_value.toLocaleString("vi-VN")}đ`
+                  : `-${v.discount_value.toLocaleString("vi-VN")}d`
                 return (
                   <div key={v.id} style={{
                     minWidth:162, flexShrink:0,
@@ -1090,7 +1090,7 @@ export default function HomePage() {
                         background: isShop ? "rgba(74,143,245,0.12)" : "rgba(255,107,0,0.12)",
                         border: `1px solid ${isShop ? "rgba(74,143,245,0.25)" : "rgba(255,107,0,0.25)"}`,
                         display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
-                        {isShop ? "🏪" : "🎉"}
+                        {isShop ? "??" : "??"}
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ color: isShop ? "#4a8ff5" : "#FF8C00", fontSize:12, fontWeight:700 }}>{valueLabel}</div>
@@ -1101,9 +1101,9 @@ export default function HomePage() {
                     {v.min_order && v.min_order > 0 && (
                       <div style={{ marginBottom:6 }}>
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
-                          <span style={{ fontSize: 10, color:"#6a5a40" }}>Đặt từ</span>
+                          <span style={{ fontSize: 10, color:"#6a5a40" }}>�?t t?</span>
                           <span style={{ fontSize: 10, color: isShop ? "#4a8ff5" : "#FF8C00", fontWeight:700 }}>
-                            {v.min_order.toLocaleString("vi-VN")}đ
+                            {v.min_order.toLocaleString("vi-VN")}d
                           </span>
                         </div>
                         <div style={{ height:3, borderRadius:2, background:"rgba(255,255,255,0.06)", overflow:"hidden" }}>
@@ -1114,7 +1114,7 @@ export default function HomePage() {
                     )}
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                       <div style={{ fontSize: 10, color: urgent ? "#ff4040" : "rgba(255,107,0,0.45)", fontWeight: urgent ? 700 : 400 }}>
-                        {urgent ? "⏰ " : ""}{expiryLabel}
+                        {urgent ? "? " : ""}{expiryLabel}
                       </div>
                       <button type="button"
                         onClick={() => setSavedVoucherIds(prev =>
@@ -1126,7 +1126,7 @@ export default function HomePage() {
                           background: saved ? "rgba(62,207,110,0.15)" : "rgba(255,107,0,0.15)",
                           color: saved ? "#3ecf6e" : "#FF8C00", transition:"all .2s",
                         }}>
-                        {saved ? "✓ Đã lưu" : "🔖 Lưu"}
+                        {saved ? "? �� luu" : "?? Luu"}
                       </button>
                     </div>
                   </div>
@@ -1135,10 +1135,10 @@ export default function HomePage() {
             </HScroll>
           )}
 
-          {/* ──────────────────────────────────────
-              S7 — Danh mục theo loại món
-          ────────────────────────────────────── */}
-          <SectionHeader title="Danh mục" more="Tất cả →" href="/danh-muc" />
+          {/* --------------------------------------
+              S7 � Danh m?c theo lo?i m�n
+          -------------------------------------- */}
+          <SectionHeader title="Danh m?c" more="T?t c? ?" href="/danh-muc" />
           <div style={{ overflowX:"auto", display:"flex", gap:8, padding:"0 16px 4px", marginBottom:10,
             scrollbarWidth:"none", msOverflowStyle:"none" }}>
             {HOME_CATS.map((m, i) => (
@@ -1173,11 +1173,11 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* ──────────────────────────────────────
-              S8 — PromoSection
-          ────────────────────────────────────── */}
+          {/* --------------------------------------
+              S8 � PromoSection
+          -------------------------------------- */}
           {promos.length > 0 && (<>
-          <SectionHeader title="🔥 Khuyến mãi hôm nay" more="Xem tất cả →" href="/promo-items" />
+          <SectionHeader title="?? Khuy?n m�i h�m nay" more="Xem t?t c? ?" href="/promo-items" />
             <HScroll>
             {promos.map(p => {
               const shopName = (p.shops as {name:string}|null)?.name ?? ""
@@ -1196,15 +1196,15 @@ export default function HomePage() {
                     background:"rgba(255,107,0,0.04)", overflow:"hidden" }}>
                     {p.image_url
                       ? <Image src={p.image_url} alt={p.name} fill sizes="120px" style={{ objectFit:"cover" }} />
-                      : <span style={{ zIndex:1 }}>🍽️</span>}
+                      : <span style={{ zIndex:1 }}>???</span>}
                     {discountPct > 0 && (
                       <div style={{ position:"absolute", top:5, left:5, zIndex:2 }}>
-                        <Badge variant="discount" size="sm" label={`-${discountPct}%`} />
+                        <Badge layer={2} variant="discount" size="sm" label={`-${discountPct}%`} />
                       </div>
                     )}
                     {discountPct === 0 && p.sold_count > 0 && (
                       <div style={{ position:"absolute", top:5, left:5, zIndex:2 }}>
-                        <Badge variant="hot" size="sm" />
+                        <Badge layer={1} variant="hot" size="sm" />
                       </div>
                     )}
                   </div>
@@ -1225,7 +1225,7 @@ export default function HomePage() {
                     </div>
                     <div style={{ display:"flex", alignItems:"center",
                       justifyContent:"space-between", marginTop:4 }}>
-                      <span style={{ color:"#6a5a40", fontSize:9 }}>🔥 {p.sold_count} đã bán</span>
+                      <span style={{ color:"#6a5a40", fontSize:9 }}>?? {p.sold_count} d� b�n</span>
                       <button
                         onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:p.id, name:p.name, price:p.price, shop:shopName, shopId:p.shop_id }) }}
                         style={{ width:22, height:22, borderRadius:7,
@@ -1242,12 +1242,12 @@ export default function HomePage() {
             </HScroll>
           </>)}
 
-          {/* ──────────────────────────────────────
-              S8.5 — Cửa hàng yêu thích
-          ────────────────────────────────────── */}
+          {/* --------------------------------------
+              S8.5 � C?a h�ng y�u th�ch
+          -------------------------------------- */}
           {favoriteShops.length > 0 && (
             <>
-              <SectionHeader title="❤️ Cửa hàng yêu thích" />
+              <SectionHeader title="?? C?a h�ng y�u th�ch" />
               <HScroll>
                 {favoriteShops.map(s => (
                   <a key={s.id} href={`/shop/${s.id}`} style={{ textDecoration:"none", flexShrink:0 }}>
@@ -1260,19 +1260,19 @@ export default function HomePage() {
                         fontSize:36, position:"relative" }}>
                         {s.logo_url
                           ? <Image src={s.logo_url} alt={s.name} fill sizes="64px" style={{ objectFit:"cover" }} />
-                          : "🏪"}
+                          : "??"}
                         <button onClick={e => { e.preventDefault(); e.stopPropagation(); toggleFavorite(s.id) }}
                           style={{ position:"absolute", top:5, right:5, width:24, height:24, borderRadius:7,
                             background:"rgba(255,64,64,0.15)", border:"1px solid rgba(255,64,64,0.3)",
                             color:"#ff6060", fontSize:12, cursor:"pointer", display:"flex",
-                            alignItems:"center", justifyContent:"center" }}>❤️</button>
+                            alignItems:"center", justifyContent:"center" }}>??</button>
                       </div>
                       <div style={{ padding:"8px 9px" }}>
                         <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600,
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</div>
                         <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:3 }}>
-                          <Badge variant={s.is_open ? "open" : "closed"} size="sm" label={s.is_open ? "Mở" : "Đóng"} />
-                          <span style={{ color:"#6a5a40", fontSize: 11 }}>· ★ {s.rating_avg?.toFixed(1) ?? "Mới"}</span>
+                          <Badge layer={3} variant={s.is_open ? "open" : "closed"} size="sm" label={s.is_open ? "M?" : "��ng"} />
+                          <span style={{ color:"#6a5a40", fontSize: 11 }}>� ? {s.rating_avg?.toFixed(1) ?? "M?i"}</span>
                         </div>
                       </div>
                     </div>
@@ -1282,12 +1282,12 @@ export default function HomePage() {
             </>
           )}
 
-          {/* ──────────────────────────────────────
-              S9 — NearbyShops
-          ────────────────────────────────────── */}
-          <SectionHeader title="📍 Quán gần bạn" more="Xem tất cả →" href="/nearby-shops" />
+          {/* --------------------------------------
+              S9 � NearbyShops
+          -------------------------------------- */}
+          <SectionHeader title="?? Qu�n g?n b?n" more="Xem t?t c? ?" href="/nearby-shops" />
 
-          {/* Filter chips — danh mục có quán */}
+          {/* Filter chips � danh m?c c� qu�n */}
           {(() => {
             const usedCats = [...new Set(nearbyShops.flatMap(s => {
               const cats = Array.isArray(s.categories) && s.categories.length > 0 ? s.categories : s.category ? [s.category] : []
@@ -1303,7 +1303,7 @@ export default function HomePage() {
                     background: nearbyFilter==="all" ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.05)",
                     border: nearbyFilter==="all" ? "1px solid rgba(255,107,0,0.4)" : "1px solid rgba(255,255,255,0.08)",
                     color: nearbyFilter==="all" ? "#FF8C00" : "#6a5a40", transition:"all .15s" }}>
-                  Tất cả
+                  T?t c?
                 </button>
                 {usedCats.map(v => {
                   const cat = getCategoryByValue(v)
@@ -1316,7 +1316,7 @@ export default function HomePage() {
                         border: active ? `1px solid ${cat.color.replace(/[\d.]+\)$/, "0.5)")}` : "1px solid rgba(255,255,255,0.08)",
                         color: active ? "#f8f0e0" : "#6a5a40", transition:"all .15s",
                         display:"flex", alignItems:"center", gap:4 }}>
-                      {cat.emoji} {cat.label.split(" · ")[0]}
+                      {cat.emoji} {cat.label.split(" � ")[0]}
                     </button>
                   )
                 })}
@@ -1334,7 +1334,7 @@ export default function HomePage() {
             gap:9, marginBottom:14 }}>
             {filteredShops.length === 0 ? (
               <div style={{ textAlign:"center", padding:"20px 0", color:"#6a5a40", fontSize:11 }}>
-                Chưa có quán nào{nearbyFilter !== "all" ? " trong danh mục này" : " trong khu vực"}
+                Chua c� qu�n n�o{nearbyFilter !== "all" ? " trong danh m?c n�y" : " trong khu v?c"}
               </div>
             ) : filteredShops.map(s => {
               const isFav    = favoriteIds.includes(s.id)
@@ -1350,7 +1350,7 @@ export default function HomePage() {
               const shopOpen = isShopInHours(s)
               return (
               <div key={s.id} style={{ position:"relative", opacity: shopOpen ? 1 : 0.55 }}>
-                {/* Quán đóng: chặn click, hiện toast */}
+                {/* Qu�n d�ng: ch?n click, hi?n toast */}
                 {!shopOpen && (
                   <div onClick={() => {
                     const el = document.getElementById(`closed-toast-${s.id}`)
@@ -1358,7 +1358,7 @@ export default function HomePage() {
                   }}
                   style={{ position:"absolute", inset:0, zIndex:2, cursor:"not-allowed", borderRadius:14 }} />
                 )}
-                {/* Toast đóng cửa */}
+                {/* Toast d�ng c?a */}
                 {!shopOpen && (
                   <div id={`closed-toast-${s.id}`} style={{
                     position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)",
@@ -1367,7 +1367,7 @@ export default function HomePage() {
                     color:"#f8f0e0", fontSize:11, fontWeight:700, pointerEvents:"none",
                     opacity:0, transition:"opacity 0.2s",
                   }}>
-                    🔴 {nextOpenLabel(s)}
+                    ?? {nextOpenLabel(s)}
                   </div>
                 )}
                 <a href={shopOpen ? `/shop/${s.id}` : "#"} onClick={e => !shopOpen && e.preventDefault()} style={{ textDecoration:"none" }}>
@@ -1383,44 +1383,44 @@ export default function HomePage() {
                       display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, overflow:"hidden" }}>
                       {s.logo_url
                         ? <Image src={s.logo_url} alt={s.name} fill sizes="56px" style={{ objectFit:"cover" }} />
-                        : "🏪"}
+                        : "??"}
                       {/* Closed overlay */}
                       {!shopOpen && (
                         <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.52)",
                           display:"flex", alignItems:"center", justifyContent:"center", borderRadius:13 }}>
-                          <span style={{ fontSize:16 }}>🔒</span>
+                          <span style={{ fontSize:16 }}>??</span>
                         </div>
                       )}
                     </div>
 
                     {/* Info */}
                     <div style={{ flex:1, minWidth:0 }}>
-                      {/* Tên quán */}
+                      {/* T�n qu�n */}
                       <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700,
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
                         marginBottom:5 }}>
                         {s.name}
                       </div>
 
-                      {/* ⭐ rating + 📍 km + trạng thái — cùng 1 hàng */}
+                      {/* ? rating + ?? km + tr?ng th�i � c�ng 1 h�ng */}
                       <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
                         {/* Stars */}
-                        {rating && <Badge variant="rating" size="sm" label={rating} />}
+                        {rating && <Badge layer={2} variant="rating" size="sm" label={rating} />}
                         {/* Distance */}
-                        {distLabel && <Badge variant="distance" size="sm" label={distLabel} />}
+                        {distLabel && <Badge layer={2} variant="distance" size="sm" label={distLabel} />}
                         {/* Open/closed */}
                         {shopOpen
-                          ? <Badge variant="open" size="sm" label="Đang mở" />
-                          : <Badge variant="closed" size="sm" label={nextOpenLabel(s)} icon={false} />
+                          ? <Badge layer={3} variant="open" size="sm" label="�ang m?" />
+                          : <Badge layer={3} variant="closed" size="sm" label={nextOpenLabel(s)} icon={false} />
                         }
                         {/* Combo badge */}
-                        {comboShopIds.has(s.id) && <Badge variant="has-combo" size="sm" />}
+                        {comboShopIds.has(s.id) && <Badge layer={2} variant="has-combo" size="sm" />}
                       </div>
                     </div>
                   </div>
                 </a>
 
-                {/* Favourite ❤️ */}
+                {/* Favourite ?? */}
                 <button onClick={e => { e.preventDefault(); toggleFavorite(s.id) }}
                   style={{ position:"absolute", top:11, right:11, width:28, height:28,
                     borderRadius:8, border:"none",
@@ -1428,7 +1428,7 @@ export default function HomePage() {
                     color: isFav ? "#ff4040" : "#6a5a40", fontSize:14, cursor:"pointer",
                     display:"flex", alignItems:"center", justifyContent:"center",
                     transition:"all .2s", zIndex:1 }}>
-                  {isFav ? "❤️" : "🤍"}
+                  {isFav ? "??" : "??"}
                 </button>
               </div>
             )})}
@@ -1436,12 +1436,12 @@ export default function HomePage() {
             )
           })()}
 
-          {/* ──────────────────────────────────────
-              S9.5 — Vừa lên menu (sản phẩm mới nhất)
-          ────────────────────────────────────── */}
+          {/* --------------------------------------
+              S9.5 � V?a l�n menu (s?n ph?m m?i nh?t)
+          -------------------------------------- */}
           {newMenuItems.length > 0 && (
             <>
-              <SectionHeader title="🆕 Vừa lên menu" more="Xem thêm →" href="/search?sort=newest" />
+              <SectionHeader title="?? V?a l�n menu" more="Xem th�m ?" href="/search?sort=newest" />
               <HScroll>
                 {newMenuItems.map(p => {
                   const shopName = (p.shops as {name:string}|null)?.name ?? ""
@@ -1459,10 +1459,10 @@ export default function HomePage() {
                           background:"linear-gradient(135deg,rgba(62,207,110,0.07),rgba(62,207,110,0.03))",
                           display:"flex", alignItems:"center", justifyContent:"center",
                           fontSize:30, position:"relative" }}>
-                          🍽️
+                          ???
                           <div style={{ position:"absolute", top:5, left:5,
                             background:"rgba(62,207,110,0.85)", color:"#000",
-                            fontSize: 10, fontWeight:700, padding:"2px 5px", borderRadius:5 }}>MỚI</div>
+                            fontSize: 10, fontWeight:700, padding:"2px 5px", borderRadius:5 }}>M?I</div>
                         </div>
                       )}
                       <div style={{ padding:"7px 8px 8px" }}>
@@ -1489,12 +1489,12 @@ export default function HomePage() {
             </>
           )}
 
-          {/* ──────────────────────────────────────
-              S9.6 — Món ăn gợi ý (theo lịch sử tìm kiếm)
-          ────────────────────────────────────── */}
+          {/* --------------------------------------
+              S9.6 � M�n an g?i � (theo l?ch s? t�m ki?m)
+          -------------------------------------- */}
           {searchSuggest.length > 0 && (
             <>
-              <SectionHeader title="🔍 Món ăn gợi ý" more="Tìm kiếm →" href="/search" />
+              <SectionHeader title="?? M�n an g?i �" more="T�m ki?m ?" href="/search" />
               <HScroll>
                 {searchSuggest.map(p => {
                   const shopName = (p.shops as {name:string}|null)?.name ?? ""
@@ -1510,7 +1510,7 @@ export default function HomePage() {
                         background:"rgba(180,100,255,0.04)" }}>
                         <div style={{ position:"absolute", inset:0,
                           background:"radial-gradient(circle at 50% 65%,rgba(180,100,255,0.1) 0%,transparent 65%)" }} />
-                        🍽️
+                        ???
                       </div>
                       <div style={{ padding:"7px 9px 8px" }}>
                         <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600,
@@ -1522,7 +1522,7 @@ export default function HomePage() {
                           backgroundClip:"text", fontSize:11, fontWeight:700, marginTop:3 }}>{fmt(p.price)}</div>
                         <div style={{ display:"flex", alignItems:"center",
                           justifyContent:"space-between", marginTop:4 }}>
-                          <span style={{ color:"#6a5a40", fontSize: 10 }}>🔥 {p.sold_count} đã bán</span>
+                          <span style={{ color:"#6a5a40", fontSize: 10 }}>?? {p.sold_count} d� b�n</span>
                           <button
                             onClick={e => { e.preventDefault(); e.stopPropagation();
                               handleAdd(e.currentTarget as HTMLElement,
@@ -1541,12 +1541,12 @@ export default function HomePage() {
             </>
           )}
 
-          {/* ──────────────────────────────────────
-              S10a — Smart Recommendations
-          ────────────────────────────────────── */}
+          {/* --------------------------------------
+              S10a � Smart Recommendations
+          -------------------------------------- */}
           {recos.length > 0 && (
             <>
-              <SectionHeader title="✨ Gợi ý cho bạn" more="Xem thêm →" href="/search" />
+              <SectionHeader title="? G?i � cho b?n" more="Xem th�m ?" href="/search" />
               <HScroll>
                 {recos.map(p => (
                   <a key={p.id} href={`/shop/${p.shop_id}`}
@@ -1561,7 +1561,7 @@ export default function HomePage() {
                       <div style={{ width:110, height:78,
                         background:"linear-gradient(135deg,rgba(255,107,0,0.07),rgba(255,179,71,0.04))",
                         display:"flex", alignItems:"center", justifyContent:"center",
-                        fontSize:30 }}>🍽️</div>
+                        fontSize:30 }}>???</div>
                     )}
                     <div style={{ padding:"7px 8px 8px" }}>
                       <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600,
@@ -1586,11 +1586,11 @@ export default function HomePage() {
             </>
           )}
 
-          {/* ──────────────────────────────────────
-              S10 — BestSellers
-          ────────────────────────────────────── */}
+          {/* --------------------------------------
+              S10 � BestSellers
+          -------------------------------------- */}
           {bestSellers.length > 0 && (<>
-          <SectionHeader title="🏆 Bán chạy tuần này" more="Xem tất cả →" href="/bestsellers" />
+          <SectionHeader title="?? B�n ch?y tu?n n�y" more="Xem t?t c? ?" href="/bestsellers" />
             <HScroll>
               {bestSellers.map((b, idx) => {
                 const rank = idx + 1
@@ -1610,7 +1610,7 @@ export default function HomePage() {
                         : <>
                             <div style={{ position:"absolute", inset:0,
                               background:"radial-gradient(circle at 50% 60%,rgba(255,107,0,0.09) 0%,transparent 65%)" }} />
-                            <span style={{ position:"relative", zIndex:1 }}>🍽️</span>
+                            <span style={{ position:"relative", zIndex:1 }}>???</span>
                           </>
                       }
                       <div style={{ position:"absolute", top:6, left:6,
@@ -1628,7 +1628,7 @@ export default function HomePage() {
                       <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
                       <div style={{ color:"#3ecf6e", fontSize: 10, fontWeight:600, marginTop:3 }}>
-                        🔥 {b.sold_count.toLocaleString("vi-VN")} đã bán
+                        ?? {b.sold_count.toLocaleString("vi-VN")} d� b�n
                       </div>
                       <div style={{ display:"flex", justifyContent:"space-between",
                         alignItems:"center", marginTop:4 }}>
@@ -1652,27 +1652,27 @@ export default function HomePage() {
             </HScroll>
           </>)}
 
-          {/* S11 — LoyaltyPoints removed: điểm chỉ hiển thị trong Profile cá nhân */}
+          {/* S11 � LoyaltyPoints removed: di?m ch? hi?n th? trong Profile c� nh�n */}
 
-          {/* S11 — Cửa hàng yêu thích: sẽ hiện khi có bảng favorites */}
+          {/* S11 � C?a h�ng y�u th�ch: s? hi?n khi c� b?ng favorites */}
 
-          {/* ──────────────────────────────────────
-              S12 — ReorderSection
-          ────────────────────────────────────── */}
-          <SectionHeader title="🔄 Đặt lại nhanh" more="Lịch sử →" href="/orders" />
+          {/* --------------------------------------
+              S12 � ReorderSection
+          -------------------------------------- */}
+          <SectionHeader title="?? �?t l?i nhanh" more="L?ch s? ?" href="/orders" />
           {reorders.length === 0 ? (
             <div style={{ padding:"0 16px 14px" }}>
               <div style={{ background:"rgba(255,255,255,0.03)", border:"1px dashed rgba(255,255,255,0.07)",
                 borderRadius:12, padding:"16px", textAlign:"center" }}>
-                <div style={{ fontSize:28, marginBottom:6 }}>🍽️</div>
-                <div style={{ color:"#6a5a40", fontSize:10 }}>Đặt đơn đầu tiên để thấy<br/>lịch sử đặt lại nhanh ở đây</div>
+                <div style={{ fontSize:28, marginBottom:6 }}>???</div>
+                <div style={{ color:"#6a5a40", fontSize:10 }}>�?t don d?u ti�n d? th?y<br/>l?ch s? d?t l?i nhanh ? d�y</div>
               </div>
             </div>
           ) : (
             <HScroll>
               {reorders.map(r => {
-                const shopName = (r.shops as {name:string}|null)?.name ?? "Quán"
-                const firstItem = (r.order_items as {name:string}[])?.[0]?.name ?? "Đơn hàng"
+                const shopName = (r.shops as {name:string}|null)?.name ?? "Qu�n"
+                const firstItem = (r.order_items as {name:string}[])?.[0]?.name ?? "�on h�ng"
                 return (
                   <div key={r.id} style={{
                     minWidth:132, flexShrink:0,
@@ -1681,7 +1681,7 @@ export default function HomePage() {
                     borderRadius:12, padding:"10px 11px", cursor:"pointer",
                   }}>
                     <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:7 }}>
-                      <span style={{ fontSize:20 }}>🛒</span>
+                      <span style={{ fontSize:20 }}>??</span>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ color:"#f8f0e0", fontSize: 11, fontWeight:600,
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
@@ -1702,7 +1702,7 @@ export default function HomePage() {
                         display:"flex", alignItems:"center", justifyContent:"center", gap:4,
                         transition:"background .15s",
                       }}>
-                        🔄 Đặt lại · {Math.round(r.total_amount/1000)}k
+                        ?? �?t l?i � {Math.round(r.total_amount/1000)}k
                       </div>
                     </a>
                   </div>
@@ -1715,9 +1715,9 @@ export default function HomePage() {
 
         </div>
 
-        {/* ──────────────────────────────────────
+        {/* --------------------------------------
             FLOATING BOTTOM NAV (Capsule)
-        ────────────────────────────────────── */}
+        -------------------------------------- */}
         <div style={{
           position:"absolute", bottom:"max(16px,env(safe-area-inset-bottom))",left:14, right:14, height:56,
           background:"rgba(8,8,6,0.92)", backdropFilter:"blur(20px)",
@@ -1729,10 +1729,10 @@ export default function HomePage() {
           boxShadow:"0 0 20px rgba(255,107,0,0.1)",
         }}>
           {[
-            { icon:"🏠", label:"Trang chủ", key:"home",     href:"/"         },
-            { icon:"📋", label:"Đơn hàng",  key:"orders",   href:"/orders"   },
-            { icon:"🛒", label:"Giỏ hàng",  key:"cart",     href:"/cart",  cart:true },
-            { icon:"⚙️", label:"Cài đặt",   key:"settings", href:"/settings" },
+            { icon:"??", label:"Trang ch?", key:"home",     href:"/"         },
+            { icon:"??", label:"�on h�ng",  key:"orders",   href:"/orders"   },
+            { icon:"??", label:"Gi? h�ng",  key:"cart",     href:"/cart",  cart:true },
+            { icon:"??", label:"C�i d?t",   key:"settings", href:"/settings" },
           ].map(tab => (
             <button key={tab.key}
               onClick={() => { setActiveTab(tab.key); router.push(tab.href) }}
@@ -1788,7 +1788,7 @@ export default function HomePage() {
 
       </div>
 
-      {/* ── Conflict Modal — đổi quán ── */}
+      {/* -- Conflict Modal � d?i qu�n -- */}
       <AnimatePresence>
         {conflictItem && (
           <motion.div
@@ -1804,16 +1804,16 @@ export default function HomePage() {
               onClick={e => e.stopPropagation()}
               style={{ background:"#151210", border:"1px solid rgba(255,107,0,0.28)",
                 borderRadius:22, padding:"22px 18px 18px", width:"100%", maxWidth:420 }}>
-              <div style={{ fontSize:32, textAlign:"center", marginBottom:8 }}>🛒</div>
+              <div style={{ fontSize:32, textAlign:"center", marginBottom:8 }}>??</div>
               <div style={{ color:"#f8f0e0", fontSize:15, fontWeight:700,
                 textAlign:"center", marginBottom:10 }}>
-                Thay đổi quán?
+                Thay d?i qu�n?
               </div>
               <div style={{ color:"#b0956a", fontSize:12, textAlign:"center",
                 lineHeight:1.7, marginBottom:20 }}>
-                Giỏ hàng đang có món từ{" "}
+                Gi? h�ng dang c� m�n t?{" "}
                 <span style={{ color:"#FF8C00", fontWeight:700 }}>{storeShopName}</span>.
-                <br />Thêm món mới sẽ <strong style={{ color:"#ff6060" }}>xóa giỏ hàng hiện tại</strong>.
+                <br />Th�m m�n m?i s? <strong style={{ color:"#ff6060" }}>x�a gi? h�ng hi?n t?i</strong>.
               </div>
               <div style={{ display:"flex", gap:10 }}>
                 <button
@@ -1823,7 +1823,7 @@ export default function HomePage() {
                     background:"rgba(255,255,255,0.06)",
                     color:"#b0956a", fontSize:13, fontWeight:600,
                     cursor:"pointer", fontFamily:"Lexend" }}>
-                  Giữ giỏ cũ
+                  Gi? gi? cu
                 </button>
                 <button
                   onClick={confirmReplace}
@@ -1832,7 +1832,7 @@ export default function HomePage() {
                     color:"#fff", fontSize:13, fontWeight:700,
                     cursor:"pointer", fontFamily:"Lexend",
                     boxShadow:"0 4px 16px rgba(255,107,0,0.4)" }}>
-                  Xóa &amp; thêm mới
+                  X�a &amp; th�m m?i
                 </button>
               </div>
             </motion.div>

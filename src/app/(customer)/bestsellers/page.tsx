@@ -104,7 +104,7 @@ export default function BestsellersPage() {
               <div style={{ color: "#6a5a40", fontSize: 10, marginTop: 2 }}>{b.shopName}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>
                 <span style={{ background: "linear-gradient(135deg,#FF6B00,#FFB347)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", fontSize: 13, fontWeight: 700 }}>{fmt(b.price)}</span>
-                <Badge variant="sold-count" size="sm" label={`${b.sold.toLocaleString("vi-VN")} đã bán`} />
+                <Badge layer={2} variant="sold-count" size="sm" label={`${b.sold.toLocaleString("vi-VN")} đã bán`} />
               </div>
             </div>
 

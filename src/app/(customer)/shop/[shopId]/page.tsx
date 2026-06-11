@@ -395,25 +395,26 @@ function ProductCard({
         </div>
         {discount && (
           <div style={{ position:"absolute", top:-4, left:-4 }}>
-            <Badge variant="discount" size="sm" label={`-${discount}%`} />
+            <Badge layer={2} variant="discount" size="sm" label={`-${discount}%`} />
           </div>
         )}
         {product.badge && (
           <div style={{ position:"absolute", bottom:-4, right:-4 }}>
             <Badge
-              variant={product.badge === "hot" ? "hot" : product.badge === "bigsale" ? "sale" : product.badge === "new" ? "new" : "bestseller"}
+              layer={1}
+              variant={product.badge === "hot" ? "hot" : product.badge === "bigsale" ? "sale" : product.badge === "new" ? "new" : "fire"}
               size="sm"
             />
           </div>
         )}
         {!product.badge && product.hot && (
           <div style={{ position:"absolute", bottom:-4, right:-4 }}>
-            <Badge variant="hot" size="sm" />
+            <Badge layer={1} variant="hot" size="sm" />
           </div>
         )}
         {isInCombo && (
           <div style={{ position:"absolute", top:-4, right:-4 }}>
-            <Badge variant="combo" size="sm" />
+            <Badge layer={1} variant="combo" size="sm" />
           </div>
         )}
       </div>
@@ -1013,7 +1014,7 @@ export default function ShopPage() {
               background:"linear-gradient(to top,rgba(8,8,6,0.85) 0%,transparent 60%)" }} />
             {shop && (
               <div style={{ position:"absolute", top:92, right:16, backdropFilter:"blur(8px)" }}>
-                <Badge variant={shopIsOpen ? "open" : "closed"} size="md" />
+                <Badge layer={3} variant={shopIsOpen ? "open" : "closed"} size="md" />
               </div>
             )}
           </div>
@@ -1048,7 +1049,7 @@ export default function ShopPage() {
                       {shop.name}
                     </span>
                     {shop.shop_type && (
-                      <Badge variant={shop.shop_type === "delivery" ? "proxy" : "partner"} size="sm" />
+                      <Badge layer={1} variant={shop.shop_type === "delivery" ? "proxy" : "partner"} size="sm" />
                     )}
                   </div>
                   {/* Mô tả */}
