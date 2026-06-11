@@ -76,6 +76,7 @@ interface ShopReview {
   reviewer:    { full_name: string | null } | null
 }
 
+interface ComboVoucherItem { product_id: string; min_quantity: number; products: { name: string; price: number } | null }
 interface ComboVoucher {
   id:           string
   code:         string
@@ -84,6 +85,8 @@ interface ComboVoucher {
   discount:     number
   minOrder:     number
   endAt:        string
+  isCombo:      boolean
+  comboItems:   ComboVoucherItem[]
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
@@ -653,11 +656,18 @@ export default function ShopPage() {
         .order("valid_to", { ascending: true })
       if (vouchers && vouchers.length > 0) {
         const cpIds = new Set<string>()
-        setCombos(vouchers.map((v: {id:string;code:string;title:string;discount_type:string;discount_value:number;min_order:number;valid_to:string;is_combo:boolean;combo_items:{product_id:string}[]|null}) => {
+        setCombos(vouchers.map((v: {id:string;code:string;title:string;discount_type:string;discount_value:number;min_order:number;valid_to:string;is_combo:boolean;combo_items:{product_id:string;min_quantity:number;products:{name:string;price:number}[]|null}[]|null}) => {
           if (v.is_combo && v.combo_items) v.combo_items.forEach(ci => cpIds.add(ci.product_id))
-          return { id: v.id, code: v.code, title: v.title,
+          return {
+            id: v.id, code: v.code, title: v.title,
             discountType: v.discount_type as "percent"|"fixed"|"freeship",
-            discount: v.discount_value, minOrder: v.min_order, endAt: v.valid_to }
+            discount: v.discount_value, minOrder: v.min_order, endAt: v.valid_to,
+            isCombo: v.is_combo ?? false,
+            comboItems: (v.combo_items ?? []).map(ci => ({
+              product_id: ci.product_id, min_quantity: ci.min_quantity,
+              products: Array.isArray(ci.products) ? (ci.products[0] ?? null) : ci.products,
+            })),
+          }
         }))
         setComboProductIds(cpIds)
       }
@@ -1114,55 +1124,79 @@ export default function ShopPage() {
 
           {/* ── Shop promotions ── */}
           {combos.length > 0 && (
-            <div style={{ padding:"10px 14px 0" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
-                <span style={{ fontSize:13 }}>🏷️</span>
-                <span style={{ color:"#f8f0e0", fontSize:12, fontWeight:700 }}>Ưu đãi quán</span>
+            <div style={{ padding:"12px 14px 0" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+                <span style={{ fontSize:13 }}>🎁</span>
+                <span style={{ color:"#f8f0e0", fontSize:12, fontWeight:700 }}>Ưu đãi &amp; Combo</span>
                 <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.06)" }} />
+                <span style={{ color:"#6a5a40", fontSize:10 }}>{combos.length} ưu đãi</span>
               </div>
-              <div style={{ display:"flex", gap:8, overflowX:"auto", scrollbarWidth:"none", paddingBottom:4 } as React.CSSProperties}>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                 {combos.map(combo => {
+                  const isCombo = combo.isCombo
                   const discountText = combo.discountType === "percent"
                     ? `Giảm ${combo.discount}%`
                     : combo.discountType === "freeship"
                     ? "Miễn phí ship"
                     : `Giảm ${fmt(combo.discount)}`
+                  const accent = isCombo ? { color:"#a855f7", bg:"rgba(168,85,247,0.07)", border:"rgba(168,85,247,0.25)", dash:"rgba(168,85,247,0.4)" } : { color:"#FF8C00", bg:"rgba(255,107,0,0.07)", border:"rgba(255,107,0,0.25)", dash:"rgba(255,107,0,0.35)" }
                   return (
-                    <div key={combo.id} style={{ flexShrink:0, width:180,
-                      background:"rgba(255,107,0,0.06)", border:"1px solid rgba(255,107,0,0.22)",
-                      borderRadius:14, padding:"11px 13px" }}>
-                      <div style={{ color:"#FF8C00", fontSize:10, fontWeight:700, marginBottom:4,
-                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{combo.title}</div>
-                      <div style={{ fontSize:14, fontWeight:800, marginBottom:4,
-                        background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
-                        WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text" }}>
-                        {discountText}
+                    <div key={combo.id} style={{ background:accent.bg, border:`1px solid ${accent.border}`, borderRadius:14, overflow:"hidden" }}>
+                      {/* Header */}
+                      <div style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 13px 8px" }}>
+                        <div style={{ width:36, height:36, borderRadius:10, background:`rgba(${isCombo?"168,85,247":"255,107,0"},0.12)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>
+                          {isCombo ? "🎁" : "🏷️"}
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700, marginBottom:2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{combo.title}</div>
+                          <div style={{ fontSize:13, fontWeight:800, background: isCombo ? "linear-gradient(90deg,#a855f7,#7c3aed)" : "linear-gradient(90deg,#FF6B00,#FF8C00)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text" }}>
+                            {discountText}
+                          </div>
+                        </div>
+                        <div style={{ textAlign:"right", flexShrink:0 }}>
+                          <div style={{ color:"#6a5a40", fontSize:9, marginBottom:2 }}>HSD</div>
+                          <div style={{ color:"#6a5a40", fontSize:10, fontWeight:600 }}>{new Date(combo.endAt).toLocaleDateString("vi-VN")}</div>
+                        </div>
                       </div>
-                      {combo.minOrder > 0 && (
-                        <div style={{ color:"#6a5a40", fontSize: 11, marginBottom:8 }}>
-                          Đơn tối thiểu {fmt(combo.minOrder)}
+
+                      {/* Combo items list */}
+                      {isCombo && combo.comboItems.length > 0 && (
+                        <div style={{ margin:"0 13px 8px", padding:"8px 10px", borderRadius:10, background:"rgba(0,0,0,0.2)", border:"1px solid rgba(168,85,247,0.15)" }}>
+                          <div style={{ color:"#a855f7", fontSize:9.5, fontWeight:700, textTransform:"uppercase", letterSpacing:0.6, marginBottom:5 }}>
+                            🛒 Phải có trong giỏ hàng
+                          </div>
+                          {combo.comboItems.map((ci, i) => (
+                            <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"3px 0", borderBottom: i < combo.comboItems.length-1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                                <span style={{ color:"#a855f7", fontSize:10 }}>✦</span>
+                                <span style={{ color:"#f8f0e0", fontSize:11, fontWeight:500 }}>{ci.products?.name ?? "—"}</span>
+                                {ci.min_quantity > 1 && (
+                                  <span style={{ background:"rgba(168,85,247,0.15)", color:"#a855f7", fontSize:9, fontWeight:700, padding:"1px 4px", borderRadius:4 }}>×{ci.min_quantity}</span>
+                                )}
+                              </div>
+                              {ci.products?.price != null && (
+                                <span style={{ color:"#6a5a40", fontSize:10 }}>{fmt(ci.products.price)}</span>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       )}
-                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                        <span style={{ fontFamily:"'Courier New',monospace", background:"rgba(255,107,0,0.1)",
-                          border:"1px dashed rgba(255,107,0,0.3)", borderRadius:5,
-                          padding:"2px 7px", color:"#FF8C00", fontSize: 11, fontWeight:700 }}>
-                          {combo.code}
-                        </span>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(combo.code).catch(() => {})
-                            fireToast(`Đã sao chép mã ${combo.code}`)
-                          }}
-                          style={{ height:26, padding:"0 10px", borderRadius:8, border:"none",
-                            background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
-                            color:"#fff", fontSize: 11, fontWeight:700,
-                            cursor:"pointer", fontFamily:"Lexend", flexShrink:0 }}>
-                          Lấy mã
-                        </button>
-                      </div>
-                      <div style={{ color:"#6a5a40", fontSize: 10, marginTop:6 }}>
-                        HSD: {new Date(combo.endAt).toLocaleDateString("vi-VN")}
+
+                      {/* Footer: code + copy */}
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 13px 11px" }}>
+                        {combo.minOrder > 0 && !isCombo && (
+                          <span style={{ color:"#6a5a40", fontSize:10 }}>Tối thiểu {fmt(combo.minOrder)}</span>
+                        )}
+                        {isCombo && <span style={{ color:"#a855f7", fontSize:10, fontWeight:600 }}>🎁 Áp dụng tự động khi đủ điều kiện</span>}
+                        <div style={{ display:"flex", alignItems:"center", gap:6, marginLeft:"auto" }}>
+                          <span style={{ fontFamily:"'Courier New',monospace", background:accent.bg, border:`1px dashed ${accent.dash}`, borderRadius:5, padding:"2px 7px", color:accent.color, fontSize:10, fontWeight:700 }}>
+                            {combo.code}
+                          </span>
+                          <button onClick={() => { navigator.clipboard.writeText(combo.code).catch(()=>{}); fireToast(`Đã sao chép mã ${combo.code}`) }}
+                            style={{ height:26, padding:"0 10px", borderRadius:8, border:"none", background: isCombo ? "linear-gradient(90deg,#a855f7,#7c3aed)" : "linear-gradient(90deg,#FF6B00,#FF8C00)", color:"#fff", fontSize:10, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}>
+                            Lấy mã
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )

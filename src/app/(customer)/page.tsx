@@ -200,6 +200,7 @@ export default function HomePage() {
   const [favoriteIds,   setFavoriteIds]   = useState<string[]>([])
   const [favoriteShops, setFavoriteShops] = useState<ShopRow[]>([])
   const [adminBanners,   setAdminBanners]   = useState<BannerRow[]>([])
+  const [comboShopIds,   setComboShopIds]   = useState<Set<string>>(new Set())
   const [adminBannerIdx, setAdminBannerIdx] = useState(0)
   const [newMenuItems,   setNewMenuItems]   = useState<NewMenuRow[]>([])
   const [searchSuggest,  setSearchSuggest]  = useState<ProductRow[]>([])
@@ -289,6 +290,20 @@ export default function HomePage() {
         return bOpen - aOpen
       })
       setNearbyShops(sorted as ShopRow[])
+
+      // Combo vouchers đang active — đánh dấu quán nào có combo
+      if (shopData && shopData.length > 0) {
+        const shopIds = (shopData as ShopRow[]).map(s => s.id)
+        const now = new Date().toISOString()
+        const { data: comboData } = await supabase
+          .from("vouchers")
+          .select("shop_id")
+          .eq("is_active", true)
+          .eq("is_combo", true)
+          .gte("valid_to", now)
+          .in("shop_id", shopIds)
+        if (comboData) setComboShopIds(new Set(comboData.map((v: { shop_id: string }) => v.shop_id)))
+      }
 
       // Best sellers — top bán chạy, không lọc theo giờ (sold_count >= 0)
       const { data: bsData } = await supabase
@@ -1436,6 +1451,15 @@ export default function HomePage() {
                             background:"rgba(255,64,64,0.07)", border:"1px solid rgba(255,64,64,0.18)",
                             borderRadius:6, padding:"2px 7px" }}>
                             <span style={{ color:"#ff6060", fontSize: 11 }}>🔴 {nextOpenLabel(s)}</span>
+                          </div>
+                        )}
+                        {/* Combo badge */}
+                        {comboShopIds.has(s.id) && (
+                          <div style={{ display:"flex", alignItems:"center", gap:3,
+                            background:"rgba(168,85,247,0.1)", border:"1px solid rgba(168,85,247,0.3)",
+                            borderRadius:6, padding:"2px 7px" }}>
+                            <span style={{ fontSize:10 }}>🎁</span>
+                            <span style={{ color:"#a855f7", fontSize:10, fontWeight:700 }}>Có Combo</span>
                           </div>
                         )}
                       </div>

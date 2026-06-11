@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 
 type VoucherType = "percent" | "fixed" | "freeship"
 
+interface ComboItem { product_id: string; min_quantity: number; products: { name: string; price: number } | null }
 interface Voucher {
   id: string
   code: string
@@ -23,6 +24,8 @@ interface Voucher {
   shopName: string | null
   used: boolean    // đã dùng bởi user hiện tại
   saved: boolean   // đã bookmark (localStorage)
+  isCombo: boolean
+  comboItems: ComboItem[]
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
@@ -32,6 +35,7 @@ const TYPE_CFG: Record<VoucherType, { label: string; icon: string; color: string
   fixed:    { label:"Giảm tiền", icon:"💸", color:"#3ecf6e", bg:"rgba(62,207,110,0.1)", border:"rgba(62,207,110,0.3)" },
   freeship: { label:"Free ship", icon:"🚚", color:"#4a8ff5", bg:"rgba(74,143,245,0.1)", border:"rgba(74,143,245,0.3)" },
 }
+const COMBO_CFG = { label:"Combo", icon:"🎁", color:"#a855f7", bg:"rgba(168,85,247,0.1)", border:"rgba(168,85,247,0.3)" }
 
 function useCountdown(isoDate: string) {
   const [diff, setDiff] = useState(0)
@@ -52,7 +56,7 @@ function useCountdown(isoDate: string) {
 
 function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () => void; onCopy: () => void; onUseNow: () => void }) {
   const countdown = useCountdown(v.validTo)
-  const cfg = TYPE_CFG[v.type]
+  const cfg = v.isCombo ? COMBO_CFG : TYPE_CFG[v.type]
   const totalLeft = v.usageLimit !== null ? Math.max(0, v.usageLimit - v.usedCount) : null
   const disabled  = v.used || countdown.expired || (totalLeft !== null && totalLeft <= 0)
 
@@ -83,8 +87,44 @@ function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () =
               <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700, marginBottom:3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                 {v.title}
               </div>
+
+              {/* Combo: danh sách món bắt buộc */}
+              {v.isCombo && v.comboItems.length > 0 && (
+                <div style={{ marginBottom:8, padding:"8px 10px", borderRadius:10,
+                  background:"rgba(168,85,247,0.06)", border:"1px solid rgba(168,85,247,0.18)" }}>
+                  <div style={{ color:"#a855f7", fontSize:9.5, fontWeight:700, textTransform:"uppercase",
+                    letterSpacing:0.6, marginBottom:5 }}>🛒 Điều kiện — phải có trong giỏ hàng</div>
+                  {v.comboItems.map((ci, i) => (
+                    <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                      padding:"4px 0", borderBottom: i < v.comboItems.length-1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                        <span style={{ color:"#a855f7", fontSize:10 }}>✦</span>
+                        <span style={{ color:"#f8f0e0", fontSize:11, fontWeight:600 }}>
+                          {ci.products?.name ?? "Sản phẩm không tên"}
+                        </span>
+                        {ci.min_quantity > 1 && (
+                          <span style={{ background:"rgba(168,85,247,0.15)", color:"#a855f7",
+                            fontSize:9, fontWeight:700, padding:"1px 5px", borderRadius:4 }}>
+                            ×{ci.min_quantity}
+                          </span>
+                        )}
+                      </div>
+                      {ci.products?.price != null && (
+                        <span style={{ color:"#6a5a40", fontSize:10 }}>{fmt(ci.products.price)}</span>
+                      )}
+                    </div>
+                  ))}
+                  <div style={{ marginTop:6, display:"flex", alignItems:"center", gap:4 }}>
+                    <span style={{ color:"#a855f7", fontSize:10 }}>🎁</span>
+                    <span style={{ color:"#a855f7", fontSize:10, fontWeight:700 }}>
+                      Mua đủ combo · Giảm ngay {v.type === "percent" ? `${v.value}%` : fmt(v.value)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div style={{ color:"#6a5a40", fontSize: 11, marginBottom:6, lineHeight:1.5 }}>
-                Đơn tối thiểu {fmt(v.minOrder)}
+                {!v.isCombo && <>Đơn tối thiểu {fmt(v.minOrder)}</>}
                 {v.maxDiscount && ` · Giảm tối đa ${fmt(v.maxDiscount)}`}
                 {v.perUserLimit && ` · Mỗi người tối đa ${v.perUserLimit} lần`}
               </div>
@@ -126,8 +166,8 @@ function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () =
               </button>
             )}
             {!disabled && (
-              <button onClick={onUseNow} style={{ background:"linear-gradient(90deg,#FF6B00,#FF8C00)", borderRadius:8, padding:"5px 14px", color:"#fff", fontSize: 11, fontWeight:700, boxShadow:"0 2px 8px rgba(255,107,0,0.3)", border:"none", cursor:"pointer", fontFamily:"Lexend" }}>
-                Dùng ngay →
+              <button onClick={onUseNow} style={{ background: v.isCombo ? "linear-gradient(90deg,#a855f7,#7c3aed)" : "linear-gradient(90deg,#FF6B00,#FF8C00)", borderRadius:8, padding:"5px 14px", color:"#fff", fontSize: 11, fontWeight:700, boxShadow: v.isCombo ? "0 2px 8px rgba(168,85,247,0.35)" : "0 2px 8px rgba(255,107,0,0.3)", border:"none", cursor:"pointer", fontFamily:"Lexend" }}>
+                {v.isCombo ? "🛒 Đặt combo →" : "Dùng ngay →"}
               </button>
             )}
           </div>
@@ -141,7 +181,7 @@ export default function VouchersPage() {
   const router = useRouter()
   const [vouchers, setVouchers]   = useState<Voucher[]>([])
   const [loading,  setLoading]    = useState(true)
-  const [filter,   setFilter]     = useState<"all"|"saved"|VoucherType>("all")
+  const [filter,   setFilter]     = useState<"all"|"saved"|"combo"|VoucherType>("all")
   const [code,     setCode]       = useState("")
   const [toast,    setToast]      = useState("")
   const [toastOk,  setToastOk]    = useState(true)
@@ -162,7 +202,7 @@ export default function VouchersPage() {
 
       const [{ data: vData }, { data: usages }, { data: shops }] = await Promise.all([
         supabase.from("vouchers")
-          .select("id, code, title, discount_type, discount_value, min_order, max_discount, per_person_limit, usage_limit, used_count, valid_to, shop_id")
+          .select("id, code, title, discount_type, discount_value, min_order, max_discount, per_person_limit, usage_limit, used_count, valid_to, shop_id, is_combo, combo_items(product_id, min_quantity, products(name, price))")
           .eq("is_active", true)
           .gte("valid_to", now)
           .order("valid_to", { ascending: true }),
@@ -180,6 +220,8 @@ export default function VouchersPage() {
         id: string; code: string; title: string; discount_type: string; discount_value: number
         min_order: number; max_discount: number | null; per_person_limit: number | null
         usage_limit: number | null; used_count: number; valid_to: string; shop_id: string | null
+        is_combo: boolean
+        combo_items: { product_id: string; min_quantity: number; products: { name: string; price: number }[] | null }[] | null
       }) => ({
         id:           v.id,
         code:         v.code,
@@ -196,6 +238,12 @@ export default function VouchersPage() {
         shopName:     v.shop_id ? (shopMap[v.shop_id] ?? null) : null,
         used:         usedSet.has(v.id),
         saved:        savedIds.includes(v.id),
+        isCombo:      v.is_combo ?? false,
+        comboItems:   (v.combo_items ?? []).map(ci => ({
+          product_id:   ci.product_id,
+          min_quantity: ci.min_quantity,
+          products:     Array.isArray(ci.products) ? (ci.products[0] ?? null) : ci.products,
+        })),
       }))
 
       setVouchers(mapped)
@@ -247,14 +295,16 @@ export default function VouchersPage() {
   }
 
   const filtered = vouchers.filter(v => {
-    if (filter === "saved") return v.saved
-    if (filter === "all")   return true
-    return v.type === filter
+    if (filter === "saved")  return v.saved
+    if (filter === "combo")  return v.isCombo
+    if (filter === "all")    return true
+    return v.type === filter && !v.isCombo
   })
 
   const FILTERS = [
     { v:"all" as const,      l:"Tất cả" },
     { v:"saved" as const,    l:"Đã lưu" },
+    { v:"combo" as const,    l:"🎁 Combo" },
     { v:"freeship" as const, l:"Free ship" },
     { v:"percent" as const,  l:"Giảm %" },
     { v:"fixed" as const,    l:"Giảm tiền" },

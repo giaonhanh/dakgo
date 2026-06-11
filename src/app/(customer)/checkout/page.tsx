@@ -1995,21 +1995,39 @@ export default function CheckoutPage() {
           </SectionCard>
           )}
 
-          {/* Combo hint banner */}
-          {comboHint && (
-            <div style={{
-              margin: "0 0 10px",
-              padding: "10px 14px", borderRadius: 12,
-              background: "rgba(46,204,113,0.08)",
-              border: "1px solid rgba(46,204,113,0.28)",
-              display: "flex", alignItems: "flex-start", gap: 10,
-            }}>
-              <span style={{ fontSize: 16, flexShrink: 0 }}>💡</span>
-              <div style={{ color: "#2ECC71", fontSize: 11.5, fontWeight: 600, lineHeight: 1.5, fontFamily: "Lexend" }}>
-                {comboHint}
+          {/* Combo progress banner */}
+          {comboHint && (() => {
+            // Tính % tiến trình: đếm số món đã có / tổng món cần
+            const comboV = dbVouchers.find(v => v.is_combo && v.combo_items?.length && !appliedVouchers.some(av => av.code === v.code))
+            const cartMap: Record<string, number> = {}
+            for (const item of cartItems) cartMap[item.id] = (cartMap[item.id] ?? 0) + item.qty
+            const total = comboV?.combo_items?.length ?? 1
+            const done  = comboV?.combo_items?.filter(ci => (cartMap[ci.product_id] ?? 0) >= ci.min_quantity).length ?? 0
+            const pct   = Math.round((done / total) * 100)
+            return (
+              <div style={{ margin:"0 0 10px", padding:"10px 13px 11px", borderRadius:13,
+                background:"rgba(168,85,247,0.07)", border:"1px solid rgba(168,85,247,0.25)" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:7 }}>
+                  <span style={{ fontSize:15 }}>🎁</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ color:"#a855f7", fontSize:11.5, fontWeight:700, lineHeight:1.4 }}>
+                      {comboHint}
+                    </div>
+                  </div>
+                </div>
+                {/* Progress bar */}
+                <div style={{ height:5, borderRadius:99, background:"rgba(168,85,247,0.15)", overflow:"hidden" }}>
+                  <div style={{ height:"100%", width:`${pct}%`, borderRadius:99,
+                    background:"linear-gradient(90deg,#a855f7,#7c3aed)",
+                    transition:"width 0.4s ease" }} />
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
+                  <span style={{ color:"#6a5a40", fontSize:9.5 }}>Tiến trình combo</span>
+                  <span style={{ color:"#a855f7", fontSize:9.5, fontWeight:700 }}>{done}/{total} món ✓</span>
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* 4. Voucher */}
           <SectionCard title="Mã giảm giá" icon="🏷️">
