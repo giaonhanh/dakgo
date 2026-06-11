@@ -1,257 +1,113 @@
 /* ================================================================
-   Badge System — Design Tokens
-   Spec: BADGE_SYSTEM_SPEC.md § 3 / Phase 1
-   Dark-only. Không gradient. border-radius: 9999px.
+   Badge & Voucher System — Design Tokens v2.0
+   Spec: BADGE_SYSTEM_SPEC.md § 7
+   Dark-only. No gradient. border-radius: 9999px.
    ================================================================ */
 
 :root {
 
-  /* ── 3.1 Product Card Badges ─────────────────────────────── */
+  /* ── LAYER 1 TONAL (bg + text, no border) ─────────────────── */
+  --badge-fire-bg:     #4a2000; --badge-fire-text:     #ffb070;
+  --badge-new-bg:      #0d3018; --badge-new-text:      #5ee898;
+  --badge-hot-bg:      #3a1010; --badge-hot-text:      #ff9090;
+  --badge-sale-bg:     #2d2000; --badge-sale-text:     #ffd060;
+  --badge-combo-bg:    #1e0a38; --badge-combo-text:    #d4a0ff;
+  --badge-partner-bg:  #0a2010; --badge-partner-text:  #5ee898;
+  --badge-proxy-bg:    #2d1100; --badge-proxy-text:    #ffb070;
+  --badge-spicy1-bg:   #1a0800; --badge-spicy1-text:   #ff9060;
+  --badge-spicy2-bg:   #2a0a00; --badge-spicy2-text:   #ff6030;
+  --badge-spicy3-bg:   #3a0500; --badge-spicy3-text:   #ff3010;
+  --badge-rank1-bg:    #2d2000; --badge-rank1-text:    #FFD700;
+  --badge-rank2-bg:    #1a1a1a; --badge-rank2-text:    #b0b8c1;
+  --badge-rank3-bg:    #1a0e05; --badge-rank3-text:    #cd9a5a;
+  --badge-rankn-bg:    #2d1100; --badge-rankn-text:    #FFB347;
+  --badge-bronze-bg:   #2a1800; --badge-bronze-text:   #d4956a;
+  --badge-silver-bg:   #1e0a38; --badge-silver-text:   #c084fc;
+  --badge-gold-bg:     #2d2000; --badge-gold-text:     #f5c542;
+  --badge-platinum-bg: #0d1f3a; --badge-platinum-text: #90c4ff;
 
-  /* discount */
-  --badge-discount-bg:      #3d0a0a;
-  --badge-discount-text:    #ff8080;
-  --badge-discount-border:  #7f1d1d;
+  /* ── LAYER 2 GHOST (transparent bg + text + border) ────────── */
+  --badge-discount-text: #ff8080;  --badge-discount-bdr: rgba(255,128,128,.45);
+  --badge-rating-text:   #FFD700;  --badge-rating-bdr:   rgba(255,215,0,.4);
+  --badge-dist-text:     #7ab3f8;  --badge-dist-bdr:     rgba(122,179,248,.45);
+  --badge-vou-text:      #FF8C00;  --badge-vou-bdr:      rgba(255,140,0,.45);
+  --badge-hc-text:       #c084fc;  --badge-hc-bdr:       rgba(192,132,252,.4);
+  --badge-soldct-text:   #3ecf6e;  --badge-soldct-bdr:   rgba(62,207,110,.45);
+  --badge-soldout-text:  #6a5a40;  --badge-soldout-bdr:  rgba(255,255,255,.12);
+  --badge-urgent-text:   #ff8080;  --badge-urgent-bdr:   rgba(255,128,128,.45);
+  --badge-lowuse-text:   #ff8080;  --badge-lowuse-bdr:   rgba(255,128,128,.45);
 
-  /* hot */
-  --badge-hot-bg:           #2d1100;
-  --badge-hot-text:         #FFB347;
-  --badge-hot-border:       #854f0b;
+  /* ── LAYER 3 STATUS (bg + text + border + indicator) ────────── */
+  --badge-open-bg:    #0a1808; --badge-open-text:    #3ecf6e; --badge-open-bdr:    rgba(62,207,110,.3);
+  --badge-closed-bg:  #1c0808; --badge-closed-text:  #ff8080; --badge-closed-bdr:  rgba(255,64,64,.3);
+  --badge-going-bg:   #0a152d; --badge-going-text:   #7ab3f8; --badge-going-bdr:   rgba(122,179,248,.3);
+  --badge-pending-bg: #2d2000; --badge-pending-text: #FFB347; --badge-pending-bdr: rgba(255,179,71,.3);
+  --badge-done-bg:    #0a2010; --badge-done-text:    #3ecf6e; --badge-done-bdr:    rgba(62,207,110,.3);
+  --badge-cancel-bg:  #1c0808; --badge-cancel-text:  #ff8080; --badge-cancel-bdr:  rgba(255,64,64,.3);
 
-  /* sale */
-  --badge-sale-bg:          #2d1e00;
-  --badge-sale-text:        #FFD700;
-  --badge-sale-border:      #92400e;
+  /* ── NOTIFICATION DOT ──────────────────────────────────────── */
+  --notif-dot-bg: #ff4040;
+  --cart-dot-bg:  #FF6B1A;
 
-  /* new */
-  --badge-new-bg:           #0a1f2d;
-  --badge-new-text:         #60c8f5;
-  --badge-new-border:       #185fa5;
+  /* ── FILTER CHIP ──────────────────────────────────────────── */
+  --chip-on-bg:   rgba(255,107,0,.15); --chip-on-text:   #FF8C00; --chip-on-bdr:   rgba(255,107,0,.4);
+  --chip-off-bg:  rgba(255,255,255,.04); --chip-off-text: #a08060; --chip-off-bdr:  rgba(255,255,255,.08);
 
-  /* bestseller */
-  --badge-bestseller-bg:    #0a2010;
-  --badge-bestseller-text:  #3ecf6e;
-  --badge-bestseller-border:#166534;
+  /* ── VOUCHER TYPE PANELS ──────────────────────────────────── */
+  --vou-pct-panel:   #2d1100; --vou-pct-accent:   #FFB347;
+  --vou-cash-panel:  #0a2010; --vou-cash-accent:  #3ecf6e;
+  --vou-ship-panel:  #0a152d; --vou-ship-accent:  #7ab3f8;
+  --vou-combo-panel: #1e0a38; --vou-combo-accent: #c084fc;
 
-  /* combo (product card) */
-  --badge-combo-bg:         #14082d;
-  --badge-combo-text:       #c084fc;
-  --badge-combo-border:     #7e22ce;
+  /* ── VTAG (voucher tags 9px — nhỏ hơn badge) ─────────────── */
+  --vtag-o-bg:    rgba(255,140,0,.15);   --vtag-o-text:    #FFB347; --vtag-o-bdr:    rgba(255,140,0,.3);
+  --vtag-g-bg:    rgba(62,207,110,.12);  --vtag-g-text:    #3ecf6e; --vtag-g-bdr:    rgba(62,207,110,.25);
+  --vtag-b-bg:    rgba(122,179,248,.12); --vtag-b-text:    #7ab3f8; --vtag-b-bdr:    rgba(122,179,248,.25);
+  --vtag-p-bg:    rgba(192,132,252,.12); --vtag-p-text:    #c084fc; --vtag-p-bdr:    rgba(192,132,252,.25);
+  --vtag-r-bg:    rgba(255,64,64,.12);   --vtag-r-text:    #ff8080; --vtag-r-bdr:    rgba(255,64,64,.25);
+  --vtag-muted-bg:rgba(255,255,255,.06); --vtag-muted-text:#6a5a40; --vtag-muted-bdr:rgba(255,255,255,.1);
 
-  /* ── 3.2 Shop Card Badges ────────────────────────────────── */
-
-  /* open */
-  --badge-open-bg:          #0a2010;
-  --badge-open-text:        #3ecf6e;
-  --badge-open-border:      rgba(46, 204, 113, 0.35);
-
-  /* closed */
-  --badge-closed-bg:        #1c0808;
-  --badge-closed-text:      #ff8080;
-  --badge-closed-border:    rgba(255, 64, 64, 0.3);
-
-  /* rating */
-  --badge-rating-bg:        #2d1e00;
-  --badge-rating-text:      #FFB347;
-  --badge-rating-border:    rgba(255, 179, 71, 0.3);
-
-  /* distance */
-  --badge-distance-bg:      #0a152d;
-  --badge-distance-text:    #7ab3f8;
-  --badge-distance-border:  rgba(74, 143, 245, 0.3);
-
-  /* has-combo */
-  --badge-has-combo-bg:     #14082d;
-  --badge-has-combo-text:   #c084fc;
-  --badge-has-combo-border: rgba(168, 85, 247, 0.3);
-
-  /* ── 3.3 Shop Profile Badges ─────────────────────────────── */
-
-  /* partner */
-  --badge-partner-bg:       #0a2010;
-  --badge-partner-text:     #3ecf6e;
-  --badge-partner-border:   #166534;
-
-  /* proxy (Mua hộ) */
-  --badge-proxy-bg:         #2d1100;
-  --badge-proxy-text:       #FFB347;
-  --badge-proxy-border:     #854f0b;
-
-  /* ── 3.4 Voucher Badges ──────────────────────────────────── */
-
-  /* voucher-percent */
-  --badge-voucher-percent-bg:     #2d1100;
-  --badge-voucher-percent-text:   #FFB347;
-  --badge-voucher-percent-border: rgba(255, 140, 0, 0.3);
-
-  /* voucher-cash */
-  --badge-voucher-cash-bg:        #0a2010;
-  --badge-voucher-cash-text:      #3ecf6e;
-  --badge-voucher-cash-border:    rgba(62, 207, 110, 0.3);
-
-  /* voucher-ship */
-  --badge-voucher-ship-bg:        #0a152d;
-  --badge-voucher-ship-text:      #7ab3f8;
-  --badge-voucher-ship-border:    rgba(74, 143, 245, 0.3);
-
-  /* voucher-combo */
-  --badge-voucher-combo-bg:       #14082d;
-  --badge-voucher-combo-text:     #c084fc;
-  --badge-voucher-combo-border:   rgba(168, 85, 247, 0.3);
-
-  /* expire-urgent */
-  --badge-expire-urgent-bg:       #1c0808;
-  --badge-expire-urgent-text:     #ff8080;
-  --badge-expire-urgent-border:   rgba(255, 64, 64, 0.3);
-
-  /* low-usage */
-  --badge-low-usage-bg:           #1c0808;
-  --badge-low-usage-text:         #ff8080;
-  --badge-low-usage-border:       rgba(255, 64, 64, 0.3);
-
-  /* ── 3.5 Ranking Badges ──────────────────────────────────── */
-
-  /* rank-1 */
-  --badge-rank-1-bg:        #2d2000;
-  --badge-rank-1-text:      #FFD700;
-  --badge-rank-1-border:    rgba(255, 215, 0, 0.35);
-
-  /* rank-2 */
-  --badge-rank-2-bg:        #1a1a1a;
-  --badge-rank-2-text:      #b0b8c1;
-  --badge-rank-2-border:    rgba(176, 184, 193, 0.3);
-
-  /* rank-3 */
-  --badge-rank-3-bg:        #1a0e05;
-  --badge-rank-3-text:      #cd9a5a;
-  --badge-rank-3-border:    rgba(205, 127, 50, 0.3);
-
-  /* rank-n */
-  --badge-rank-n-bg:        #2d1100;
-  --badge-rank-n-text:      #FFB347;
-  --badge-rank-n-border:    rgba(255, 140, 0, 0.3);
-
-  /* sold-count */
-  --badge-sold-count-bg:    #0a2010;
-  --badge-sold-count-text:  #3ecf6e;
-  --badge-sold-count-border:rgba(62, 207, 110, 0.3);
-
-  /* ── 3.7 Loyalty Tier Badges ─────────────────────────────── */
-
-  /* bronze */
-  --badge-bronze-bg:        #1a0e05;
-  --badge-bronze-text:      #cd9a5a;
-  --badge-bronze-border:    rgba(205, 127, 50, 0.3);
-
-  /* silver */
-  --badge-silver-bg:        #14082d;
-  --badge-silver-text:      #c084fc;
-  --badge-silver-border:    rgba(180, 100, 255, 0.3);
-
-  /* gold */
-  --badge-gold-bg:          #2d2000;
-  --badge-gold-text:        #f5c542;
-  --badge-gold-border:      rgba(245, 197, 66, 0.3);
-
-  /* platinum */
-  --badge-platinum-bg:      #0a152d;
-  --badge-platinum-text:    #7ab3f8;
-  --badge-platinum-border:  rgba(74, 143, 245, 0.3);
-
-  /* ── 3.8 Filter Chips ────────────────────────────────────── */
-
-  --badge-filter-active-bg:      rgba(255, 107, 0, 0.15);
-  --badge-filter-active-text:    #FF8C00;
-  --badge-filter-active-border:  rgba(255, 107, 0, 0.4);
-
-  --badge-filter-inactive-bg:    rgba(255, 255, 255, 0.04);
-  --badge-filter-inactive-text:  #a08060;
-  --badge-filter-inactive-border:rgba(255, 255, 255, 0.08);
-
-  /* ── 3.9 Spicy Level Badges ──────────────────────────────── */
-
-  /* spicy-1 */
-  --badge-spicy-1-bg:       #1a0800;
-  --badge-spicy-1-text:     #ff9060;
-  --badge-spicy-1-border:   rgba(255, 107, 26, 0.3);
-
-  /* spicy-2 */
-  --badge-spicy-2-bg:       #2a0a00;
-  --badge-spicy-2-text:     #ff6030;
-  --badge-spicy-2-border:   rgba(255, 64, 0, 0.4);
-
-  /* spicy-3 */
-  --badge-spicy-3-bg:       #3a0500;
-  --badge-spicy-3-text:     #ff3010;
-  --badge-spicy-3-border:   rgba(220, 0, 0, 0.5);
-
-  /* ── 3.10 Order / Trip Status Badges ────────────────────── */
-
-  /* status-pending */
-  --badge-status-pending-bg:    #2d1e00;
-  --badge-status-pending-text:  #FFB347;
-  --badge-status-pending-border:rgba(255, 179, 71, 0.3);
-
-  /* status-going */
-  --badge-status-going-bg:      #0a152d;
-  --badge-status-going-text:    #7ab3f8;
-  --badge-status-going-border:  rgba(74, 143, 245, 0.3);
-
-  /* status-done */
-  --badge-status-done-bg:       #0a2010;
-  --badge-status-done-text:     #3ecf6e;
-  --badge-status-done-border:   rgba(62, 207, 110, 0.3);
-
-  /* status-cancelled */
-  --badge-status-cancelled-bg:    #1c0808;
-  --badge-status-cancelled-text:  #ff8080;
-  --badge-status-cancelled-border:rgba(255, 64, 64, 0.3);
-
-  /* ── 3.6 Notification Dot ────────────────────────────────── */
-
-  --badge-notif-bg:    #ff4040;
-  --badge-notif-text:  #ffffff;
-  --badge-notif-bg-hi: #FF6B1A; /* khi count >= 100 */
-
-  /* ── Sizing system ───────────────────────────────────────── */
-
-  --badge-height-sm:    18px;
-  --badge-px-sm:        7px;
-  --badge-py-sm:        2px;
-  --badge-font-sm:      10px;
-  --badge-icon-sm:      11px;
-
-  --badge-height-md:    22px;
-  --badge-px-md:        9px;
-  --badge-py-md:        3px;
-  --badge-font-md:      11px;
-  --badge-icon-md:      12px;
-
-  --badge-height-lg:    26px;
-  --badge-px-lg:        11px;
-  --badge-py-lg:        4px;
-  --badge-font-lg:      12px;
-  --badge-icon-lg:      14px;
-
-  --badge-gap:          3px;
-  --badge-radius:       9999px;
-  --badge-border-width: 1px;
-  --badge-font-weight:  500;
+  /* ── SIZING ──────────────────────────────────────────────── */
+  --badge-radius:      9999px;
+  --badge-font-sm:     10px;
+  --badge-font-md:     11px;
+  --badge-font-lg:     12px;
+  --badge-font-weight: 500;
+  --badge-icon-sm:     11px;
+  --badge-icon-md:     12px;
+  --badge-icon-lg:     14px;
+  --badge-gap:         3px;
+  --badge-px-sm:       8px;
+  --badge-py-sm:       3px;
+  --badge-px-md:       9px;
+  --badge-py-md:       3px;
+  --badge-px-lg:       11px;
+  --badge-py-lg:       4px;
+  /* Layer 2 ghost — padding nhỏ hơn */
+  --badge-ghost-px:    7px;
+  --badge-ghost-py:    2px;
 }
 
-/* ── Dot pulse animation (open status) ──────────────────────── */
+/* ── Animations ─────────────────────────────────────────────── */
 
-@keyframes badge-pulse {
-  0%, 100% { opacity: 1;    }
-  50%       { opacity: 0.35; }
+@keyframes badge-blink {
+  0%, 100% { opacity: 1;   }
+  50%       { opacity: 0.2; }
 }
 
-.badge-dot-pulse {
-  animation: badge-pulse 1.5s ease-in-out infinite;
+@keyframes badge-spin {
+  to { transform: rotate(360deg); }
 }
+
+@keyframes nudge-pulse {
+  0%, 100% { border-color: var(--nudge-border-dim);    }
+  50%       { border-color: var(--nudge-border-bright); }
+}
+
+.badge-dot-live  { animation: badge-blink 1.4s ease-in-out infinite; }
+.badge-ring-spin { animation: badge-spin  0.8s linear infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .badge-dot-pulse {
-    animation: none;
-  }
+  .badge-dot-live,
+  .badge-ring-spin { animation: none; }
 }
