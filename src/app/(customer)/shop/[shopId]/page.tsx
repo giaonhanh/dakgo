@@ -656,7 +656,7 @@ export default function ShopPage() {
         { id:"m5", food_rating:5, comment:null, food_tags:["Món ngon","Giao nhanh"], created_at: new Date(Date.now()-86400000*7).toISOString(), reviewer:{ full_name:"Võ Thị Mai" } },
       ]
       setReviews(MOCK_REVIEWS)
-      setReviewsTotal(MOCK_REVIEWS.length)
+      setReviewsTotal(12) // mock: giả lập còn 7 review nữa chưa load
       // TODO: XÓA HARDCODE ↑ và bật lại đoạn dưới
       // const { data: rvData, count: rvCount } = await supabase
       //   .from("reviews")
