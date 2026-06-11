@@ -101,8 +101,8 @@ function isShopInHours(shop: ShopRow): boolean {
 // Giờ mở cửa tiếp theo để hiển thị "Mở lúc HH:mm"
 function nextOpenLabel(shop: ShopRow): string {
   const oh = shop.opening_hours
-  if (oh?.open) return `M? lúc ${oh.open}`
-  return "Đang đóng cửa"
+  if (oh?.open) return `Mở lúc ${oh.open}`
+  return "Tạm đóng"
 }
 
 function isProductInTime(p: { all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }): boolean {
@@ -847,68 +847,9 @@ export default function HomePage() {
           </AnimatePresence>
 
           {/* --------------------------------------
-              S4 — FlashSaleBanner / AdminBanner / InviteFriend
+              S4 — AdminBanner (luôn hiển thị nếu có)
           -------------------------------------- */}
-          {vouchers.length > 0 ? (() => {
-            const DEAL_EMOJI: Record<string, string> = { percent:"🏷️", fixed:"💵", freeship:"🚚" }
-            const deal = vouchers[bannerIdx % vouchers.length]
-            const dealEmoji   = DEAL_EMOJI[deal.discount_type] ?? "?"
-            const dealTitle   = deal.title
-            const dealSubLine = deal.discount_type === "percent"  ? `Giảm ${deal.discount_value}% · Áp dụng ngay`
-              : deal.discount_type === "fixed"    ? `Giảm ${fmt(deal.discount_value)} · Đặt ngay`
-              : "Miễn phí giao hàng · Đơn từ bất kỳ"
-            return (
-              <div style={{ margin:"0 16px 8px" }}>
-                <div style={{
-                  aspectRatio:"2/1", borderRadius:16, overflow:"hidden",
-                  border:"1px solid rgba(255,107,0,0.35)",
-                  position:"relative",
-                  background:"linear-gradient(135deg,#1a0d00,#2d1500,#0d0900)",
-                }}>
-                  <div style={{ position:"absolute", top:-30, right:-20, width:200, height:200,
-                    background:"radial-gradient(circle,rgba(255,107,0,0.32) 0%,transparent 65%)" }} />
-                  <div style={{ position:"absolute", bottom:-20, left:10, width:120, height:120,
-                    background:"radial-gradient(circle,rgba(255,179,71,0.12) 0%,transparent 65%)" }} />
-                  <div style={{ position:"absolute", top:0, left:"-100%", width:"50%", height:"100%",
-                    background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)",
-                    animation:"logoShine 3.5s infinite" }} />
-                  <div style={{ position:"relative", zIndex:1, padding:"20px 20px" }}>
-                    <div style={{ display:"inline-block",
-                      background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
-                      borderRadius:8, padding:"3px 11px", marginBottom:8,
-                      color:"#000", fontSize:10, fontWeight:700, letterSpacing:.4 }}>
-                      ? FLASH SALE · {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
-                    </div>
-                    <div style={{ color:"#fff", fontSize:18, fontWeight:700, lineHeight:1.25, maxWidth:"62%", wordBreak:"break-word" }}>
-                      {dealTitle}
-                    </div>
-                    <div style={{ color:"rgba(255,255,255,0.4)", fontSize:11, marginTop:5 }}>
-                      {dealSubLine}
-                    </div>
-                    <div onClick={() => router.push(deal?.shop_id ? `/shop/${deal.shop_id}` : "/vouchers")}
-                      style={{ display:"inline-block", marginTop:10, cursor:"pointer",
-                        background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)",
-                        borderRadius:8, padding:"5px 14px", color:"#fff", fontSize:11, fontWeight:600 }}>
-                      Đ?t ngay ?
-                    </div>
-                  </div>
-                  <div style={{ position:"absolute", right:18, top:"50%", transform:"translateY(-50%)",
-                    fontSize:72, zIndex:1, filter:"drop-shadow(0 0 18px rgba(255,107,0,0.5))" }}>
-                    {dealEmoji}
-                  </div>
-                </div>
-                <div style={{ display:"flex", gap:4, justifyContent:"center", padding:"7px 0 8px" }}>
-                  {vouchers.map((_,i) => (
-                    <div key={i} onClick={() => setBannerIdx(i)} style={{
-                      width:bannerIdx===i?18:5, height:5, borderRadius:3, cursor:"pointer",
-                      background:bannerIdx===i?"#FF6B00":"rgba(255,255,255,0.08)",
-                      transition:"all .3s", boxShadow:bannerIdx===i?"0 0 5px #FF6B00":"none",
-                    }} />
-                  ))}
-                </div>
-              </div>
-            )
-          })() : adminBanners.length > 0 ? (
+          {adminBanners.length > 0 && (
             <div style={{ margin:"0 16px 8px" }}>
               <div style={{ aspectRatio:"2/1", borderRadius:16, overflow:"hidden",
                 border:"1px solid rgba(255,255,255,0.12)", position:"relative",
@@ -945,9 +886,76 @@ export default function HomePage() {
                 </div>
               )}
             </div>
-          ) : (
-            <div style={{ height: 8 }} />
           )}
+
+          {/* --------------------------------------
+              S4b — FlashSaleBanner (chỉ hiển thị khi có voucher)
+          -------------------------------------- */}
+          {vouchers.length > 0 && (() => {
+            const DEAL_EMOJI: Record<string, string> = { percent:"🏷️", fixed:"💵", freeship:"🚚" }
+            const deal = vouchers[bannerIdx % vouchers.length]
+            const dealEmoji   = DEAL_EMOJI[deal.discount_type] ?? "🎁"
+            const dealTitle   = deal.title
+            const dealSubLine = deal.discount_type === "percent"  ? `Giảm ${deal.discount_value}% · Áp dụng ngay`
+              : deal.discount_type === "fixed"    ? `Giảm ${fmt(deal.discount_value)} · Đặt ngay`
+              : "Miễn phí giao hàng · Đơn từ bất kỳ"
+            return (
+              <div style={{ margin:"0 16px 8px" }}>
+                <div style={{
+                  aspectRatio:"2/1", borderRadius:16, overflow:"hidden",
+                  border:"1px solid rgba(255,107,0,0.35)",
+                  position:"relative",
+                  background:"linear-gradient(135deg,#1a0d00,#2d1500,#0d0900)",
+                }}>
+                  <div style={{ position:"absolute", top:-30, right:-20, width:200, height:200,
+                    background:"radial-gradient(circle,rgba(255,107,0,0.32) 0%,transparent 65%)" }} />
+                  <div style={{ position:"absolute", bottom:-20, left:10, width:120, height:120,
+                    background:"radial-gradient(circle,rgba(255,179,71,0.12) 0%,transparent 65%)" }} />
+                  <div style={{ position:"absolute", top:0, left:"-100%", width:"50%", height:"100%",
+                    background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)",
+                    animation:"logoShine 3.5s infinite" }} />
+                  <div style={{ position:"relative", zIndex:1, padding:"20px 20px" }}>
+                    <div style={{ display:"inline-flex", alignItems:"center", gap:5,
+                      background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
+                      borderRadius:8, padding:"3px 11px", marginBottom:8,
+                      color:"#000", fontSize:10, fontWeight:800, letterSpacing:.4,
+                      fontFamily:"Lexend" }}>
+                      ⚡ FLASH SALE · {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
+                    </div>
+                    <div style={{ color:"#fff", fontSize:18, fontWeight:700, lineHeight:1.25, maxWidth:"62%",
+                      wordBreak:"break-word", fontFamily:"Lexend" }}>
+                      {dealTitle}
+                    </div>
+                    <div style={{ color:"rgba(255,255,255,0.5)", fontSize:11, marginTop:5, fontFamily:"Lexend" }}>
+                      {dealSubLine}
+                    </div>
+                    <div onClick={() => router.push(deal?.shop_id ? `/shop/${deal.shop_id}` : "/vouchers")}
+                      style={{ display:"inline-flex", alignItems:"center", gap:5, marginTop:10, cursor:"pointer",
+                        background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)",
+                        borderRadius:8, padding:"5px 14px", color:"#fff", fontSize:11, fontWeight:600,
+                        fontFamily:"Lexend" }}>
+                      Đặt ngay →
+                    </div>
+                  </div>
+                  <div style={{ position:"absolute", right:18, top:"50%", transform:"translateY(-50%)",
+                    fontSize:72, zIndex:1, filter:"drop-shadow(0 0 18px rgba(255,107,0,0.5))" }}>
+                    {dealEmoji}
+                  </div>
+                </div>
+                {vouchers.length > 1 && (
+                  <div style={{ display:"flex", gap:4, justifyContent:"center", padding:"7px 0 8px" }}>
+                    {vouchers.map((_,i) => (
+                      <div key={i} onClick={() => setBannerIdx(i)} style={{
+                        width:bannerIdx===i?18:5, height:5, borderRadius:3, cursor:"pointer",
+                        background:bannerIdx===i?"#FF6B00":"rgba(255,255,255,0.08)",
+                        transition:"all .3s", boxShadow:bannerIdx===i?"0 0 5px #FF6B00":"none",
+                      }} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* --------------------------------------
               S4.5 — Mời bạn bè (luôn hiển thị)
@@ -1303,7 +1311,7 @@ export default function HomePage() {
                     background: nearbyFilter==="all" ? "rgba(255,107,0,0.15)" : "rgba(255,255,255,0.05)",
                     border: nearbyFilter==="all" ? "1px solid rgba(255,107,0,0.4)" : "1px solid rgba(255,255,255,0.08)",
                     color: nearbyFilter==="all" ? "#FF8C00" : "#6a5a40", transition:"all .15s" }}>
-                  T?t c?
+                  Tất cả
                 </button>
                 {usedCats.map(v => {
                   const cat = getCategoryByValue(v)
@@ -1386,9 +1394,9 @@ export default function HomePage() {
                         : "🏪"}
                       {/* Closed overlay */}
                       {!shopOpen && (
-                        <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.52)",
+                        <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.45)",
                           display:"flex", alignItems:"center", justifyContent:"center", borderRadius:13 }}>
-                          <span style={{ fontSize:16 }}>📍</span>
+                          <span style={{ fontSize:15 }}>🔒</span>
                         </div>
                       )}
                     </div>
