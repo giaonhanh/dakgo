@@ -1021,7 +1021,7 @@ export default function ShopPage() {
                       if (hours?.open && hours?.close) return `${hours.open} – ${hours.close}`
                       return "07:00 – 21:00"
                     })(), sub:"Giờ mở cửa hôm nay" },
-                  { icon:"📦", val: shop.total_orders ? `${shop.total_orders} đơn` : "Mới khai trương", sub:"Tổng đơn hàng" },
+                  { icon:"📦", val: shop.prep_time ? `${shop.prep_time} phút` : "10–15 phút", sub:"Thời gian chuẩn bị" },
                   { icon:"💬", val: shop.rating_count ? `${shop.rating_count}` : "–", sub:"Lượt đánh giá" },
                 ].map(s => (
                   <div key={s.icon} style={{ flex:1, textAlign:"center",
