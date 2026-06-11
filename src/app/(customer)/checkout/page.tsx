@@ -32,12 +32,15 @@ interface BankInfo { code: string; name: string; short: string; featured: boolea
 
 interface AppliedVoucher { code: string; type: "app" | "shop"; label: string; discount: number }
 
+interface ComboRequirement { product_id: string; min_quantity: number; products: { name: string } | null }
 interface DbVoucher {
   id: string; code: string; title: string
   discount_type: "percent" | "fixed" | "freeship"
   discount_value: number; min_order: number; max_discount: number | null
   valid_to: string; shop_id: string | null; is_active: boolean
   per_person_limit: number | null
+  is_combo: boolean
+  combo_items: ComboRequirement[] | null
 }
 
 function calcVoucherDiscount(v: DbVoucher, sub: number, fee: number): number {
@@ -1163,6 +1166,7 @@ export default function CheckoutPage() {
   const [deliveryFee,    setDeliveryFee]    = useState(15000)
   const [feeLoading,     setFeeLoading]     = useState(false)
   const [foodPricing,    setFoodPricing]    = useState<{ rows: string[]; extra: string } | null>(null)
+  const [comboHint,      setComboHint]      = useState<string | null>(null)
 
   // ── Load user, saved addresses, xu balance ──
   useEffect(() => {
@@ -1174,7 +1178,7 @@ export default function CheckoutPage() {
       const [{ data: addrs }, { data: wallet }, { data: voucherData }, { data: refUsage }, { data: settingsData }] = await Promise.all([
         supabase.from("saved_addresses").select("id, label, address, lat, lng, is_default").eq("user_id", user.id).order("is_default", { ascending: false }),
         supabase.from("wallets").select("id, balance, bonus_balance").eq("user_id", user.id).eq("type", "customer").maybeSingle(),
-        supabase.from("vouchers").select("id,code,title,discount_type,discount_value,min_order,max_discount,valid_to,shop_id,is_active,per_person_limit").eq("is_active", true).gte("valid_to", new Date().toISOString()).limit(30),
+        supabase.from("vouchers").select("id,code,title,discount_type,discount_value,min_order,max_discount,valid_to,shop_id,is_active,per_person_limit,is_combo,combo_items(product_id,min_quantity,products(name))").eq("is_active", true).gte("valid_to", new Date().toISOString()).limit(30),
         supabase.from("referral_usages").select("id").eq("referee_id", user.id).maybeSingle(),
         supabase.from("app_settings").select("key,value").in("key", ["weather_surcharge","night_surcharge","pricing"]),
       ])
@@ -1204,7 +1208,7 @@ export default function CheckoutPage() {
       }
       if (refUsage) setRefAlready(true)
       if (voucherData) {
-        setDbVouchers(voucherData as DbVoucher[])
+        setDbVouchers(voucherData as unknown as DbVoucher[])
         const { data: usages } = await supabase.from("voucher_usages").select("voucher_id").eq("user_id", user.id)
         const umap: Record<string, number> = {}
         for (const u of usages ?? []) umap[u.voucher_id] = (umap[u.voucher_id] ?? 0) + 1
@@ -1216,7 +1220,7 @@ export default function CheckoutPage() {
           if (raw) {
             const pv = JSON.parse(raw) as { code: string; title: string }
             sessionStorage.removeItem("pending_voucher")
-            const found = (voucherData as DbVoucher[]).find(v => v.code === pv.code)
+            const found = (voucherData as unknown as DbVoucher[]).find(v => v.code === pv.code)
             if (found) {
               setTimeout(() => {
                 const yes = window.confirm(`Bạn có muốn áp dụng mã "${pv.code}" (${pv.title}) không?`)
@@ -1329,6 +1333,40 @@ export default function CheckoutPage() {
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2000) }
 
+  // ── Auto-detect combo voucher conditions ──
+  useEffect(() => {
+    if (!dbVouchers.length || !cartItems.length) { setComboHint(null); return }
+    const cartMap: Record<string, number> = {}
+    for (const item of cartItems) cartMap[item.id] = (cartMap[item.id] ?? 0) + item.qty
+
+    for (const v of dbVouchers) {
+      if (!v.is_combo || !v.combo_items?.length) continue
+      if (appliedVouchers.some(av => av.code === v.code)) continue
+
+      const unmet = v.combo_items.filter(ci => (cartMap[ci.product_id] ?? 0) < ci.min_quantity)
+      if (unmet.length === 0) {
+        // Đủ điều kiện → tự động apply nếu chưa có conflict
+        const vType = dbVoucherType(v)
+        if (!appliedVouchers.some(av => av.type === vType)) {
+          const disc = calcVoucherDiscount(v, subtotal, deliveryFee)
+          setAppliedVouchers(prev => [...prev, { code: v.code, type: vType, label: v.title, discount: disc }])
+          setToast(`🎉 Tự động áp dụng combo "${v.title}" · Giảm ${fmt(disc)}`)
+          setTimeout(() => setToast(""), 3500)
+          setComboHint(null)
+          return
+        }
+      } else if (unmet.length < v.combo_items.length) {
+        // Thiếu một phần → gợi ý mua thêm
+        const names = unmet.map(ci => ci.products?.name ?? "món còn thiếu").join(", ")
+        const discLabel = v.discount_type === "percent" ? `-${v.discount_value}%` : `-${fmt(v.discount_value)}`
+        setComboHint(`🛒 Thêm ${names} để được combo "${v.title}" · Giảm ${discLabel}`)
+        return
+      }
+    }
+    setComboHint(null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems, dbVouchers, appliedVouchers])
+
   const applyVoucherCode = (rawCode: string, fromPicker = false) => {
     const code = rawCode.trim().toUpperCase()
     if (!code) return
@@ -1337,6 +1375,19 @@ export default function CheckoutPage() {
     }
     const found = dbVouchers.find(v => v.code === code)
     if (!found) { fireToast("Mã voucher không hợp lệ ❌"); return }
+
+    // Validate combo: phải có đúng các sản phẩm yêu cầu trong giỏ
+    if (found.is_combo && found.combo_items?.length) {
+      const cartMap: Record<string, number> = {}
+      for (const item of cartItems) cartMap[item.id] = (cartMap[item.id] ?? 0) + item.qty
+      const unmet = found.combo_items.filter(ci => (cartMap[ci.product_id] ?? 0) < ci.min_quantity)
+      if (unmet.length > 0) {
+        const names = unmet.map(ci => ci.products?.name ?? "món cần thiết").join(", ")
+        fireToast(`❌ Chưa đủ combo — cần thêm: ${names}`)
+        return
+      }
+    }
+
     const foundType = dbVoucherType(found)
     const conflict = appliedVouchers.find(v => v.type === foundType)
     if (conflict) {
@@ -1942,6 +1993,22 @@ export default function CheckoutPage() {
               )}
             </AnimatePresence>
           </SectionCard>
+          )}
+
+          {/* Combo hint banner */}
+          {comboHint && (
+            <div style={{
+              margin: "0 0 10px",
+              padding: "10px 14px", borderRadius: 12,
+              background: "rgba(46,204,113,0.08)",
+              border: "1px solid rgba(46,204,113,0.28)",
+              display: "flex", alignItems: "flex-start", gap: 10,
+            }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }}>💡</span>
+              <div style={{ color: "#2ECC71", fontSize: 11.5, fontWeight: 600, lineHeight: 1.5, fontFamily: "Lexend" }}>
+                {comboHint}
+              </div>
+            </div>
           )}
 
           {/* 4. Voucher */}

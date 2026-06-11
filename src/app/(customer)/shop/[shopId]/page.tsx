@@ -360,11 +360,12 @@ function ProductSheet({
 
 // ─── ProductCard ──────────────────────────────────────────
 function ProductCard({
-  product, onAdd, badgeRef,
+  product, onAdd, badgeRef, isInCombo,
 }: {
   product: Product
   onAdd: (p: Product, btn: HTMLElement) => void
   badgeRef: React.RefObject<HTMLElement | null>
+  isInCombo?: boolean
 }) {
   const btnRef = useRef<HTMLButtonElement>(null)
   const discount = product.origPrice
@@ -418,6 +419,14 @@ function ProductCard({
             color:"#fff", borderRadius:6, padding:"1px 6px",
             fontSize: 10, fontWeight:700 }}>
             🔥 Hot
+          </div>
+        )}
+        {isInCombo && (
+          <div style={{ position:"absolute", top:-4, right:-4,
+            background:"linear-gradient(135deg,#2ECC71,#1a9e54)",
+            color:"#fff", borderRadius:6, padding:"1px 6px",
+            fontSize: 10, fontWeight:800 }}>
+            🎁 Combo
           </div>
         )}
       </div>
@@ -504,6 +513,7 @@ export default function ShopPage() {
   const [products,      setProducts]      = useState<Product[]>([])
   const [categories,    setCategories]    = useState<{id:string; label:string}[]>([])
   const [combos,        setCombos]        = useState<ComboVoucher[]>([])
+  const [comboProductIds, setComboProductIds] = useState<Set<string>>(new Set())
   const [loading,       setLoading]       = useState(true)
   const [activeTab,     setActiveTab]     = useState("")
   const [scrolled,      setScrolled]      = useState(false)
@@ -636,17 +646,20 @@ export default function ShopPage() {
       const now = new Date().toISOString()
       const { data: vouchers } = await supabase
         .from("vouchers")
-        .select("id,code,title,discount_type,discount_value,min_order,valid_to")
+        .select("id,code,title,discount_type,discount_value,min_order,valid_to,is_combo,combo_items(product_id)")
         .eq("shop_id", shopId)
         .eq("is_active", true)
         .gte("valid_to", now)
         .order("valid_to", { ascending: true })
       if (vouchers && vouchers.length > 0) {
-        setCombos(vouchers.map((v: {id:string;code:string;title:string;discount_type:string;discount_value:number;min_order:number;valid_to:string}) => ({
-          id: v.id, code: v.code, title: v.title,
-          discountType: v.discount_type as "percent"|"fixed"|"freeship",
-          discount: v.discount_value, minOrder: v.min_order, endAt: v.valid_to,
-        })))
+        const cpIds = new Set<string>()
+        setCombos(vouchers.map((v: {id:string;code:string;title:string;discount_type:string;discount_value:number;min_order:number;valid_to:string;is_combo:boolean;combo_items:{product_id:string}[]|null}) => {
+          if (v.is_combo && v.combo_items) v.combo_items.forEach(ci => cpIds.add(ci.product_id))
+          return { id: v.id, code: v.code, title: v.title,
+            discountType: v.discount_type as "percent"|"fixed"|"freeship",
+            discount: v.discount_value, minOrder: v.min_order, endAt: v.valid_to }
+        }))
+        setComboProductIds(cpIds)
       }
 
       // TODO: XÓA HARDCODE — chỉ dùng để kiểm tra UI reviews
@@ -1207,7 +1220,7 @@ export default function ShopPage() {
                         <span style={{ color:"#6a5a40", fontSize: 11 }}>{items.length} món</span>
                       </div>
                       {items.map(product => (
-                        <ProductCard key={product.id} product={product} onAdd={handleAdd} badgeRef={cartBadgeRef} />
+                        <ProductCard key={product.id} product={product} onAdd={handleAdd} badgeRef={cartBadgeRef} isInCombo={comboProductIds.has(product.id)} />
                       ))}
                     </div>
                   )
@@ -1228,7 +1241,7 @@ export default function ShopPage() {
                         <span style={{ color:"#6a5a40", fontSize: 11 }}>{items.length} món</span>
                       </div>
                       {items.map(product => (
-                        <ProductCard key={product.id} product={product} onAdd={handleAdd} badgeRef={cartBadgeRef} />
+                        <ProductCard key={product.id} product={product} onAdd={handleAdd} badgeRef={cartBadgeRef} isInCombo={comboProductIds.has(product.id)} />
                       ))}
                     </div>
                   )
