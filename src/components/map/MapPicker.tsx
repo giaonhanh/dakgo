@@ -44,7 +44,15 @@ export default function MapPicker({ lat, lng, onLocationChange, height = 200 }: 
       })
       mapRef.current = map
 
-      map.on("load", () => applyBrandStyle(map))
+      map.on("load", () => {
+        map.resize()
+        requestAnimationFrame(() => { applyBrandStyle(map) })
+      })
+      if (divRef.current) {
+        const ro = new ResizeObserver(() => { map.resize() })
+        ro.observe(divRef.current)
+        map.once("remove", () => ro.disconnect())
+      }
       map.on("dragstart", () => setFloating(true))
       map.on("dragend",   () => setFloating(false))
       map.on("moveend", () => {

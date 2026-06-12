@@ -236,7 +236,12 @@ export default function AddressPickerClient({
       })
       mapRef.current = map
 
-      map.on("load", () => { applyBrandStyle(map); setTilesReady(true) })
+      map.on("load", () => {
+        // resize trước để đảm bảo MapLibre biết kích thước thực của container
+        map.resize()
+        requestAnimationFrame(() => { applyBrandStyle(map) })
+        setTilesReady(true)
+      })
       map.on("error", () => { setTilesReady(true); setMapError(true) })
       map.on("dragstart", () => { setFloating(true); setShowSuggest(false) })
       map.on("dragend",   () => {
@@ -253,8 +258,16 @@ export default function AddressPickerClient({
         scheduleGeocode(c.lat, c.lng)
       })
 
-      // Fallback tiles-ready timeout (3s cho mạng chậm)
-      setTimeout(() => setTilesReady(true), 3000)
+      // ResizeObserver: tự resize map khi container thay đổi kích thước
+      if (divRef.current) {
+        const ro = new ResizeObserver(() => { map.resize() })
+        ro.observe(divRef.current)
+        // cleanup sẽ disconnect khi map bị remove
+        map.once("remove", () => ro.disconnect())
+      }
+
+      // Fallback tiles-ready timeout (4s cho mạng chậm)
+      setTimeout(() => setTilesReady(true), 4000)
     }
 
     init()
