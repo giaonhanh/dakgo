@@ -169,8 +169,6 @@ export default function MuaHoPage() {
               <div style={{ color:"#f8f0e0",fontSize:16,fontWeight:800 }}>🛍️ Mua hộ</div>
               <div style={{ color:"#6a5a40",fontSize: 11,marginTop:1 }}>Tài xế đi chợ / cửa hàng mua cho bạn</div>
             </div>
-            <div style={{ background:"rgba(62,207,110,0.12)",border:"1px solid rgba(62,207,110,0.25)",
-              borderRadius:8,padding:"3px 10px",color:"#3ecf6e",fontSize: 11,fontWeight:700 }}>HOT 🔥</div>
           </div>
         </div>
 
