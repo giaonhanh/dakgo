@@ -910,7 +910,7 @@ export default function HomePage() {
             return (
               <div style={{ margin:"0 16px 8px" }}>
                 <div style={{
-                  aspectRatio:"2/1", borderRadius:16, overflow:"hidden",
+                  height:110, borderRadius:16, overflow:"hidden",
                   border:"1px solid rgba(255,107,0,0.35)",
                   position:"relative",
                   background:"linear-gradient(135deg,#1a0d00,#2d1500,#0d0900)",
@@ -922,31 +922,32 @@ export default function HomePage() {
                   <div style={{ position:"absolute", top:0, left:"-100%", width:"50%", height:"100%",
                     background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)",
                     animation:"logoShine 3.5s infinite" }} />
-                  <div style={{ position:"relative", zIndex:1, padding:"20px 20px" }}>
-                    <div style={{ display:"inline-flex", alignItems:"center", gap:5,
+                  <div style={{ position:"relative", zIndex:1, padding:"12px 14px", height:"100%",
+                    display:"flex", flexDirection:"column", justifyContent:"center" }}>
+                    <div style={{ display:"inline-flex", alignItems:"center", gap:4,
                       background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
-                      borderRadius:8, padding:"3px 11px", marginBottom:8,
-                      color:"#000", fontSize:10, fontWeight:800, letterSpacing:.4,
+                      borderRadius:6, padding:"2px 8px", marginBottom:5, alignSelf:"flex-start",
+                      color:"#000", fontSize:9, fontWeight:800, letterSpacing:.5,
                       fontFamily:"Lexend" }}>
                       ⚡ FLASH SALE · {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
                     </div>
-                    <div style={{ color:"#fff", fontSize:18, fontWeight:700, lineHeight:1.25, maxWidth:"62%",
-                      wordBreak:"break-word", fontFamily:"Lexend" }}>
+                    <div style={{ color:"#fff", fontSize:15, fontWeight:700, lineHeight:1.2, maxWidth:"60%",
+                      wordBreak:"break-word", fontFamily:"Lexend", marginBottom:3 }}>
                       {dealTitle}
                     </div>
-                    <div style={{ color:"rgba(255,255,255,0.5)", fontSize:11, marginTop:5, fontFamily:"Lexend" }}>
+                    <div style={{ color:"rgba(255,255,255,0.5)", fontSize:10, fontFamily:"Lexend", marginBottom:7 }}>
                       {dealSubLine}
                     </div>
                     <div onClick={() => router.push(deal?.shop_id ? `/shop/${deal.shop_id}` : "/vouchers")}
-                      style={{ display:"inline-flex", alignItems:"center", gap:5, marginTop:10, cursor:"pointer",
+                      style={{ display:"inline-flex", alignItems:"center", gap:4, cursor:"pointer",
                         background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)",
-                        borderRadius:8, padding:"5px 14px", color:"#fff", fontSize:11, fontWeight:600,
-                        fontFamily:"Lexend" }}>
+                        borderRadius:7, padding:"4px 11px", color:"#fff", fontSize:10, fontWeight:600,
+                        fontFamily:"Lexend", alignSelf:"flex-start" }}>
                       Đặt ngay →
                     </div>
                   </div>
-                  <div style={{ position:"absolute", right:18, top:"50%", transform:"translateY(-50%)",
-                    fontSize:72, zIndex:1, filter:"drop-shadow(0 0 18px rgba(255,107,0,0.5))" }}>
+                  <div style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)",
+                    fontSize:52, zIndex:1, filter:"drop-shadow(0 0 14px rgba(255,107,0,0.5))" }}>
                     {dealEmoji}
                   </div>
                 </div>
@@ -1265,35 +1266,46 @@ export default function HomePage() {
             <>
               <SectionHeader title="❤️ Cửa hàng yêu thích" />
               <HScroll>
-                {favoriteShops.map(s => (
+                {favoriteShops.map(s => {
+                  const shopOpen = isShopInHours(s)
+                  return (
                   <a key={s.id} href={`/shop/${s.id}`} style={{ textDecoration:"none", flexShrink:0 }}>
                     <div style={{
                       width:140, background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
                       border:"1px solid rgba(255,107,0,0.18)", borderRadius:14, overflow:"hidden",
+                      opacity: shopOpen ? 1 : 0.6,
                     }}>
                       <div style={{ height:64, background:"rgba(255,107,0,0.06)",
                         display:"flex", alignItems:"center", justifyContent:"center",
                         fontSize:36, position:"relative" }}>
                         {s.logo_url
                           ? <Image src={s.logo_url} alt={s.name} fill sizes="64px" style={{ objectFit:"cover" }} />
-                          : "🤍"}
+                          : "🏪"}
+                        {!shopOpen && (
+                          <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.45)",
+                            display:"flex", alignItems:"center", justifyContent:"center" }}>
+                            <span style={{ fontSize:15 }}>🔒</span>
+                          </div>
+                        )}
                         <button onClick={e => { e.preventDefault(); e.stopPropagation(); toggleFavorite(s.id) }}
                           style={{ position:"absolute", top:5, right:5, width:24, height:24, borderRadius:7,
                             background:"rgba(255,64,64,0.15)", border:"1px solid rgba(255,64,64,0.3)",
                             color:"#ff6060", fontSize:12, cursor:"pointer", display:"flex",
-                            alignItems:"center", justifyContent:"center" }}>+</button>
+                            alignItems:"center", justifyContent:"center" }}>✕</button>
                       </div>
                       <div style={{ padding:"8px 9px" }}>
                         <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600,
                           whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</div>
                         <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:3 }}>
-                          <Badge layer={3} variant={s.is_open ? "open" : "closed"} size="sm" label={s.is_open ? "Mở" : "Đóng"} />
-                          <span style={{ color:"#6a5a40", fontSize: 11 }}>· ⭐ {s.rating_avg?.toFixed(1) ?? "Mới"}</span>
+                          <Badge layer={3} variant={shopOpen ? "open" : "closed"} size="sm"
+                            label={shopOpen ? "Đang mở" : nextOpenLabel(s)} />
+                          <span style={{ color:"#6a5a40", fontSize: 11 }}>⭐ {s.rating_avg?.toFixed(1) ?? "Mới"}</span>
                         </div>
                       </div>
                     </div>
                   </a>
-                ))}
+                  )
+                })}
               </HScroll>
             </>
           )}

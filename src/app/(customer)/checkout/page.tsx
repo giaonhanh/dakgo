@@ -1490,11 +1490,20 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           shop_id:          shopId,
-          items:            cartItems.map(item => ({
-            product_id: item.id.split("__")[0],
-            quantity:   item.qty,
-            note:       item.note || null,
-          })),
+          items:            cartItems.map(item => {
+            const bd = item.breakdown
+            const bdParts: string[] = []
+            if (bd?.sizeLabel) bdParts.push(bd.sizeLabel)
+            if (bd?.toppings?.length) bdParts.push(bd.toppings.map(t => t.name).join(", "))
+            const bdStr = bdParts.join(" · ")
+            const fullNote = [bdStr, item.note].filter(Boolean).join(" | ") || null
+            return {
+              product_id: item.id.split("__")[0],
+              quantity:   item.qty,
+              note:       fullNote,
+              breakdown:  bd ?? null,
+            }
+          }),
           delivery_address: currentAddr.address,
           delivery_lat:     deliveryLat,
           delivery_lng:     deliveryLng,

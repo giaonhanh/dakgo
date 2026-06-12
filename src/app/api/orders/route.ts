@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     if (voucher_id) {
       const { data: voucher, error: vErr } = await supabase
         .from("vouchers")
-        .select("id, shop_id, discount_type, discount_value, min_order, max_discount, usage_limit, used_count, per_person_limit, valid_from, valid_to, is_active")
+        .select("id, shop_id, discount_type, discount_value, min_order, max_discount, usage_limit, used_count, per_person_limit, valid_from, valid_to, is_active, is_combo, combo_items(product_id, min_quantity)")
         .eq("id", voucher_id)
         .single()
 
@@ -142,6 +142,20 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Validate combo: kiểm tra server-side giỏ hàng có đủ sản phẩm yêu cầu
+      if (voucher.is_combo && voucher.combo_items?.length) {
+        const cartMap: Record<string, number> = {}
+        for (const item of items) {
+          const pid = item.product_id as string
+          cartMap[pid] = (cartMap[pid] ?? 0) + (item.quantity as number)
+        }
+        const unmet = (voucher.combo_items as { product_id: string; min_quantity: number }[])
+          .filter(ci => (cartMap[ci.product_id] ?? 0) < ci.min_quantity)
+        if (unmet.length > 0) {
+          return NextResponse.json({ error: "Giỏ hàng chưa đủ điều kiện để dùng voucher combo này" }, { status: 400 })
+        }
+      }
+
       // Tính discount
       if (voucher.discount_type === "percent") {
         const raw = Math.round(total * voucher.discount_value / 100)
@@ -152,6 +166,7 @@ export async function POST(req: NextRequest) {
         const raw = ship_fee
         discount_amount = voucher.max_discount != null ? Math.min(raw, voucher.max_discount) : raw
       }
+      // combo dùng chung discount_type (fixed/percent) đã xử lý ở trên
 
       validatedVoucherId = voucher.id
     }
