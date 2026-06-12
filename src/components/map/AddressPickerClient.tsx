@@ -4,8 +4,6 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { AddressPickerResult } from "@/types"
 import { getCachedGeocode, setCachedGeocode } from "@/lib/geocodeCache"
-import { applyBrandStyle } from "@/lib/mapStyle"
-
 const DEFAULT_LAT = 12.7107
 const DEFAULT_LNG = 108.3034
 const PANEL_H    = 216
@@ -14,7 +12,22 @@ const GEOCODE_MS = 600
 const SEARCH_MS  = 500
 
 const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
-const STYLE_URL   = `https://maps.vietmap.vn/mt/tm/style.json?apikey=${VIETMAP_KEY}`
+
+// Dùng raster tile thay vector style.json — vector dataset của VietMap hay bị expired
+function buildRasterStyle(key: string) {
+  return {
+    version: 8 as const,
+    sources: {
+      vietmap: {
+        type: "raster" as const,
+        tiles: [`https://maps.vietmap.vn/mt/tm/{z}/{x}/{y}.png?apikey=${key}`],
+        tileSize: 256,
+        attribution: "© VietMap",
+      },
+    },
+    layers: [{ id: "vietmap-raster", type: "raster" as const, source: "vietmap" }],
+  }
+}
 
 interface LatLng { lat: number; lng: number }
 
@@ -227,34 +240,20 @@ export default function AddressPickerClient({
 
       map = new maplibre.Map({
         container:          divRef.current!,
-        style:              STYLE_URL,
+        style:              buildRasterStyle(VIETMAP_KEY),
         center:             [initLng, initLat],
         zoom:               15,
         maxZoom:            20,
         attributionControl: false,
         dragRotate:         false,
-        // Inject apikey vào mọi tile request từ VietMap (kể cả URL bên trong style.json)
-        transformRequest: (url: string) => {
-          if (url.includes("maps.vietmap.vn") && !url.includes("apikey=")) {
-            return { url: `${url}${url.includes("?") ? "&" : "?"}apikey=${VIETMAP_KEY}` }
-          }
-          return { url }
-        },
       })
       mapRef.current = map
 
       map.on("load", () => {
         map.resize()
-      })
-      // style.load fire sau khi style.json + sources fully parsed → an toàn để applyBrandStyle
-      map.on("style.load", () => {
-        requestAnimationFrame(() => { applyBrandStyle(map) })
         setTilesReady(true)
       })
-      map.on("error", (e: any) => {
-        // Chỉ hiện error UI nếu style fail, không phải tile lỗi đơn lẻ
-        if (e?.error?.message?.includes("style")) { setTilesReady(true); setMapError(true) }
-      })
+      map.on("error", () => { setTilesReady(true); setMapError(true) })
       map.on("dragstart", () => { setFloating(true); setShowSuggest(false) })
       map.on("dragend",   () => {
         setFloating(false)

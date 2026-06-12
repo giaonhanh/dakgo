@@ -1,10 +1,15 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { applyBrandStyle } from "@/lib/mapStyle"
-
 const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
-const STYLE_URL   = `https://maps.vietmap.vn/mt/tm/style.json?apikey=${VIETMAP_KEY}`
+
+function buildRasterStyle(key: string) {
+  return {
+    version: 8 as const,
+    sources: { vietmap: { type: "raster" as const, tiles: [`https://maps.vietmap.vn/mt/tm/{z}/{x}/{y}.png?apikey=${key}`], tileSize: 256 } },
+    layers: [{ id: "vietmap-raster", type: "raster" as const, source: "vietmap" }],
+  }
+}
 
 interface Props {
   lat:    number
@@ -29,25 +34,16 @@ export default function MiniMapPicker({ lat, lng, onPick }: Props) {
 
       map = new maplibre.Map({
         container:          divRef.current!,
-        style:              STYLE_URL,
+        style:              buildRasterStyle(VIETMAP_KEY),
         center:             [lng, lat],
         zoom:               16,
         maxZoom:            20,
         attributionControl: false,
         dragRotate:         false,
-        transformRequest: (url: string) => {
-          if (url.includes("maps.vietmap.vn") && !url.includes("apikey=")) {
-            return { url: `${url}${url.includes("?") ? "&" : "?"}apikey=${VIETMAP_KEY}` }
-          }
-          return { url }
-        },
       })
       mapRef.current = map
 
       map.on("load", () => { map.resize() })
-      map.on("style.load", () => {
-        requestAnimationFrame(() => { applyBrandStyle(map) })
-      })
       if (divRef.current) {
         const ro = new ResizeObserver(() => { map.resize() })
         ro.observe(divRef.current)
