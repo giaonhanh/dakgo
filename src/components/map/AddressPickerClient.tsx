@@ -11,24 +11,8 @@ const SEARCH_H   = 56
 const GEOCODE_MS = 600
 const SEARCH_MS  = 500
 
-// Proxy tile qua /api/tiles để tránh CORS — VietMap block Origin từ browser
-// maxzoom: 17 vì VietMap raster tiles không có zoom > 17 (trả 404)
-function buildRasterStyle() {
-  return {
-    version: 8 as const,
-    sources: {
-      vietmap: {
-        type: "raster" as const,
-        tiles: ["/api/tiles/{z}/{x}/{y}"],
-        tileSize: 256,
-        minzoom: 5,
-        maxzoom: 17,
-        attribution: "© VietMap",
-      },
-    },
-    layers: [{ id: "vietmap-raster", type: "raster" as const, source: "vietmap" }],
-  }
-}
+// Style proxy: /api/map-style trả style.json với tile URL đã replace → /api/vt (tránh CORS)
+const MAP_STYLE = "/api/map-style"
 
 interface LatLng { lat: number; lng: number }
 
@@ -241,7 +225,7 @@ export default function AddressPickerClient({
 
       map = new maplibre.Map({
         container:          divRef.current!,
-        style:              buildRasterStyle(),
+        style:              MAP_STYLE,
         center:             [initLng, initLat],
         zoom:               15,
         maxZoom:            20,

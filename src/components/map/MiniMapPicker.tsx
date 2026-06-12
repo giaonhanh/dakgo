@@ -1,13 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-function buildRasterStyle() {
-  return {
-    version: 8 as const,
-    sources: { vietmap: { type: "raster" as const, tiles: ["/api/tiles/{z}/{x}/{y}"], tileSize: 256, minzoom: 5, maxzoom: 17 } },
-    layers: [{ id: "vietmap-raster", type: "raster" as const, source: "vietmap" }],
-  }
-}
+const MAP_STYLE = "/api/map-style"
 
 interface Props {
   lat:    number
@@ -32,7 +26,7 @@ export default function MiniMapPicker({ lat, lng, onPick }: Props) {
 
       map = new maplibre.Map({
         container:          divRef.current!,
-        style:              buildRasterStyle(),
+        style:              MAP_STYLE,
         center:             [lng, lat],
         zoom:               16,
         maxZoom:            20,

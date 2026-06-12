@@ -6,13 +6,7 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import { reverseGeocodeStructured } from "@/lib/vietmapRoute"
 
-function buildRasterStyle() {
-  return {
-    version: 8 as const,
-    sources: { vietmap: { type: "raster" as const, tiles: ["/api/tiles/{z}/{x}/{y}"], tileSize: 256, minzoom: 5, maxzoom: 17 } },
-    layers: [{ id: "vietmap-raster", type: "raster" as const, source: "vietmap" }],
-  }
-}
+const MAP_STYLE = "/api/map-style"
 
 interface MapPickerProps {
   lat:              number
@@ -39,7 +33,7 @@ export default function MapPicker({ lat, lng, onLocationChange, height = 200 }: 
 
       map = new maplibre.Map({
         container:          divRef.current!,
-        style:              buildRasterStyle(),
+        style:              MAP_STYLE,
         center:             [lng, lat],
         zoom:               15,
         maxZoom:            20,
