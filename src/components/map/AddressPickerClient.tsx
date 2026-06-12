@@ -4,7 +4,9 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { AddressPickerResult } from "@/types"
 import { getCachedGeocode, setCachedGeocode } from "@/lib/geocodeCache"
-import "leaflet/dist/leaflet.css"
+import "maplibre-gl/dist/maplibre-gl.css"
+import { MAP_STYLE, vmTransform } from "@/lib/mapConfig"
+
 const DEFAULT_LAT = 12.7107
 const DEFAULT_LNG = 108.3034
 const PANEL_H    = 216
@@ -220,20 +222,20 @@ export default function AddressPickerClient({
     let mounted = true
 
     const init = async () => {
-      const L = (await import("leaflet")).default
+      const maplibregl = (await import("maplibre-gl")).default
       if (!mounted || !divRef.current || mapRef.current) return
 
-      const VIETMAP_KEY  = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
-      const VIETMAP_TILE = `https://maps.vietmap.vn/mt/tm/{z}/{x}/{y}.png?apikey=${VIETMAP_KEY}`
-
-      map = L.map(divRef.current, {
-        center: [initLat, initLng], zoom: 15,
-        zoomControl: false, attributionControl: false,
-        doubleClickZoom: false,
+      map = new maplibregl.Map({
+        container: divRef.current,
+        style: MAP_STYLE,
+        center: [initLng, initLat],
+        zoom: 15,
+        attributionControl: false,
+        transformRequest: vmTransform,
       })
       mapRef.current = map
-      L.tileLayer(VIETMAP_TILE, { maxZoom: 19 }).addTo(map)
-      setTilesReady(true)
+
+      map.on("load", () => { if (mounted) setTilesReady(true) })
 
       map.on("dragstart", () => { setFloating(true); setShowSuggest(false) })
       map.on("dragend",   () => {
@@ -289,10 +291,10 @@ export default function AddressPickerClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // FlyTo when flyTarget changes (Leaflet: [lat, lng])
+  // FlyTo when flyTarget changes — flyTarget is [lat, lng], MapLibre needs [lng, lat]
   useEffect(() => {
     if (!flyTarget || !mapRef.current) return
-    mapRef.current.flyTo([flyTarget[0], flyTarget[1]], 18)
+    mapRef.current.flyTo({ center: [flyTarget[1], flyTarget[0]], zoom: 18 })
   }, [flyTarget])
 
   const handleGPS = useCallback(() => {
@@ -364,7 +366,7 @@ export default function AddressPickerClient({
           100% { transform: scale(3.5);  opacity: 0 }
         }
         @keyframes shimmer { 0% { left:-60% } 100% { left:120% } }
-        .leaflet-control-container{display:none!important}
+        .maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right,.maplibregl-ctrl-top-left,.maplibregl-ctrl-top-right{display:none!important}
       `}</style>
 
       {/* Search Bar */}

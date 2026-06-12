@@ -2,10 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { reverseGeocode } from "@/lib/vietmapRoute"
-import "leaflet/dist/leaflet.css"
-
-const VIETMAP_KEY  = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
-const VIETMAP_TILE = `https://maps.vietmap.vn/mt/tm/{z}/{x}/{y}.png?apikey=${VIETMAP_KEY}`
+import "maplibre-gl/dist/maplibre-gl.css"
+import { MAP_STYLE, vmTransform } from "@/lib/mapConfig"
 
 const DEFAULT_LAT = 12.5833
 const DEFAULT_LNG = 108.4833
@@ -53,19 +51,20 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
   useEffect(() => {
     if (!divRef.current) return
     let mounted = true
-    let map: any
 
     const init = async () => {
-      const L = (await import("leaflet")).default
+      const maplibregl = (await import("maplibre-gl")).default
       if (!mounted || !divRef.current || mapRef.current) return
 
-      map = L.map(divRef.current, {
-        center: [initLat, initLng], zoom: 17,
-        zoomControl: false, attributionControl: false,
-        doubleClickZoom: false,
+      const map = new maplibregl.Map({
+        container: divRef.current,
+        style: MAP_STYLE,
+        center: [initLng, initLat],
+        zoom: 17,
+        attributionControl: false,
+        transformRequest: vmTransform,
       })
       mapRef.current = map
-      L.tileLayer(VIETMAP_TILE, { maxZoom: 19 }).addTo(map)
 
       map.on("dragstart", () => setFloating(true))
       map.on("dragend",   () => setFloating(false))
@@ -83,7 +82,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
     return () => {
       mounted = false
       clearTimeout(geocodeTimer.current)
-      if (map) { map.remove(); mapRef.current = null }
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -98,7 +97,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
         skipRef.current = true
         setPickedLat(coords.latitude)
         setPickedLng(coords.longitude)
-        mapRef.current.flyTo([coords.latitude, coords.longitude], 18)
+        mapRef.current.flyTo({ center: [coords.longitude, coords.latitude], zoom: 18 })
         void doGeocode(coords.latitude, coords.longitude)
       },
       () => {
@@ -121,8 +120,6 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
       display: "flex", flexDirection: "column",
       background: "#080806", fontFamily: "'Lexend',sans-serif",
     }}>
-      <style>{`.leaflet-control-container{display:none!important}`}</style>
-
       <div style={{
         padding: "calc(env(safe-area-inset-top) + 10px) 16px 10px",
         background: "rgba(8,8,6,0.97)", backdropFilter: "blur(20px)",
@@ -167,7 +164,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
           </div>
         )}
 
-        <div ref={divRef} style={{ width: "100%", height: "100%", touchAction: "none" }} />
+        <div ref={divRef} style={{ width: "100%", height: "100%" }} />
 
         {/* Center pin */}
         <div style={{

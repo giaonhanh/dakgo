@@ -1,10 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import "leaflet/dist/leaflet.css"
-
-const VIETMAP_KEY  = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
-const VIETMAP_TILE = `https://maps.vietmap.vn/mt/tm/{z}/{x}/{y}.png?apikey=${VIETMAP_KEY}`
+import "maplibre-gl/dist/maplibre-gl.css"
+import { VIETMAP_KEY, MAP_STYLE, vmTransform } from "@/lib/mapConfig"
 
 interface Props {
   lat:    number
@@ -24,16 +22,18 @@ export default function MiniMapPicker({ lat, lng, onPick }: Props) {
     let mounted = true
 
     const init = async () => {
-      const L = (await import("leaflet")).default
+      const maplibregl = (await import("maplibre-gl")).default
       if (!mounted || !divRef.current || mapRef.current) return
 
-      const map = L.map(divRef.current, {
-        center: [lat, lng], zoom: 16,
-        zoomControl: false, attributionControl: false,
-        doubleClickZoom: false,
+      const map = new maplibregl.Map({
+        container: divRef.current,
+        style: MAP_STYLE,
+        center: [lng, lat],
+        zoom: 16,
+        attributionControl: false,
+        transformRequest: vmTransform,
       })
       mapRef.current = map
-      L.tileLayer(VIETMAP_TILE, { maxZoom: 19 }).addTo(map)
 
       map.on("dragstart", () => setFloating(true))
       map.on("dragend",   () => setFloating(false))
@@ -57,7 +57,7 @@ export default function MiniMapPicker({ lat, lng, onPick }: Props) {
     prevProps.current = { lat, lng }
     if (!mapRef.current) return
     skipRef.current = true
-    mapRef.current.flyTo([lat, lng], 17)
+    mapRef.current.flyTo({ center: [lng, lat], zoom: 17 })
   }, [lat, lng])
 
   const handleZoom = useCallback((delta: number) => {
@@ -67,8 +67,6 @@ export default function MiniMapPicker({ lat, lng, onPick }: Props) {
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }}>
-      <style>{`.leaflet-control-container{display:none!important}`}</style>
-
       <div ref={divRef} style={{ width: "100%", height: "100%" }} />
 
       {/* Center pin */}
