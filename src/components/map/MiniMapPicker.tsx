@@ -1,12 +1,10 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
-
-function buildRasterStyle(key: string) {
+function buildRasterStyle() {
   return {
     version: 8 as const,
-    sources: { vietmap: { type: "raster" as const, tiles: [`https://maps.vietmap.vn/mt/tm/{z}/{x}/{y}.png?apikey=${key}`], tileSize: 256 } },
+    sources: { vietmap: { type: "raster" as const, tiles: ["/api/tiles/{z}/{x}/{y}"], tileSize: 256 } },
     layers: [{ id: "vietmap-raster", type: "raster" as const, source: "vietmap" }],
   }
 }
@@ -34,7 +32,7 @@ export default function MiniMapPicker({ lat, lng, onPick }: Props) {
 
       map = new maplibre.Map({
         container:          divRef.current!,
-        style:              buildRasterStyle(VIETMAP_KEY),
+        style:              buildRasterStyle(),
         center:             [lng, lat],
         zoom:               16,
         maxZoom:            20,

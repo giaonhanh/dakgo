@@ -11,16 +11,14 @@ const SEARCH_H   = 56
 const GEOCODE_MS = 600
 const SEARCH_MS  = 500
 
-const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
-
-// Dùng raster tile thay vector style.json — vector dataset của VietMap hay bị expired
-function buildRasterStyle(key: string) {
+// Proxy tile qua /api/tiles để tránh CORS — VietMap block Origin từ browser
+function buildRasterStyle() {
   return {
     version: 8 as const,
     sources: {
       vietmap: {
         type: "raster" as const,
-        tiles: [`https://maps.vietmap.vn/mt/tm/{z}/{x}/{y}.png?apikey=${key}`],
+        tiles: ["/api/tiles/{z}/{x}/{y}"],
         tileSize: 256,
         attribution: "© VietMap",
       },
@@ -240,7 +238,7 @@ export default function AddressPickerClient({
 
       map = new maplibre.Map({
         container:          divRef.current!,
-        style:              buildRasterStyle(VIETMAP_KEY),
+        style:              buildRasterStyle(),
         center:             [initLng, initLat],
         zoom:               15,
         maxZoom:            20,
