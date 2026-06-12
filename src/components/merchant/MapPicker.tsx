@@ -1,11 +1,11 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { reverseGeocode } from "@/lib/vietmapRoute"
-import { applyBrandStyle } from "@/lib/mapStyle"
+import "leaflet/dist/leaflet.css"
 
-const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
-const STYLE_URL   = `https://maps.vietmap.vn/mt/tm/style.json?apikey=${VIETMAP_KEY}`
+const VIETMAP_KEY  = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
+const VIETMAP_TILE = `https://maps.vietmap.vn/mt/tm/{z}/{x}/{y}.png?apikey=${VIETMAP_KEY}`
 
 const DEFAULT_LAT = 12.5833
 const DEFAULT_LNG = 108.4833
@@ -34,8 +34,6 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
   const [gpsLoading, setGpsLoading] = useState(false)
   const [gpsError,   setGpsError]   = useState(false)
   const [floating,   setFloating]   = useState(false)
-  const [mapLoaded,  setMapLoaded]  = useState(false)
-  const [mapError,   setMapError]   = useState(false)
 
   const doGeocode = useCallback(async (lat: number, lng: number) => {
     const myId = ++geocodeIdRef.current
@@ -54,26 +52,21 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
 
   useEffect(() => {
     if (!divRef.current) return
+    let mounted = true
     let map: any
 
     const init = async () => {
-      const maplibre = (await import("maplibre-gl")).default
-      await import("maplibre-gl/dist/maplibre-gl.css")
+      const L = (await import("leaflet")).default
+      if (!mounted || !divRef.current || mapRef.current) return
 
-      map = new maplibre.Map({
-        container:          divRef.current!,
-        style:              STYLE_URL,
-        center:             [initLng, initLat],
-        zoom:               17,
-        maxZoom:            20,
-        attributionControl: false,
-        dragRotate:         false,
+      map = L.map(divRef.current, {
+        center: [initLat, initLng], zoom: 17,
+        zoomControl: false, attributionControl: false,
+        doubleClickZoom: false,
       })
       mapRef.current = map
+      L.tileLayer(VIETMAP_TILE, { maxZoom: 19 }).addTo(map)
 
-      map.on("load", () => { applyBrandStyle(map); setMapLoaded(true) })
-      map.on("error", () => { setMapLoaded(true); setMapError(true) })
-      setTimeout(() => setMapLoaded(true), 3000)
       map.on("dragstart", () => setFloating(true))
       map.on("dragend",   () => setFloating(false))
       map.on("moveend", () => {
@@ -88,6 +81,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
 
     init()
     return () => {
+      mounted = false
       clearTimeout(geocodeTimer.current)
       if (map) { map.remove(); mapRef.current = null }
     }
@@ -104,7 +98,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
         skipRef.current = true
         setPickedLat(coords.latitude)
         setPickedLng(coords.longitude)
-        mapRef.current.flyTo({ center: [coords.longitude, coords.latitude], zoom: 18 })
+        mapRef.current.flyTo([coords.latitude, coords.longitude], 18)
         void doGeocode(coords.latitude, coords.longitude)
       },
       () => {
@@ -127,7 +121,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
       display: "flex", flexDirection: "column",
       background: "#080806", fontFamily: "'Lexend',sans-serif",
     }}>
-      <style>{`.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{display:none!important}`}</style>
+      <style>{`.leaflet-control-container{display:none!important}`}</style>
 
       <div style={{
         padding: "calc(env(safe-area-inset-top) + 10px) 16px 10px",
@@ -162,33 +156,6 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
       </div>
 
       <div style={{ flex: 1, position: "relative" }}>
-        {!mapLoaded && (
-          <div style={{
-            position: "absolute", inset: 0, zIndex: 5,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            flexDirection: "column", gap: 8, background: "#080806",
-          }}>
-            <span style={{ fontSize: 28, opacity: 0.5 }}>🗺️</span>
-            <div style={{ color: "#6a5a40", fontSize: 12 }}>Đang tải bản đồ...</div>
-          </div>
-        )}
-
-        {mapError && (
-          <div style={{
-            position: "absolute", inset: 0, zIndex: 6,
-            background: "rgba(8,8,6,0.93)", backdropFilter: "blur(8px)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            flexDirection: "column", gap: 10,
-          }}>
-            <span style={{ fontSize: 30 }}>🗺️</span>
-            <span style={{ color: "#ff4040", fontSize: 12, fontFamily: "Lexend", fontWeight: 600 }}>Không thể tải bản đồ</span>
-            <button onClick={() => window.location.reload()}
-              style={{ padding: "7px 18px", borderRadius: 10, background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.35)", color: "#FF8C00", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>
-              Thử lại
-            </button>
-          </div>
-        )}
-
         {gpsError && (
           <div style={{
             position: "absolute", top: 12, left: 12, right: 12, zIndex: 20,
@@ -202,6 +169,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
 
         <div ref={divRef} style={{ width: "100%", height: "100%", touchAction: "none" }} />
 
+        {/* Center pin */}
         <div style={{
           position: "absolute", inset: 0, zIndex: 10,
           pointerEvents: "none",
@@ -228,9 +196,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
           display: "flex", flexDirection: "column", gap: 4,
         }}>
           {["+", "-"].map(label => (
-            <button
-              key={label}
-              type="button"
+            <button key={label} type="button"
               onClick={() => handleZoom(label === "+" ? 1 : -1)}
               style={{
                 width: 36, height: 36, borderRadius: 10,
@@ -262,8 +228,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
             {pickedLat.toFixed(6)}, {pickedLng.toFixed(6)}
           </div>
         </div>
-        <button
-          onClick={() => onConfirm(pickedLat, pickedLng, geocoded)}
+        <button onClick={() => onConfirm(pickedLat, pickedLng, geocoded)}
           style={{
             width: "100%", height: 48, borderRadius: 13, border: "none",
             background: "linear-gradient(90deg,#FF6B00,#FF8C00)",
