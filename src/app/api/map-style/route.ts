@@ -5,7 +5,10 @@ const STYLE_URL   = `https://maps.vietmap.vn/mt/tm/style.json?apikey=${VIETMAP_K
 
 // Fetch style.json từ VietMap, replace tile URL → proxy /api/vt để tránh CORS
 export async function GET() {
-  const res = await fetch(STYLE_URL, { next: { revalidate: 3600 } })
+  const res = await fetch(STYLE_URL, {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; MapLibreGL/5)" },
+    next: { revalidate: 3600 },
+  })
   if (!res.ok) return new NextResponse(null, { status: res.status })
 
   const style = await res.json()

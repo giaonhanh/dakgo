@@ -14,7 +14,14 @@ export async function GET(
   const tileUrl = `https://maps.vietmap.vn/mt/tile/data-20250529/${z}/${x}/${y}?apikey=${VIETMAP_KEY}`
 
   try {
-    const res = await fetch(tileUrl, { next: { revalidate: 86400 } })
+    const res = await fetch(tileUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; MapLibreGL/5)",
+        "Referer":    "https://giaonhanh.vercel.app/",
+        "Accept":     "application/x-protobuf,*/*",
+      },
+      next: { revalidate: 86400 },
+    })
     if (!res.ok) return new NextResponse(null, { status: res.status })
 
     const buf = await res.arrayBuffer()
