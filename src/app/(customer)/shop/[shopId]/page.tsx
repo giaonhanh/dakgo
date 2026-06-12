@@ -634,7 +634,7 @@ export default function ShopPage() {
       const now = new Date().toISOString()
       const { data: vouchers } = await supabase
         .from("vouchers")
-        .select("id,code,title,discount_type,discount_value,min_order,valid_to,is_combo,combo_items(product_id)")
+        .select("id,code,title,discount_type,discount_value,min_order,valid_to,is_combo,combo_items(product_id,min_quantity,products(name,price))")
         .eq("shop_id", shopId)
         .eq("is_active", true)
         .gte("valid_to", now)
