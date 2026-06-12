@@ -691,7 +691,7 @@ function BankRow({ bank, selected, onSelect }: { bank: BankInfo; selected: strin
 // ─── Voucher Picker Sheet ─────────────────────────────────────
 
 function VoucherPickerSheet({
-  appliedVouchers, subtotal, deliveryFee, onApply, onClose, vouchers, userUsageMap,
+  appliedVouchers, subtotal, deliveryFee, onApply, onClose, vouchers, userUsageMap, shopId,
 }: {
   appliedVouchers: AppliedVoucher[]
   subtotal: number; deliveryFee: number
@@ -699,9 +699,11 @@ function VoucherPickerSheet({
   onClose: () => void
   vouchers: DbVoucher[]
   userUsageMap: Record<string, number>
+  shopId: string | null
 }) {
   const appVouchers  = vouchers.filter(v => dbVoucherType(v) === "app")
-  const shopVouchers = vouchers.filter(v => dbVoucherType(v) === "shop")
+  // Chỉ hiển thị voucher quán khớp với quán hiện tại trong giỏ hàng
+  const shopVouchers = vouchers.filter(v => dbVoucherType(v) === "shop" && (!shopId || v.shop_id === shopId))
 
   const rowStatus = (v: DbVoucher) => {
     const code = v.code; const type = dbVoucherType(v)
@@ -1408,6 +1410,19 @@ export default function CheckoutPage() {
     const found = dbVouchers.find(v => v.code === code)
     if (!found) { fireToast("Mã voucher không hợp lệ ❌"); return }
 
+    // Kiểm tra voucher quán phải khớp với quán trong giỏ hàng
+    if (found.shop_id && found.shop_id !== shopId) {
+      fireToast("Voucher này chỉ áp dụng cho quán khác ❌"); return
+    }
+
+    // Kiểm tra per_person_limit client-side
+    if (found.per_person_limit != null) {
+      const usedCount = userUsageMap[found.id] ?? 0
+      if (usedCount >= found.per_person_limit) {
+        fireToast(`Bạn đã dùng voucher này tối đa ${found.per_person_limit} lần rồi ❌`); return
+      }
+    }
+
     // Validate combo: phải có đúng các sản phẩm yêu cầu trong giỏ
     if (found.is_combo && found.combo_items?.length) {
       const cartMap: Record<string, number> = {}
@@ -1640,6 +1655,7 @@ export default function CheckoutPage() {
             onClose={() => setShowVoucherPicker(false)}
             vouchers={dbVouchers}
             userUsageMap={userUsageMap}
+            shopId={shopId}
           />
         )}
       </AnimatePresence>

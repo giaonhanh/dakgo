@@ -34,7 +34,7 @@ import NotifDot from "@/components/ui/NotifDot"
 type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null; category?: string; categories?: string[] | null }
 type ProductRow = { id: string; name: string; price: number; original_price?: number | null; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null } | { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
-type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null }
+type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null; shopName?: string | null }
 
 function distKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180
@@ -296,9 +296,10 @@ export default function HomePage() {
       // Chỉ giữ voucher toàn hệ thống (không có shop_id)
       // hoặc voucher của quán đang mở — ẩn voucher của quán đóng cửa
       const openShopIds = new Set(sorted.filter(s => isShopInHours(s as ShopRow)).map(s => s.id))
+      const shopNameMap: Record<string, string> = Object.fromEntries((sorted as ShopRow[]).map(s => [s.id, s.name]))
       const filteredVouchers = (voucherData ?? []).filter(v =>
         !v.shop_id || openShopIds.has(v.shop_id)
-      ).slice(0, 6)
+      ).slice(0, 6).map(v => ({ ...v, shopName: v.shop_id ? (shopNameMap[v.shop_id] ?? null) : null }))
       setVouchers(filteredVouchers as VoucherRow[])
 
       // Combo vouchers đang active — đánh dấu quán nào có combo
@@ -1082,71 +1083,93 @@ export default function HomePage() {
               {vouchers.map(v => {
                 const saved = savedVoucherIds.includes(v.id)
                 const isShop = !!v.shop_id
-                const expDate = new Date(v.valid_to)
-                const daysLeft = Math.ceil((expDate.getTime() - Date.now()) / 86400000)
-                const urgent = daysLeft <= 1
-                const expiryLabel = daysLeft <= 0 ? "Hết hạn HÔM NAY!" : daysLeft === 1 ? "Còn 1 ngày" : `Còn ${daysLeft} ngày`
-                const valueLabel = v.discount_type === "percent" ? `-${v.discount_value}%`
-                  : v.discount_type === "freeship" ? "Free ship"
-                  : `-${v.discount_value.toLocaleString("vi-VN")}d`
+                const isFreeship = v.discount_type === "freeship"
+                const isPercent  = v.discount_type === "percent"
+                const clr   = isFreeship ? "#4a8ff5" : isPercent ? "#FF8C00" : "#3ecf6e"
+                const bg    = isFreeship ? "rgba(74,143,245,0.08)"  : isPercent ? "rgba(255,107,0,0.08)"  : "rgba(62,207,110,0.08)"
+                const bord  = isFreeship ? "rgba(74,143,245,0.25)"  : isPercent ? "rgba(255,107,0,0.25)"  : "rgba(62,207,110,0.25)"
+                const stripe= isFreeship ? "#4a8ff5" : isPercent ? "linear-gradient(180deg,#FF6B00,#FF8C00)" : "#3ecf6e"
+                const icon  = isFreeship ? "🚚" : isShop ? "🏪" : "🏷️"
+                const valueLabel = isPercent ? `-${v.discount_value}%`
+                  : isFreeship ? "Free ship"
+                  : `-${v.discount_value.toLocaleString("vi-VN")}đ`
+                const daysLeft   = Math.ceil((new Date(v.valid_to).getTime() - Date.now()) / 86400000)
+                const urgent     = daysLeft <= 1
+                const expiryLabel= daysLeft <= 0 ? "Hết hôm nay" : daysLeft === 1 ? "Còn 1 ngày" : `Còn ${daysLeft} ngày`
+                const href = isShop ? `/shop/${v.shop_id}` : "/vouchers"
                 return (
-                  <div key={v.id} style={{
-                    minWidth:162, flexShrink:0,
-                    background: isShop ? "rgba(74,143,245,0.07)" : "rgba(255,107,0,0.07)",
-                    backdropFilter:"blur(10px)",
-                    border: `1px solid ${isShop ? "rgba(74,143,245,0.22)" : "rgba(255,107,0,0.2)"}`,
-                    borderRadius:12, padding:"9px 11px",
-                    display:"flex", flexDirection:"column", gap:7,
-                    position:"relative", overflow:"hidden",
-                  }}>
-                    <div style={{ position:"absolute", top:0, left:"-80%", width:"40%", height:"100%",
-                      background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)",
-                      animation:"shimmer 3s infinite" }} />
-                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                      <div style={{ width:32, height:32, borderRadius:9,
-                        background: isShop ? "rgba(74,143,245,0.12)" : "rgba(255,107,0,0.12)",
-                        border: `1px solid ${isShop ? "rgba(74,143,245,0.25)" : "rgba(255,107,0,0.25)"}`,
-                        display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
-                        {isShop ? "🏪" : "🍜"}
-                      </div>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ color: isShop ? "#4a8ff5" : "#FF8C00", fontSize:12, fontWeight:700 }}>{valueLabel}</div>
-                        <div style={{ color:"#b0956a", fontSize: 11, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.title}</div>
-                      </div>
-                    </div>
-                    {/* Min spend progress bar */}
-                    {v.min_order && v.min_order > 0 && (
-                      <div style={{ marginBottom:6 }}>
-                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
-                          <span style={{ fontSize: 10, color:"#6a5a40" }}>Đặt từ</span>
-                          <span style={{ fontSize: 10, color: isShop ? "#4a8ff5" : "#FF8C00", fontWeight:700 }}>
-                            {v.min_order.toLocaleString("vi-VN")}d
+                  <a key={v.id} href={href} style={{ textDecoration:"none", display:"block" }}>
+                    <div style={{
+                      minWidth:172, flexShrink:0,
+                      background: bg,
+                      border: `1px solid ${bord}`,
+                      borderRadius:14, overflow:"hidden",
+                      display:"flex",
+                    }}>
+                      {/* Left colour stripe — dashed border style giống kho voucher */}
+                      <div style={{ width:5, background: stripe, borderRight:`2px dashed ${bord}`, flexShrink:0 }} />
+
+                      {/* Content */}
+                      <div style={{ flex:1, padding:"10px 10px 8px", display:"flex", flexDirection:"column", gap:5 }}>
+                        {/* Icon + value + shop chip */}
+                        <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+                          <div style={{ width:32, height:32, borderRadius:9,
+                            background:`${bg}`, border:`1px solid ${bord}`,
+                            display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
+                            {icon}
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ color:clr, fontSize:13, fontWeight:800, fontFamily:"Lexend" }}>{valueLabel}</div>
+                            {v.shopName && (
+                              <div style={{ fontSize:9, color:"#6a5a40", background:"rgba(255,255,255,0.04)",
+                                border:"1px solid rgba(255,255,255,0.07)", borderRadius:4,
+                                padding:"1px 5px", marginTop:2,
+                                overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                                {v.shopName}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Title */}
+                        <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600, lineHeight:1.35,
+                          overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {v.title}
+                        </div>
+
+                        {/* Min order */}
+                        {v.min_order && v.min_order > 0 && (
+                          <div style={{ color:"#6a5a40", fontSize:9.5 }}>
+                            Đơn từ {v.min_order.toLocaleString("vi-VN")}đ
+                          </div>
+                        )}
+
+                        {/* Footer: code + expiry + save */}
+                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:2 }}>
+                          <span style={{ fontFamily:"'Courier New',monospace", background:"rgba(0,0,0,0.2)",
+                            border:`1px dashed ${bord}`, borderRadius:4, padding:"1px 6px",
+                            color:clr, fontSize:9.5, fontWeight:700,
+                            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:80 }}>
+                            {v.code}
+                          </span>
+                          <span style={{ fontSize:9, color: urgent ? "#ff6060" : "#6a5a40", fontWeight: urgent ? 700 : 400 }}>
+                            {urgent ? "⚠ " : ""}{expiryLabel}
                           </span>
                         </div>
-                        <div style={{ height:3, borderRadius:2, background:"rgba(255,255,255,0.06)", overflow:"hidden" }}>
-                          <div style={{ height:"100%", width:"0%", borderRadius:2,
-                            background: isShop ? "#4a8ff5" : "#FF8C00" }} />
-                        </div>
+
+                        {/* Save button */}
+                        <button type="button"
+                          onClick={e => { e.preventDefault(); setSavedVoucherIds(prev =>
+                            saved ? prev.filter(x => x !== v.id) : [...prev, v.id]) }}
+                          style={{ alignSelf:"flex-end", height:20, padding:"0 8px", borderRadius:6, border:"none",
+                            cursor:"pointer", fontSize:9.5, fontWeight:700, fontFamily:"Lexend",
+                            background: saved ? "rgba(62,207,110,0.15)" : "rgba(255,255,255,0.06)",
+                            color: saved ? "#3ecf6e" : "#6a5a40", transition:"all .2s" }}>
+                          {saved ? "✓ Đã lưu" : "🔖 Lưu"}
+                        </button>
                       </div>
-                    )}
-                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                      <div style={{ fontSize: 10, color: urgent ? "#ff4040" : "rgba(255,107,0,0.45)", fontWeight: urgent ? 700 : 400 }}>
-                        {urgent ? "? " : ""}{expiryLabel}
-                      </div>
-                      <button type="button"
-                        onClick={() => setSavedVoucherIds(prev =>
-                          saved ? prev.filter(x => x !== v.id) : [...prev, v.id]
-                        )}
-                        style={{
-                          height:20, padding:"0 7px", borderRadius:6, border:"none",
-                          cursor:"pointer", fontSize: 11, fontWeight:700, fontFamily:"Lexend",
-                          background: saved ? "rgba(62,207,110,0.15)" : "rgba(255,107,0,0.15)",
-                          color: saved ? "#3ecf6e" : "#FF8C00", transition:"all .2s",
-                        }}>
-                        {saved ? "✓ Đã lưu" : "🔖 Lưu"}
-                      </button>
                     </div>
-                  </div>
+                  </a>
                 )
               })}
             </HScroll>
