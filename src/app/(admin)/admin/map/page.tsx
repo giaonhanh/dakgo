@@ -19,12 +19,19 @@ interface ActiveOrder {
   id: string; status: string; shop: string; customer: string; driver: string | null; eta: string
 }
 
+function isValidVNCoords(lat: number, lng: number): boolean {
+  return lat >= 8 && lat <= 24 && lng >= 102 && lng <= 110
+}
+
 function parseWKB(location: unknown): { lat: number; lng: number } | null {
   if (!location) return null
   try {
     if (typeof location === "object") {
       const geo = location as { type?: string; coordinates?: [number, number] }
-      if (geo.type === "Point" && Array.isArray(geo.coordinates)) return { lat: geo.coordinates[1], lng: geo.coordinates[0] }
+      if (geo.type === "Point" && Array.isArray(geo.coordinates)) {
+        const lat = geo.coordinates[1], lng = geo.coordinates[0]
+        return isValidVNCoords(lat, lng) ? { lat, lng } : null
+      }
     }
     if (typeof location !== "string") return null
     const bytes = new Uint8Array((location as string).match(/../g)!.map(b => parseInt(b, 16)))
@@ -33,7 +40,9 @@ function parseWKB(location: unknown): { lat: number; lng: number } | null {
     const typeCode = view.getUint32(1, le)
     const hasSRID = (typeCode & 0x20000000) !== 0
     let offset = 5; if (hasSRID) offset += 4
-    return { lat: view.getFloat64(offset + 8, le), lng: view.getFloat64(offset, le) }
+    const lat = view.getFloat64(offset + 8, le)
+    const lng = view.getFloat64(offset, le)
+    return isValidVNCoords(lat, lng) ? { lat, lng } : null
   } catch { return null }
 }
 
@@ -56,12 +65,15 @@ interface AdminMapClientProps {
 require("leaflet/dist/leaflet.css")
 
 function AdminMapClientInner({ drivers, shops, selected, onSelect }: AdminMapClientProps) {
-  const divRef = useRef<HTMLDivElement>(null)
+  const divRef     = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mapRef = useRef<any>(null)
+  const mapRef     = useRef<any>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const LRef       = useRef<any>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersRef = useRef<any[]>([])
 
+  // ── Init map (chạy 1 lần) ─────────────────────────────────
   useEffect(() => {
     if (!divRef.current) return
     let mounted = true
@@ -70,10 +82,12 @@ function AdminMapClientInner({ drivers, shops, selected, onSelect }: AdminMapCli
       const L = (await import("leaflet")).default
       if (!mounted || !divRef.current) return
       if (mapRef.current) return
+      LRef.current = L
 
       const map = L.map(divRef.current, {
         center: [12.5833, 108.4833], zoom: 14,  // Phước An, Krông Pắc
         zoomControl: false, attributionControl: false,
+        doubleClickZoom: false,
       })
       mapRef.current = map
 
@@ -82,66 +96,81 @@ function AdminMapClientInner({ drivers, shops, selected, onSelect }: AdminMapCli
       }).addTo(map)
 
       L.control.zoom({ position: "topright" }).addTo(map)
-
-      // Shop markers
-      shops.forEach(s => {
-        const icon = L.divIcon({
-          html: `<div style="
-            width:28px;height:28px;border-radius:8px;
-            background:rgba(74,143,245,0.9);
-            border:2px solid ${s.isOpen ? "#4a8ff5" : "rgba(255,255,255,0.3)"};
-            display:flex;align-items:center;justify-content:center;
-            font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.5);
-            opacity:${s.isOpen ? 1 : 0.5};
-          ">🏪</div>`,
-          className: "", iconSize: [28, 28], iconAnchor: [14, 14],
-        })
-        const marker = L.marker([s.lat, s.lng], { icon })
-        marker.addTo(map)
-        marker.bindPopup(`<div style="font-family:Lexend,sans-serif;font-size:12px;color:#333">
-          <b>${s.name}</b><br>
-          <span style="color:${s.isOpen ? "#3ecf6e" : "#ff4040"}">${s.isOpen ? "● Đang mở" : "● Đã đóng"}</span>
-        </div>`, { closeButton: false })
-      })
-
-      // Driver markers
-      drivers.forEach(d => {
-        const isBusy = d.status === "busy"
-        const pulse = isBusy
-          ? `<div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid #FF6B00;animation:radarPulse 1.8s infinite;"></div>`
-          : ""
-        const icon = L.divIcon({
-          html: `<div style="position:relative">
-            ${pulse}
-            <div style="
-              width:34px;height:34px;border-radius:50%;
-              background:${isBusy ? "rgba(255,107,0,0.25)" : "rgba(62,207,110,0.2)"};
-              border:2.5px solid ${isBusy ? "#FF6B00" : "#3ecf6e"};
-              display:flex;align-items:center;justify-content:center;
-              font-size:17px;box-shadow:0 0 12px ${isBusy ? "rgba(255,107,0,0.5)" : "rgba(62,207,110,0.4)"};
-            ">🛵</div>
-          </div>`,
-          className: "", iconSize: [34, 34], iconAnchor: [17, 17],
-        })
-        const marker = L.marker([d.lat, d.lng], { icon })
-        marker.addTo(map)
-        marker.bindPopup(`<div style="font-family:Lexend,sans-serif;font-size:12px;">
-          <b>${d.name}</b><br>
-          <span style="color:#888">${d.vehicle}</span><br>
-          <span style="color:${isBusy ? "#FF6B00" : "#3ecf6e"}">${isBusy ? "● Đang giao" : "● Rảnh"}</span>
-          ${d.order ? `<br><span style="color:#FF6B00">Đơn #${d.order}</span>` : ""}
-        </div>`, { closeButton: false })
-        marker.on("click", () => onSelect(d))
-        markersRef.current.push(marker)
-      })
     }
 
     init()
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Pan to selected driver
+  // ── Cập nhật markers khi drivers/shops thay đổi ───────────
+  useEffect(() => {
+    const L   = LRef.current
+    const map = mapRef.current
+    if (!L || !map) return
+
+    // Xóa tất cả markers cũ
+    markersRef.current.forEach(m => m.remove())
+    markersRef.current = []
+
+    // Shop markers
+    shops.forEach(s => {
+      const icon = L.divIcon({
+        html: `<div style="
+          width:28px;height:28px;border-radius:8px;
+          background:rgba(74,143,245,0.9);
+          border:2px solid ${s.isOpen ? "#4a8ff5" : "rgba(255,255,255,0.3)"};
+          display:flex;align-items:center;justify-content:center;
+          font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.5);
+          opacity:${s.isOpen ? 1 : 0.5};
+        ">🏪</div>`,
+        className: "", iconSize: [28, 28], iconAnchor: [14, 14],
+      })
+      const marker = L.marker([s.lat, s.lng], { icon })
+      marker.addTo(map)
+      marker.bindPopup(`<div style="font-family:Lexend,sans-serif;font-size:12px;color:#333">
+        <b>${s.name}</b><br>
+        <span style="color:${s.isOpen ? "#3ecf6e" : "#ff4040"}">${s.isOpen ? "● Đang mở" : "● Đã đóng"}</span>
+      </div>`, { closeButton: false })
+      markersRef.current.push(marker)
+    })
+
+    // Driver markers
+    drivers.forEach(d => {
+      const isBusy = d.status === "busy"
+      const pulse = isBusy
+        ? `<div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid #FF6B00;animation:radarPulse 1.8s infinite;"></div>`
+        : ""
+      const icon = L.divIcon({
+        html: `<div style="position:relative">
+          ${pulse}
+          <div style="
+            width:34px;height:34px;border-radius:50%;
+            background:${isBusy ? "rgba(255,107,0,0.25)" : "rgba(62,207,110,0.2)"};
+            border:2.5px solid ${isBusy ? "#FF6B00" : "#3ecf6e"};
+            display:flex;align-items:center;justify-content:center;
+            font-size:17px;box-shadow:0 0 12px ${isBusy ? "rgba(255,107,0,0.5)" : "rgba(62,207,110,0.4)"};
+          ">🛵</div>
+        </div>`,
+        className: "", iconSize: [34, 34], iconAnchor: [17, 17],
+      })
+      const marker = L.marker([d.lat, d.lng], { icon })
+      marker.addTo(map)
+      marker.bindPopup(`<div style="font-family:Lexend,sans-serif;font-size:12px;">
+        <b>${d.name}</b><br>
+        <span style="color:#888">${d.vehicle}</span><br>
+        <span style="color:${isBusy ? "#FF6B00" : "#3ecf6e"}">${isBusy ? "● Đang giao" : "● Rảnh"}</span>
+        ${d.order ? `<br><span style="color:#FF6B00">Đơn #${d.order}</span>` : ""}
+      </div>`, { closeButton: false })
+      marker.on("click", () => onSelect(d))
+      markersRef.current.push(marker)
+    })
+  }, [drivers, shops, onSelect])
+
+  // ── Pan to selected driver ─────────────────────────────────
   useEffect(() => {
     if (!mapRef.current || !selected) return
     mapRef.current.flyTo([selected.lat, selected.lng], 16, { duration: 1 })

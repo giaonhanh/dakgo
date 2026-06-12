@@ -292,7 +292,7 @@ export default function AddressPickerClient({
           setTimeout(() => setGpsDeniedMsg(false), 4000)
           void doGeocode(DEFAULT_LAT, DEFAULT_LNG)
         },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 },
       )
     } else {
       setLocating(false)
@@ -331,7 +331,7 @@ export default function AddressPickerClient({
         setGpsDeniedMsg(true)
         setTimeout(() => setGpsDeniedMsg(false), 4000)
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 },
     )
   }, [doGeocode])
 

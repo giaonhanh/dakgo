@@ -78,9 +78,11 @@ export default function NavMap({
   // ── Init map ───────────────────────────────────────────────
   useEffect(() => {
     if (!divRef.current) return
+    let mounted = true
 
     const init = async () => {
       const L = (await import("leaflet")).default
+      if (!mounted || !divRef.current) return
       LRef.current = L
 
       // Fix default icon path
@@ -113,6 +115,7 @@ export default function NavMap({
         attributionControl:false,
         dragging:          true,
         scrollWheelZoom:   true,
+        doubleClickZoom:   false,
       })
       mapRef.current = map
 
@@ -151,6 +154,7 @@ export default function NavMap({
     init()
 
     return () => {
+      mounted = false
       if (mapRef.current) {
         mapRef.current.remove()
         mapRef.current   = null

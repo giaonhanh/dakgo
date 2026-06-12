@@ -15,7 +15,8 @@ interface LiveTrackMapProps {
   height?:    number
 }
 
-const DARK_TILE = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
+const VIETMAP_TILE = `https://maps.vietmap.vn/mt/tm/{z}/{x}/{y}.png?apikey=${VIETMAP_KEY}`
 
 export default function LiveTrackMap({
   driverLat, driverLng, destLat, destLng, height = 280,
@@ -26,15 +27,19 @@ export default function LiveTrackMap({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const driverRef = useRef<any>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const destRef   = useRef<any>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const routeRef  = useRef<any>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const LRef      = useRef<any>(null)
 
   useEffect(() => {
     if (!divRef.current) return
+    let mounted = true
 
     const init = async () => {
       const L = (await import("leaflet")).default
+      if (!mounted || !divRef.current) return
       LRef.current = L
 
       if (mapRef.current) return
@@ -45,9 +50,10 @@ export default function LiveTrackMap({
       const map = L.map(divRef.current!, {
         center: [midLat, midLng], zoom: 15,
         zoomControl: false, attributionControl: false,
+        doubleClickZoom: false,
       })
       mapRef.current = map
-      L.tileLayer(DARK_TILE, { maxZoom: 19 }).addTo(map)
+      L.tileLayer(VIETMAP_TILE, { maxZoom: 19 }).addTo(map)
 
       // Driver marker — pulsing orange dot
       const driverIcon = L.divIcon({
@@ -77,7 +83,7 @@ export default function LiveTrackMap({
       })
 
       driverRef.current = L.marker([driverLat, driverLng], { icon: driverIcon }).addTo(map)
-      L.marker([destLat, destLng], { icon: destIcon }).addTo(map)
+      destRef.current   = L.marker([destLat, destLng], { icon: destIcon }).addTo(map)
 
       // Route polyline
       routeRef.current = L.polyline(
@@ -94,18 +100,19 @@ export default function LiveTrackMap({
 
     init()
     return () => {
+      mounted = false
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Update driver position when props change
+  // Update driver + dest positions when props change
   useEffect(() => {
-    const L   = LRef.current
     const map = mapRef.current
-    if (!L || !map || !driverRef.current) return
+    if (!map || !driverRef.current) return
 
     driverRef.current.setLatLng([driverLat, driverLng])
+    destRef.current?.setLatLng([destLat, destLng])
     if (routeRef.current) {
       routeRef.current.setLatLngs([[driverLat, driverLng], [destLat, destLng]])
     }
