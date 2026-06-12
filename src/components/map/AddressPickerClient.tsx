@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { AddressPickerResult } from "@/types"
 import { getCachedGeocode, setCachedGeocode } from "@/lib/geocodeCache"
+import "leaflet/dist/leaflet.css"
 const DEFAULT_LAT = 12.7107
 const DEFAULT_LNG = 108.3034
 const PANEL_H    = 216
@@ -11,8 +12,6 @@ const SEARCH_H   = 56
 const GEOCODE_MS = 600
 const SEARCH_MS  = 500
 
-// Style proxy: /api/map-style trả style.json với tile URL đã replace → /api/vt (tránh CORS)
-const MAP_STYLE = "/api/map-style"
 
 interface LatLng { lat: number; lng: number }
 
@@ -138,7 +137,6 @@ export default function AddressPickerClient({
   const mapRef          = useRef<any>(null)
   const geocodeTimer    = useRef<ReturnType<typeof setTimeout>>(undefined)
   const searchTimer     = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const loadTimer       = useRef<ReturnType<typeof setTimeout>>(undefined)
   const autoNoteRef     = useRef("")
   const searchInputRef  = useRef<HTMLInputElement>(null)
   const skipGeocodeRef  = useRef(false)
@@ -219,36 +217,24 @@ export default function AddressPickerClient({
   useEffect(() => {
     if (!divRef.current) return
     let map: any
+    let mounted = true
 
     const init = async () => {
-      const maplibre = (await import("maplibre-gl")).default
-      await import("maplibre-gl/dist/maplibre-gl.css")
+      const L = (await import("leaflet")).default
+      if (!mounted || !divRef.current || mapRef.current) return
 
-      map = new maplibre.Map({
-        container:          divRef.current!,
-        style:              MAP_STYLE,
-        center:             [initLng, initLat],
-        zoom:               15,
-        maxZoom:            20,
-        attributionControl: false,
-        dragRotate:         false,
+      const VIETMAP_KEY  = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
+      const VIETMAP_TILE = `https://maps.vietmap.vn/mt/tm/{z}/{x}/{y}.png?apikey=${VIETMAP_KEY}`
+
+      map = L.map(divRef.current, {
+        center: [initLat, initLng], zoom: 15,
+        zoomControl: false, attributionControl: false,
+        doubleClickZoom: false,
       })
       mapRef.current = map
+      L.tileLayer(VIETMAP_TILE, { maxZoom: 19 }).addTo(map)
+      setTilesReady(true)
 
-      map.on("load", () => {
-        map.resize()
-        clearTimeout(loadTimer.current)
-        setTilesReady(true)
-      })
-      // Bỏ qua tile errors (non-fatal), chỉ hiện lỗi nếu style fail
-      map.on("error", (e: any) => {
-        const isTileError = e?.tile != null || String(e?.error?.message ?? "").toLowerCase().includes("tile")
-        if (!isTileError) { clearTimeout(loadTimer.current); setTilesReady(true); setMapError(true) }
-      })
-      // Timeout: 12s nếu map vẫn chưa load
-      loadTimer.current = setTimeout(() => {
-        setTilesReady(t => { if (!t) { setMapError(true); return true } return t })
-      }, 12000)
       map.on("dragstart", () => { setFloating(true); setShowSuggest(false) })
       map.on("dragend",   () => {
         setFloating(false)
@@ -263,17 +249,6 @@ export default function AddressPickerClient({
         setCenter({ lat: c.lat, lng: c.lng })
         scheduleGeocode(c.lat, c.lng)
       })
-
-      // ResizeObserver: tự resize map khi container thay đổi kích thước
-      if (divRef.current) {
-        const ro = new ResizeObserver(() => { map.resize() })
-        ro.observe(divRef.current)
-        // cleanup sẽ disconnect khi map bị remove
-        map.once("remove", () => ro.disconnect())
-      }
-
-      // Fallback tiles-ready timeout (4s cho mạng chậm)
-      setTimeout(() => setTilesReady(true), 4000)
     }
 
     init()
@@ -306,18 +281,18 @@ export default function AddressPickerClient({
     }
 
     return () => {
+      mounted = false
       clearTimeout(geocodeTimer.current)
       clearTimeout(searchTimer.current)
-      clearTimeout(loadTimer.current)
       if (map) { map.remove(); mapRef.current = null }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // FlyTo when flyTarget changes
+  // FlyTo when flyTarget changes (Leaflet: [lat, lng])
   useEffect(() => {
     if (!flyTarget || !mapRef.current) return
-    mapRef.current.flyTo({ center: [flyTarget[1], flyTarget[0]], zoom: 18, animate: true })
+    mapRef.current.flyTo([flyTarget[0], flyTarget[1]], 18)
   }, [flyTarget])
 
   const handleGPS = useCallback(() => {
@@ -389,7 +364,7 @@ export default function AddressPickerClient({
           100% { transform: scale(3.5);  opacity: 0 }
         }
         @keyframes shimmer { 0% { left:-60% } 100% { left:120% } }
-        .maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{display:none!important}
+        .leaflet-control-container{display:none!important}
       `}</style>
 
       {/* Search Bar */}
