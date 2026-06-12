@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/utils"
 import { useCartStore } from "@/store/cartStore"
 import { createClient } from "@/lib/supabase/client"
 import { getAdminContact } from "@/lib/adminContact"
+import { maskPhone } from "@/lib/maskPhone"
 
 // ─── Types ───────────────────────────────────────────────
 type Status = "delivering" | "preparing" | "pending" | "accepted" | "ready" | "completed" | "cancelled"
@@ -990,7 +991,7 @@ export default function OrdersPage() {
                                   ...(order.customerName  ? [{ icon: "👤", key: "Họ tên",       val: order.customerName }] : []),
                                   ...(order.customerPhone ? [{ icon: "📞", key: "Số điện thoại", val: order.customerPhone }] : []),
                                   ...(order.driver        ? [{ icon: "🛵", key: "Tài xế",        val: `${order.driver.name}${order.driver.plate ? " · " + order.driver.plate : ""}` }] : []),
-                                  ...(order.driver?.phone ? [{ icon: "📞", key: "SĐT tài xế",    val: order.driver.phone }] : []),
+                                  ...(order.driver?.phone ? [{ icon: "📞", key: "SĐT tài xế",    val: maskPhone(order.driver.phone) }] : []),
                                   ...(order.note          ? [{ icon: "📝", key: "Ghi chú",       val: order.note }] : []),
                                 ]} />
                               </>
@@ -1150,8 +1151,8 @@ export default function OrdersPage() {
                             <InfoBox rows={[
                               ...(order.pickupAddress ? [{ icon: "📤", key: "Lấy tại",     val: order.pickupAddress }] : []),
                               { icon: "📍", key: order.serviceType === "food" ? "Địa chỉ giao" : "Giao đến", val: order.address },
-                              ...(order.senderName    ? [{ icon: "👤", key: "Người gửi",    val: `${order.senderName} · ${order.senderPhone ?? ""}` }] : []),
-                              ...(order.recipientName ? [{ icon: "📬", key: "Người nhận",   val: `${order.recipientName} · ${order.recipientPhone ?? ""}` }] : []),
+                              ...(order.senderName    ? [{ icon: "👤", key: "Người gửi",    val: `${order.senderName} · ${maskPhone(order.senderPhone)}` }] : []),
+                              ...(order.recipientName ? [{ icon: "📬", key: "Người nhận",   val: `${order.recipientName} · ${maskPhone(order.recipientPhone)}` }] : []),
                               ...(order.driver        ? [{ icon: "🛵", key: "Tài xế",        val: `${order.driver.name}${order.driver.plate ? " · " + order.driver.plate : ""}` }] : []),
                               ...(order.driver?.phone ? [{ icon: "📞", key: "SĐT tài xế",   val: order.driver.phone }] : []),
                               ...(order.note          ? [{ icon: "📝", key: "Ghi chú đơn",  val: order.note }] : []),

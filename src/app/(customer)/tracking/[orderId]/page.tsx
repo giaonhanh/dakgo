@@ -9,6 +9,7 @@ import { useParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { ChatDrawer } from "@/components/chat/ChatDrawer"
 import { getAdminContact } from "@/lib/adminContact"
+import { maskPhone } from "@/lib/maskPhone"
 
 const LiveTrackMap = dynamic(() => import("@/components/map/LiveTrackMap"), {
   ssr: false,
@@ -550,7 +551,7 @@ export default function TrackingPage() {
                         padding:"7px 10px",borderRadius:8,
                         background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)" }}>
                         <span style={{ color:"#b0956a",fontSize:10.5,fontWeight:600 }}>
-                          📱 {driverData.phone}
+                          📱 {maskPhone(driverData.phone)}
                         </span>
                         <a href={`tel:${driverData.phone}`}
                           style={{ padding:"4px 12px",borderRadius:7,

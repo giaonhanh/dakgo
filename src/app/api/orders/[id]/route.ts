@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { maskPhone } from "@/lib/maskPhone"
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -23,7 +24,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 })
     }
 
-    return NextResponse.json(order)
+    // Mask SĐT trước khi trả về client — giữ đầy đủ ở server, mask ở response
+    const safeOrder = {
+      ...order,
+      shop: order.shop ? { ...order.shop, phone: maskPhone(order.shop.phone) } : order.shop,
+      driver: order.driver ? {
+        ...order.driver,
+        profile: order.driver.profile ? {
+          ...order.driver.profile,
+          phone: maskPhone(order.driver.profile.phone),
+        } : order.driver.profile,
+      } : order.driver,
+    }
+
+    return NextResponse.json(safeOrder)
   } catch {
     return NextResponse.json({ error: "Lỗi server" }, { status: 500 })
   }
