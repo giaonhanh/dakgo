@@ -66,6 +66,7 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
       })
       mapRef.current = map
 
+      map.on("load", () => { if (mounted) map.resize() })
       map.on("dragstart", () => setFloating(true))
       map.on("dragend",   () => setFloating(false))
       map.on("moveend", () => {

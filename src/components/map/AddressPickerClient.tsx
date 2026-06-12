@@ -235,7 +235,7 @@ export default function AddressPickerClient({
       })
       mapRef.current = map
 
-      map.on("load", () => { if (mounted) setTilesReady(true) })
+      map.on("load", () => { if (mounted) { setTilesReady(true); map.resize() } })
 
       map.on("dragstart", () => { setFloating(true); setShowSuggest(false) })
       map.on("dragend",   () => {

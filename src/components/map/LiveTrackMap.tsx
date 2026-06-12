@@ -55,6 +55,7 @@ export default function LiveTrackMap({
       map.on("load", () => {
         if (!mounted) return
         loadedRef.current = true
+        map.resize()
 
         map.addSource("route", {
           type: "geojson",

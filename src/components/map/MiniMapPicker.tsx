@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { VIETMAP_KEY, MAP_STYLE, vmTransform } from "@/lib/mapConfig"
+import { MAP_STYLE, vmTransform } from "@/lib/mapConfig"
 
 interface Props {
   lat:    number
@@ -35,6 +35,7 @@ export default function MiniMapPicker({ lat, lng, onPick }: Props) {
       })
       mapRef.current = map
 
+      map.on("load", () => { if (mounted) map.resize() })
       map.on("dragstart", () => setFloating(true))
       map.on("dragend",   () => setFloating(false))
       map.on("moveend", () => {

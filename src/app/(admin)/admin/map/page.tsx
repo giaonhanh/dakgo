@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/client"
 import AdminShell from "@/components/admin/AdminShell"
+import "maplibre-gl/dist/maplibre-gl.css"
+import { MAP_STYLE, vmTransform } from "@/lib/mapConfig"
 
 interface DriverMarker {
   id: string; name: string; vehicle: string
@@ -53,7 +55,7 @@ const STATUS_CFG: Record<string, { label:string; color:string; bg:string }> = {
   delivering: { label:"Đang giao",  color:"#FF8C00", bg:"rgba(255,140,0,0.1)"   },
 }
 
-// ─── Leaflet map component (no-SSR) ─────────────────────────────────────────
+// ─── MapLibre map component (no-SSR) ────────────────────────────────────────
 interface AdminMapClientProps {
   drivers: DriverMarker[]
   shops: ShopMarker[]
@@ -61,41 +63,35 @@ interface AdminMapClientProps {
   onSelect: (d: DriverMarker | null) => void
 }
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-require("leaflet/dist/leaflet.css")
-
 function AdminMapClientInner({ drivers, shops, selected, onSelect }: AdminMapClientProps) {
   const divRef     = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef     = useRef<any>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const LRef       = useRef<any>(null)
+  const mlRef      = useRef<any>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersRef = useRef<any[]>([])
 
-  // ── Init map (chạy 1 lần) ─────────────────────────────────
+  // ── Init map ──────────────────────────────────────────────
   useEffect(() => {
     if (!divRef.current) return
     let mounted = true
 
     const init = async () => {
-      const L = (await import("leaflet")).default
-      if (!mounted || !divRef.current) return
-      if (mapRef.current) return
-      LRef.current = L
+      const ml = (await import("maplibre-gl")).default
+      if (!mounted || !divRef.current || mapRef.current) return
+      mlRef.current = ml
 
-      const map = L.map(divRef.current, {
-        center: [12.5833, 108.4833], zoom: 14,  // Phước An, Krông Pắc
-        zoomControl: false, attributionControl: false,
-        doubleClickZoom: false,
+      const map = new ml.Map({
+        container: divRef.current,
+        style: MAP_STYLE,
+        center: [108.4833, 12.5833],
+        zoom: 14,
+        attributionControl: false,
+        transformRequest: vmTransform,
       })
       mapRef.current = map
-
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        maxZoom: 19,
-      }).addTo(map)
-
-      L.control.zoom({ position: "topright" }).addTo(map)
+      map.on("load", () => { if (mounted) map.resize() })
     }
 
     init()
@@ -108,64 +104,39 @@ function AdminMapClientInner({ drivers, shops, selected, onSelect }: AdminMapCli
 
   // ── Cập nhật markers khi drivers/shops thay đổi ───────────
   useEffect(() => {
-    const L   = LRef.current
     const map = mapRef.current
-    if (!L || !map) return
+    const ml  = mlRef.current
+    if (!map || !ml) return
 
-    // Xóa tất cả markers cũ
     markersRef.current.forEach(m => m.remove())
     markersRef.current = []
 
     // Shop markers
     shops.forEach(s => {
-      const icon = L.divIcon({
-        html: `<div style="
-          width:28px;height:28px;border-radius:8px;
-          background:rgba(74,143,245,0.9);
-          border:2px solid ${s.isOpen ? "#4a8ff5" : "rgba(255,255,255,0.3)"};
-          display:flex;align-items:center;justify-content:center;
-          font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.5);
-          opacity:${s.isOpen ? 1 : 0.5};
-        ">🏪</div>`,
-        className: "", iconSize: [28, 28], iconAnchor: [14, 14],
-      })
-      const marker = L.marker([s.lat, s.lng], { icon })
-      marker.addTo(map)
-      marker.bindPopup(`<div style="font-family:Lexend,sans-serif;font-size:12px;color:#333">
-        <b>${s.name}</b><br>
-        <span style="color:${s.isOpen ? "#3ecf6e" : "#ff4040"}">${s.isOpen ? "● Đang mở" : "● Đã đóng"}</span>
-      </div>`, { closeButton: false })
+      const el = document.createElement("div")
+      el.innerHTML = `<div style="width:28px;height:28px;border-radius:8px;background:rgba(74,143,245,0.9);border:2px solid ${s.isOpen ? "#4a8ff5" : "rgba(255,255,255,0.3)"};display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.5);opacity:${s.isOpen ? 1 : 0.5}">🏪</div>`
+
+      const popup = new ml.Popup({ closeButton: false, offset: 14 }).setHTML(
+        `<b>${s.name}</b><br><span style="color:${s.isOpen ? "#3ecf6e" : "#ff4040"}">${s.isOpen ? "● Đang mở" : "● Đã đóng"}</span>`
+      )
+      const marker = new ml.Marker({ element: el }).setLngLat([s.lng, s.lat]).setPopup(popup).addTo(map)
       markersRef.current.push(marker)
     })
 
     // Driver markers
     drivers.forEach(d => {
       const isBusy = d.status === "busy"
-      const pulse = isBusy
-        ? `<div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid #FF6B00;animation:radarPulse 1.8s infinite;"></div>`
-        : ""
-      const icon = L.divIcon({
-        html: `<div style="position:relative">
-          ${pulse}
-          <div style="
-            width:34px;height:34px;border-radius:50%;
-            background:${isBusy ? "rgba(255,107,0,0.25)" : "rgba(62,207,110,0.2)"};
-            border:2.5px solid ${isBusy ? "#FF6B00" : "#3ecf6e"};
-            display:flex;align-items:center;justify-content:center;
-            font-size:17px;box-shadow:0 0 12px ${isBusy ? "rgba(255,107,0,0.5)" : "rgba(62,207,110,0.4)"};
-          ">🛵</div>
-        </div>`,
-        className: "", iconSize: [34, 34], iconAnchor: [17, 17],
-      })
-      const marker = L.marker([d.lat, d.lng], { icon })
-      marker.addTo(map)
-      marker.bindPopup(`<div style="font-family:Lexend,sans-serif;font-size:12px;">
-        <b>${d.name}</b><br>
-        <span style="color:#888">${d.vehicle}</span><br>
-        <span style="color:${isBusy ? "#FF6B00" : "#3ecf6e"}">${isBusy ? "● Đang giao" : "● Rảnh"}</span>
-        ${d.order ? `<br><span style="color:#FF6B00">Đơn #${d.order}</span>` : ""}
-      </div>`, { closeButton: false })
-      marker.on("click", () => onSelect(d))
+      const el = document.createElement("div")
+      el.style.cssText = "position:relative;width:34px;height:34px;cursor:pointer"
+      el.innerHTML = `
+        ${isBusy ? `<div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid #FF6B00;animation:radarPulse 1.8s infinite;pointer-events:none"></div>` : ""}
+        <div style="width:34px;height:34px;border-radius:50%;background:${isBusy ? "rgba(255,107,0,0.25)" : "rgba(62,207,110,0.2)"};border:2.5px solid ${isBusy ? "#FF6B00" : "#3ecf6e"};display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 0 12px ${isBusy ? "rgba(255,107,0,0.5)" : "rgba(62,207,110,0.4)"}">🛵</div>`
+      el.addEventListener("click", () => onSelect(d))
+
+      const popup = new ml.Popup({ closeButton: false, offset: 17 }).setHTML(
+        `<b>${d.name}</b><br><span style="color:#888">${d.vehicle}</span><br><span style="color:${isBusy ? "#FF6B00" : "#3ecf6e"}">${isBusy ? "● Đang giao" : "● Rảnh"}</span>${d.order ? `<br><span style="color:#FF6B00">Đơn #${d.order}</span>` : ""}`
+      )
+      const marker = new ml.Marker({ element: el }).setLngLat([d.lng, d.lat]).setPopup(popup).addTo(map)
       markersRef.current.push(marker)
     })
   }, [drivers, shops, onSelect])
@@ -173,16 +144,16 @@ function AdminMapClientInner({ drivers, shops, selected, onSelect }: AdminMapCli
   // ── Pan to selected driver ─────────────────────────────────
   useEffect(() => {
     if (!mapRef.current || !selected) return
-    mapRef.current.flyTo([selected.lat, selected.lng], 16, { duration: 1 })
+    mapRef.current.flyTo({ center: [selected.lng, selected.lat], zoom: 16 })
   }, [selected])
 
   return (
     <>
       <style>{`
         @keyframes radarPulse { 0%{opacity:.8;transform:scale(.3)} 100%{opacity:0;transform:scale(1.4)} }
-        .leaflet-popup-content-wrapper { background:#1a1520 !important; border:1px solid rgba(255,255,255,0.1); border-radius:10px !important; box-shadow:0 4px 20px rgba(0,0,0,0.5) !important; }
-        .leaflet-popup-tip { background:#1a1520 !important; }
-        .leaflet-popup-content { color:#f0eaff !important; margin:10px 14px !important; }
+        .maplibregl-popup-content { background:#1a1520 !important; border:1px solid rgba(255,255,255,0.1) !important; border-radius:10px !important; box-shadow:0 4px 20px rgba(0,0,0,0.5) !important; color:#f0eaff !important; padding:10px 14px !important; font-family:Lexend,sans-serif; font-size:12px; }
+        .maplibregl-popup-tip { border-top-color:#1a1520 !important; }
+        .maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right { display:none !important; }
       `}</style>
       <div ref={divRef} style={{ width:"100%", height:"100%", background:"#0a0d12" }} />
     </>

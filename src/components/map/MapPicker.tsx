@@ -38,6 +38,7 @@ export default function MapPicker({ lat, lng, onLocationChange, height = 200 }: 
       })
       mapRef.current = map
 
+      map.on("load", () => { if (mounted) map.resize() })
       map.on("dragstart", () => setFloating(true))
       map.on("dragend",   () => setFloating(false))
       map.on("moveend", () => {
