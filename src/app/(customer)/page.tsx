@@ -911,7 +911,7 @@ export default function HomePage() {
             return (
               <div style={{ margin:"0 16px 8px" }}>
                 <div style={{
-                  height:110, borderRadius:16, overflow:"hidden",
+                  minHeight:110, borderRadius:16, overflow:"hidden",
                   border:"1px solid rgba(255,107,0,0.35)",
                   position:"relative",
                   background:"linear-gradient(135deg,#1a0d00,#2d1500,#0d0900)",
@@ -923,7 +923,7 @@ export default function HomePage() {
                   <div style={{ position:"absolute", top:0, left:"-100%", width:"50%", height:"100%",
                     background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)",
                     animation:"logoShine 3.5s infinite" }} />
-                  <div style={{ position:"relative", zIndex:1, padding:"12px 14px", height:"100%",
+                  <div style={{ position:"relative", zIndex:1, padding:"12px 14px 12px",
                     display:"flex", flexDirection:"column", justifyContent:"center" }}>
                     <div style={{ display:"inline-flex", alignItems:"center", gap:4,
                       background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
@@ -932,8 +932,12 @@ export default function HomePage() {
                       fontFamily:"Lexend" }}>
                       ⚡ FLASH SALE · {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
                     </div>
-                    <div style={{ color:"#fff", fontSize:15, fontWeight:700, lineHeight:1.2, maxWidth:"60%",
-                      wordBreak:"break-word", fontFamily:"Lexend", marginBottom:3 }}>
+                    <div style={{
+                      color:"#fff", fontWeight:700, lineHeight:1.25,
+                      maxWidth:"62%", fontFamily:"Lexend", marginBottom:3,
+                      fontSize: dealTitle.length > 40 ? 11 : dealTitle.length > 25 ? 13 : 15,
+                      wordBreak:"break-word",
+                    }}>
                       {dealTitle}
                     </div>
                     <div style={{ color:"rgba(255,255,255,0.5)", fontSize:10, fontFamily:"Lexend", marginBottom:7 }}>

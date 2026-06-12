@@ -57,6 +57,7 @@ function voucherToItem(v: Voucher): VoucherItem {
     isSaved:        v.saved,
     isApplied:      false,
     shopId:         v.shopId ?? undefined,
+    shopName:       v.shopName ?? undefined,
   }
 }
 

@@ -15,6 +15,7 @@ export interface VoucherItem {
   isSaved: boolean
   isApplied: boolean
   shopId?: string
+  shopName?: string | null
 }
 
 export interface VoucherCardProps {

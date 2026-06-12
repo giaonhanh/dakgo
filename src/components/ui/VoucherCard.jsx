@@ -129,6 +129,15 @@ export default function VoucherCard({
           <div style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700, marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {v.title}
           </div>
+          {/* Shop name chip */}
+          {v.shopName && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 600,
+              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
+              borderRadius: 4, padding: "1px 6px", color: "#6a5a40", marginBottom: 4,
+              maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              🏪 {v.shopName}
+            </span>
+          )}
 
           {/* Description / conditions */}
           <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.5, marginBottom: 7 }}>
