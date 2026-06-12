@@ -3,6 +3,7 @@ import { Lexend } from "next/font/google"
 import "./globals.css"
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar"
 import { SessionProvider } from "@/components/SessionProvider"
+import ContentProtection from "@/components/ContentProtection"
 
 const lexend = Lexend({
   subsets: ["latin", "vietnamese"],
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="vi" className={lexend.className} style={{ background: "#080806" }}>
       <body style={{ background: "#080806", margin: 0 }}>
+        <ContentProtection />
         <SessionProvider>{children}</SessionProvider>
         <ServiceWorkerRegistrar />
       </body>

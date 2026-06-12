@@ -209,6 +209,45 @@ html, body {
   .badge-ring-spin { animation: none; }
 }
 
+/* ─── Content Protection ─── */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none;
+  pointer-events: none;
+}
+/* Cho phép click trên ảnh có role button/link */
+a img, button img, [role="button"] img, .clickable-img {
+  pointer-events: auto;
+}
+/* Chặn chọn text trên các vùng UI (không phải input/textarea) */
+.no-select,
+nav, header, [data-nav], [data-header],
+.product-card, .shop-card, .voucher-card, .order-card {
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Watermark layer cho ảnh nhạy cảm */
+.protected-img {
+  position: relative;
+  display: inline-block;
+}
+.protected-img::after {
+  content: "Giao Nhanh";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  pointer-events: none;
+  transform: rotate(-20deg);
+}
+
 /* ─── Utility classes ─── */
 .acc-gradient {
   background: linear-gradient(135deg, var(--acc), var(--acc-light));
