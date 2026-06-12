@@ -1708,7 +1708,7 @@ export default function CheckoutPage() {
           <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             style={{
-              position: "fixed", top: 52, left: "50%", transform: "translateX(-50%)",
+              position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 62px)", left: "50%", transform: "translateX(-50%)",
               zIndex: 500, whiteSpace: "nowrap",
               background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.35)",
               borderRadius: 12, padding: "7px 16px",

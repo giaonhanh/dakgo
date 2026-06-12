@@ -229,7 +229,7 @@ export default function GiaoHoPage() {
       `}</style>
 
       {toast && (
-        <div style={{ position:"fixed",top:"calc(env(safe-area-inset-top,0px) + 12px)",left:"50%",
+        <div style={{ position:"fixed",top:"calc(env(safe-area-inset-top, 0px) + 62px)",left:"50%",
           transform:"translateX(-50%)",zIndex:9999,whiteSpace:"nowrap",
           background:"rgba(255,107,0,0.15)",border:"1px solid rgba(255,107,0,0.35)",
           borderRadius:12,padding:"7px 16px",color:"#FF8C00",fontSize:11,fontWeight:600,

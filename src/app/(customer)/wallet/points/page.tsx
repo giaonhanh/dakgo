@@ -93,7 +93,7 @@ export default function PointsPage() {
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity:0, y:-14 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-14 }}
-            style={{ position:"fixed", top:52, left:"50%", transform:"translateX(-50%)",
+            style={{ position:"fixed", top:"calc(env(safe-area-inset-top, 0px) + 62px)", left:"50%", transform:"translateX(-50%)",
               zIndex:999, whiteSpace:"nowrap",
               background:"rgba(245,197,66,0.12)", border:"1px solid rgba(245,197,66,0.3)",
               borderRadius:12, padding:"7px 18px", color:"#F5C542",
