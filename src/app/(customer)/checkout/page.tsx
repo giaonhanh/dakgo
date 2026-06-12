@@ -2099,7 +2099,7 @@ export default function CheckoutPage() {
 
           {/* 4. Voucher — SmartVoucherPicker banner */}
           {!smartDismissed && (() => {
-            const voucherItems = dbVouchers.map(v => dbVoucherToVoucherItem(v, appliedVouchers.map(av => av.code), userUsageMap))
+            const voucherItems = relevantVouchers.map(v => dbVoucherToVoucherItem(v, appliedVouchers.map(av => av.code), userUsageMap))
             return (
               <div style={{ marginBottom: 10 }}>
                 <SmartVoucherPicker
