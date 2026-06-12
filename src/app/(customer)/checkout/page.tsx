@@ -1252,7 +1252,9 @@ export default function CheckoutPage() {
             const pv = JSON.parse(raw) as { code: string; title: string }
             sessionStorage.removeItem("pending_voucher")
             const found = (voucherData as unknown as DbVoucher[]).find(v => v.code === pv.code)
-            if (found) {
+            const currentShopId = cartItems[0]?.shopId ?? null
+            // Chỉ gợi ý nếu voucher thuộc đúng quán hoặc là voucher toàn hệ thống
+            if (found && (!found.shop_id || found.shop_id === currentShopId)) {
               setTimeout(() => {
                 const yes = window.confirm(`Bạn có muốn áp dụng mã "${pv.code}" (${pv.title}) không?`)
                 if (yes) applyVoucherCode(pv.code)
@@ -1364,16 +1366,19 @@ export default function CheckoutPage() {
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2000) }
 
+  // Chỉ giữ voucher toàn hệ thống + voucher đúng quán trong giỏ hàng
+  const relevantVouchers = dbVouchers.filter(v => !v.shop_id || v.shop_id === shopId)
+
   // ── Auto-detect combo voucher conditions ──
   useEffect(() => {
-    if (!dbVouchers.length || !cartItems.length) { setComboHint(null); return }
+    if (!relevantVouchers.length || !cartItems.length) { setComboHint(null); return }
     const cartMap: Record<string, number> = {}
     for (const item of cartItems) {
       const pid = item.id.split("__")[0]
       cartMap[pid] = (cartMap[pid] ?? 0) + item.qty
     }
 
-    for (const v of dbVouchers) {
+    for (const v of relevantVouchers) {
       if (!v.is_combo || !v.combo_items?.length) continue
       if (appliedVouchers.some(av => av.code === v.code)) continue
 
@@ -1399,7 +1404,7 @@ export default function CheckoutPage() {
     }
     setComboHint(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartItems, dbVouchers, appliedVouchers])
+  }, [cartItems, relevantVouchers, appliedVouchers])
 
   const applyVoucherCode = (rawCode: string, fromPicker = false) => {
     const code = rawCode.trim().toUpperCase()
@@ -2058,7 +2063,7 @@ export default function CheckoutPage() {
           {/* Combo progress banner */}
           {comboHint && (() => {
             // Tính % tiến trình: đếm số món đã có / tổng món cần
-            const comboV = dbVouchers.find(v => v.is_combo && v.combo_items?.length && !appliedVouchers.some(av => av.code === v.code))
+            const comboV = relevantVouchers.find(v => v.is_combo && v.combo_items?.length && !appliedVouchers.some(av => av.code === v.code))
             const cartMap: Record<string, number> = {}
             for (const item of cartItems) {
               const pid = item.id.split("__")[0]
@@ -2112,7 +2117,7 @@ export default function CheckoutPage() {
           <SectionCard title="Mã giảm giá" icon="🏷️">
             {/* VoucherNudgeBar — nudge mua thêm để đạt ngưỡng */}
             {appliedVouchers.length === 0 && (() => {
-              const voucherItems = dbVouchers.map(v => dbVoucherToVoucherItem(v, [], userUsageMap))
+              const voucherItems = relevantVouchers.map(v => dbVoucherToVoucherItem(v, [], userUsageMap))
               return (
                 <div style={{ marginBottom: 10 }}>
                   <VoucherNudgeBar
@@ -2356,7 +2361,7 @@ export default function CheckoutPage() {
               </div>
               {/* VoucherInlineHint — dưới total */}
               {(() => {
-                const voucherItems = dbVouchers.map(v => dbVoucherToVoucherItem(v, appliedVouchers.map(av => av.code), userUsageMap))
+                const voucherItems = relevantVouchers.map(v => dbVoucherToVoucherItem(v, appliedVouchers.map(av => av.code), userUsageMap))
                 const appliedItem  = appliedVouchers[0] ? voucherItems.find(vi => vi.isApplied) : null
                 const nudgeResult  = !appliedItem ? findNextThreshold(subtotal, voucherItems) : null
                 return (
