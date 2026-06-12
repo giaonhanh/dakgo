@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
+import SignedImage from "@/components/ui/SignedImage"
 
 interface Review {
   id: string
@@ -260,7 +261,7 @@ export default function MerchantReviewsPage() {
                       display:"flex", alignItems:"center", justifyContent:"center",
                       fontSize:16, overflow:"hidden" }}>
                       {rv.customerAvatar
-                        ? <img src={rv.customerAvatar} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                        ? <SignedImage src={rv.customerAvatar} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
                         : "👤"}
                     </div>
 
@@ -336,7 +337,7 @@ export default function MerchantReviewsPage() {
                         {rv.images.length > 0 && (
                           <div style={{ display:"flex", gap:6, overflowX:"auto", marginTop:8 }}>
                             {rv.images.map((img, i) => (
-                              <img key={i} src={img} alt=""
+                              <SignedImage key={i} src={img} alt=""
                                 style={{ width:80, height:80, borderRadius:10, objectFit:"cover",
                                   flexShrink:0, border:"1px solid rgba(255,255,255,0.08)" }} />
                             ))}

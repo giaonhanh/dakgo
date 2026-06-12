@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
+import SignedImage from "@/components/ui/SignedImage"
 import { getAdminContact } from "@/lib/adminContact"
 import { BANKS } from "@/lib/banks"
 
@@ -563,7 +564,7 @@ export default function DriverProfilePage() {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 0 20px" }}>
             <div onClick={openFilePicker} style={{ position: "relative", marginBottom: 14, cursor: "pointer" }}>
               <div style={{ width: 90, height: 90, borderRadius: 24, background: "linear-gradient(135deg,rgba(255,107,0,0.2),rgba(255,107,0,0.05))", border: "2.5px solid rgba(255,107,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, overflow: "hidden" }}>
-                {avatar ? <img src={avatar} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🧑‍💼"}
+                {avatar ? <SignedImage src={avatar} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "🧑‍💼"}
               </div>
               <div style={{ position: "absolute", bottom: -4, right: -4, width: 28, height: 28, borderRadius: 9, background: "rgba(255,107,0,0.12)", border: "2px solid #080806", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>📷</div>
             </div>

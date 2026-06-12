@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
+import SignedImage from "@/components/ui/SignedImage"
 import AdminShell from "@/components/admin/AdminShell"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -292,7 +293,7 @@ export default function AdminDriversPage() {
                       {/* Avatar */}
                       <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, overflow: "hidden", position: "relative" }}>
                         {d.avatarUrl
-                          ? <img src={d.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          ? <SignedImage src={d.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                           : "🧑‍💼"}
                         {d.status === "approved" && (
                           <div style={{ position: "absolute", bottom: -2, right: -2, width: 11, height: 11, borderRadius: "50%", background: on.color, border: "1.5px solid #06050a" }} />
@@ -408,7 +409,7 @@ export default function AdminDriversPage() {
                   <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 14 }}>
                     <div style={{ width: 60, height: 60, borderRadius: 16, flexShrink: 0, background: "rgba(74,143,245,0.12)", border: "2px solid rgba(74,143,245,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, overflow: "hidden" }}>
                       {selected.avatarUrl
-                        ? <img src={selected.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ? <SignedImage src={selected.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                         : "🧑‍💼"}
                     </div>
                     <div style={{ flex: 1 }}>

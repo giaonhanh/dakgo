@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
+import SignedImage from "@/components/ui/SignedImage"
 
 interface NotifSettings {
   order:  boolean
@@ -396,7 +397,7 @@ export default function ProfilePage() {
             <div style={{ position: "relative", marginBottom: 10 }}>
               <div style={{ width: 80, height: 80, borderRadius: 24, background: avatarUrl ? "transparent" : "rgba(255,107,0,0.12)", border: "2px solid rgba(255,107,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", boxShadow: "0 0 20px rgba(255,107,0,0.2)" }}>
                 {avatarUrl
-                  ? <img src={avatarUrl} alt="Ảnh đại diện" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ? <SignedImage src={avatarUrl} alt="Ảnh đại diện" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   : <span style={{ fontSize: 28, fontWeight: 800, background: "linear-gradient(135deg,#FF6B00,#FFB347)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" } as React.CSSProperties}>{initials(name || "GN")}</span>
                 }
               </div>

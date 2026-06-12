@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
+import SignedImage from "@/components/ui/SignedImage"
 import AdminShell from "@/components/admin/AdminShell"
 
 type RTab = "shops" | "drivers"
@@ -376,7 +377,7 @@ export default function AdminReviewsPage() {
                             {rv.images.length > 0 && (
                               <div style={{ display:"flex", gap:8 }}>
                                 {rv.images.map((img, i) => (
-                                  <img key={i} src={img} alt="" style={{ width:72, height:72, borderRadius:9,
+                                  <SignedImage key={i} src={img} alt="" style={{ width:72, height:72, borderRadius:9,
                                     objectFit:"cover", border:"1px solid rgba(255,255,255,0.08)" }} />
                                 ))}
                               </div>
