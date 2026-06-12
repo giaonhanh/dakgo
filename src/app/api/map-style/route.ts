@@ -13,13 +13,20 @@ export async function GET() {
 
   const style = await res.json()
 
-  // Replace tile URLs trong sources → dùng proxy /api/vt
+  // Replace tile URLs → proxy /api/vt (tránh CORS)
   if (style.sources) {
     for (const src of Object.values(style.sources) as any[]) {
       if (src.tiles) {
         src.tiles = src.tiles.map(() => "/api/vt/{z}/{x}/{y}")
       }
     }
+  }
+
+  // Glyphs URL thiếu apikey → thêm vào (CORS OK nhưng cần key để server nhận)
+  if (style.glyphs && !style.glyphs.includes("apikey")) {
+    style.glyphs = style.glyphs.includes("?")
+      ? `${style.glyphs}&apikey=${VIETMAP_KEY}`
+      : `${style.glyphs}?apikey=${VIETMAP_KEY}`
   }
 
   return NextResponse.json(style, {
