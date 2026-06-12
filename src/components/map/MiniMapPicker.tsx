@@ -35,11 +35,17 @@ export default function MiniMapPicker({ lat, lng, onPick }: Props) {
         maxZoom:            20,
         attributionControl: false,
         dragRotate:         false,
+        transformRequest: (url: string) => {
+          if (url.includes("maps.vietmap.vn") && !url.includes("apikey=")) {
+            return { url: `${url}${url.includes("?") ? "&" : "?"}apikey=${VIETMAP_KEY}` }
+          }
+          return { url }
+        },
       })
       mapRef.current = map
 
-      map.on("load", () => {
-        map.resize()
+      map.on("load", () => { map.resize() })
+      map.on("style.load", () => {
         requestAnimationFrame(() => { applyBrandStyle(map) })
       })
       if (divRef.current) {

@@ -233,16 +233,28 @@ export default function AddressPickerClient({
         maxZoom:            20,
         attributionControl: false,
         dragRotate:         false,
+        // Inject apikey vào mọi tile request từ VietMap (kể cả URL bên trong style.json)
+        transformRequest: (url: string) => {
+          if (url.includes("maps.vietmap.vn") && !url.includes("apikey=")) {
+            return { url: `${url}${url.includes("?") ? "&" : "?"}apikey=${VIETMAP_KEY}` }
+          }
+          return { url }
+        },
       })
       mapRef.current = map
 
       map.on("load", () => {
-        // resize trước để đảm bảo MapLibre biết kích thước thực của container
         map.resize()
+      })
+      // style.load fire sau khi style.json + sources fully parsed → an toàn để applyBrandStyle
+      map.on("style.load", () => {
         requestAnimationFrame(() => { applyBrandStyle(map) })
         setTilesReady(true)
       })
-      map.on("error", () => { setTilesReady(true); setMapError(true) })
+      map.on("error", (e: any) => {
+        // Chỉ hiện error UI nếu style fail, không phải tile lỗi đơn lẻ
+        if (e?.error?.message?.includes("style")) { setTilesReady(true); setMapError(true) }
+      })
       map.on("dragstart", () => { setFloating(true); setShowSuggest(false) })
       map.on("dragend",   () => {
         setFloating(false)
