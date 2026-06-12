@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client"
 const SHIP_FEE_DEFAULT = 15000
 
 interface AppliedCombo { title: string; discount: number }
+interface ComboHint { title: string; discountLabel: string; missingNames: string[] }
 
 export default function CartPage() {
   const router   = useRouter()
@@ -23,6 +24,7 @@ export default function CartPage() {
 
   const [openNoteId,     setOpenNoteId]     = useState<string | null>(null)
   const [appliedCombos,  setAppliedCombos]  = useState<AppliedCombo[]>([])
+  const [comboHints,     setComboHints]     = useState<ComboHint[]>([])
   const [shipFee,        setShipFee]        = useState(SHIP_FEE_DEFAULT)
 
   // Load phí giao hàng tối thiểu từ app_settings
@@ -35,28 +37,39 @@ export default function CartPage() {
       })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Tự nhận diện combo đủ điều kiện
+  // Nhận diện combo: đủ điều kiện → applied, thiếu một phần → hint
   useEffect(() => {
-    if (!shopId || items.length === 0) { setAppliedCombos([]); return }
+    if (!shopId || items.length === 0) { setAppliedCombos([]); setComboHints([]); return }
     const now = new Date().toISOString()
     supabase.from("vouchers")
-      .select("id,title,discount_value,combo_items(product_id,min_quantity)")
+      .select("id,title,discount_type,discount_value,combo_items(product_id,min_quantity,products(name))")
       .eq("shop_id", shopId).eq("is_active", true).eq("is_combo", true).gte("valid_to", now)
       .then(({ data }) => {
         if (!data) return
         const matched: AppliedCombo[] = []
-        data.forEach((v: { id: string; title: string; discount_value: number; combo_items: { product_id: string; min_quantity: number }[] }) => {
-          const allMet = v.combo_items.every(ci => {
-            const totalQty = items
-              .filter(i => i.id.split("__")[0] === ci.product_id)
-              .reduce((s, i) => s + i.qty, 0)
-            return totalQty >= ci.min_quantity
-          })
-          if (allMet && v.combo_items.length > 0) {
+        const hints: ComboHint[] = []
+        type RawCombo = { id: string; title: string; discount_type: string; discount_value: number; combo_items: { product_id: string; min_quantity: number; products: { name: string } | { name: string }[] | null }[] }
+        ;(data as RawCombo[]).forEach(v => {
+          if (!v.combo_items?.length) return
+          const cartMap: Record<string, number> = {}
+          for (const item of items) cartMap[item.id.split("__")[0]] = (cartMap[item.id.split("__")[0]] ?? 0) + item.qty
+
+          const missing = v.combo_items.filter(ci => (cartMap[ci.product_id] ?? 0) < ci.min_quantity)
+          const discLabel = v.discount_type === "percent" ? `-${v.discount_value}%` : `-${v.discount_value.toLocaleString("vi-VN")}đ`
+
+          if (missing.length === 0) {
             matched.push({ title: v.title, discount: v.discount_value })
+          } else if (missing.length < v.combo_items.length) {
+            // Đã có 1 số món → gợi ý thêm món còn thiếu
+            const missingNames = missing.map(ci => {
+              const p = ci.products
+              return (Array.isArray(p) ? p[0]?.name : p?.name) ?? "món cần thêm"
+            })
+            hints.push({ title: v.title, discountLabel: discLabel, missingNames })
           }
         })
         setAppliedCombos(matched)
+        setComboHints(hints)
       })
   }, [items, shopId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -353,6 +366,34 @@ export default function CartPage() {
                   }}
                 />
               </Section>
+
+              {/* Combo hint — thiếu một số món, gợi ý quay lại quán */}
+              {comboHints.map((hint, i) => (
+                <motion.div key={i} initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
+                  style={{ marginBottom:8, background:"rgba(255,107,0,0.06)",
+                    border:"1px solid rgba(255,107,0,0.25)", borderRadius:12, padding:"10px 13px" }}>
+                  <div style={{ display:"flex", alignItems:"flex-start", gap:8 }}>
+                    <span style={{ fontSize:18, flexShrink:0 }}>🎁</span>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ color:"#FF8C00", fontSize:11, fontWeight:700, marginBottom:3 }}>
+                        Gần đủ combo · {hint.discountLabel}
+                      </div>
+                      <div style={{ color:"#b0956a", fontSize:10.5, lineHeight:1.5, marginBottom:7 }}>
+                        Thêm <strong style={{ color:"#f8f0e0" }}>{hint.missingNames.join(", ")}</strong> để nhận ưu đãi <em>"{hint.title}"</em>
+                      </div>
+                      <button type="button"
+                        onClick={() => router.push(`/shop/${shopId}`)}
+                        style={{ height:28, padding:"0 12px", borderRadius:8, border:"none",
+                          background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
+                          color:"#fff", fontSize:10.5, fontWeight:700,
+                          fontFamily:"'Lexend',sans-serif", cursor:"pointer",
+                          boxShadow:"0 2px 8px rgba(255,107,0,0.35)" }}>
+                        Vào quán thêm món →
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
 
               {/* Combo savings badge */}
               {appliedCombos.length > 0 && (
