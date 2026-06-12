@@ -138,6 +138,7 @@ export default function AddressPickerClient({
   const mapRef          = useRef<any>(null)
   const geocodeTimer    = useRef<ReturnType<typeof setTimeout>>(undefined)
   const searchTimer     = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const loadTimer       = useRef<ReturnType<typeof setTimeout>>(undefined)
   const autoNoteRef     = useRef("")
   const searchInputRef  = useRef<HTMLInputElement>(null)
   const skipGeocodeRef  = useRef(false)
@@ -236,9 +237,18 @@ export default function AddressPickerClient({
 
       map.on("load", () => {
         map.resize()
+        clearTimeout(loadTimer.current)
         setTilesReady(true)
       })
-      map.on("error", () => { setTilesReady(true); setMapError(true) })
+      // Bỏ qua tile errors (non-fatal), chỉ hiện lỗi nếu style fail
+      map.on("error", (e: any) => {
+        const isTileError = e?.tile != null || String(e?.error?.message ?? "").toLowerCase().includes("tile")
+        if (!isTileError) { clearTimeout(loadTimer.current); setTilesReady(true); setMapError(true) }
+      })
+      // Timeout: 12s nếu map vẫn chưa load
+      loadTimer.current = setTimeout(() => {
+        setTilesReady(t => { if (!t) { setMapError(true); return true } return t })
+      }, 12000)
       map.on("dragstart", () => { setFloating(true); setShowSuggest(false) })
       map.on("dragend",   () => {
         setFloating(false)
@@ -298,6 +308,7 @@ export default function AddressPickerClient({
     return () => {
       clearTimeout(geocodeTimer.current)
       clearTimeout(searchTimer.current)
+      clearTimeout(loadTimer.current)
       if (map) { map.remove(); mapRef.current = null }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
