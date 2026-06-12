@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react"
 function buildRasterStyle() {
   return {
     version: 8 as const,
-    sources: { vietmap: { type: "raster" as const, tiles: ["/api/tiles/{z}/{x}/{y}"], tileSize: 256 } },
+    sources: { vietmap: { type: "raster" as const, tiles: ["/api/tiles/{z}/{x}/{y}"], tileSize: 256, minzoom: 5, maxzoom: 17 } },
     layers: [{ id: "vietmap-raster", type: "raster" as const, source: "vietmap" }],
   }
 }

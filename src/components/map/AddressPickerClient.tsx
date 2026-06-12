@@ -12,6 +12,7 @@ const GEOCODE_MS = 600
 const SEARCH_MS  = 500
 
 // Proxy tile qua /api/tiles để tránh CORS — VietMap block Origin từ browser
+// maxzoom: 17 vì VietMap raster tiles không có zoom > 17 (trả 404)
 function buildRasterStyle() {
   return {
     version: 8 as const,
@@ -20,6 +21,8 @@ function buildRasterStyle() {
         type: "raster" as const,
         tiles: ["/api/tiles/{z}/{x}/{y}"],
         tileSize: 256,
+        minzoom: 5,
+        maxzoom: 17,
         attribution: "© VietMap",
       },
     },
