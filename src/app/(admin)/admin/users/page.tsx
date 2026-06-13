@@ -176,6 +176,7 @@ export default function AdminUsersPage() {
   const [importShopSearch, setImportShopSearch] = useState("")
   const [importShopId,     setImportShopId]     = useState<string | null>(null)
   const [importShopName,   setImportShopName]   = useState("")
+  const [importAutoShop,   setImportAutoShop]   = useState(false) // true = shop tự nhận từ SĐT trong file
   const [importItems,      setImportItems]       = useState<ImportMenuItem[] | null>(null)
   const [importError,      setImportError]       = useState("")
   const [importSaving,     setImportSaving]      = useState(false)
@@ -222,21 +223,57 @@ export default function AdminUsersPage() {
   }
 
   const onImportFile = (file: File) => {
-    setImportError(""); setImportItems(null)
+    setImportError(""); setImportItems(null); setImportShopId(null); setImportShopName(""); setImportAutoShop(false)
     const isXlsx = /\.(xlsx|xls)$/i.test(file.name)
-    const parse = (buf: ArrayBuffer | string) => {
+    const parse = async (buf: ArrayBuffer | string) => {
       try {
         const wb = isXlsx ? XLSX.read(new Uint8Array(buf as ArrayBuffer), { type: "array" }) : XLSX.read(buf as string, { type: "string" })
         const raw = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" }) as string[][]
-        const isHdr = raw[0] && /tên|name|món|danh|category/i.test(String(raw[0][0]) + String(raw[0][1]))
+
+        // Đọc SĐT từ dòng đầu — format: ["SĐT_QUAN:", "0901234567"]
+        let dataStart = 0
+        const firstCell = String(raw[0]?.[0] ?? "").trim()
+        if (/sdt|s\.đ\.t|phone|điện thoại|sdt_quan/i.test(firstCell)) {
+          const digits = String(raw[0]?.[1] ?? "").trim().replace(/\D/g, "")
+          if (digits.length >= 9) {
+            const suffix = digits.slice(-9) // so sánh 9 số cuối
+            const sb = createClient()
+            const { data: found } = await sb.from("shops")
+              .select("id,name,phone")
+              .ilike("phone", `%${suffix}`)
+              .eq("status", "approved")
+              .limit(1)
+            if (found && found.length > 0) {
+              setImportShopId(found[0].id)
+              setImportShopName(found[0].name)
+              setImportAutoShop(true)
+            } else {
+              setImportError(`❌ Không tìm thấy quán với SĐT ${digits}. Kiểm tra SĐT hoặc trạng thái quán.`)
+              return
+            }
+          } else {
+            setImportError("❌ SĐT trong file không hợp lệ. Vui lòng điền SĐT cửa hàng vào dòng đầu.")
+            return
+          }
+          dataStart = 1
+        } else {
+          setImportError("❌ File không có dòng SĐT. Dòng đầu phải là: SĐT_QUAN: | 0901234567")
+          return
+        }
+
+        // Header detection
+        const isHdr = raw[dataStart] && /tên|name|món|danh|category/i.test(String(raw[dataStart][0]) + String(raw[dataStart][1]))
         const items: ImportMenuItem[] = []
-        for (let i = isHdr ? 1 : 0; i < raw.length; i++) { const r = parseImportRow(raw[i].map(c => String(c ?? ""))); if (r) items.push(r) }
+        for (let i = dataStart + (isHdr ? 1 : 0); i < raw.length; i++) {
+          const r = parseImportRow(raw[i].map(c => String(c ?? "")))
+          if (r) items.push(r)
+        }
         if (items.length === 0) { setImportError("File trống hoặc sai định dạng"); return }
         setImportItems(items)
       } catch { setImportError("Không đọc được file. Vui lòng dùng file mẫu.") }
     }
-    if (isXlsx) { const r = new FileReader(); r.onload = e => parse(e.target?.result as ArrayBuffer); r.readAsArrayBuffer(file) }
-    else { const r = new FileReader(); r.onload = e => parse(e.target?.result as string); r.readAsText(file, "utf-8") }
+    if (isXlsx) { const r = new FileReader(); r.onload = e => { parse(e.target?.result as ArrayBuffer) }; r.readAsArrayBuffer(file) }
+    else { const r = new FileReader(); r.onload = e => { parse(e.target?.result as string) }; r.readAsText(file, "utf-8") }
   }
 
   const saveImportMenu = async () => {
@@ -1500,7 +1537,7 @@ export default function AdminUsersPage() {
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📥</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800 }}>Import Menu cho quán</div>
-                  <div style={{ color: "rgba(144,128,176,0.6)", fontSize: 10, marginTop: 1 }}>Chọn quán → tải file Excel → xem lại → lưu</div>
+                  <div style={{ color: "rgba(144,128,176,0.6)", fontSize: 10, marginTop: 1 }}>Tải file Excel → xem lại → lưu (SĐT quán đọc tự động từ file)</div>
                 </div>
                 <button onClick={() => { setShowImport(false); setImportItems(null) }}
                   style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "none", color: "#6a5a40", fontSize: 18, cursor: "pointer" }}>×</button>
@@ -1508,55 +1545,12 @@ export default function AdminUsersPage() {
 
               <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
 
-                {/* STEP 1: Chọn quán */}
+                {/* STEP 1: Upload file — SĐT đọc tự động từ dòng đầu */}
                 <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(74,143,245,0.18)", borderRadius: 14, padding: "13px 14px" }}>
-                  <div style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, marginBottom: 8, textTransform: "uppercase" }}>① Chọn cửa hàng</div>
-                  <div style={{ position: "relative" }}>
-                    <input value={importShopSearch}
-                      onChange={e => { setImportShopSearch(e.target.value); setImportShopId(null); setImportShopName("") }}
-                      placeholder="Tìm theo tên quán hoặc số điện thoại..."
-                      style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: `1px solid ${importShopId ? "rgba(62,207,110,0.5)" : "rgba(255,255,255,0.12)"}`, borderRadius: 10, padding: "10px 12px", color: "#f0eaff", fontSize: 12, boxSizing: "border-box" as const }} />
-                    {importShopId && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "#3ecf6e", fontSize: 14 }}>✓</span>}
+                  <div style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, marginBottom: 10, textTransform: "uppercase" }}>① Upload file Excel / CSV</div>
+                  <div style={{ color: "#6a5a40", fontSize: 9, marginBottom: 10 }}>
+                    Dòng đầu file phải là: <span style={{ color: "#b0956a", fontWeight: 700 }}>SĐT_QUAN: | 0901234567</span> — hệ thống tự tìm quán theo SĐT
                   </div>
-                  {/* Results dropdown */}
-                  {importShopSearch.length >= 2 && !importShopId && (() => {
-                    const q = importShopSearch.toLowerCase()
-                    const results = merchants
-                      .filter(m => m.shopName.toLowerCase().includes(q) || m.phone.includes(q))
-                      .slice(0, 6)
-                    return results.length > 0 ? (
-                      <div style={{ marginTop: 6, background: "rgba(10,8,20,0.98)", border: "1px solid rgba(74,143,245,0.2)", borderRadius: 10, overflow: "hidden" }}>
-                        {results.map((m, i) => (
-                          <div key={m.id}
-                            onClick={() => { setImportShopId(m.id); setImportShopName(m.shopName); setImportShopSearch(m.shopName) }}
-                            style={{ padding: "9px 12px", cursor: "pointer", borderTop: i > 0 ? "1px solid rgba(255,255,255,0.04)" : "none", display: "flex", alignItems: "center", gap: 9 }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(74,143,245,0.08)")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                            <span style={{ fontSize: 16 }}>🏪</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ color: "#f0eaff", fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.shopName}</div>
-                              <div style={{ color: "#6a5a40", fontSize: 9 }}>{m.phone} · {m.address.split(",")[0]}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : <div style={{ marginTop: 6, color: "#6a5a40", fontSize: 10, padding: "6px 12px" }}>Không tìm thấy quán phù hợp</div>
-                  })()}
-                  {importShopId && (
-                    <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, background: "rgba(62,207,110,0.07)", border: "1px solid rgba(62,207,110,0.2)", borderRadius: 9, padding: "7px 11px" }}>
-                      <span>🏪</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>{importShopName}</div>
-                      </div>
-                      <button onClick={() => { setImportShopId(null); setImportShopSearch(""); setImportShopName("") }}
-                        style={{ background: "none", border: "none", color: "#6a5a40", fontSize: 14, cursor: "pointer" }}>✕</button>
-                    </div>
-                  )}
-                </div>
-
-                {/* STEP 2: Upload file */}
-                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(74,143,245,0.18)", borderRadius: 14, padding: "13px 14px" }}>
-                  <div style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, marginBottom: 10, textTransform: "uppercase" }}>② Upload file Excel / CSV</div>
                   <input ref={importFileRef} type="file" accept=".xlsx,.xls,.csv"
                     onChange={e => { const f = e.target.files?.[0]; if (f) onImportFile(f); e.target.value = "" }}
                     style={{ display: "none" }} />
@@ -1566,24 +1560,41 @@ export default function AdminUsersPage() {
                       📎 Chọn file .xlsx / .csv
                     </button>
                     <button onClick={() => {
-                      const headers = ["Danh mục","Tên món *","Mô tả / Nguyên liệu","Giá bán * (đ)","Giá KM (đ)","Badge","Đang bán"]
-                      const samples = [["Cơm","Cơm sườn bì chả","Cơm + sườn + bì + chả",40000,"","bestseller","CÓ"],["Đồ uống","Trà đá","Trà mát lạnh",5000,"","","CÓ"]]
-                      const ws = XLSX.utils.aoa_to_sheet([headers,...samples])
-                      ws["!cols"] = [{wch:16},{wch:26},{wch:36},{wch:14},{wch:12},{wch:12},{wch:11}]
-                      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Danh sách món")
+                      const phoneRow = ["SĐT_QUAN:", "0901234567 (điền SĐT quán vào đây)"]
+                      const headers = ["Danh mục (tối đa 3)","Nhóm menu","Tên món *","Mô tả / Nguyên liệu","Giá bán * (đ)","Giá KM (đ)","Badge","Đang bán","Giờ từ","Giờ đến","Sizes","Toppings"]
+                      const samples = [
+                        ["Cơm, Buổi trưa","Cơm","Cơm sườn bì chả","Cơm + sườn + bì + chả",40000,"","bestseller","CÓ","","","",""],
+                        ["Đồ uống","Trà","Trà đá","Mát lạnh",5000,"","","CÓ","","","",""],
+                      ]
+                      const ws = XLSX.utils.aoa_to_sheet([phoneRow, headers, ...samples])
+                      ws["!cols"] = [{wch:18},{wch:14},{wch:26},{wch:30},{wch:14},{wch:12},{wch:12},{wch:10},{wch:9},{wch:9},{wch:18},{wch:20}]
+                      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "📋 Danh sách món")
                       XLSX.writeFile(wb, "template_menu_giaonhanh.xlsx")
                     }} style={{ height: 40, padding: "0 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#6a5a40", fontSize: 10, cursor: "pointer" }}>
                       ↓ File mẫu
                     </button>
                   </div>
                   {importError && <div style={{ marginTop: 8, color: "#ff4040", fontSize: 10, background: "rgba(255,64,64,0.08)", border: "1px solid rgba(255,64,64,0.2)", borderRadius: 8, padding: "6px 10px" }}>⚠️ {importError}</div>}
+                  {/* Shop auto-detected từ SĐT trong file */}
+                  {importAutoShop && importShopId && (
+                    <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8,
+                      background: "rgba(62,207,110,0.07)", border: "1px solid rgba(62,207,110,0.25)",
+                      borderRadius: 10, padding: "8px 12px" }}>
+                      <span style={{ fontSize: 16 }}>🏪</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>{importShopName}</div>
+                        <div style={{ color: "#6a5a40", fontSize: 9 }}>Tự động nhận diện từ SĐT trong file</div>
+                      </div>
+                      <span style={{ color: "#3ecf6e", fontSize: 16 }}>✓</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* STEP 3: Preview + Edit */}
+                {/* STEP 2: Preview + Edit */}
                 {importItems && importItems.length > 0 && (
                   <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(74,143,245,0.18)", borderRadius: 14, padding: "13px 14px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                      <div style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", flex: 1 }}>③ Xem lại danh sách</div>
+                      <div style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", flex: 1 }}>② Xem lại danh sách</div>
                       <div style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 700 }}>{importItems.length} món · {[...new Set(importItems.map(r => r.category).filter(Boolean))].length} nhóm</div>
                     </div>
                     <div style={{ maxHeight: 320, overflowY: "auto", display: "flex", flexDirection: "column", gap: 5 }}>
