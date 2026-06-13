@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import AddressPicker from "@/components/map/AddressPicker"
 import { createClient } from "@/lib/supabase/client"
 import type { AddressPickerResult } from "@/types"
-import { reverseGeocodeStructured, haversineKm, calcDeliveryFeeFromPricing } from "@/lib/vietmapRoute"
+import { reverseGeocodeStructured, getRouteKm, calcDeliveryFeeFromPricing } from "@/lib/vietmapRoute"
 
 type BuyItem = { id: number; name: string; qty: number; price: string }
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
@@ -59,8 +59,10 @@ export default function MuaHoPage() {
   }, [])
 
   useEffect(() => {
-    if (pickupCoord && deliveryCoord)
-      setDistanceKm(haversineKm(pickupCoord.lat, pickupCoord.lng, deliveryCoord.lat, deliveryCoord.lng))
+    if (!pickupCoord || !deliveryCoord) { setDistanceKm(null); return }
+    setDistanceKm(null)
+    getRouteKm(pickupCoord.lat, pickupCoord.lng, deliveryCoord.lat, deliveryCoord.lng)
+      .then(km => setDistanceKm(Math.round(km * 10) / 10))
   }, [pickupCoord, deliveryCoord])
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2300) }

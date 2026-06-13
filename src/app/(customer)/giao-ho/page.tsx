@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import AddressPicker from "@/components/map/AddressPicker"
 import { createClient } from "@/lib/supabase/client"
-import { reverseGeocodeStructured, haversineKm, calcDeliveryFeeFromPricing } from "@/lib/vietmapRoute"
+import { reverseGeocodeStructured, getRouteKm, calcDeliveryFeeFromPricing } from "@/lib/vietmapRoute"
 import type { AddressPickerResult } from "@/types"
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
@@ -128,14 +128,12 @@ export default function GiaoHoPage() {
     )
   }, [])
 
-  // Tính khoảng cách khi có đủ 2 toạ độ
+  // Tính khoảng cách theo cung đường thực khi có đủ 2 toạ độ
   useEffect(() => {
-    if (pickupCoord && deliveryCoord) {
-      const km = haversineKm(pickupCoord.lat, pickupCoord.lng, deliveryCoord.lat, deliveryCoord.lng)
-      setDistanceKm(Math.round(km * 10) / 10)
-    } else {
-      setDistanceKm(null)
-    }
+    if (!pickupCoord || !deliveryCoord) { setDistanceKm(null); return }
+    setDistanceKm(null) // reset để UI hiện loading
+    getRouteKm(pickupCoord.lat, pickupCoord.lng, deliveryCoord.lat, deliveryCoord.lng)
+      .then(km => setDistanceKm(Math.round(km * 10) / 10))
   }, [pickupCoord, deliveryCoord])
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {

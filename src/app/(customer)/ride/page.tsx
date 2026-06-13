@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import AddressPicker from "@/components/map/AddressPicker";
 import { createClient } from "@/lib/supabase/client";
-import { haversineKm } from "@/lib/vietmapRoute";
+import { getRouteKm } from "@/lib/vietmapRoute";
 import type { AddressPickerResult } from "@/types";
 
 // Same row-based fare calc as taxi
@@ -56,14 +56,12 @@ function RideContent() {
       })
   }, [])
 
-  // Recalculate distance when both coords are available
+  // Tính km cung đường thực khi có đủ 2 toạ độ (fallback haversine nếu API lỗi)
   useEffect(() => {
-    if (pickupCoord && destCoord) {
-      const km = haversineKm(pickupCoord.lat, pickupCoord.lng, destCoord.lat, destCoord.lng)
-      setDistanceKm(parseFloat(km.toFixed(1)))
-    } else {
-      setDistanceKm(0)
-    }
+    if (!pickupCoord || !destCoord) { setDistanceKm(0); return }
+    setDistanceKm(0)
+    getRouteKm(pickupCoord.lat, pickupCoord.lng, destCoord.lat, destCoord.lng)
+      .then(km => setDistanceKm(parseFloat(km.toFixed(1))))
   }, [pickupCoord, destCoord])
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }

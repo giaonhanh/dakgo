@@ -7,38 +7,9 @@ import { formatPrice } from "@/lib/utils"
 import AddressPicker from "@/components/map/AddressPicker"
 import { createClient } from "@/lib/supabase/client"
 import type { AddressPickerResult } from "@/types"
-import { reverseGeocodeStructured, haversineKm } from "@/lib/vietmapRoute"
+import { reverseGeocodeStructured, getRouteKm, calcDeliveryFeeFromPricing } from "@/lib/vietmapRoute"
 
-function calcFeeFromRows(km: number, rows: string[], extra: string): number {
-  const effectiveKm = Math.max(km, 1)
-  const wholeKm     = Math.floor(effectiveKm)
-  const fracKm      = effectiveKm - wholeKm
-  const extraPrice  = parseInt(extra) || 0
-
-  const getPriceAt = (i: number): number => {
-    const idx = Math.min(i, rows.length - 1)
-    for (let j = idx; j >= 0; j--) {
-      if (rows[j] && rows[j] !== "") return parseInt(rows[j]) || 0
-    }
-    return 0
-  }
-
-  let total = 0
-  for (let i = 0; i < Math.min(wholeKm, 10); i++) total += getPriceAt(i)
-  if (wholeKm > 10) total += (wholeKm - 10) * extraPrice
-  if (fracKm > 0) {
-    const fracPrice = wholeKm < 10 ? getPriceAt(wholeKm) : extraPrice
-    total += Math.round(fracKm * fracPrice)
-  }
-  return total
-}
-
-// estimateKm chỉ dùng khi chưa có tọa độ thực — trả 0 để UI hiện "Chưa tính được"
-// Khi đã có tọa độ, dùng haversineKm trực tiếp.
-function estimateKm(pickupCoord: { lat: number; lng: number } | null, destCoord: { lat: number; lng: number } | null): number {
-  if (!pickupCoord || !destCoord) return 0
-  return haversineKm(pickupCoord.lat, pickupCoord.lng, destCoord.lat, destCoord.lng)
-}
+const calcFeeFromRows = calcDeliveryFeeFromPricing
 
 export default function XeOmPage() {
   const router   = useRouter()
@@ -57,6 +28,15 @@ export default function XeOmPage() {
   const [serviceEnabled, setServiceEnabled] = useState(true)
   const [serviceMsg,     setServiceMsg]     = useState("Dịch vụ xe ôm tạm ngừng phục vụ. Vui lòng thử lại sau.")
   const [onlineCount,    setOnlineCount]    = useState<number | null>(null)
+  const [distanceKm,     setDistanceKm]     = useState<number>(0)
+
+  // Tính km cung đường thực khi có đủ 2 toạ độ
+  useEffect(() => {
+    if (!pickupCoord || !destCoord) { setDistanceKm(0); return }
+    setDistanceKm(0)
+    getRouteKm(pickupCoord.lat, pickupCoord.lng, destCoord.lat, destCoord.lng)
+      .then(km => setDistanceKm(parseFloat(km.toFixed(1))))
+  }, [pickupCoord, destCoord])
 
   // Auto-detect GPS pickup
   useEffect(() => {
@@ -96,7 +76,7 @@ export default function XeOmPage() {
   }, [])
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
-  const estimatedKm    = estimateKm(pickupCoord, destCoord)
+  const estimatedKm    = distanceKm
   const estimatedPrice = estimatedKm > 0 ? calcFeeFromRows(estimatedKm, pricingRows, pricingExtra) : 0
 
   const handleBook = async () => {
