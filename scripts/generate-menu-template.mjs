@@ -92,7 +92,7 @@ async function main() {
     const row = ws.addRow(rowData)
     row.height = 20
     row.eachCell({ includeEmpty: true }, (cell) => {
-      cell.font = { name: "Arial", size: 9 }
+      cell.font = { name: "Arial", size: 9, color: { argb: "FFFFFFFF" } }
       cell.fill = {
         type: "pattern",
         pattern: "solid",
