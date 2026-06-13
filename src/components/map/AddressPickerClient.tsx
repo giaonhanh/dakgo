@@ -295,7 +295,7 @@ export default function AddressPickerClient({
   // FlyTo when flyTarget changes — flyTarget is [lat, lng], MapLibre needs [lng, lat]
   useEffect(() => {
     if (!flyTarget || !mapRef.current) return
-    mapRef.current.flyTo({ center: [flyTarget[1], flyTarget[0]], zoom: 18 })
+    mapRef.current.flyTo({ center: [flyTarget[1], flyTarget[0]], zoom: 16 })
   }, [flyTarget])
 
   const handleGPS = useCallback(() => {
