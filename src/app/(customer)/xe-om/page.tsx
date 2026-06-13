@@ -7,26 +7,37 @@ import { formatPrice } from "@/lib/utils"
 import AddressPicker from "@/components/map/AddressPicker"
 import { createClient } from "@/lib/supabase/client"
 import type { AddressPickerResult } from "@/types"
-import { reverseGeocodeStructured } from "@/lib/vietmapRoute"
+import { reverseGeocodeStructured, haversineKm } from "@/lib/vietmapRoute"
 
 function calcFeeFromRows(km: number, rows: string[], extra: string): number {
-  const kmInt = Math.ceil(Math.max(km, 1))
-  let total = 0
-  for (let i = 0; i < Math.min(kmInt, 10); i++) {
-    let price = 0
-    for (let j = i; j >= 0; j--) {
-      if (rows[j] && rows[j] !== "") { price = parseInt(rows[j]) || 0; break }
+  const effectiveKm = Math.max(km, 1)
+  const wholeKm     = Math.floor(effectiveKm)
+  const fracKm      = effectiveKm - wholeKm
+  const extraPrice  = parseInt(extra) || 0
+
+  const getPriceAt = (i: number): number => {
+    const idx = Math.min(i, rows.length - 1)
+    for (let j = idx; j >= 0; j--) {
+      if (rows[j] && rows[j] !== "") return parseInt(rows[j]) || 0
     }
-    total += price
+    return 0
   }
-  if (kmInt > 10) total += (kmInt - 10) * (parseInt(extra) || 0)
+
+  let total = 0
+  for (let i = 0; i < Math.min(wholeKm, 10); i++) total += getPriceAt(i)
+  if (wholeKm > 10) total += (wholeKm - 10) * extraPrice
+  if (fracKm > 0) {
+    const fracPrice = wholeKm < 10 ? getPriceAt(wholeKm) : extraPrice
+    total += Math.round(fracKm * fracPrice)
+  }
   return total
 }
 
-function estimateKm(dest: string): number {
-  if (!dest) return 0
-  const seed = dest.split("").reduce((a, c) => a + c.charCodeAt(0), 0)
-  return parseFloat(((seed % 60 + 10) / 10).toFixed(1))
+// estimateKm chỉ dùng khi chưa có tọa độ thực — trả 0 để UI hiện "Chưa tính được"
+// Khi đã có tọa độ, dùng haversineKm trực tiếp.
+function estimateKm(pickupCoord: { lat: number; lng: number } | null, destCoord: { lat: number; lng: number } | null): number {
+  if (!pickupCoord || !destCoord) return 0
+  return haversineKm(pickupCoord.lat, pickupCoord.lng, destCoord.lat, destCoord.lng)
 }
 
 export default function XeOmPage() {
@@ -85,8 +96,8 @@ export default function XeOmPage() {
   }, [])
 
   const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500) }
-  const estimatedKm    = estimateKm(dest)
-  const estimatedPrice = calcFeeFromRows(estimatedKm, pricingRows, pricingExtra)
+  const estimatedKm    = estimateKm(pickupCoord, destCoord)
+  const estimatedPrice = estimatedKm > 0 ? calcFeeFromRows(estimatedKm, pricingRows, pricingExtra) : 0
 
   const handleBook = async () => {
     if (!dest.trim()) { fireToast("Vui lòng nhập điểm đến"); return }
@@ -200,12 +211,12 @@ export default function XeOmPage() {
                   <span style={{ background:"linear-gradient(90deg,#4a8ff5,#7ab3ff)",
                     WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
                     backgroundClip:"text",fontSize:22,fontWeight:900 }}>
-                    {dest ? formatPrice(estimatedPrice) : `Từ ${formatPrice(calcFeeFromRows(1, pricingRows, pricingExtra))}`}
+                    {estimatedKm > 0 ? formatPrice(estimatedPrice) : `Từ ${formatPrice(calcFeeFromRows(1, pricingRows, pricingExtra))}`}
                   </span>
                 </div>
-                {dest && (
+                {estimatedKm > 0 && (
                   <div style={{ color:"#6a5a40",fontSize: 11,marginTop:4 }}>
-                    ~{estimatedKm}km · {Math.round(estimatedKm * 3 + 5)}–{Math.round(estimatedKm * 4 + 8)} phút
+                    ~{estimatedKm.toFixed(1)}km · {Math.round(estimatedKm * 3 + 5)}–{Math.round(estimatedKm * 4 + 8)} phút
                   </div>
                 )}
               </div>
@@ -299,7 +310,7 @@ export default function XeOmPage() {
                   </div>
                   <div style={{ textAlign:"right" }}>
                     <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:2 }}>Khoảng cách</div>
-                    <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>{estimatedKm} km</div>
+                    <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>{estimatedKm.toFixed(1)} km</div>
                     <div style={{ color:"#6a5a40",fontSize: 11,marginTop:2 }}>
                       {Math.round(estimatedKm * 3 + 5)}–{Math.round(estimatedKm * 4 + 8)} phút
                     </div>

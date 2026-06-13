@@ -19,7 +19,8 @@ const CARS: Record<CarType, { emoji: string; label: string; sub: string; seats: 
 function calcFare(baseFare: number, perKm: number, km: number, perKmOver30 = perKm): number {
   const base = Math.min(Math.max(0, km - 1), 29)
   const over = Math.max(0, km - 30)
-  return Math.round((baseFare + base * perKm + over * perKmOver30) / 1000) * 1000
+  // làm tròn 500đ để số tự nhiên hơn mà không quá thô (tránh luôn tròn nghìn)
+  return Math.round((baseFare + base * perKm + over * perKmOver30) / 500) * 500
 }
 
 function isNightTime(start: string, end: string): boolean {
@@ -158,9 +159,9 @@ export default function TaxiPage() {
 
   function applyNight(fare: number, km = 1): number {
     if (!isNight) return fare
-    if (taxiNight.type === "percent") return Math.round(fare * (1 + taxiNight.value / 100) / 1000) * 1000
-    if (taxiNight.type === "per_km")  return Math.round((fare + km * taxiNight.value) / 1000) * 1000
-    return Math.round((fare + taxiNight.value) / 1000) * 1000 // flat
+    if (taxiNight.type === "percent") return Math.round(fare * (1 + taxiNight.value / 100) / 500) * 500
+    if (taxiNight.type === "per_km")  return Math.round((fare + km * taxiNight.value) / 500) * 500
+    return Math.round((fare + taxiNight.value) / 500) * 500 // flat
   }
 
   const v = carType === "7cho" ? taxi7 : taxi4
