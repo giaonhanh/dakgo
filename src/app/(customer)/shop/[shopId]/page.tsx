@@ -1085,7 +1085,7 @@ export default function ShopPage() {
             </div>
           )}
 
-          {/* ── Shop promotions — horizontal scroll strip ── */}
+          {/* ── Shop promotions — 2-up grid, swipe if > 2 ── */}
           {combos.length > 0 && (
             <div style={{ padding:"12px 0 4px" }}>
               {/* Header */}
@@ -1093,10 +1093,24 @@ export default function ShopPage() {
                 <span style={{ fontSize:12 }}>🎁</span>
                 <span style={{ color:"#f8f0e0", fontSize:11, fontWeight:700 }}>Ưu đãi &amp; Combo</span>
                 <span style={{ color:"#6a5a40", fontSize:10 }}>({combos.length})</span>
+                {combos.length > 2 && (
+                  <span style={{ marginLeft:"auto", color:"#FF8C00", fontSize:10, fontWeight:700,
+                    display:"flex", alignItems:"center", gap:2 }}>
+                    Vuốt xem thêm <span style={{ fontSize:13, lineHeight:1 }}>›</span>
+                  </span>
+                )}
               </div>
-              {/* Horizontal strip */}
-              <div style={{ display:"flex", gap:8, overflowX:"auto", padding:"0 14px 4px",
-                scrollbarWidth:"none", msOverflowStyle:"none" } as React.CSSProperties}>
+
+              {/* Scroll strip — cards sized so exactly 2 fit; 3rd peeks ~20px when > 2 */}
+              <div style={{ position:"relative" }}>
+              <div style={{
+                display:"flex", gap:8,
+                overflowX: combos.length > 2 ? "auto" : "visible",
+                padding:"0 14px 6px",
+                scrollbarWidth:"none", msOverflowStyle:"none",
+                scrollSnapType: combos.length > 2 ? "x mandatory" : undefined,
+                WebkitOverflowScrolling:"touch",
+              } as React.CSSProperties}>
                 {combos.map(combo => {
                   const isCombo = combo.isCombo
                   const discountText = combo.discountType === "percent"
@@ -1113,13 +1127,27 @@ export default function ShopPage() {
                     ? combo.comboItems.map(ci => `${ci.products?.name ?? "?"}${ci.min_quantity > 1 ? ` ×${ci.min_quantity}` : ""}`).join(" + ")
                     : null
 
+                  /*
+                   * Width logic:
+                   *  ≤ 2 vouchers → chia đôi container: calc((100% - 8px) / 2)
+                   *  > 2 vouchers → thu nhỏ để cái thứ 3 lộ ~20px bên phải:
+                   *    calc((100vw - 28px - 8px) / 2 - 10px)
+                   *    (28px = 14px pad×2, 8px = gap, 10px = bù để lộ peek)
+                   */
+                  const cardWidth = combos.length > 2
+                    ? "calc((100vw - 36px) / 2 - 10px)"
+                    : "calc((100% - 8px) / 2)"
+
                   return (
                     <div key={combo.id} style={{
-                      flexShrink:0, width:168,
+                      flexShrink:0,
+                      width: cardWidth,
+                      minWidth: cardWidth,
+                      scrollSnapAlign: combos.length > 2 ? "start" : undefined,
                       background:ac.bg, border:`1px solid ${ac.border}`,
                       borderRadius:12, overflow:"hidden",
                       display:"flex", flexDirection:"column",
-                    }}>
+                    } as React.CSSProperties}>
                       {/* Top accent bar */}
                       <div style={{ height:3, background: ac.btn }} />
 
@@ -1178,6 +1206,16 @@ export default function ShopPage() {
                   )
                 })}
               </div>
+
+              {/* Peek fade — overlay cạnh phải, gợi ý còn nội dung */}
+              {combos.length > 2 && (
+                <div style={{
+                  position:"absolute", right:0, top:0, bottom:6,
+                  width:44, pointerEvents:"none",
+                  background:"linear-gradient(to left, var(--bg-primary) 20%, transparent 100%)",
+                }} />
+              )}
+              </div>{/* end position:relative wrapper */}
             </div>
           )}
 
