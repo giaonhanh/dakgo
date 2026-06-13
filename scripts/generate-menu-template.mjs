@@ -92,11 +92,11 @@ async function main() {
     const row = ws.addRow(rowData)
     row.height = 20
     row.eachCell({ includeEmpty: true }, (cell) => {
-      cell.font = { name: "Arial", size: 9, color: { argb: "FFFFFFFF" } }
+      cell.font = { name: "Arial", size: 9, color: { argb: "FF000000" } }
       cell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "FF1A1208" },
+        fgColor: { argb: "FFFFFFFF" },
       }
       cell.alignment = { vertical: "middle" }
     })
