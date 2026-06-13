@@ -6,32 +6,12 @@ import { useRouter } from "next/navigation"
 import AddressPicker from "@/components/map/AddressPicker"
 import { createClient } from "@/lib/supabase/client"
 import type { AddressPickerResult } from "@/types"
-import { reverseGeocodeStructured } from "@/lib/vietmapRoute"
+import { reverseGeocodeStructured, haversineKm, calcDeliveryFeeFromPricing } from "@/lib/vietmapRoute"
 
 type BuyItem = { id: number; name: string; qty: number; price: string }
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLng = (lng2 - lng1) * Math.PI / 180
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-}
-
-function calcFeeFromRows(km: number, rows: string[], extra: string): number {
-  const kmInt = Math.ceil(Math.max(km, 1))
-  let total = 0
-  for (let i = 0; i < Math.min(kmInt, 10); i++) {
-    let price = 0
-    for (let j = i; j >= 0; j--) {
-      if (rows[j] && rows[j] !== "") { price = parseInt(rows[j]) || 0; break }
-    }
-    total += price
-  }
-  if (kmInt > 10) total += (kmInt - 10) * (parseInt(extra) || 0)
-  return total
-}
+const calcFeeFromRows = calcDeliveryFeeFromPricing
 
 export default function MuaHoPage() {
   const router   = useRouter()

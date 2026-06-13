@@ -68,7 +68,7 @@ export async function getRouteKm(
   return haversineKm(fromLat, fromLng, toLat, toLng)
 }
 
-/** Tính phí theo cấu hình admin (pricing.food từ app_settings) */
+/** Tính phí theo cấu hình admin — dùng cho food delivery, xe ôm, giao hộ, mua hộ */
 export function calcDeliveryFeeFromPricing(
   km: number,
   rows: string[],
