@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       name: fullName,
       phone: phone ?? null,
       shop_type: shopType,
-      status: "pending",
+      status: "approved",
       is_open: false,
     })
   }
