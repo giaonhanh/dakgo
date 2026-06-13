@@ -187,6 +187,23 @@ export default function AdminUsersPage() {
   const [importAutoShop,   setImportAutoShop]   = useState(false)
   const importFileRef = useRef<HTMLInputElement>(null)
 
+  const parseImportSizes = (raw: string) => {
+    if (!raw.trim()) return null
+    const items = raw.split(",").map(s => s.trim()).filter(Boolean).map((s, i) => {
+      const [label, priceStr] = s.split(":").map(x => x.trim())
+      return { id: `s${i}`, label: label || s, _abs: parseInt((priceStr ?? "").replace(/\D/g, "")) || 0 }
+    })
+    return items.map((s, _, arr) => ({ id: s.id, label: s.label, priceDiff: s._abs - (arr[0]?._abs ?? 0) }))
+  }
+
+  const parseImportToppings = (raw: string) => {
+    if (!raw.trim()) return null
+    return raw.split(",").map(s => s.trim()).filter(Boolean).map((s, i) => {
+      const [name, priceStr] = s.split(":").map(x => x.trim())
+      return { id: `t${i}`, name: name || s, price: parseInt((priceStr ?? "").replace(/\D/g, "")) || 0 }
+    })
+  }
+
   const parseImportRow = (cols: string[]): ImportMenuItem | null => {
     // A=SĐT | B=Cat1 | C=Cat2 | D=Cat3 | E=NhómMenu | F=Tên | G=MôTả | H=Giá | I=Size | J=Topping
     const phone       = cols[0]?.trim().replace(/\D/g, "") ?? ""
@@ -244,6 +261,7 @@ export default function AdminUsersPage() {
           const { data } = await sb.from("shops")
             .select("id,name,phone")
             .ilike("phone", `%${suffix}`)
+            .eq("status", "approved")
             .limit(1)
           if (data && data.length > 0) {
             shopMap.set(phone, { id: data[0].id, name: data[0].name })
@@ -293,6 +311,8 @@ export default function AdminUsersPage() {
       const nextOrder = orderCache.get(shopId) ?? 0
       orderCache.set(shopId, nextOrder + 1)
 
+      const sizes    = parseImportSizes(item.sizesRaw)
+      const toppings = parseImportToppings(item.toppingsRaw)
       const { error } = await sb.from("products").insert({
         shop_id: shopId,
         name: item.name,
@@ -306,6 +326,8 @@ export default function AdminUsersPage() {
         all_day: true,
         start_hour: null,
         end_hour: null,
+        sizes: sizes ?? null,
+        toppings: toppings ?? null,
         sold_count: 0,
         sort_order: nextOrder,
       })
