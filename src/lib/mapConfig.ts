@@ -1,5 +1,23 @@
+import type { StyleSpecification } from "maplibre-gl"
+
 export const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
-export const MAP_STYLE   = "https://maps.vietmap.vn/mt/styles/tm/style.json"
+
+// VietMap mã hóa vector tile (cần SDK riêng để giải mã) — maplibre-gl thuần không đọc được
+// (lỗi "Unimplemented type: 7"). Dùng RASTER tile PNG (không mã hóa) thay thế: đường + nhãn
+// đã render sẵn trong ảnh, render được ngay với maplibre-gl chuẩn. apikey do vmTransform inject.
+export const MAP_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    vietmap: {
+      type: "raster",
+      tiles: ["https://maps.vietmap.vn/api/tm/{z}/{x}/{y}.png"],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: "© VietMap",
+    },
+  },
+  layers: [{ id: "vietmap-base", type: "raster", source: "vietmap" }],
+}
 
 // True khi build/deploy thiếu env NEXT_PUBLIC_VIETMAP_TILEMAP_KEY.
 // Tile của VietMap sẽ trả 401 → bản đồ trắng. Dùng cờ này để hiện overlay cảnh báo.
