@@ -38,7 +38,13 @@ export async function POST(req: NextRequest) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  const { error } = await adminClient.auth.admin.updateUserById(userId, { password: newPassword })
+  // Lấy phone từ profiles để sync email về phone@giaonhanh.local
+  const { data: prof } = await adminClient.from("profiles").select("phone").eq("id", userId).single()
+  const phone = (prof?.phone ?? "").replace(/\D/g, "")
+  const updates: { password: string; email?: string } = { password: newPassword }
+  if (phone) updates.email = `${phone}@giaonhanh.local`
+
+  const { error } = await adminClient.auth.admin.updateUserById(userId, updates)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ success: true })

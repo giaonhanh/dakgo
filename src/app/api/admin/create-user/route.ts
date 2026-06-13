@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     role?: "customer" | "driver" | "merchant"; shopType?: "partner" | "delivery"
   }
 
-  if (!email || !password || !fullName || !role) {
+  if (!password || !fullName || !role) {
     return NextResponse.json({ error: "Thiếu thông tin bắt buộc" }, { status: 400 })
   }
   if (password.length < 6) {
@@ -44,9 +44,14 @@ export async function POST(req: NextRequest) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
+  // Dùng phone@giaonhanh.local để đồng bộ với login page
+  const cleanPhone = (phone ?? "").replace(/\D/g, "")
+  const authEmail = cleanPhone ? `${cleanPhone}@giaonhanh.local` : (email ?? "")
+  if (!authEmail) return NextResponse.json({ error: "Cần SĐT hoặc email" }, { status: 400 })
+
   // Create auth user (no email confirmation)
   const { data: created, error: authErr } = await adminClient.auth.admin.createUser({
-    email,
+    email: authEmail,
     password,
     email_confirm: true,
   })
