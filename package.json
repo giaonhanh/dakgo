@@ -46,6 +46,7 @@
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "15.0.0",
+    "exceljs": "^4.4.0",
     "typescript": "^5"
   }
 }
