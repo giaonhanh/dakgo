@@ -158,118 +158,116 @@ export default function AdminUsersPage() {
   const [cuError,         setCuError]         = useState("")
 
   // ── Import Menu states ──
+  // Format: A=SĐT | B=Cat1 | C=Cat2 | D=Cat3 | E=NhómMenu | F=Tên | G=MôTả | H=Giá | I=Size | J=Topping
   interface ImportMenuItem {
-    categories: string[]   // danh mục app (col 0)
-    category: string       // nhóm menu nội bộ (col 1)
-    name: string           // tên món (col 2)
-    description: string    // mô tả (col 3)
-    price: number          // giá bán (col 4)
-    promoPrice: number | null  // giá KM (col 5)
-    badge: "hot"|"bigsale"|"bestseller"|"new"|null  // col 6
-    isAvailable: boolean   // col 7
-    startHour: string      // col 8
-    endHour: string        // col 9
-    sizesRaw: string       // col 10
-    toppingsRaw: string    // col 11
+    phone: string          // col A
+    categories: string[]   // B+C+D dedup
+    category: string       // col E — nhóm menu nội bộ (products.category)
+    name: string           // col F
+    description: string    // col G
+    price: number          // col H
+    sizesRaw: string       // col I
+    toppingsRaw: string    // col J
+    promoPrice: number | null
+    badge: "hot"|"bigsale"|"bestseller"|"new"|null
+    isAvailable: boolean
+    startHour: string
+    endHour: string
   }
-  const [showImport,       setShowImport]       = useState(false)
+  const [showImport,    setShowImport]    = useState(false)
+  const [importItems,   setImportItems]   = useState<ImportMenuItem[] | null>(null)
+  const [importShopMap, setImportShopMap] = useState<Map<string,{id:string,name:string}>>(new Map())
+  const [importError,   setImportError]   = useState("")
+  const [importSaving,  setImportSaving]  = useState(false)
+  const [importEditIdx, setImportEditIdx] = useState<number | null>(null)
+  // legacy — giữ cho compat với UI card hiển thị + saveImportMenu
   const [importShopSearch, setImportShopSearch] = useState("")
   const [importShopId,     setImportShopId]     = useState<string | null>(null)
   const [importShopName,   setImportShopName]   = useState("")
-  const [importAutoShop,   setImportAutoShop]   = useState(false) // true = shop tự nhận từ SĐT trong file
-  const [importItems,      setImportItems]       = useState<ImportMenuItem[] | null>(null)
-  const [importError,      setImportError]       = useState("")
-  const [importSaving,     setImportSaving]      = useState(false)
-  const [importEditIdx,    setImportEditIdx]     = useState<number | null>(null)
+  const [importAutoShop,   setImportAutoShop]   = useState(false)
   const importFileRef = useRef<HTMLInputElement>(null)
 
   const parseImportRow = (cols: string[]): ImportMenuItem | null => {
-    // FORMAT MỚI (12 cột): [0]Menu [1]TênMón [2]MôTả [3]Giá [4]GiáKM [5]Badge [6]ĐangBán [7]GiờTừ [8]GiờĐến [9]Sizes [10]Toppings
-    // FORMAT CŨ (9 cột):   [0]Menu [1]TênMón [2]MôTả [3]Giá [4]GiáKM [5]Badge [6]ĐangBán [7]Sizes [8]Toppings
-    const isNewFmt = cols.length >= 10
-    let catRaw: string, category: string, name: string, description: string
-    let pRaw: string, pmRaw: string, bRaw: string, aRaw: string
-    let startHour: string, endHour: string, sizesRaw: string, toppingsRaw: string
-    if (isNewFmt) {
-      catRaw      = cols[0]?.trim() ?? ""
-      category    = cols[1]?.trim() ?? ""
-      name        = cols[2]?.trim() ?? ""
-      description = cols[3]?.trim() ?? ""
-      pRaw        = String(cols[4] ?? "")
-      pmRaw       = String(cols[5] ?? "")
-      bRaw        = (cols[6] ?? "").toString().toLowerCase().trim()
-      aRaw        = (cols[7] ?? "").toString().toLowerCase().trim()
-      startHour   = cols[8]?.toString().trim() ?? ""
-      endHour     = cols[9]?.toString().trim() ?? ""
-      sizesRaw    = cols[10]?.toString().trim() ?? ""
-      toppingsRaw = cols[11]?.toString().trim() ?? ""
-    } else {
-      const p3 = parseInt((cols[3] ?? "").replace(/\D/g, ""))
-      const isOldNew = !isNaN(p3) && p3 > 0
-      catRaw = cols[0]?.trim() ?? ""; startHour = ""; endHour = ""; sizesRaw = ""; toppingsRaw = ""
-      if (isOldNew) {
-        category = ""; name = cols[1]?.trim() ?? ""; description = cols[2]?.trim() ?? ""; pRaw = cols[3] ?? ""; pmRaw = cols[4] ?? ""; bRaw = (cols[5] ?? "").toLowerCase().trim(); aRaw = (cols[6] ?? "").toLowerCase().trim()
-      } else {
-        category = ""; name = cols[0]?.trim() ?? ""; description = cols[1]?.trim() ?? ""; pRaw = cols[2] ?? ""; pmRaw = cols[3] ?? ""; bRaw = (cols[5] ?? "").toLowerCase().trim(); aRaw = (cols[6] ?? "").toLowerCase().trim(); catRaw = cols[4]?.trim() ?? ""
-      }
+    // A=SĐT | B=Cat1 | C=Cat2 | D=Cat3 | E=NhómMenu | F=Tên | G=MôTả | H=Giá | I=Size | J=Topping
+    const phone       = cols[0]?.trim().replace(/\D/g, "") ?? ""
+    const cat1        = cols[1]?.trim() ?? ""
+    const cat2        = cols[2]?.trim() ?? ""
+    const cat3        = cols[3]?.trim() ?? ""
+    const category    = cols[4]?.trim() ?? ""   // nhóm menu nội bộ
+    const name        = cols[5]?.trim() ?? ""
+    const description = cols[6]?.trim() ?? ""
+    const price       = parseInt(String(cols[7] ?? "").replace(/\D/g, "")) || 0
+    const sizesRaw    = cols[8]?.trim() ?? ""
+    const toppingsRaw = cols[9]?.trim() ?? ""
+
+    if (!name || !phone || price === 0) return null
+
+    // Ghép danh mục, bỏ trống và trùng
+    const categories = [...new Set([cat1, cat2, cat3].filter(Boolean))]
+
+    return {
+      phone, categories, category, name, description, price,
+      sizesRaw, toppingsRaw,
+      promoPrice: null, badge: null, isAvailable: true, startHour: "", endHour: "",
     }
-    if (!name) return null
-    const categories: string[] = []
-    const price = parseInt(pRaw.replace(/\D/g, "")) || 0
-    const promoPrice = pmRaw ? (parseInt(String(pmRaw).replace(/\D/g, "")) || null) : null
-    const badge = bRaw === "hot" ? "hot" : bRaw === "bigsale" ? "bigsale" : bRaw === "bestseller" ? "bestseller" : bRaw === "new" ? "new" : null
-    const isAvailable = aRaw === "" || ["có","co","yes","1","true"].includes(aRaw)
-    return { categories, category, name, description, price, promoPrice, badge: badge as ImportMenuItem["badge"], isAvailable, startHour, endHour, sizesRaw, toppingsRaw }
   }
 
   const onImportFile = (file: File) => {
-    setImportError(""); setImportItems(null); setImportShopId(null); setImportShopName(""); setImportAutoShop(false)
+    setImportError(""); setImportItems(null); setImportShopMap(new Map())
+    setImportShopId(null); setImportShopName(""); setImportAutoShop(false)
     const isXlsx = /\.(xlsx|xls)$/i.test(file.name)
     const parse = async (buf: ArrayBuffer | string) => {
       try {
         const wb = isXlsx ? XLSX.read(new Uint8Array(buf as ArrayBuffer), { type: "array" }) : XLSX.read(buf as string, { type: "string" })
         const raw = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" }) as string[][]
 
-        // Đọc SĐT từ dòng đầu — format: ["SĐT_QUAN:", "0901234567"]
-        let dataStart = 0
-        const firstCell = String(raw[0]?.[0] ?? "").trim()
-        if (/sdt|s\.đ\.t|phone|điện thoại|sdt_quan/i.test(firstCell)) {
-          const digits = String(raw[0]?.[1] ?? "").trim().replace(/\D/g, "")
-          if (digits.length >= 9) {
-            const suffix = digits.slice(-9) // so sánh 9 số cuối
-            const sb = createClient()
-            const { data: found } = await sb.from("shops")
-              .select("id,name,phone")
-              .ilike("phone", `%${suffix}`)
-              .eq("status", "approved")
-              .limit(1)
-            if (found && found.length > 0) {
-              setImportShopId(found[0].id)
-              setImportShopName(found[0].name)
-              setImportAutoShop(true)
-            } else {
-              setImportError(`❌ Không tìm thấy quán với SĐT ${digits}. Kiểm tra SĐT hoặc trạng thái quán.`)
-              return
-            }
+        // Bỏ header row nếu có (kiểm tra dòng đầu có phải dữ liệu hay tiêu đề)
+        const isHdr = raw[0] && /tên|name|sđt|phone|danh mục|category/i.test(String(raw[0][0]) + String(raw[0][5]))
+        const dataRows = raw.slice(isHdr ? 1 : 0)
+
+        // Parse tất cả dòng
+        const items: ImportMenuItem[] = []
+        for (const row of dataRows) {
+          const r = parseImportRow(row.map(c => String(c ?? "")))
+          if (r) items.push(r)
+        }
+        if (items.length === 0) { setImportError("File trống hoặc không đọc được. Kiểm tra cột SĐT, Tên món, Giá bán."); return }
+
+        // Thu thập SĐT duy nhất, tìm shop song song
+        const uniquePhones = [...new Set(items.map(it => it.phone))]
+        const sb = createClient()
+        const shopMap = new Map<string, {id:string,name:string}>()
+        const notFound: string[] = []
+
+        await Promise.all(uniquePhones.map(async (phone) => {
+          const suffix = phone.slice(-9)
+          const { data } = await sb.from("shops")
+            .select("id,name,phone")
+            .ilike("phone", `%${suffix}`)
+            .eq("status", "approved")
+            .limit(1)
+          if (data && data.length > 0) {
+            shopMap.set(phone, { id: data[0].id, name: data[0].name })
           } else {
-            setImportError("❌ SĐT trong file không hợp lệ. Vui lòng điền SĐT cửa hàng vào dòng đầu.")
-            return
+            notFound.push(phone)
           }
-          dataStart = 1
-        } else {
-          setImportError("❌ File không có dòng SĐT. Dòng đầu phải là: SĐT_QUAN: | 0901234567")
+        }))
+
+        if (notFound.length > 0) {
+          setImportError(`❌ Không tìm thấy quán với SĐT: ${notFound.join(", ")} — kiểm tra SĐT hoặc trạng thái quán.`)
           return
         }
 
-        // Header detection
-        const isHdr = raw[dataStart] && /tên|name|món|danh|category/i.test(String(raw[dataStart][0]) + String(raw[dataStart][1]))
-        const items: ImportMenuItem[] = []
-        for (let i = dataStart + (isHdr ? 1 : 0); i < raw.length; i++) {
-          const r = parseImportRow(raw[i].map(c => String(c ?? "")))
-          if (r) items.push(r)
-        }
-        if (items.length === 0) { setImportError("File trống hoặc sai định dạng"); return }
+        setImportShopMap(shopMap)
         setImportItems(items)
+
+        // Hiển thị tóm tắt: nếu 1 quán thì set legacy state để UI card hiện
+        if (shopMap.size === 1) {
+          const [, shop] = [...shopMap.entries()][0]
+          setImportShopId(shop.id); setImportShopName(shop.name); setImportAutoShop(true)
+        } else {
+          setImportShopName(`${shopMap.size} quán`); setImportAutoShop(true)
+        }
       } catch { setImportError("Không đọc được file. Vui lòng dùng file mẫu.") }
     }
     if (isXlsx) { const r = new FileReader(); r.onload = e => { parse(e.target?.result as ArrayBuffer) }; r.readAsArrayBuffer(file) }
@@ -277,34 +275,55 @@ export default function AdminUsersPage() {
   }
 
   const saveImportMenu = async () => {
-    if (!importItems || !importShopId) return
+    if (!importItems || importShopMap.size === 0) return
     setImportSaving(true)
     const sb = createClient()
-    const { data: ex } = await sb.from("products").select("sort_order").eq("shop_id", importShopId).order("sort_order", { ascending: false }).limit(1)
-    let nextOrder = (((ex?.[0] as { sort_order?: number } | undefined)?.sort_order) ?? -1) + 1
-    let saved = 0
-    let firstErr = ""
+
+    // Cache sort_order hiện tại theo shop_id
+    const orderCache = new Map<string, number>()
+    for (const { id } of importShopMap.values()) {
+      const { data: ex } = await sb.from("products").select("sort_order").eq("shop_id", id).order("sort_order", { ascending: false }).limit(1)
+      orderCache.set(id, (((ex?.[0] as { sort_order?: number } | undefined)?.sort_order) ?? -1) + 1)
+    }
+
+    let saved = 0, firstErr = ""
     for (const item of importItems) {
-      const allDay = !item.startHour && !item.endHour
+      const shop = importShopMap.get(item.phone)
+      if (!shop) continue
+      const shopId = shop.id
+      const nextOrder = orderCache.get(shopId) ?? 0
+      orderCache.set(shopId, nextOrder + 1)
+
       const { error } = await sb.from("products").insert({
-        shop_id: importShopId, name: item.name, description: item.description || null,
-        price: item.price, original_price: item.promoPrice || null,
-        category: item.category || null, tags: item.categories.length ? item.categories : null,
-        badge: item.badge || null, is_available: item.isAvailable,
-        all_day: allDay, start_hour: item.startHour || null, end_hour: item.endHour || null,
-        sold_count: 0, sort_order: nextOrder++,
+        shop_id: shopId,
+        name: item.name,
+        description: item.description || null,
+        price: item.price,
+        original_price: null,
+        category: item.category || null,
+        tags: item.categories.length ? item.categories : null,
+        badge: null,
+        is_available: true,
+        all_day: true,
+        start_hour: null,
+        end_hour: null,
+        sold_count: 0,
+        sort_order: nextOrder,
       })
       if (!error) saved++
       else if (!firstErr) firstErr = error.message
     }
+
     setImportSaving(false)
     if (saved === 0) {
       setImportError(`❌ Không lưu được: ${firstErr || "Kiểm tra quyền RLS hoặc tên cột"}`)
       return
     }
-    setShowImport(false); setImportItems(null); setImportShopId(null); setImportShopSearch(""); setImportShopName("")
+    const shopNames = [...importShopMap.values()].map(s => s.name).join(", ")
+    setShowImport(false); setImportItems(null); setImportShopMap(new Map())
+    setImportShopId(null); setImportShopSearch(""); setImportShopName(""); setImportAutoShop(false)
     fire(saved === importItems.length
-      ? `✅ Đã lưu ${saved} món vào "${importShopName}"`
+      ? `✅ Đã lưu ${saved} món vào: ${shopNames}`
       : `⚠️ Lưu ${saved}/${importItems.length} món — ${firstErr}`)
   }
 
@@ -1713,13 +1732,13 @@ export default function AdminUsersPage() {
                   Thoát
                 </button>
                 <button onClick={saveImportMenu}
-                  disabled={!importShopId || !importItems || importItems.length === 0 || importSaving}
+                  disabled={importShopMap.size === 0 || !importItems || importItems.length === 0 || importSaving}
                   style={{ flex: 1, height: 44, borderRadius: 12, border: "none",
-                    cursor: (!importShopId || !importItems || importSaving) ? "not-allowed" : "pointer",
-                    background: (!importShopId || !importItems) ? "rgba(74,143,245,0.15)" : "linear-gradient(90deg,#4a8ff5,#6ba5ff)",
-                    color: (!importShopId || !importItems) ? "rgba(74,143,245,0.4)" : "#fff",
+                    cursor: (importShopMap.size === 0 || !importItems || importSaving) ? "not-allowed" : "pointer",
+                    background: (importShopMap.size === 0 || !importItems) ? "rgba(74,143,245,0.15)" : "linear-gradient(90deg,#4a8ff5,#6ba5ff)",
+                    color: (importShopMap.size === 0 || !importItems) ? "rgba(74,143,245,0.4)" : "#fff",
                     fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                  {importSaving ? "⏳ Đang lưu..." : `💾 Lưu ${importItems?.length ?? 0} món vào "${importShopName || "quán"}"`}
+                  {importSaving ? "⏳ Đang lưu..." : `💾 Lưu ${importItems?.length ?? 0} món vào ${importShopName || "quán"}`}
                 </button>
               </div>
             </motion.div>
