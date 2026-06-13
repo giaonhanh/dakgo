@@ -244,7 +244,6 @@ export default function AdminUsersPage() {
           const { data } = await sb.from("shops")
             .select("id,name,phone")
             .ilike("phone", `%${suffix}`)
-            .eq("status", "approved")
             .limit(1)
           if (data && data.length > 0) {
             shopMap.set(phone, { id: data[0].id, name: data[0].name })
