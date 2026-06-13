@@ -33,6 +33,7 @@ import NotifDot from "@/components/ui/NotifDot"
 // --- Types -------------------------------------------------
 type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null; category?: string; categories?: string[] | null }
 type ProductRow = { id: string; name: string; price: number; original_price?: number | null; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null } | { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
+type PromoProductRow = ProductRow & { promoTag: 'discount' | 'combo' | 'freeship' }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null; shopName?: string | null }
 
@@ -197,7 +198,7 @@ export default function HomePage() {
   const [nearbyShops,   setNearbyShops]   = useState<ShopRow[]>([])
   const [bestSellers,   setBestSellers]   = useState<ProductRow[]>([])
   const [reorders,      setReorders]      = useState<OrderRow[]>([])
-  const [promos,        setPromos]        = useState<ProductRow[]>([])
+  const [promos,        setPromos]        = useState<PromoProductRow[]>([])
   const [recos,         setRecos]         = useState<RecoRow[]>([])
   const [favoriteIds,   setFavoriteIds]   = useState<string[]>([])
   const [favoriteShops, setFavoriteShops] = useState<ShopRow[]>([])
@@ -326,29 +327,93 @@ export default function HomePage() {
         .limit(20)
       setBestSellers(((bsData ?? []) as ProductRow[]).filter(p => isShopOpen(p)).slice(0, 8))
 
-      // Promos — sản phẩm có giá khuyến mãi (original_price > price)
-      const { data: promoData } = await supabase
-        .from("products")
-        .select("id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour")
-        .eq("is_available", true)
-        .eq("shops.status", "approved")
-        .not("original_price", "is", null)
-        .order("sold_count", { ascending: false })
-        .limit(20)
-      // Fallback: nếu không có sản phẩm KM, lấy sản phẩm bán chạy nhất
-      const promoFiltered = ((promoData ?? []) as ProductRow[]).filter(p => isShopOpen(p))
-      if (promoFiltered.length > 0) {
-        setPromos(promoFiltered.slice(0, 8))
+      // Promos — gộp 3 nguồn: giảm giá trực tiếp + combo voucher + quán có free ship
+      const now = new Date().toISOString()
+      const productSelectFields = "id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour"
+
+      const [{ data: discountData }, { data: comboVoucherData }, { data: freeshopData }] = await Promise.all([
+        // 1. Sản phẩm giảm giá trực tiếp (original_price > price)
+        supabase.from("products")
+          .select(productSelectFields)
+          .eq("is_available", true).eq("shops.status", "approved")
+          .not("original_price", "is", null)
+          .order("sold_count", { ascending: false }).limit(16),
+
+        // 2. Voucher combo đang active — lấy danh sách product_id
+        supabase.from("vouchers")
+          .select("combo_items(product_id)")
+          .eq("is_active", true).eq("is_combo", true)
+          .lte("valid_from", now).gte("valid_to", now),
+
+        // 3. Shop có voucher free ship đang active
+        supabase.from("vouchers")
+          .select("shop_id")
+          .eq("is_active", true).eq("discount_type", "freeship")
+          .not("shop_id", "is", null)
+          .lte("valid_from", now).gte("valid_to", now),
+      ])
+
+      // Gộp & dedup theo id — ưu tiên: discount > combo > freeship
+      const seen = new Set<string>()
+      const merged: PromoProductRow[] = []
+
+      const addProducts = (rows: ProductRow[], tag: PromoProductRow["promoTag"]) => {
+        for (const p of rows) {
+          if (!isShopOpen(p) || seen.has(p.id)) continue
+          seen.add(p.id)
+          merged.push({ ...p, promoTag: tag })
+        }
+      }
+
+      // Discount
+      addProducts((discountData ?? []) as ProductRow[], "discount")
+
+      // Combo — lấy product_id rồi fetch sản phẩm
+      const comboProductIds = [
+        ...new Set(
+          ((comboVoucherData ?? []) as { combo_items: { product_id: string }[] | null }[])
+            .flatMap(v => (v.combo_items ?? []).map(ci => ci.product_id))
+        ),
+      ].filter(id => !seen.has(id))
+
+      if (comboProductIds.length > 0) {
+        const { data: comboProducts } = await supabase.from("products")
+          .select(productSelectFields)
+          .in("id", comboProductIds)
+          .eq("is_available", true).eq("shops.status", "approved")
+        addProducts((comboProducts ?? []) as ProductRow[], "combo")
+      }
+
+      // Freeship — lấy shop_id rồi fetch sản phẩm bán chạy
+      const freeshopIds = [
+        ...new Set(
+          ((freeshopData ?? []) as { shop_id: string }[]).map(v => v.shop_id)
+        ),
+      ].filter(Boolean)
+
+      if (freeshopIds.length > 0) {
+        const { data: freeshopProducts } = await supabase.from("products")
+          .select(productSelectFields)
+          .in("shop_id", freeshopIds)
+          .eq("is_available", true).eq("shops.status", "approved")
+          .order("sold_count", { ascending: false }).limit(12)
+        addProducts((freeshopProducts ?? []) as ProductRow[], "freeship")
+      }
+
+      if (merged.length > 0) {
+        setPromos(merged.slice(0, 12))
       } else {
-        // fallback: top sản phẩm từ quán đang mở
-        const { data: fallbackPromo } = await supabase
-          .from("products")
-          .select("id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour")
-          .eq("is_available", true)
-          .eq("shops.status", "approved")
-          .order("sold_count", { ascending: false })
-          .limit(20)
-        setPromos(((fallbackPromo ?? []) as ProductRow[]).filter(p => isShopOpen(p)).slice(0, 8))
+        // fallback: top sản phẩm bán chạy từ quán đang mở
+        const { data: fallbackPromo } = await supabase.from("products")
+          .select(productSelectFields)
+          .eq("is_available", true).eq("shops.status", "approved")
+          .order("sold_count", { ascending: false }).limit(20)
+        setPromos(
+          ((fallbackPromo ?? []) as ProductRow[])
+            .filter(p => isShopOpen(p))
+            .slice(0, 8)
+            .map(p => ({ ...p, promoTag: "discount" as const }))
+        )
       }
 
       // Admin banners
@@ -1227,12 +1292,31 @@ export default function HomePage() {
               const shopName = (p.shops as {name:string}|null)?.name ?? ""
               const discountPct = p.original_price && p.original_price > p.price
                 ? Math.round((1 - p.price / p.original_price) * 100) : 0
+
+              // Badge theo loại khuyến mãi
+              const promoBadge =
+                p.promoTag === "combo"
+                  ? <span style={{ display:"inline-flex", alignItems:"center", gap:2,
+                      background:"rgba(168,85,247,0.18)", border:"1px solid rgba(168,85,247,0.4)",
+                      color:"#c084fc", fontSize:8, fontWeight:800, padding:"1px 5px",
+                      borderRadius:4, lineHeight:1.4 }}>COMBO</span>
+                : p.promoTag === "freeship"
+                  ? <span style={{ display:"inline-flex", alignItems:"center", gap:2,
+                      background:"rgba(62,207,110,0.15)", border:"1px solid rgba(62,207,110,0.35)",
+                      color:"#3ecf6e", fontSize:8, fontWeight:800, padding:"1px 5px",
+                      borderRadius:4, lineHeight:1.4 }}>FREE SHIP</span>
+                : discountPct > 0
+                  ? <Badge layer={2} variant="discount" size="sm" label={`-${discountPct}%`} />
+                  : <Badge layer={1} variant="hot" size="sm" />
+
               return (
                 <a key={p.id} href={`/shop/${p.shop_id}`} style={{ textDecoration:"none" }}>
                 <div className="promo-card" style={{
                   minWidth:120, flexShrink:0,
                   background:"rgba(255,255,255,0.04)", backdropFilter:"blur(10px)",
-                  border:"1px solid rgba(255,255,255,0.08)",
+                  border: p.promoTag === "combo"   ? "1px solid rgba(168,85,247,0.18)"
+                        : p.promoTag === "freeship" ? "1px solid rgba(62,207,110,0.18)"
+                        : "1px solid rgba(255,255,255,0.08)",
                   borderRadius:14, overflow:"hidden", cursor:"pointer",
                 }}>
                   <div style={{ height:74, display:"flex", alignItems:"center",
@@ -1241,16 +1325,9 @@ export default function HomePage() {
                     {p.image_url
                       ? <Image src={p.image_url} alt={p.name} fill sizes="120px" style={{ objectFit:"cover" }} />
                       : <span style={{ zIndex:1 }}>🍽️</span>}
-                    {discountPct > 0 && (
-                      <div style={{ position:"absolute", top:5, left:5, zIndex:2 }}>
-                        <Badge layer={2} variant="discount" size="sm" label={`-${discountPct}%`} />
-                      </div>
-                    )}
-                    {discountPct === 0 && p.sold_count > 0 && (
-                      <div style={{ position:"absolute", top:5, left:5, zIndex:2 }}>
-                        <Badge layer={1} variant="hot" size="sm" />
-                      </div>
-                    )}
+                    <div style={{ position:"absolute", top:5, left:5, zIndex:2 }}>
+                      {promoBadge}
+                    </div>
                   </div>
                   <div style={{ padding:"7px 9px 8px" }}>
                     <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600,
@@ -1269,7 +1346,7 @@ export default function HomePage() {
                     </div>
                     <div style={{ display:"flex", alignItems:"center",
                       justifyContent:"space-between", marginTop:4 }}>
-                      <span style={{ color:"#6a5a40", fontSize:9 }}>🔥 {p.sold_count} dă bán</span>
+                      <span style={{ color:"#6a5a40", fontSize:9 }}>🔥 {p.sold_count} đã bán</span>
                       <button
                         onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:p.id, name:p.name, price:p.price, shop:shopName, shopId:p.shop_id }) }}
                         style={{ width:22, height:22, borderRadius:7,
