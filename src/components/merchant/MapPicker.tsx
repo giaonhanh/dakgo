@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import { reverseGeocode } from "@/lib/vietmapRoute"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { MAP_STYLE, vmTransform } from "@/lib/mapConfig"
+import { MAP_STYLE, vmTransform, VIETMAP_KEY_MISSING } from "@/lib/mapConfig"
+import MapKeyMissing from "@/components/map/MapKeyMissing"
 
 const DEFAULT_LAT = 12.5833
 const DEFAULT_LNG = 108.4833
@@ -166,6 +167,8 @@ export default function MapPicker({ initialLat, initialLng, onConfirm, onClose }
         )}
 
         <div ref={divRef} style={{ width: "100%", height: "100%" }} />
+
+        {VIETMAP_KEY_MISSING && <MapKeyMissing />}
 
         {/* Center pin */}
         <div style={{

@@ -5,7 +5,8 @@ import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/client"
 import AdminShell from "@/components/admin/AdminShell"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { MAP_STYLE, vmTransform } from "@/lib/mapConfig"
+import { MAP_STYLE, vmTransform, VIETMAP_KEY_MISSING } from "@/lib/mapConfig"
+import MapKeyMissing from "@/components/map/MapKeyMissing"
 
 interface DriverMarker {
   id: string; name: string; vehicle: string
@@ -156,6 +157,7 @@ function AdminMapClientInner({ drivers, shops, selected, onSelect }: AdminMapCli
         .maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right { display:none !important; }
       `}</style>
       <div ref={divRef} style={{ width:"100%", height:"100%", background:"#0a0d12" }} />
+      {VIETMAP_KEY_MISSING && <MapKeyMissing />}
     </>
   )
 }

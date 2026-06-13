@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { MAP_STYLE, vmTransform } from "@/lib/mapConfig"
+import { MAP_STYLE, vmTransform, VIETMAP_KEY_MISSING } from "@/lib/mapConfig"
+import MapKeyMissing from "@/components/map/MapKeyMissing"
 
 interface NavMapProps {
   driverLat: number
@@ -142,5 +143,10 @@ export default function NavMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [driverLat, driverLng, targetLat, targetLng, phase])
 
-  return <div ref={divRef} style={{ width: "100%", height, background: "#07090e" }} />
+  return (
+    <div style={{ position: "relative", width: "100%", height }}>
+      <div ref={divRef} style={{ width: "100%", height, background: "#07090e" }} />
+      {VIETMAP_KEY_MISSING && <MapKeyMissing />}
+    </div>
+  )
 }

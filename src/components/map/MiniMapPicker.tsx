@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { MAP_STYLE, vmTransform } from "@/lib/mapConfig"
+import { MAP_STYLE, vmTransform, VIETMAP_KEY_MISSING } from "@/lib/mapConfig"
+import MapKeyMissing from "@/components/map/MapKeyMissing"
 
 interface Props {
   lat:    number
@@ -69,6 +70,8 @@ export default function MiniMapPicker({ lat, lng, onPick }: Props) {
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }}>
       <div ref={divRef} style={{ width: "100%", height: "100%" }} />
+
+      {VIETMAP_KEY_MISSING && <MapKeyMissing />}
 
       {/* Center pin */}
       <div style={{

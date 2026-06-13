@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import type { AddressPickerResult } from "@/types"
 import { getCachedGeocode, setCachedGeocode } from "@/lib/geocodeCache"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { MAP_STYLE, vmTransform } from "@/lib/mapConfig"
+import { MAP_STYLE, vmTransform, VIETMAP_KEY_MISSING } from "@/lib/mapConfig"
+import MapKeyMissing from "@/components/map/MapKeyMissing"
 
 const DEFAULT_LAT = 12.7107
 const DEFAULT_LNG = 108.3034
@@ -514,6 +515,8 @@ export default function AddressPickerClient({
         )}
 
         <div ref={divRef} style={{ width: "100%", height: "100%", touchAction: "none" }} />
+
+        {VIETMAP_KEY_MISSING && <MapKeyMissing />}
 
         {/* Map Controls — bottom right */}
         <div style={{

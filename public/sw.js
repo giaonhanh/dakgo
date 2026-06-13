@@ -1,5 +1,5 @@
-const CACHE_NAME = 'giaonhanh-v2'
-const MAP_CACHE  = 'giaonhanh-maps-v1'
+const CACHE_NAME = 'giaonhanh-v3'
+const MAP_CACHE  = 'giaonhanh-maps-v2'
 const OFFLINE_URL = '/offline'
 
 const PRECACHE_URLS = [
@@ -46,6 +46,11 @@ self.addEventListener('fetch', (event) => {
 
   // API calls: network only, không cache (dữ liệu realtime)
   if (url.pathname.startsWith('/api/')) return
+
+  // Bản đồ VietMap (tiles vector + style + sprite + glyphs): KHÔNG cho SW chen vào.
+  // MapLibre fetch tile/glyph trong Web Worker cross-origin — nếu SW bọc lại bằng
+  // fetch(request) sẽ làm hỏng response → tile 200 nhưng map trắng. Bỏ qua hẳn.
+  if (url.hostname.includes('vietmap.vn')) return
 
   // Map tiles (CartoDB / OSM): cache-first 24h
   if (url.hostname.includes('cartocdn.com') || url.hostname.includes('tile.openstreetmap.org')) {
