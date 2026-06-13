@@ -263,6 +263,7 @@ export default function MerchantDashboard() {
         filter: `shop_id=eq.${shopId}`
       }, () => {
         fetchOrders(shopId)
+        setUnreadNotif(n => n + 1) // tăng badge chuông ngay, trigger DB đã tạo notification
         fireToast("🔔 Đơn mới vừa vào!")
       })
       .on("postgres_changes", {
