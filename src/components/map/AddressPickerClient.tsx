@@ -263,7 +263,6 @@ export default function AddressPickerClient({
       navigator.geolocation.getCurrentPosition(
         ({ coords }) => {
           setLocating(false)
-          skipGeocodeRef.current = true
           const pos = { lat: coords.latitude, lng: coords.longitude }
           centerRef.current = pos
           setCenter(pos)
@@ -293,8 +292,11 @@ export default function AddressPickerClient({
   }, [])
 
   // FlyTo when flyTarget changes — flyTarget is [lat, lng], MapLibre needs [lng, lat]
+  // skipGeocodeRef đặt tại đây (không phải trước setFlyTarget) để chắc chắn chặn
+  // moveend do animation flyTo gây ra, tránh geocode ghi đè địa chỉ GPS đúng.
   useEffect(() => {
     if (!flyTarget || !mapRef.current) return
+    skipGeocodeRef.current = true
     mapRef.current.flyTo({ center: [flyTarget[1], flyTarget[0]], zoom: 16 })
   }, [flyTarget])
 
@@ -304,7 +306,6 @@ export default function AddressPickerClient({
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         setLocating(false)
-        skipGeocodeRef.current = true
         const pos = { lat: coords.latitude, lng: coords.longitude }
         centerRef.current = pos
         setCenter(pos)
