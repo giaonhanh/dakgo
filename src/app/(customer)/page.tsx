@@ -490,7 +490,20 @@ export default function HomePage() {
       // Smart recommendations via RPC (falls back gracefully if not deployed)
       const { data: recoData } = await supabase.rpc("get_recommendations", { uid: user.id, lim: 10 })
       if (recoData && Array.isArray(recoData) && recoData.length > 0) {
-        setRecos(recoData as RecoRow[])
+        const recoShopIds = [...new Set((recoData as RecoRow[]).map(r => r.shop_id))]
+        const { data: recoShopStatus } = await supabase
+          .from("shops")
+          .select("id,is_open,status,opening_hours")
+          .in("id", recoShopIds)
+          .eq("status", "approved")
+          .eq("is_open", true)
+        const openShopIds = new Set(
+          (recoShopStatus ?? [])
+            .filter(s => checkOpeningHours(s.opening_hours, true))
+            .map(s => s.id as string)
+        )
+        const filteredRecos = (recoData as RecoRow[]).filter(r => openShopIds.has(r.shop_id))
+        if (filteredRecos.length > 0) setRecos(filteredRecos)
       } else {
         // Fallback: top products from shops the user ordered from
         const { data: histShops } = await supabase
@@ -549,11 +562,16 @@ export default function HomePage() {
         const filter = terms.map(t => `name.ilike.%${t}%`).join(",")
         const { data } = await supabase
           .from("products")
-          .select("id,name,price,sold_count,shop_id,shops(name)")
+          .select("id,name,price,sold_count,shop_id,shops!inner(name,is_open,status,opening_hours)")
           .eq("is_available", true)
+          .eq("shops.status", "approved")
+          .eq("shops.is_open", true)
           .or(filter)
-          .limit(8)
-        if (data?.length) setSearchSuggest(data as ProductRow[])
+          .limit(20)
+        if (data?.length) {
+          const open = (data as ProductRow[]).filter(p => isShopOpen(p))
+          if (open.length) setSearchSuggest(open.slice(0, 8))
+        }
       } catch { /* ignore */ }
     }
     loadSearchSuggestions()
@@ -1326,7 +1344,7 @@ export default function HomePage() {
                       borderRadius:4, lineHeight:1.4 }}>FREE SHIP</span>
                 : discountPct > 0
                   ? <Badge layer={2} variant="discount" size="sm" label={`-${discountPct}%`} />
-                  : <Badge layer={1} variant="hot" size="sm" />
+                  : null
 
               return (
                 <a key={p.id} href={`/shop/${p.shop_id}`} style={{ textDecoration:"none" }}>
