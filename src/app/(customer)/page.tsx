@@ -79,49 +79,41 @@ function FlashCountdown({ validTo }: { validTo: string }) {
 }
 
 // --- Helpers ------------------------------------------------
-function shopInHoursFromHours(oh: { open?: string; close?: string } | null | undefined): boolean {
-  if (!oh?.open || !oh?.close) return true  // không có giờ → không giới hạn
-  const now = new Date()
+type DayHoursEntry = { day: string; open: boolean; slots: { from: string; to: string }[] }
+
+// Hàm chung: kiểm tra opening_hours (cả format cũ lẫn DayHours[])
+function checkOpeningHours(oh: unknown, fallback = true): boolean {
+  if (!oh) return fallback
+  const now   = new Date()
   const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
-  const [oph, opm] = oh.open.split(":").map(Number)
-  const [clh, clm] = oh.close.split(":").map(Number)
-  const o = (oph ?? 0) * 60 + (opm ?? 0)
-  const c = (clh ?? 0) * 60 + (clm ?? 0)
-  return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c
+  const toMin = (t: string) => { const [h,m] = t.split(":").map(Number); return (h??0)*60+(m??0) }
+  const inSlot = (f: string, t: string) => { const o = toMin(f), c = toMin(t); return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c }
+  // Format mới: DayHours[]
+  if (Array.isArray(oh)) {
+    const dayNames = ["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"]
+    const today    = dayNames[new Date(now.getTime() + 7*3600000).getUTCDay()]
+    const entry    = (oh as DayHoursEntry[]).find(d => d.day === today)
+    if (!entry?.open || !entry.slots.length) return false
+    return entry.slots.some(s => inSlot(s.from, s.to))
+  }
+  // Format cũ: { open: "HH:mm", close: "HH:mm" }
+  const old = oh as { open?: string; close?: string }
+  if (!old.open || !old.close) return fallback
+  return inSlot(old.open, old.close)
 }
 
 function isShopOpen(p: ProductRow): boolean {
   const s = Array.isArray(p.shops) ? p.shops[0] : p.shops
   if (!s) return false
   if (s.status !== "approved") return false
-  return shopInHoursFromHours(s.opening_hours)
+  if (!s.is_open) return false
+  return checkOpeningHours(s.opening_hours, true)
 }
 
 // Tính quán có đang trong giờ mở cửa không (múi giờ VN UTC+7)
 function isShopInHours(shop: ShopRow): boolean {
   if (!shop.is_open) return false
-  const oh = shop.opening_hours
-  if (!oh) return true
-  const now    = new Date()
-  const vnMin  = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
-  const toMin  = (t: string) => { const [h,m] = t.split(":").map(Number); return (h??0)*60+(m??0) }
-  const inSlot = (from: string, to: string) => {
-    const o = toMin(from), c = toMin(to)
-    return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c
-  }
-  // Format mới: DayHours[] — mỗi ngày có slots riêng
-  if (Array.isArray(oh)) {
-    const vnDate  = new Date(now.getTime() + 7 * 3600 * 1000)
-    const dayNames = ["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"]
-    const today   = dayNames[vnDate.getUTCDay()]
-    const entry   = (oh as Array<{day:string;open:boolean;slots:{from:string;to:string}[]}>).find(d => d.day === today)
-    if (!entry?.open) return false
-    return entry.slots.some(s => inSlot(s.from, s.to))
-  }
-  // Format cu: { open: "HH:mm", close: "HH:mm" }
-  const old = oh as { open?: string; close?: string }
-  if (!old.open || !old.close) return true
-  return inSlot(old.open, old.close)
+  return checkOpeningHours(shop.opening_hours, true)
 }
 
 // Giờ mở cửa tiếp theo để hiển thị "Mở lúc HH:mm"

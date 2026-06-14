@@ -531,14 +531,24 @@ export default function ShopPage() {
   // Tính trạng thái mở/đóng từ opening_hours (UTC+7), không dùng is_open column vì cron 1 lần/ngày
   const shopIsOpen = (() => {
     if (!shop) return false
+    if (!shop.is_open) return false
     const oh = shop.opening_hours
-    if (!oh?.open || !oh?.close) return shop.is_open
-    const now = new Date()
+    if (!oh) return true
+    const now   = new Date()
     const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
-    const [oph, opm] = oh.open.split(":").map(Number)
-    const [clh, clm] = oh.close.split(":").map(Number)
-    const o = (oph ?? 0) * 60 + (opm ?? 0), c = (clh ?? 0) * 60 + (clm ?? 0)
-    return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c
+    const toMin = (t: string) => { const [h,m] = t.split(":").map(Number); return (h??0)*60+(m??0) }
+    const inSlot = (f: string, t: string) => { const o = toMin(f), c = toMin(t); return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c }
+    if (Array.isArray(oh)) {
+      const dayNames = ["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"]
+      const today    = dayNames[new Date(now.getTime() + 7*3600000).getUTCDay()]
+      type DE = { day: string; open: boolean; slots: { from: string; to: string }[] }
+      const entry    = (oh as DE[]).find(d => d.day === today)
+      if (!entry?.open || !entry.slots.length) return false
+      return entry.slots.some(s => inSlot(s.from, s.to))
+    }
+    const old = oh as { open?: string; close?: string }
+    if (!old.open || !old.close) return true
+    return inSlot(old.open, old.close)
   })()
 
   const containerRef = useRef<HTMLDivElement>(null)
