@@ -200,14 +200,40 @@ function SearchContent() {
 
   useEffect(() => { setRecentSearches(loadHistory()) }, [])
 
-  useEffect(() => {
+  const requestGps = useCallback(() => {
     if (!navigator.geolocation) { setGpsBlocked(true); return }
     navigator.geolocation.getCurrentPosition(
-      pos => { setUserLat(pos.coords.latitude); setUserLng(pos.coords.longitude) },
+      pos => {
+        setUserLat(pos.coords.latitude)
+        setUserLng(pos.coords.longitude)
+        setGpsBlocked(false)
+      },
       () => setGpsBlocked(true),
-      { timeout: 6000 }
+      { timeout: 15000, enableHighAccuracy: false, maximumAge: 60000 }
     )
   }, [])
+
+  useEffect(() => {
+    if (!navigator.geolocation) { setGpsBlocked(true); return }
+    // Kiểm tra permission state trước — tránh hỏi lại nếu đã granted
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: "geolocation" }).then(status => {
+        if (status.state === "denied") {
+          setGpsBlocked(true)
+        } else {
+          // "granted" hoặc "prompt" — thử lấy luôn
+          requestGps()
+          // Lắng nghe nếu user thay đổi quyền trong Settings
+          status.onchange = () => {
+            if (status.state === "granted") requestGps()
+            else if (status.state === "denied") setGpsBlocked(true)
+          }
+        }
+      })
+    } else {
+      requestGps()
+    }
+  }, [requestGps])
 
   // Auto-load newest products khi vào từ "Vừa lên menu > Xem thêm"
   useEffect(() => {
@@ -397,13 +423,7 @@ function SearchContent() {
                 <div style={{ color:"#FF8C00", fontSize:11, fontWeight:700 }}>Chưa có vị trí GPS</div>
                 <div style={{ color:"#b0956a", fontSize:10 }}>Cấp quyền vị trí để xem phí ship chính xác</div>
               </div>
-              <button onClick={() => {
-                navigator.geolocation.getCurrentPosition(
-                  pos => { setUserLat(pos.coords.latitude); setUserLng(pos.coords.longitude); setGpsBlocked(false) },
-                  () => alert("Vui lòng bật GPS trong cài đặt trình duyệt và thử lại"),
-                  { timeout: 10000 }
-                )
-              }} style={{ fontSize:10, fontWeight:700, color:"#FF8C00", background:"rgba(255,107,0,0.15)",
+              <button onClick={requestGps} style={{ fontSize:10, fontWeight:700, color:"#FF8C00", background:"rgba(255,107,0,0.15)",
                 border:"1px solid rgba(255,107,0,0.3)", borderRadius:6, padding:"4px 8px", cursor:"pointer",
                 whiteSpace:"nowrap" }}>Cấp quyền</button>
             </div>
