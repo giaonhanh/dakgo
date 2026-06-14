@@ -178,6 +178,25 @@ export default function AdminSettingsPage() {
   const setSvcTime = (svc: string, field: keyof SvcTime, val: Partial<SvcTime[keyof SvcTime]>) =>
     setSvcTimeState(p => ({ ...p, [svc]: { ...p[svc], [field]: { ...(p[svc]?.[field] as object), ...val } } }))
 
+  // service toggle key → svcTime key
+  const SVC_TOGGLE_TO_TIME_KEY: Record<string, string> = {
+    motorbike: "motorbike", taxi_4cho: "taxi", taxi_7cho: "taxi7",
+    mua_ho: "errand", giao_ho: "delivery_pkg",
+  }
+  const isInHoursNow = (svcKey: string): boolean => {
+    const t = svcTime[svcKey]
+    if (!t) return true
+    const { allDay, open, close } = t.hours
+    if (allDay) return true
+    const now = new Date()
+    const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+    const [oh, om] = open.split(":").map(Number)
+    const [ch, cm] = close.split(":").map(Number)
+    const oMin = (oh ?? 0) * 60 + (om ?? 0)
+    const cMin = (ch ?? 0) * 60 + (cm ?? 0)
+    return oMin <= cMin ? vnMin >= oMin && vnMin < cMin : vnMin >= oMin || vnMin < cMin
+  }
+
   const calcTaxiFare = (v: TaxiVehicle, km: number, night: SvcTime["night"]): number => {
     const base = Math.min(km - 1, 29)
     const over = Math.max(0, km - 30)
@@ -425,37 +444,54 @@ export default function AdminSettingsPage() {
     </button>
   )
 
+  const renderHoursBlock = (svc: string) => {
+    const t = svcTime[svc] ?? SVC_TIME_DEFAULT
+    const h = t.hours
+    const inHours = isInHoursNow(svc)
+    const toggle = (style: object) => ({ width:48, height:26, borderRadius:13, border:"none", cursor:"pointer", position:"relative" as const, flexShrink:0, transition:"background .2s", ...style })
+    const knob = (on: boolean) => ({ width:20, height:20, borderRadius:"50%", background:"#fff", position:"absolute" as const, top:3, left: on ? 25 : 3, transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,0.4)" })
+    return (
+      <div style={{ background:"rgba(255,255,255,0.03)", border:`1px solid ${inHours ? "rgba(62,207,110,0.2)" : "rgba(255,107,0,0.2)"}`, borderRadius:14, padding:"0 16px", marginBottom:10 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 6px" }}>
+          <div>
+            <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>🕐 Giờ hoạt động</div>
+            <div style={{ marginTop:3, fontSize:10, color: inHours ? "#3ecf6e" : "#FF6B00", fontWeight:600 }}>
+              {inHours ? "🟢 Đang trong giờ phục vụ" : "🔴 Ngoài giờ — sẽ tự động khoá"}
+            </div>
+          </div>
+          <button onClick={() => setSvcTime(svc, "hours", { allDay: !h.allDay })}
+            style={{ ...toggle({ background: h.allDay ? "#3ecf6e" : "rgba(255,255,255,0.08)" }) }}>
+            <div style={knob(h.allDay)} />
+          </button>
+        </div>
+        {h.allDay ? (
+          <div style={{ color:"#3ecf6e", fontSize:11, paddingBottom:10 }}>✓ 24/24 — Hoạt động liên tục</div>
+        ) : (
+          <div style={{ display:"flex", gap:12, padding:"8px 0 10px" }}>
+            <div style={{ flex:1 }}>
+              <div style={{ color:"#6a5a40", fontSize:10, marginBottom:3 }}>Mở cửa</div>
+              <input type="time" value={h.open} onChange={e => setSvcTime(svc, "hours", { open: e.target.value })}
+                style={{ width:"100%", padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark" as const, boxSizing:"border-box" as const }} />
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ color:"#6a5a40", fontSize:10, marginBottom:3 }}>Đóng cửa</div>
+              <input type="time" value={h.close} onChange={e => setSvcTime(svc, "hours", { close: e.target.value })}
+                style={{ width:"100%", padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark" as const, boxSizing:"border-box" as const }} />
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const renderSvcTimeBlock = (svc: string) => {
     const t = svcTime[svc] ?? SVC_TIME_DEFAULT
     const h = t.hours; const n = t.night; const w = t.weather
     const toggle = (style: object) => ({ width:48, height:26, borderRadius:13, border:"none", cursor:"pointer", position:"relative" as const, flexShrink:0, transition:"background .2s", ...style })
     const knob = (on: boolean) => ({ width:20, height:20, borderRadius:"50%", background:"#fff", position:"absolute" as const, top:3, left: on ? 25 : 3, transition:"left .2s", boxShadow:"0 1px 4px rgba(0,0,0,0.4)" })
+    void h
     return (
       <>
-        {/* Giờ hoạt động */}
-        <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 0 8px" }}>
-            <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>🕐 Giờ hoạt động</div>
-            <button onClick={() => setSvcTime(svc, "hours", { allDay: !h.allDay, open:"00:00", close:"23:59" })}
-              style={{ ...toggle({ background: h.allDay ? "#3ecf6e" : "rgba(255,255,255,0.08)" }) }}>
-              <div style={knob(h.allDay)} />
-            </button>
-          </div>
-          {h.allDay ? (
-            <div style={{ color:"#3ecf6e", fontSize:11, paddingBottom:12 }}>✓ 24/24 — Hoạt động liên tục</div>
-          ) : (
-            <div style={{ display:"flex", gap:16, padding:"10px 0" }}>
-              <div style={{ flex:1 }}>
-                <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>Mở cửa</div>
-                <input type="time" value={h.open} onChange={e => setSvcTime(svc, "hours", { open: e.target.value })} style={{ width:"100%", padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark", boxSizing:"border-box" as const }} />
-              </div>
-              <div style={{ flex:1 }}>
-                <div style={{ color:"#6a5a40", fontSize:10, marginBottom:4 }}>Đóng cửa</div>
-                <input type="time" value={h.close} onChange={e => setSvcTime(svc, "hours", { close: e.target.value })} style={{ width:"100%", padding:"7px 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"#f0eaff", fontSize:12, fontFamily:"Lexend", colorScheme:"dark", boxSizing:"border-box" as const }} />
-              </div>
-            </div>
-          )}
-        </div>
         {/* Phụ phí đêm khuya */}
         <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 0 8px" }}>
@@ -877,8 +913,8 @@ export default function AdminSettingsPage() {
           {/* SERVICES */}
           {activeSection === "services" && (
             <div style={{ animation:"fadeUp .3s ease" }}>
-              <div style={{ color:"#f0eaff", fontSize:15, fontWeight:700, marginBottom:4 }}>🔌 Bật / Tắt dịch vụ</div>
-              <div style={{ color:"#6a5a40", fontSize:11, marginBottom:20 }}>Tắt dịch vụ và chọn lý do — khách sẽ thấy thông báo phù hợp thay vì chờ mãi không có tài xế</div>
+              <div style={{ color:"#f0eaff", fontSize:15, fontWeight:700, marginBottom:4 }}>🔌 Dịch vụ</div>
+              <div style={{ color:"#6a5a40", fontSize:11, marginBottom:20 }}>Cài giờ hoạt động — hệ thống tự khoá ngoài giờ. Tắt thủ công khi cần thiết.</div>
               <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
                 {serviceToggles.map(s => {
                   const presets = SERVICE_PRESETS[s.key] ?? []
@@ -907,11 +943,21 @@ export default function AdminSettingsPage() {
                         </div>
                       </div>
 
-                      {/* Preset reason picker — chỉ hiện khi dịch vụ bị tắt */}
+                      {/* Giờ hoạt động — luôn hiện */}
+                      {SVC_TOGGLE_TO_TIME_KEY[s.key] && (
+                        <div style={{ padding:"0 16px 14px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+                          <div style={{ color:"#6a5a40", fontSize:9, fontWeight:600, margin:"10px 0 8px", textTransform:"uppercase", letterSpacing:".05em" }}>
+                            Giờ hoạt động (tự động khoá ngoài giờ):
+                          </div>
+                          {renderHoursBlock(SVC_TOGGLE_TO_TIME_KEY[s.key])}
+                        </div>
+                      )}
+
+                      {/* Preset reason picker — chỉ hiện khi dịch vụ bị tắt thủ công */}
                       {!s.enabled && (
                         <div style={{ padding:"0 16px 14px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
                           <div style={{ color:"#6a5a40", fontSize:9, fontWeight:600, margin:"10px 0 8px", textTransform:"uppercase", letterSpacing:".05em" }}>
-                            Lý do hiển thị cho khách:
+                            Lý do tắt thủ công (hiển thị cho khách):
                           </div>
                           <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
                             {presets.map(p => {
@@ -939,7 +985,8 @@ export default function AdminSettingsPage() {
               <div style={{ marginTop:16, padding:"12px 14px", borderRadius:12, background:"rgba(255,179,71,0.08)", border:"1px solid rgba(255,179,71,0.2)" }}>
                 <div style={{ color:"#FFB347", fontSize:11, fontWeight:600, marginBottom:4 }}>💡 Lưu ý</div>
                 <div style={{ color:"#6a5a40", fontSize:10, lineHeight:1.6 }}>
-                  Chọn lý do xong → nhấn <b style={{color:"#f0eaff"}}>Lưu cài đặt</b> để áp dụng. Khách sẽ thấy đúng thông báo tương ứng.
+                  Giờ hoạt động: hệ thống tự động khoá dịch vụ khi ngoài giờ, khách thấy thông báo ngay trên trang chủ.<br/>
+                  Tắt thủ công: ghi đè tất cả, dịch vụ bị khoá cho đến khi bật lại. Nhấn <b style={{color:"#f0eaff"}}>Lưu</b> để áp dụng.
                 </div>
               </div>
             </div>

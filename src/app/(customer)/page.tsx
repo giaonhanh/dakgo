@@ -174,6 +174,21 @@ function isProductGroupInTime(p: ProductRow): boolean {
 const fmt  = (n: number) => n.toLocaleString("vi-VN") + "d"
 const RANK_ICON = ["🥇","🥈","🥉"]
 
+// SvcGrid key → svcTime key in admin settings
+const SVC_GRID_TIME_KEY: Record<string, string> = {
+  "giao-ho": "delivery_pkg",
+  "mua-ho":  "errand",
+  "xe-om":   "motorbike",
+  "taxi":    "taxi",
+}
+// SvcGrid key → service_toggles key
+const SVC_GRID_TOGGLE_KEY: Record<string, string> = {
+  "giao-ho": "giao_ho",
+  "mua-ho":  "mua_ho",
+  "xe-om":   "motorbike",
+  "taxi":    "taxi_4cho",
+}
+
 function getWeatherTip(code: number, temp: number, hour: number): string {
   if (code >= 95) return "⛈️ Bão giông đang đến! Ở nhà an toàn, order ngay về thôi!"
   if (code >= 80) return "🌧️ Đang có mưa rào — đặt để ăn giao về, khỏi ướt!"
@@ -259,6 +274,9 @@ export default function HomePage() {
   const [adminBanners,   setAdminBanners]   = useState<BannerRow[]>([])
   const [freeshipsShopIds, setFreeshipsShopIds] = useState<Set<string>>(new Set())
   const [discountShopIds,  setDiscountShopIds]  = useState<Set<string>>(new Set())
+  const [svcTimeMap,   setSvcTimeMap]   = useState<Record<string, { open:string; close:string; allDay:boolean }>>({})
+  const [svcToggleMap, setSvcToggleMap] = useState<Record<string, { enabled:boolean; customerMsg:string }>>({})
+  const [lockedSvcMsg, setLockedSvcMsg] = useState<string | null>(null)
   const [adminBannerIdx, setAdminBannerIdx] = useState(0)
   const [newMenuItems,   setNewMenuItems]   = useState<NewMenuRow[]>([])
   const [searchSuggest,  setSearchSuggest]  = useState<ProductRow[]>([])
@@ -481,6 +499,26 @@ export default function HomePage() {
         .order("sort_order", { ascending: true })
         .limit(5)
       setAdminBanners((bannerData ?? []) as BannerRow[])
+
+      // Service hours + toggles from app_settings
+      const { data: appSettings } = await supabase
+        .from("app_settings")
+        .select("key,value")
+        .in("key", ["service_time_pricing", "service_toggles"])
+      if (appSettings) {
+        for (const row of appSettings) {
+          if (row.key === "service_time_pricing") {
+            const map: Record<string, { open:string; close:string; allDay:boolean }> = {}
+            for (const [k, v] of Object.entries(row.value as Record<string, { hours?: { open:string; close:string; allDay:boolean } }>)) {
+              if (v?.hours) map[k] = v.hours
+            }
+            setSvcTimeMap(map)
+          }
+          if (row.key === "service_toggles") {
+            setSvcToggleMap(row.value as Record<string, { enabled:boolean; customerMsg:string }>)
+          }
+        }
+      }
 
       // V?a lên menu — quán đang mở, trong khung giờ bán
       const { data: newMenuData } = await supabase
@@ -1129,40 +1167,80 @@ export default function HomePage() {
               S5 — ServiceGrid (4 dịch vụ nhanh)
           -------------------------------------- */}
           <SectionHeader title="Dịch vụ nhanh" />
+          {lockedSvcMsg && (
+            <div style={{ margin:"0 16px 10px", padding:"9px 14px", borderRadius:10,
+              background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.3)",
+              color:"#FFB347", fontSize:11, lineHeight:1.5 }}>
+              🔒 {lockedSvcMsg}
+            </div>
+          )}
           <div style={{
             display:"grid", gridTemplateColumns:"repeat(4,1fr)",
             gap:7, padding:"0 16px", marginBottom:14,
           }}>
             {[
-              { icon:"📦", label:"Giao hộ",  href:"/giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00", badge:"" },
-              { icon:"🛒", label:"Mua hộ",   href:"/mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e", badge:"" },
-              { icon:"🛵", label:"Xe ôm",    href:"/xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5", badge:"" },
-              { icon:"🚗", label:"Taxi",     href:"/taxi",    bg:"rgba(180,100,255,0.10)",ic:"#b464ff", badge:"" },
-            ].map((s,i) => (
-              <a key={i} href={s.href} style={{ textDecoration:"none" }}>
-                <div className="svc-card" style={{
-                  background:"rgba(255,255,255,0.04)",
-                  backdropFilter:"blur(10px)", WebkitBackdropFilter:"blur(10px)",
-                  border:"1px solid rgba(255,255,255,0.08)",
-                  borderRadius:14, padding:"10px 4px",
-                  display:"flex", flexDirection:"column", alignItems:"center", gap:4,
-                  position:"relative",
-                }}>
-                  {s.badge && (
-                    <div style={{ position:"absolute", top:-3, right:4 }}>
-                      <Badge layer={1} variant="hot" size="sm" label={s.badge} />
+              { icon:"📦", label:"Giao hộ", key:"giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00" },
+              { icon:"🛒", label:"Mua hộ",  key:"mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e" },
+              { icon:"🛵", label:"Xe ôm",   key:"xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5" },
+              { icon:"🚗", label:"Taxi",    key:"taxi",    bg:"rgba(180,100,255,0.10)",ic:"#b464ff" },
+            ].map((s, i) => {
+              const timeKey   = SVC_GRID_TIME_KEY[s.key]
+              const toggleKey = SVC_GRID_TOGGLE_KEY[s.key]
+              // Manual disable check
+              const toggle = svcToggleMap[toggleKey]
+              const manualOff = toggle && toggle.enabled === false
+              // Hours check
+              const hours = svcTimeMap[timeKey]
+              let outsideHours = false
+              if (hours && !hours.allDay) {
+                const now = new Date()
+                const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+                const [oh, om] = hours.open.split(":").map(Number)
+                const [ch, cm] = hours.close.split(":").map(Number)
+                const oMin = (oh ?? 0) * 60 + (om ?? 0)
+                const cMin = (ch ?? 0) * 60 + (cm ?? 0)
+                outsideHours = oMin <= cMin ? !(vnMin >= oMin && vnMin < cMin) : !(vnMin >= oMin || vnMin < cMin)
+              }
+              const locked = manualOff || outsideHours
+              const lockMsg = manualOff
+                ? (toggle?.customerMsg || "Dịch vụ tạm ngừng phục vụ.")
+                : outsideHours && hours
+                  ? `Dịch vụ hoạt động từ ${hours.open} – ${hours.close}. Vui lòng quay lại trong giờ phục vụ.`
+                  : ""
+              return (
+                <div key={i} onClick={() => {
+                  if (locked) { setLockedSvcMsg(lockMsg); setTimeout(() => setLockedSvcMsg(null), 4000); return }
+                  window.location.href = `/${s.key}`
+                }} style={{ textDecoration:"none", cursor: locked ? "not-allowed" : "pointer" }}>
+                  <div className="svc-card" style={{
+                    background: locked ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.04)",
+                    backdropFilter:"blur(10px)", WebkitBackdropFilter:"blur(10px)",
+                    border: locked ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(255,255,255,0.08)",
+                    borderRadius:14, padding:"10px 4px",
+                    display:"flex", flexDirection:"column", alignItems:"center", gap:4,
+                    position:"relative", opacity: locked ? 0.5 : 1,
+                    transition:"opacity .2s",
+                  }}>
+                    {locked && (
+                      <div style={{ position:"absolute", top:3, right:4, fontSize:9, color:"#ff4040" }}>🔒</div>
+                    )}
+                    <div style={{ width:38, height:38, borderRadius:11,
+                      background: locked ? "rgba(255,255,255,0.04)" : s.bg,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      fontSize:20, color: locked ? "#6a5a40" : s.ic }}>
+                      {s.icon}
                     </div>
-                  )}
-                  <div style={{ width:38, height:38, borderRadius:11,
-                    background:s.bg, display:"flex", alignItems:"center", justifyContent:"center",
-                    fontSize:20, color:s.ic }}>
-                    {s.icon}
+                    <span style={{ color: locked ? "#6a5a40" : "#b0956a", fontSize:11, textAlign:"center",
+                      fontWeight:500, lineHeight:1.3 }}>{s.label}</span>
+                    {outsideHours && hours && (
+                      <span style={{ fontSize:8, color:"#ff6060", textAlign:"center", lineHeight:1.2 }}>
+                        {hours.open}–{hours.close}
+                      </span>
+                    )}
                   </div>
-                  <span style={{ color:"#b0956a", fontSize: 11, textAlign:"center",
-                    fontWeight:500, lineHeight:1.3 }}>{s.label}</span>
                 </div>
-              </a>
-            ))}
+              )
+            })}
           </div>
 
           {/* --------------------------------------
