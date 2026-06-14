@@ -174,19 +174,19 @@ function isProductGroupInTime(p: ProductRow): boolean {
 const fmt  = (n: number) => n.toLocaleString("vi-VN") + "d"
 const RANK_ICON = ["🥇","🥈","🥉"]
 
-// SvcGrid key → svcTime key in admin settings
-const SVC_GRID_TIME_KEY: Record<string, string> = {
-  "giao-ho": "delivery_pkg",
-  "mua-ho":  "errand",
-  "xe-om":   "motorbike",
-  "taxi":    "taxi",
-}
-// SvcGrid key → service_toggles key
-const SVC_GRID_TOGGLE_KEY: Record<string, string> = {
+// SvcGrid key → service_toggles key (taxi: array = ALL must be off to lock)
+const SVC_GRID_TOGGLE_KEY: Record<string, string | string[]> = {
   "giao-ho": "giao_ho",
   "mua-ho":  "mua_ho",
   "xe-om":   "motorbike",
-  "taxi":    "taxi_4cho",
+  "taxi":    ["taxi_4cho", "taxi_7cho"],
+}
+// SvcGrid key → svcTime keys (taxi: array = ALL must be out-of-hours to lock)
+const SVC_GRID_TIME_KEYS: Record<string, string | string[]> = {
+  "giao-ho": "delivery_pkg",
+  "mua-ho":  "errand",
+  "xe-om":   "motorbike",
+  "taxi":    ["taxi", "taxi7"],
 }
 
 function getWeatherTip(code: number, temp: number, hour: number): string {
@@ -1184,28 +1184,37 @@ export default function HomePage() {
               { icon:"🛵", label:"Xe ôm",   key:"xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5" },
               { icon:"🚗", label:"Taxi",    key:"taxi",    bg:"rgba(180,100,255,0.10)",ic:"#b464ff" },
             ].map((s, i) => {
-              const timeKey   = SVC_GRID_TIME_KEY[s.key]
-              const toggleKey = SVC_GRID_TOGGLE_KEY[s.key]
-              // Manual disable check
-              const toggle = svcToggleMap[toggleKey]
-              const manualOff = toggle && toggle.enabled === false
-              // Hours check
-              const hours = svcTimeMap[timeKey]
-              let outsideHours = false
-              if (hours && !hours.allDay) {
+              const timeKeys   = SVC_GRID_TIME_KEYS[s.key]
+              const toggleKeys = SVC_GRID_TOGGLE_KEY[s.key]
+
+              // Manual disable: locked only when ALL keys are off
+              const toggleKeyArr = Array.isArray(toggleKeys) ? toggleKeys : [toggleKeys]
+              const manualOff = toggleKeyArr.every(k => svcToggleMap[k] && svcToggleMap[k].enabled === false)
+              const disabledToggle = toggleKeyArr.find(k => svcToggleMap[k] && svcToggleMap[k].enabled === false)
+              const manualMsg = disabledToggle ? (svcToggleMap[disabledToggle].customerMsg || "Dịch vụ tạm ngừng phục vụ.") : ""
+
+              // Hours check: locked only when ALL time keys are outside hours
+              const checkOutside = (tk: string) => {
+                const hours = svcTimeMap[tk]
+                if (!hours || hours.allDay) return false
                 const now = new Date()
                 const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
                 const [oh, om] = hours.open.split(":").map(Number)
                 const [ch, cm] = hours.close.split(":").map(Number)
                 const oMin = (oh ?? 0) * 60 + (om ?? 0)
                 const cMin = (ch ?? 0) * 60 + (cm ?? 0)
-                outsideHours = oMin <= cMin ? !(vnMin >= oMin && vnMin < cMin) : !(vnMin >= oMin || vnMin < cMin)
+                return oMin <= cMin ? !(vnMin >= oMin && vnMin < cMin) : !(vnMin >= oMin || vnMin < cMin)
               }
+              const timeKeyArr = Array.isArray(timeKeys) ? timeKeys : [timeKeys]
+              const outsideHours = timeKeyArr.every(tk => checkOutside(tk))
+              // For display: pick first available hours range
+              const firstHours = timeKeyArr.map(tk => svcTimeMap[tk]).find(h => h && !h.allDay)
+
               const locked = manualOff || outsideHours
               const lockMsg = manualOff
-                ? (toggle?.customerMsg || "Dịch vụ tạm ngừng phục vụ.")
-                : outsideHours && hours
-                  ? `Dịch vụ hoạt động từ ${hours.open} – ${hours.close}. Vui lòng quay lại trong giờ phục vụ.`
+                ? manualMsg
+                : outsideHours && firstHours
+                  ? `Dịch vụ hoạt động từ ${firstHours.open} – ${firstHours.close}. Vui lòng quay lại trong giờ phục vụ.`
                   : ""
               return (
                 <div key={i} onClick={() => {
@@ -1232,9 +1241,9 @@ export default function HomePage() {
                     </div>
                     <span style={{ color: locked ? "#6a5a40" : "#b0956a", fontSize:11, textAlign:"center",
                       fontWeight:500, lineHeight:1.3 }}>{s.label}</span>
-                    {outsideHours && hours && (
+                    {outsideHours && firstHours && (
                       <span style={{ fontSize:8, color:"#ff6060", textAlign:"center", lineHeight:1.2 }}>
-                        {hours.open}–{hours.close}
+                        {firstHours.open}–{firstHours.close}
                       </span>
                     )}
                   </div>
