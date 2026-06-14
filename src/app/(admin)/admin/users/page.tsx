@@ -187,20 +187,29 @@ export default function AdminUsersPage() {
   const [importAutoShop,   setImportAutoShop]   = useState(false)
   const importFileRef = useRef<HTMLInputElement>(null)
 
+  const splitImportOptions = (raw: string) =>
+    // Hỗ trợ cả "," và "|" làm separator; chuẩn hoá fullwidth colon "：" → ":"
+    raw.replace(/：/g, ":").split(/[,|]/).map(s => s.trim()).filter(Boolean)
+
   const parseImportSizes = (raw: string) => {
     if (!raw.trim()) return null
-    const items = raw.split(",").map(s => s.trim()).filter(Boolean).map((s, i) => {
-      const [label, priceStr] = s.split(":").map(x => x.trim())
-      return { id: `s${i}`, label: label || s, _abs: parseInt((priceStr ?? "").replace(/\D/g, "")) || 0 }
+    const opts = splitImportOptions(raw)
+    const items = opts.map((s, i) => {
+      const colonIdx = s.lastIndexOf(":")          // lấy ":" CUỐI để tránh "Nhỏ (2 ng):25000"
+      const label    = colonIdx > 0 ? s.slice(0, colonIdx).trim() : s
+      const priceStr = colonIdx > 0 ? s.slice(colonIdx + 1).trim() : ""
+      return { id: `s${i}`, label, _abs: parseInt(priceStr.replace(/\D/g, "")) || 0 }
     })
     return items.map((s, _, arr) => ({ id: s.id, label: s.label, priceDiff: s._abs - (arr[0]?._abs ?? 0) }))
   }
 
   const parseImportToppings = (raw: string) => {
     if (!raw.trim()) return null
-    return raw.split(",").map(s => s.trim()).filter(Boolean).map((s, i) => {
-      const [name, priceStr] = s.split(":").map(x => x.trim())
-      return { id: `t${i}`, name: name || s, price: parseInt((priceStr ?? "").replace(/\D/g, "")) || 0 }
+    return splitImportOptions(raw).map((s, i) => {
+      const colonIdx = s.lastIndexOf(":")
+      const name     = colonIdx > 0 ? s.slice(0, colonIdx).trim() : s
+      const priceStr = colonIdx > 0 ? s.slice(colonIdx + 1).trim() : ""
+      return { id: `t${i}`, name, price: parseInt(priceStr.replace(/\D/g, "")) || 0 }
     })
   }
 
