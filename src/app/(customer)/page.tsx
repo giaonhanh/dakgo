@@ -53,6 +53,31 @@ const HOME_CATS = SHOP_CATEGORIES.filter(c => c.value !== "khac")
 // --- Không c̣n mock data — dùng Supabase th?t -------------
 
 
+// FlashCountdown — component độc lập, tự quản lý timer riêng
+function FlashCountdown({ validTo }: { validTo: string }) {
+  const pZ = (n: number) => String(n).padStart(2, "0")
+  const [time, setTime] = useState({ h: 0, m: 0, s: 0 })
+  useEffect(() => {
+    function calc() {
+      const diff = Math.max(0, Math.floor((new Date(validTo).getTime() - Date.now()) / 1000))
+      setTime({ h: Math.floor(diff / 3600), m: Math.floor((diff % 3600) / 60), s: diff % 60 })
+    }
+    calc()
+    const t = setInterval(calc, 1000)
+    return () => clearInterval(t)
+  }, [validTo])
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      background: "linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
+      borderRadius: 6, padding: "2px 8px", marginBottom: 5, alignSelf: "flex-start",
+      color: "#000", fontSize: 9, fontWeight: 800, letterSpacing: .5, fontFamily: "Lexend",
+    }}>
+      ⚡ FLASH SALE · {pZ(time.h)}h {pZ(time.m)}p {pZ(time.s)}s
+    </div>
+  )
+}
+
 // --- Helpers ------------------------------------------------
 function shopInHoursFromHours(oh: { open?: string; close?: string } | null | undefined): boolean {
   if (!oh?.open || !oh?.close) return true  // không có giờ → không giới hạn
@@ -178,7 +203,6 @@ export default function HomePage() {
   const [nearbyFilter,    setNearbyFilter]    = useState<string>("all")
   const [savedVoucherIds, setSavedVoucherIds] = useState<string[]>([])
   const [bannerIdx,     setBannerIdx]     = useState(0)
-  const [countdown,     setCountdown]     = useState({ h:0, m:0, s:0 })
   const [activeTab,     setActiveTab]     = useState("home")
   const [conflictItem,  setConflictItem]  = useState<PendingItem | null>(null)
   const [weatherTip,    setWeatherTip]    = useState<string | null>(null)
@@ -561,24 +585,7 @@ export default function HomePage() {
     return () => clearInterval(t)
   }, [vouchers])
 
-  // Countdown — computed from current deal's valid_to
-  useEffect(() => {
-    if (!vouchers.length) return
-    const update = () => {
-      const deal = vouchers[bannerIdx % vouchers.length]
-      if (!deal) return
-      const diff = Math.max(0, new Date(deal.valid_to).getTime() - Date.now())
-      const totalSecs = Math.floor(diff / 1000)
-      setCountdown({
-        h: Math.floor(totalSecs / 3600),
-        m: Math.floor((totalSecs % 3600) / 60),
-        s: totalSecs % 60,
-      })
-    }
-    update()
-    const t = setInterval(update, 1000)
-    return () => clearInterval(t)
-  }, [vouchers, bannerIdx])
+  // Countdown state đã được chuyển vào FlashCountdown component — không còn setInterval tại đây
 
   // Live orders carousel auto-cycle
   useEffect(() => {
@@ -976,7 +983,7 @@ export default function HomePage() {
             return (
               <div style={{ margin:"0 16px 8px" }}>
                 <div style={{
-                  minHeight:110, borderRadius:16, overflow:"hidden",
+                  height:110, borderRadius:16, overflow:"hidden",
                   border:"1px solid rgba(255,107,0,0.35)",
                   position:"relative",
                   background:"linear-gradient(135deg,#1a0d00,#2d1500,#0d0900)",
@@ -988,15 +995,9 @@ export default function HomePage() {
                   <div style={{ position:"absolute", top:0, left:"-100%", width:"50%", height:"100%",
                     background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)",
                     animation:"logoShine 3.5s infinite" }} />
-                  <div style={{ position:"relative", zIndex:1, padding:"12px 14px 12px",
-                    display:"flex", flexDirection:"column", justifyContent:"center" }}>
-                    <div style={{ display:"inline-flex", alignItems:"center", gap:4,
-                      background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
-                      borderRadius:6, padding:"2px 8px", marginBottom:5, alignSelf:"flex-start",
-                      color:"#000", fontSize:9, fontWeight:800, letterSpacing:.5,
-                      fontFamily:"Lexend" }}>
-                      ⚡ FLASH SALE · {padZ(countdown.h)}h {padZ(countdown.m)}p {padZ(countdown.s)}s
-                    </div>
+                  <div style={{ position:"relative", zIndex:1, padding:"12px 14px",
+                    display:"flex", flexDirection:"column", justifyContent:"center", height:"100%" }}>
+                    <FlashCountdown validTo={deal.valid_to} />
                     <div style={{
                       color:"#fff", fontWeight:700, lineHeight:1.25,
                       maxWidth:"62%", fontFamily:"Lexend", marginBottom:3,
