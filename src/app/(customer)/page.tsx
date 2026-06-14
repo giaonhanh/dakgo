@@ -207,9 +207,26 @@ export default function HomePage() {
   const [conflictItem,  setConflictItem]  = useState<PendingItem | null>(null)
   const [weatherTip,    setWeatherTip]    = useState<string | null>(null)
 
-  // Đọc địa chỉ từ locationStore (đã được GpsInit trong layout lấy sẵn)
+  // GPS dùng để tính quán gần, phí ship — không hiện trực tiếp
   const locationData = useLocationStore()
-  const location = locationData.address || "Phước An, Krông Pắc"
+  const [defaultAddress, setDefaultAddress] = useState<string | null>(null)
+
+  useEffect(() => {
+    const sb = createClient()
+    sb.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      sb.from("saved_addresses")
+        .select("address, label")
+        .eq("user_id", user.id)
+        .eq("is_default", true)
+        .single()
+        .then(({ data }) => {
+          if (data) setDefaultAddress(`${data.label ? data.label + " — " : ""}${data.address}`)
+        })
+    })
+  }, [])
+
+  const location = defaultAddress || locationData.address || "Nhấn để thêm địa chỉ"
   const containerRef = useRef<HTMLDivElement>(null)
   const cartIconRef  = useRef<HTMLDivElement>(null)
 
