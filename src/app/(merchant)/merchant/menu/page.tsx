@@ -98,36 +98,36 @@ function SortableProductCard({ p, groups, onEdit, onToggle, onDelete }: ProductC
   return (
     <div ref={setNodeRef} style={{ transform:CSS.Transform.toString(transform), transition,
       background:"rgba(255,255,255,0.04)", border:`1px solid ${p.available?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.04)"}`,
-      borderRadius:14, padding:11, marginBottom:8, display:"flex", gap:10, alignItems:"center",
+      borderRadius:14, padding:10, marginBottom:8, display:"flex", gap:11, alignItems:"flex-start",
       opacity: isDragging ? 0.5 : p.available ? 1 : 0.6 }}>
       {/* Drag handle */}
       <div ref={setActivatorNodeRef} {...attributes} {...listeners}
         style={{ cursor:isDragging?"grabbing":"grab", touchAction:"none", flexShrink:0,
           color:"#3a2a15", fontSize:14, display:"flex", alignItems:"center", padding:"0 2px", userSelect:"none" as React.CSSProperties["userSelect"] }}>⠿</div>
       {/* Image */}
-      <div style={{width:54,height:54,borderRadius:12,flexShrink:0,background:"rgba(255,107,0,0.07)",border:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,overflow:"hidden",position:"relative"}}>
+      <div style={{width:72,height:72,borderRadius:14,flexShrink:0,background:"rgba(255,107,0,0.07)",border:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,overflow:"hidden",position:"relative"}}>
         {p.imagePreview ? <img src={p.imagePreview} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}} /> : <span>🍽️</span>}
-        {bc && <div style={{position:"absolute",top:2,left:2,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:4,padding:"1px 4px",fontSize:7,fontWeight:800,color:bc.color,lineHeight:1.3}}>{bc.label.split(" ")[0]}</div>}
+        {bc && <div style={{position:"absolute",top:3,left:3,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:4,padding:"2px 5px",fontSize:8,fontWeight:800,color:bc.color,lineHeight:1.3}}>{bc.label.split(" ")[0]}</div>}
       </div>
       {/* Info */}
       <div style={{flex:1,minWidth:0}}>
-        <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:2}}>
-          <div style={{color:"#f8f0e0",fontSize:11,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1,minWidth:0}}>{p.name}</div>
-          {!p.available && <span style={{background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"1px 5px",color:"#ff4040",fontSize:7,fontWeight:700,flexShrink:0}}>ẨN</span>}
+        <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:3}}>
+          <div style={{color:"#f8f0e0",fontSize:12,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1,minWidth:0}}>{p.name}</div>
+          {!p.available && <span style={{background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"2px 6px",color:"#ff4040",fontSize:9,fontWeight:700,flexShrink:0}}>ẨN</span>}
         </div>
-        <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:4}}>
-          <span style={{background:"linear-gradient(90deg,#FF6B00,#FFB347)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontSize:12,fontWeight:800}}>{fmt(p.price)}</span>
+        <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:5}}>
+          <span style={{background:"linear-gradient(90deg,#FF6B00,#FFB347)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",fontSize:13,fontWeight:800}}>{fmt(p.price)}</span>
           {p.promoEnabled && p.promoPrice && p.promoPrice < p.price && (
-            <span style={{background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"1px 6px",color:"#ff4040",fontSize:9,fontWeight:700}}>{fmt(p.promoPrice)}</span>
+            <span style={{background:"rgba(255,64,64,0.1)",border:"1px solid rgba(255,64,64,0.2)",borderRadius:4,padding:"2px 7px",color:"#ff4040",fontSize:10,fontWeight:700}}>{fmt(p.promoPrice)}</span>
           )}
         </div>
-        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-          {gName && <span style={{background:"rgba(74,143,245,0.1)",border:"1px solid rgba(74,143,245,0.2)",borderRadius:4,padding:"1px 5px",color:"#4a8ff5",fontSize:7}}>{gName}</span>}
-          {p.categories.slice(0,2).map(c => (
-            <span key={c} style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:4,padding:"1px 5px",color:"#6a5a40",fontSize:7}}>{c}</span>
+        <div style={{display:"flex",gap:4,flexWrap:"wrap",rowGap:4}}>
+          {gName && <span style={{background:"rgba(74,143,245,0.1)",border:"1px solid rgba(74,143,245,0.2)",borderRadius:5,padding:"2px 7px",color:"#4a8ff5",fontSize:9,fontWeight:600}}>{gName}</span>}
+          {p.categories.slice(0,3).map(c => (
+            <span key={c} style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:5,padding:"2px 7px",color:"#6a5a40",fontSize:9}}>{c}</span>
           ))}
-          {p.toppings.length > 0 && <span style={{background:"rgba(180,100,255,0.08)",border:"1px solid rgba(180,100,255,0.2)",borderRadius:4,padding:"1px 5px",color:"#b464ff",fontSize:7}}>{p.toppings.length} topping</span>}
-          {p.sizes.length > 0 && <span style={{background:"rgba(62,207,110,0.08)",border:"1px solid rgba(62,207,110,0.2)",borderRadius:4,padding:"1px 5px",color:"#3ecf6e",fontSize:7}}>{p.sizes.length} size</span>}
+          {p.toppings.length > 0 && <span style={{background:"rgba(180,100,255,0.08)",border:"1px solid rgba(180,100,255,0.2)",borderRadius:5,padding:"2px 7px",color:"#b464ff",fontSize:9}}>{p.toppings.length} topping</span>}
+          {p.sizes.length > 0 && <span style={{background:"rgba(62,207,110,0.08)",border:"1px solid rgba(62,207,110,0.2)",borderRadius:5,padding:"2px 7px",color:"#3ecf6e",fontSize:9}}>{p.sizes.length} size</span>}
         </div>
       </div>
       {/* Actions */}
