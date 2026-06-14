@@ -19,7 +19,7 @@ interface ShopResult {
   rating_avg:      number
   total_reviews:   number
   distance_km:     number
-  delivery_fee:    number
+  delivery_fee:    number | null
   is_open:         boolean
   lat:             number | null
   lng:             number | null
@@ -76,13 +76,11 @@ async function loadPricing() {
   if (food?.rows) { _pricingRows = food.rows; _pricingExtra = food.extra ?? "3500" }
 }
 
-function shopDeliveryFee(lat: number | null, lng: number | null, userLat: number | null, userLng: number | null): number {
-  if (lat && lng && userLat && userLng) {
-    const km = haversineKm(userLat, userLng, lat, lng)
-    if (_pricingRows) return calcDeliveryFeeFromPricing(km, _pricingRows, _pricingExtra)
-    return calcDeliveryFee(km)
-  }
-  return 0
+function shopDeliveryFee(lat: number | null, lng: number | null, userLat: number | null, userLng: number | null): number | null {
+  if (!lat || !lng || !userLat || !userLng) return null
+  const km = haversineKm(userLat, userLng, lat, lng)
+  if (_pricingRows) return calcDeliveryFeeFromPricing(km, _pricingRows, _pricingExtra)
+  return calcDeliveryFee(km)
 }
 
 async function searchSupabase(query: string, userLat: number | null, userLng: number | null): Promise<SearchResult[]> {
@@ -677,7 +675,7 @@ function ShopCard({ shop, onClick, userLat }: { shop: ShopResult; onClick: () =>
             {shop.total_reviews > 0 && <span style={{ color: "#6a5a40" }}> ({shop.total_reviews})</span>}
           </span>
           {etaMin && <span>🕐 ~{etaMin} phút</span>}
-          <span>{!userLat
+          <span>{shop.delivery_fee === null
             ? <span style={{ color:"#6a5a40" }}>📍 Cần GPS</span>
             : shop.delivery_fee === 0
             ? <span style={{ color: "#3ecf6e" }}>🚚 Free ship</span>
