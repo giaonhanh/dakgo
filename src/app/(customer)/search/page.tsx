@@ -78,9 +78,10 @@ async function loadPricing() {
   if (food?.rows) { _pricingRows = food.rows; _pricingExtra = food.extra ?? "3500" }
 }
 
+// null = thiếu GPS user | -1 = quán chưa cài tọa độ | 0 = free | >0 = phí thực
 function shopDeliveryFee(lat: number | null, lng: number | null, userLat: number | null, userLng: number | null): number | null {
-  if (!userLat || !userLng) return null           // thiếu GPS user → hiện "Cần GPS"
-  if (!lat || !lng) return calcDeliveryFee(3)     // quán chưa có tọa độ → ước 3km (~20k)
+  if (!userLat || !userLng) return null
+  if (!lat || !lng) return -1
   const km = haversineKm(userLat, userLng, lat, lng)
   if (_pricingRows) return calcDeliveryFeeFromPricing(km, _pricingRows, _pricingExtra)
   return calcDeliveryFee(km)
@@ -660,6 +661,8 @@ function ShopCard({ shop, onClick, userLat }: { shop: ShopResult; onClick: () =>
           {etaMin && <span>🕐 ~{etaMin} phút</span>}
           <span>{shop.delivery_fee === null
             ? <span style={{ color:"#6a5a40" }}>📍 Cần GPS</span>
+            : shop.delivery_fee === -1
+            ? <span style={{ color:"#6a5a40" }}>🏪 Liên hệ quán</span>
             : shop.delivery_fee === 0
             ? <span style={{ color: "#3ecf6e" }}>🚚 Free ship</span>
             : `🛵 ${formatPrice(shop.delivery_fee)}`}
