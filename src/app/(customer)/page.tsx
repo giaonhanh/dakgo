@@ -32,7 +32,9 @@ import NotifDot from "@/components/ui/NotifDot"
 
 // --- Types -------------------------------------------------
 type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; lat: number | null; lng: number | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null; category?: string; categories?: string[] | null }
-type ProductRow = { id: string; name: string; price: number; original_price?: number | null; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null } | { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
+type MenuGroupMeta = { id: string; allDay: boolean; startHour: string; endHour: string }
+type ProductShop = { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null; menu_groups_data?: MenuGroupMeta[] | null }
+type ProductRow = { id: string; name: string; price: number; original_price?: number | null; sold_count: number; shop_id: string; image_url: string | null; category?: string | null; shops: ProductShop | ProductShop[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 type PromoProductRow = ProductRow & { promoTag: 'discount' | 'combo' | 'freeship' }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null; shopName?: string | null }
@@ -146,14 +148,27 @@ function nextOpenLabel(shop: ShopRow): string {
   return "Tạm đóng"
 }
 
-function isProductInTime(p: { all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }): boolean {
-  if (p.all_day !== false) return true
+function checkTimeRange(allDay: boolean | null | undefined, startHour: string | null | undefined, endHour: string | null | undefined): boolean {
+  if (allDay !== false) return true
   const now = new Date()
   const cur = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
-  const [sh, sm] = (p.start_hour ?? "00:00").split(":").map(Number)
-  const [eh, em] = (p.end_hour   ?? "23:59").split(":").map(Number)
+  const [sh, sm] = (startHour ?? "00:00").split(":").map(Number)
+  const [eh, em] = (endHour   ?? "23:59").split(":").map(Number)
   const start = sh * 60 + sm, end = eh * 60 + em
   return start <= end ? cur >= start && cur < end : cur >= start || cur < end
+}
+
+function isProductInTime(p: { all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }): boolean {
+  return checkTimeRange(p.all_day, p.start_hour, p.end_hour)
+}
+
+function isProductGroupInTime(p: ProductRow): boolean {
+  const shop = Array.isArray(p.shops) ? p.shops[0] : p.shops
+  const groups = shop?.menu_groups_data
+  if (!groups || !Array.isArray(groups) || !p.category) return true
+  const group = groups.find(g => g.id === p.category)
+  if (!group) return true
+  return checkTimeRange(group.allDay === false ? false : true, group.startHour, group.endHour)
 }
 
 const fmt  = (n: number) => n.toLocaleString("vi-VN") + "d"
@@ -362,16 +377,16 @@ export default function HomePage() {
       // Best sellers — top bán chạy, không lọc theo giờ (sold_count >= 0)
       const { data: bsData } = await supabase
         .from("products")
-        .select("id,name,price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour")
+        .select("id,name,price,sold_count,shop_id,image_url,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),all_day,start_hour,end_hour")
         .eq("is_available", true)
         .eq("shops.status", "approved")
         .order("sold_count", { ascending: false })
         .limit(20)
-      setBestSellers(((bsData ?? []) as ProductRow[]).filter(p => isShopOpen(p) && isProductInTime(p)).slice(0, 8))
+      setBestSellers(((bsData ?? []) as ProductRow[]).filter(p => isShopOpen(p) && isProductInTime(p) && isProductGroupInTime(p)).slice(0, 8))
 
       // Promos — gộp 3 nguồn: giảm giá trực tiếp + combo voucher + quán có free ship
       const now = new Date().toISOString()
-      const productSelectFields = "id,name,price,original_price,sold_count,shop_id,image_url,shops!inner(name,is_open,status,opening_hours),all_day,start_hour,end_hour"
+      const productSelectFields = "id,name,price,original_price,sold_count,shop_id,image_url,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),all_day,start_hour,end_hour"
 
       const [{ data: discountData }, { data: comboVoucherData }, { data: freeshopData }] = await Promise.all([
         // 1. Sản phẩm giảm giá trực tiếp (original_price > price)
@@ -401,7 +416,7 @@ export default function HomePage() {
 
       const addProducts = (rows: ProductRow[], tag: PromoProductRow["promoTag"]) => {
         for (const p of rows) {
-          if (!isShopOpen(p) || !isProductInTime(p) || seen.has(p.id)) continue
+          if (!isShopOpen(p) || !isProductInTime(p) || !isProductGroupInTime(p) || seen.has(p.id)) continue
           seen.add(p.id)
           merged.push({ ...p, promoTag: tag })
         }
@@ -452,7 +467,7 @@ export default function HomePage() {
           .order("sold_count", { ascending: false }).limit(20)
         setPromos(
           ((fallbackPromo ?? []) as ProductRow[])
-            .filter(p => isShopOpen(p) && isProductInTime(p))
+            .filter(p => isShopOpen(p) && isProductInTime(p) && isProductGroupInTime(p))
             .slice(0, 8)
             .map(p => ({ ...p, promoTag: "discount" as const }))
         )
@@ -470,12 +485,15 @@ export default function HomePage() {
       // V?a lên menu — quán đang mở, trong khung giờ bán
       const { data: newMenuData } = await supabase
         .from("products")
-        .select("id,name,price,image_url,shop_id,shops!inner(name,is_open,status,opening_hours),created_at,all_day,start_hour,end_hour")
+        .select("id,name,price,image_url,shop_id,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),created_at,all_day,start_hour,end_hour")
         .eq("is_available", true)
         .eq("shops.status", "approved")
         .order("created_at", { ascending: false })
         .limit(30)
-      setNewMenuItems(((newMenuData ?? []) as unknown as NewMenuRow[]).filter(p => isShopOpen(p as unknown as ProductRow) && isProductInTime(p)).slice(0, 10))
+      setNewMenuItems(((newMenuData ?? []) as unknown as NewMenuRow[]).filter(p => {
+        const pr = p as unknown as ProductRow
+        return isShopOpen(pr) && isProductInTime(pr) && isProductGroupInTime(pr)
+      }).slice(0, 10))
 
       // Reorders (last 5 delivered orders for this user)
       const { data: orderData } = await supabase
@@ -517,14 +535,14 @@ export default function HomePage() {
         if (shopIds.length > 0) {
           const { data: recFallback } = await supabase
             .from("products")
-            .select("id, name, price, original_price, image_url, sold_count, shop_id, shops!inner(name,is_open,status,opening_hours), all_day, start_hour, end_hour")
+            .select("id, name, price, original_price, image_url, sold_count, shop_id, category, shops!inner(name,is_open,status,opening_hours,menu_groups_data), all_day, start_hour, end_hour")
             .in("shop_id", shopIds)
             .eq("is_available", true)
             .eq("shops.is_open", true)
             .eq("shops.status", "approved")
             .order("sold_count", { ascending: false })
             .limit(25)
-          setRecos((recFallback ?? []).filter(p => isShopOpen(p as ProductRow) && isProductInTime(p)).slice(0, 10).map(p => {
+          setRecos((recFallback ?? []).filter(p => isShopOpen(p as ProductRow) && isProductInTime(p) && isProductGroupInTime(p as ProductRow)).slice(0, 10).map(p => {
             const sn = Array.isArray(p.shops) ? (p.shops[0] as { name: string })?.name : (p.shops as { name: string } | null)?.name
             return { id: p.id, name: p.name, price: p.price, original_price: p.original_price,
               image_url: p.image_url, sold_count: p.sold_count, shop_id: p.shop_id,
@@ -562,14 +580,14 @@ export default function HomePage() {
         const filter = terms.map(t => `name.ilike.%${t}%`).join(",")
         const { data } = await supabase
           .from("products")
-          .select("id,name,price,sold_count,shop_id,shops!inner(name,is_open,status,opening_hours)")
+          .select("id,name,price,sold_count,shop_id,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),all_day,start_hour,end_hour")
           .eq("is_available", true)
           .eq("shops.status", "approved")
           .eq("shops.is_open", true)
           .or(filter)
           .limit(20)
         if (data?.length) {
-          const open = (data as ProductRow[]).filter(p => isShopOpen(p) && isProductInTime(p))
+          const open = (data as ProductRow[]).filter(p => isShopOpen(p) && isProductInTime(p) && isProductGroupInTime(p))
           if (open.length) setSearchSuggest(open.slice(0, 8))
         }
       } catch { /* ignore */ }
