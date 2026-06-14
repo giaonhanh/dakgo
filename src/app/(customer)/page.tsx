@@ -149,7 +149,7 @@ function nextOpenLabel(shop: ShopRow): string {
 function isProductInTime(p: { all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }): boolean {
   if (p.all_day !== false) return true
   const now = new Date()
-  const cur = now.getHours() * 60 + now.getMinutes()
+  const cur = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
   const [sh, sm] = (p.start_hour ?? "00:00").split(":").map(Number)
   const [eh, em] = (p.end_hour   ?? "23:59").split(":").map(Number)
   const start = sh * 60 + sm, end = eh * 60 + em
@@ -367,7 +367,7 @@ export default function HomePage() {
         .eq("shops.status", "approved")
         .order("sold_count", { ascending: false })
         .limit(20)
-      setBestSellers(((bsData ?? []) as ProductRow[]).filter(p => isShopOpen(p)).slice(0, 8))
+      setBestSellers(((bsData ?? []) as ProductRow[]).filter(p => isShopOpen(p) && isProductInTime(p)).slice(0, 8))
 
       // Promos — gộp 3 nguồn: giảm giá trực tiếp + combo voucher + quán có free ship
       const now = new Date().toISOString()
@@ -401,7 +401,7 @@ export default function HomePage() {
 
       const addProducts = (rows: ProductRow[], tag: PromoProductRow["promoTag"]) => {
         for (const p of rows) {
-          if (!isShopOpen(p) || seen.has(p.id)) continue
+          if (!isShopOpen(p) || !isProductInTime(p) || seen.has(p.id)) continue
           seen.add(p.id)
           merged.push({ ...p, promoTag: tag })
         }
@@ -452,7 +452,7 @@ export default function HomePage() {
           .order("sold_count", { ascending: false }).limit(20)
         setPromos(
           ((fallbackPromo ?? []) as ProductRow[])
-            .filter(p => isShopOpen(p))
+            .filter(p => isShopOpen(p) && isProductInTime(p))
             .slice(0, 8)
             .map(p => ({ ...p, promoTag: "discount" as const }))
         )
@@ -569,7 +569,7 @@ export default function HomePage() {
           .or(filter)
           .limit(20)
         if (data?.length) {
-          const open = (data as ProductRow[]).filter(p => isShopOpen(p))
+          const open = (data as ProductRow[]).filter(p => isShopOpen(p) && isProductInTime(p))
           if (open.length) setSearchSuggest(open.slice(0, 8))
         }
       } catch { /* ignore */ }
