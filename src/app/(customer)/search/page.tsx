@@ -208,22 +208,28 @@ function SearchContent() {
     setLoading(true)
     supabase
       .from("products")
-      .select("id, name, price, original_price, image_url, sold_count, shop_id, shops!shop_id(name)")
+      .select("id, name, price, original_price, image_url, sold_count, shop_id, shops(name, status)")
       .eq("is_available", true)
       .order("created_at", { ascending: false })
       .limit(40)
-      .then(({ data }) => {
-        if (!data) { setLoading(false); return }
-        const items: ProductResult[] = data.map(p => {
-          const shop = (Array.isArray(p.shops) ? p.shops[0] : p.shops) as { name: string } | null
-          return {
-            id: p.id, type: "product" as const,
-            name: p.name, shop_name: shop?.name ?? "",
-            shop_id: p.shop_id, image_url: p.image_url ?? "",
-            price: p.price, original_price: p.original_price ?? undefined,
-            rating: 5, sold_count: p.sold_count ?? 0,
-          }
-        })
+      .then(({ data, error }) => {
+        if (error) console.error("[newest]", error.message)
+        if (!data || data.length === 0) { setLoading(false); return }
+        const items: ProductResult[] = data
+          .filter(p => {
+            const shop = (Array.isArray(p.shops) ? p.shops[0] : p.shops) as { name: string; status?: string } | null
+            return shop?.status === "approved" || shop?.status === undefined
+          })
+          .map(p => {
+            const shop = (Array.isArray(p.shops) ? p.shops[0] : p.shops) as { name: string } | null
+            return {
+              id: p.id, type: "product" as const,
+              name: p.name, shop_name: shop?.name ?? "",
+              shop_id: p.shop_id, image_url: p.image_url ?? "",
+              price: p.price, original_price: p.original_price ?? undefined,
+              rating: 5, sold_count: p.sold_count ?? 0,
+            }
+          })
         setResults(items)
         setLoading(false)
       })
@@ -517,12 +523,12 @@ function SearchContent() {
                   animate={{ opacity: 1 }}
                   style={{ textAlign: "center", padding: "60px 20px" }}
                 >
-                  <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+                  <div style={{ fontSize: 48, marginBottom: 16 }}>{isNewest ? "🍽️" : "🔍"}</div>
                   <p style={{ color: "#f8f0e0", fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
-                    Không tìm thấy &ldquo;{query}&rdquo;
+                    {isNewest ? "Chưa có món ăn mới" : `Không tìm thấy "${query}"`}
                   </p>
                   <p style={{ color: "#6a5a40", fontSize: 13 }}>
-                    Thử từ khóa khác hoặc xóa bộ lọc
+                    {isNewest ? "Các quán chưa cập nhật thực đơn" : "Thử từ khóa khác hoặc xóa bộ lọc"}
                   </p>
                 </motion.div>
               ) : (

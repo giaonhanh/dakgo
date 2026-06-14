@@ -6,6 +6,7 @@ import { motion } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/lib/categories"
 import { useCartStore } from "@/store/cartStore"
+import { useLocationStore } from "@/store/locationStore"
 import Badge from "@/components/ui/Badge"
 
 interface Shop {
@@ -44,6 +45,7 @@ export default function NearbyShopsPage() {
   const router   = useRouter()
   const { items } = useCartStore()
   const totalQty  = items.reduce((s, i) => s + i.qty, 0)
+  const { lat: userLat, lng: userLng } = useLocationStore()
 
   const [shops,     setShops]     = useState<Shop[]>([])
   const [loading,   setLoading]   = useState(true)
@@ -54,20 +56,20 @@ export default function NearbyShopsPage() {
     const supabase = createClient()
     supabase
       .from("shops")
-      .select("id, name, address, is_open, rating_avg, logo_url, location, category, categories")
+      .select("id, name, address, is_open, rating_avg, logo_url, lat, lng, category, categories")
       .eq("status", "approved")
       .order("rating_avg", { ascending: false })
       .limit(80)
       .then(({ data }) => {
         const mapped: Shop[] = (data ?? []).map(r => {
-          const coords = extractCoords(r.location)
           const rawCats: string[] = Array.isArray(r.categories) && r.categories.length > 0 ? r.categories : r.category ? [r.category] : []
           return {
             id: r.id, name: r.name, address: r.address ?? "",
             isOpen: r.is_open ?? false,
             rating: r.rating_avg ?? 0,
             logoUrl: r.logo_url ?? null,
-            lat: coords?.lat ?? null, lng: coords?.lng ?? null,
+            lat: (r as { lat?: number | null }).lat ?? null,
+            lng: (r as { lng?: number | null }).lng ?? null,
             distanceKm: null,
             category: normalizeCategoryValue(r.category ?? "khac"),
             categories: rawCats.map((v: string) => normalizeCategoryValue(v)),
@@ -75,22 +77,6 @@ export default function NearbyShopsPage() {
         })
         setShops(mapped)
         setLoading(false)
-
-        // Geolocation
-        if (typeof navigator !== "undefined" && navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            pos => {
-              const { latitude: uLat, longitude: uLng } = pos.coords
-              setShops(prev => prev.map(s => ({
-                ...s,
-                distanceKm: s.lat !== null && s.lng !== null
-                  ? haversineKm(uLat, uLng, s.lat, s.lng) : null,
-              })))
-            },
-            () => {},
-            { timeout: 8000, maximumAge: 60000 }
-          )
-        }
       })
   }, [])
 
@@ -101,6 +87,11 @@ export default function NearbyShopsPage() {
     return SHOP_CATEGORIES.filter(c => set.has(c.value))
   }, [shops])
 
+  const getDist = (s: Shop) => {
+    if (!userLat || !userLng || !s.lat || !s.lng) return null
+    return haversineKm(userLat, userLng, s.lat, s.lng)
+  }
+
   const filtered = useMemo(() => {
     const byTab = activeTab === "all"
       ? shops
@@ -109,17 +100,19 @@ export default function NearbyShopsPage() {
     return [...byTab].sort((a, b) => {
       if (sortBy === "open") {
         if (a.isOpen !== b.isOpen) return a.isOpen ? -1 : 1
+        const dA = getDist(a), dB = getDist(b)
+        if (dA !== null && dB !== null) return dA - dB
         return b.rating - a.rating
       }
       if (sortBy === "rating") return b.rating - a.rating
       if (sortBy === "distance") {
-        if (a.distanceKm !== null && b.distanceKm !== null) return a.distanceKm - b.distanceKm
-        if (a.distanceKm !== null) return -1
-        if (b.distanceKm !== null) return 1
+        const dA = getDist(a) ?? 9999
+        const dB = getDist(b) ?? 9999
+        return dA - dB
       }
       return b.rating - a.rating
     })
-  }, [shops, activeTab, sortBy])
+  }, [shops, activeTab, sortBy, userLat, userLng]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeCat = activeTab !== "all" ? getCategoryByValue(activeTab) : null
 
@@ -261,8 +254,8 @@ export default function NearbyShopsPage() {
                       {s.rating > 0 && (
                         <Badge layer={2} variant="rating" size="sm" label={s.rating.toFixed(1)} />
                       )}
-                      {s.distanceKm !== null && (
-                        <Badge layer={2} variant="distance" size="sm" label={formatDist(s.distanceKm)} />
+                      {getDist(s) !== null && (
+                        <Badge layer={2} variant="distance" size="sm" label={formatDist(getDist(s)!)} />
                       )}
                       {/* Category tags */}
                       {s.categories.slice(0, 2).map(v => {
