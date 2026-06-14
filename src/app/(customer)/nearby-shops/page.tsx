@@ -9,6 +9,8 @@ import { useCartStore } from "@/store/cartStore"
 import { useLocationStore } from "@/store/locationStore"
 import Badge from "@/components/ui/Badge"
 
+type DayHoursEntry = { day: string; open: boolean; slots: { from: string; to: string }[] }
+
 interface Shop {
   id: string; name: string; address: string
   isOpen: boolean; rating: number
@@ -18,15 +20,22 @@ interface Shop {
   category: string; categories: string[]
 }
 
-type GeoJSONPoint = { type: string; coordinates: number[] }
-
-function extractCoords(loc: unknown): { lat: number; lng: number } | null {
-  if (!loc || typeof loc !== "object") return null
-  const geo = loc as Partial<GeoJSONPoint>
-  if (!Array.isArray(geo.coordinates) || geo.coordinates.length < 2) return null
-  const [lng, lat] = geo.coordinates
-  if (typeof lng !== "number" || typeof lat !== "number") return null
-  return { lat, lng }
+function checkOpeningHours(oh: unknown, fallback = true): boolean {
+  if (!oh) return fallback
+  const now = new Date()
+  const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+  const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return (h ?? 0) * 60 + (m ?? 0) }
+  const inSlot = (f: string, t: string) => { const o = toMin(f), c = toMin(t); return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c }
+  if (Array.isArray(oh)) {
+    const dayNames = ["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"]
+    const today = dayNames[new Date(now.getTime() + 7 * 3600000).getUTCDay()]
+    const entry = (oh as DayHoursEntry[]).find(d => d.day === today)
+    if (!entry?.open || !entry.slots.length) return false
+    return entry.slots.some(s => inSlot(s.from, s.to))
+  }
+  const old = oh as { open?: string; close?: string }
+  if (!old.open || !old.close) return fallback
+  return inSlot(old.open, old.close)
 }
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -56,16 +65,18 @@ export default function NearbyShopsPage() {
     const supabase = createClient()
     supabase
       .from("shops")
-      .select("id, name, address, is_open, rating_avg, logo_url, lat, lng, category, categories")
+      .select("id, name, address, is_open, opening_hours, rating_avg, logo_url, lat, lng, category, categories")
       .eq("status", "approved")
       .order("rating_avg", { ascending: false })
       .limit(80)
       .then(({ data }) => {
         const mapped: Shop[] = (data ?? []).map(r => {
           const rawCats: string[] = Array.isArray(r.categories) && r.categories.length > 0 ? r.categories : r.category ? [r.category] : []
+          const dbOpen = r.is_open ?? false
+          const isOpen = dbOpen && checkOpeningHours(r.opening_hours, true)
           return {
             id: r.id, name: r.name, address: r.address ?? "",
-            isOpen: r.is_open ?? false,
+            isOpen,
             rating: r.rating_avg ?? 0,
             logoUrl: r.logo_url ?? null,
             lat: (r as { lat?: number | null }).lat ?? null,
