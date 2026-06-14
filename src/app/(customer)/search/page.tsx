@@ -9,16 +9,18 @@ const supabase = createClient()
 
 // --- Types ---
 interface ShopResult {
-  id:         string
-  type:       "shop"
-  name:       string
-  category:   string
-  logo_url:   string
-  rating_avg: number
-  distance_km: number
-  delivery_fee: number
-  is_open:    boolean
-  promo?:     string
+  id:              string
+  type:            "shop"
+  name:            string
+  category:        string
+  logo_url:        string
+  cover_image_url: string
+  rating_avg:      number
+  total_reviews:   number
+  distance_km:     number
+  delivery_fee:    number
+  is_open:         boolean
+  promo?:          string
 }
 
 interface ProductResult {
@@ -56,6 +58,7 @@ interface RpcProduct {
 }
 interface RpcShop {
   id: string; name: string; category?: string; logo_url: string | null
+  cover_image_url?: string | null; total_reviews?: number
   rating_avg: number; is_open: boolean; score?: number
 }
 interface RpcResult { products: RpcProduct[] | null; shops: RpcShop[] | null }
@@ -72,7 +75,9 @@ async function searchSupabase(query: string): Promise<SearchResult[]> {
       id: s.id, type: "shop" as const,
       name: s.name, category: s.category ?? "",
       logo_url: s.logo_url ?? "",
+      cover_image_url: s.cover_image_url ?? "",
       rating_avg: Number(s.rating_avg ?? 5),
+      total_reviews: s.total_reviews ?? 0,
       distance_km: 0, delivery_fee: 15000,
       is_open: s.is_open,
     }))
@@ -90,7 +95,7 @@ async function searchSupabase(query: string): Promise<SearchResult[]> {
   const [{ data: shops }, { data: products }] = await Promise.all([
     supabase
       .from("shops")
-      .select("id, name, logo_url, rating_avg, is_open")
+      .select("id, name, logo_url, cover_image_url, rating_avg, total_reviews, is_open")
       .eq("status", "approved")
       .ilike("name", `%${q}%`)
       .limit(20),
@@ -105,7 +110,9 @@ async function searchSupabase(query: string): Promise<SearchResult[]> {
     id: s.id, type: "shop" as const,
     name: s.name, category: "",
     logo_url: s.logo_url ?? "",
+    cover_image_url: (s as { cover_image_url?: string | null }).cover_image_url ?? "",
     rating_avg: Number(s.rating_avg ?? 5),
+    total_reviews: (s as { total_reviews?: number }).total_reviews ?? 0,
     distance_km: 0, delivery_fee: 15000,
     is_open: s.is_open,
   }))
@@ -551,39 +558,58 @@ export default function SearchPage() {
 
 // --- Shop Card ---
 function ShopCard({ shop, onClick }: { shop: ShopResult; onClick: () => void }) {
-  const emoji = "🏪"
+  const etaMin = shop.distance_km > 0 ? Math.round(shop.distance_km * 3 + 5) : null
   return (
     <div onClick={onClick} style={{
       background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-      borderRadius: 14, padding: "6px 10px", marginBottom: 10, cursor: "pointer",
-      display: "flex", gap: 12, alignItems: "center",
+      borderRadius: 16, marginBottom: 10, cursor: "pointer", overflow: "hidden",
+      opacity: shop.is_open ? 1 : 0.6,
     }}>
-      <div style={{
-        width: 68, height: 68, borderRadius: "50%", flexShrink: 0,
-        background: shop.logo_url ? "transparent" : "rgba(255,255,255,0.06)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26,
-        overflow: "hidden",
-      }}>
-        {shop.logo_url
-          ? <img src={shop.logo_url} alt={shop.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          : emoji}
+      {/* Ảnh bìa */}
+      <div style={{ position: "relative", height: 110, background: "rgba(255,107,0,0.06)", overflow: "hidden" }}>
+        {shop.cover_image_url
+          ? <img src={shop.cover_image_url} alt={shop.name}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : <div style={{ width: "100%", height: "100%",
+              background: "linear-gradient(135deg,rgba(255,107,0,0.12),rgba(255,107,0,0.04))",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36 }}>🏪</div>
+        }
+        {/* Gradient mờ phía dưới để text đè lên dễ đọc */}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 48,
+          background: "linear-gradient(to top,rgba(8,8,6,0.75),transparent)" }} />
+        {!shop.is_open && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)",
+            display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ color: "#b0956a", fontSize: 12, fontWeight: 700,
+              background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: 6 }}>Đóng cửa</span>
+          </div>
+        )}
+        {/* Logo tròn đè lên góc trái dưới */}
+        <div style={{ position: "absolute", bottom: -18, left: 12,
+          width: 52, height: 52, borderRadius: "50%", overflow: "hidden",
+          border: "2.5px solid #080806", background: "rgba(255,255,255,0.08)",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+          {shop.logo_url
+            ? <img src={shop.logo_url} alt={shop.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : "🏪"}
+        </div>
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-          <span style={{ fontWeight: 700, fontSize: 14, color: "#f8f0e0" }}>{shop.name}</span>
-          {!shop.is_open && (
-            <span style={{
-              fontSize: 10, fontWeight: 700, color: "#6a5a40",
-              background: "rgba(255,255,255,0.06)", borderRadius: 4, padding: "2px 6px",
-            }}>Đóng cửa</span>
-          )}
+      {/* Info */}
+      <div style={{ padding: "24px 12px 12px 12px" }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: "#f8f0e0", marginBottom: 6,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {shop.name}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: "#6a5a40" }}>
-          <span>⭐ {shop.rating_avg}</span>
-          <span>📍 {shop.distance_km}km</span>
-          <span>{shop.delivery_fee === 0 ? "🆓 Free ship" : `🛵 ${formatPrice(shop.delivery_fee)}`}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "#b0956a", flexWrap: "wrap" }}>
+          <span>⭐ {shop.rating_avg.toFixed(1)}
+            {shop.total_reviews > 0 && <span style={{ color: "#6a5a40" }}> ({shop.total_reviews})</span>}
+          </span>
+          {etaMin && <span>🕐 ~{etaMin} phút</span>}
+          <span>{shop.delivery_fee === 0
+            ? <span style={{ color: "#3ecf6e" }}>🚚 Free ship</span>
+            : `🛵 ${formatPrice(shop.delivery_fee)}`}
+          </span>
         </div>
         {shop.promo && (
           <span style={{
@@ -593,7 +619,6 @@ function ShopCard({ shop, onClick }: { shop: ShopResult; onClick: () => void }) 
           }}>🏷️ {shop.promo}</span>
         )}
       </div>
-      <span style={{ color: "#6a5a40", fontSize: 16 }}>›</span>
     </div>
   )
 }
