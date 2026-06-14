@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, Suspense } from "react
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
+import { calcDeliveryFee, haversineKm } from "@/lib/vietmapRoute"
 
 const supabase = createClient()
 
@@ -20,6 +21,8 @@ interface ShopResult {
   distance_km:     number
   delivery_fee:    number
   is_open:         boolean
+  lat:             number | null
+  lng:             number | null
   promo?:          string
 }
 
@@ -59,11 +62,20 @@ interface RpcProduct {
 interface RpcShop {
   id: string; name: string; category?: string; logo_url: string | null
   cover_image_url?: string | null; total_reviews?: number
+  location?: { coordinates: [number, number] } | null
   rating_avg: number; is_open: boolean; score?: number
 }
 interface RpcResult { products: RpcProduct[] | null; shops: RpcShop[] | null }
 
-async function searchSupabase(query: string): Promise<SearchResult[]> {
+function shopDeliveryFee(lat: number | null, lng: number | null, userLat: number | null, userLng: number | null): number {
+  if (lat && lng && userLat && userLng) {
+    const km = haversineKm(userLat, userLng, lat, lng)
+    return calcDeliveryFee(km)
+  }
+  return 15000
+}
+
+async function searchSupabase(query: string, userLat: number | null, userLng: number | null): Promise<SearchResult[]> {
   const q = query.trim()
   if (!q) return []
 
@@ -71,16 +83,22 @@ async function searchSupabase(query: string): Promise<SearchResult[]> {
     { data: RpcResult | null; error: unknown }
 
   if (!error && rpc) {
-    const shopResults: ShopResult[] = (rpc.shops ?? []).map(s => ({
-      id: s.id, type: "shop" as const,
-      name: s.name, category: s.category ?? "",
-      logo_url: s.logo_url ?? "",
-      cover_image_url: s.cover_image_url ?? "",
-      rating_avg: Number(s.rating_avg ?? 5),
-      total_reviews: s.total_reviews ?? 0,
-      distance_km: 0, delivery_fee: 15000,
-      is_open: s.is_open,
-    }))
+    const shopResults: ShopResult[] = (rpc.shops ?? []).map(s => {
+      const coords = s.location?.coordinates
+      const lat = coords ? coords[1] : null
+      const lng = coords ? coords[0] : null
+      return {
+        id: s.id, type: "shop" as const,
+        name: s.name, category: s.category ?? "",
+        logo_url: s.logo_url ?? "",
+        cover_image_url: s.cover_image_url ?? "",
+        rating_avg: Number(s.rating_avg ?? 5),
+        total_reviews: s.total_reviews ?? 0,
+        distance_km: (lat && lng && userLat && userLng) ? haversineKm(userLat, userLng, lat, lng) : 0,
+        delivery_fee: shopDeliveryFee(lat, lng, userLat, userLng),
+        is_open: s.is_open, lat, lng,
+      }
+    })
     const productResults: ProductResult[] = (rpc.products ?? []).map(p => ({
       id: p.id, type: "product" as const,
       name: p.name, shop_name: p.shop_name ?? "", shop_id: p.shop_id,
@@ -95,7 +113,7 @@ async function searchSupabase(query: string): Promise<SearchResult[]> {
   const [{ data: shops }, { data: products }] = await Promise.all([
     supabase
       .from("shops")
-      .select("id, name, logo_url, cover_image_url, rating_avg, total_reviews, is_open")
+      .select("id, name, logo_url, cover_image_url, rating_avg, total_reviews, is_open, location")
       .eq("status", "approved")
       .ilike("name", `%${q}%`)
       .limit(20),
@@ -106,16 +124,22 @@ async function searchSupabase(query: string): Promise<SearchResult[]> {
       .ilike("name", `%${q}%`)
       .limit(20),
   ])
-  const shopResults: ShopResult[] = (shops ?? []).map(s => ({
-    id: s.id, type: "shop" as const,
-    name: s.name, category: "",
-    logo_url: s.logo_url ?? "",
-    cover_image_url: (s as { cover_image_url?: string | null }).cover_image_url ?? "",
-    rating_avg: Number(s.rating_avg ?? 5),
-    total_reviews: (s as { total_reviews?: number }).total_reviews ?? 0,
-    distance_km: 0, delivery_fee: 15000,
-    is_open: s.is_open,
-  }))
+  const shopResults: ShopResult[] = (shops ?? []).map(s => {
+    const loc = (s as { location?: { coordinates: [number,number] } | null }).location
+    const lat = loc?.coordinates ? loc.coordinates[1] : null
+    const lng = loc?.coordinates ? loc.coordinates[0] : null
+    return {
+      id: s.id, type: "shop" as const,
+      name: s.name, category: "",
+      logo_url: s.logo_url ?? "",
+      cover_image_url: (s as { cover_image_url?: string | null }).cover_image_url ?? "",
+      rating_avg: Number(s.rating_avg ?? 5),
+      total_reviews: (s as { total_reviews?: number }).total_reviews ?? 0,
+      distance_km: (lat && lng && userLat && userLng) ? haversineKm(userLat, userLng, lat, lng) : 0,
+      delivery_fee: shopDeliveryFee(lat, lng, userLat, userLng),
+      is_open: s.is_open, lat, lng,
+    }
+  })
   const productResults: ProductResult[] = (products ?? []).map(p => {
     const shopName = Array.isArray(p.shops)
       ? (p.shops[0] as { name: string })?.name
@@ -152,6 +176,8 @@ function SearchContent() {
   const [query, setQuery]           = useState(params.get("q") ?? "")
   const [results, setResults]       = useState<SearchResult[]>([])
   const [loading, setLoading]       = useState(false)
+  const [userLat, setUserLat]       = useState<number | null>(null)
+  const [userLng, setUserLng]       = useState<number | null>(null)
   const [showFilter, setShowFilter] = useState(params.get("filter") === "open")
   const [filter, setFilter]         = useState<FilterState>({
     ...DEFAULT_FILTER,
@@ -163,6 +189,13 @@ function SearchContent() {
   const isNewest = params.get("sort") === "newest"
 
   useEffect(() => { setRecentSearches(loadHistory()) }, [])
+
+  useEffect(() => {
+    navigator.geolocation?.getCurrentPosition(pos => {
+      setUserLat(pos.coords.latitude)
+      setUserLng(pos.coords.longitude)
+    })
+  }, [])
 
   // Auto-load newest products khi vào từ "Vừa lên menu > Xem thêm"
   useEffect(() => {
@@ -220,11 +253,11 @@ function SearchContent() {
     setLoading(true)
     if (searchTimeout.current) clearTimeout(searchTimeout.current)
     searchTimeout.current = setTimeout(async () => {
-      const data = await searchSupabase(q)
+      const data = await searchSupabase(q, userLat, userLng)
       setResults(data)
       setLoading(false)
     }, 400)
-  }, [])
+  }, [userLat, userLng])
 
   useEffect(() => {
     if (query) doSearch(query)
