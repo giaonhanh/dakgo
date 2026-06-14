@@ -1325,14 +1325,12 @@ export default function HomePage() {
                     {p.image_url
                       ? <Image src={p.image_url} alt={p.name} fill sizes="120px" style={{ objectFit:"cover" }} />
                       : <span style={{ zIndex:1 }}>🍽️</span>}
-                    <div style={{ position:"absolute", top:5, left:5, zIndex:2 }}>
-                      {promoBadge}
-                    </div>
                   </div>
                   <div style={{ padding:"7px 9px 8px" }}>
                     <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600,
                       whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
-                    <div style={{ color:"#6a5a40", fontSize:9, marginTop:1,
+                    {promoBadge && <div style={{ marginTop:3 }}>{promoBadge}</div>}
+                    <div style={{ color:"#6a5a40", fontSize:9, marginTop:2,
                       whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
                     <div style={{ marginTop:3 }}>
                       <span style={{ background:"linear-gradient(135deg,#FF6B00,#FFB347)",
