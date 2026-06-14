@@ -659,14 +659,14 @@ function ShopCard({ shop, onClick, userLat }: { shop: ShopResult; onClick: () =>
             {shop.total_reviews > 0 && <span style={{ color: "#6a5a40" }}> ({shop.total_reviews})</span>}
           </span>
           {etaMin && <span>🕐 ~{etaMin} phút</span>}
-          <span>{shop.delivery_fee === null
+          {shop.delivery_fee === null
             ? <span style={{ color:"#6a5a40" }}>📍 Cần GPS</span>
             : shop.delivery_fee === -1
-            ? <span style={{ color:"#6a5a40" }}>🏪 Liên hệ quán</span>
+            ? null
             : shop.delivery_fee === 0
             ? <span style={{ color: "#3ecf6e" }}>🚚 Free ship</span>
-            : `🛵 ${formatPrice(shop.delivery_fee)}`}
-          </span>
+            : <span>{`🛵 ${formatPrice(shop.delivery_fee)}`}</span>
+          }
 
         </div>
         {shop.promo && (
