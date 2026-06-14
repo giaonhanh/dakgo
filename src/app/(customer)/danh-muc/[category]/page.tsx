@@ -214,7 +214,7 @@ export default function CategoryPage() {
                   opacity: open ? 1 : 0.55, cursor:"pointer", position:"relative",
                 }}>
                   {/* Avatar */}
-                  <div style={{ width:62, height:62, borderRadius:14, flexShrink:0,
+                  <div style={{ width:62, height:62, borderRadius:"50%", flexShrink:0,
                     background: cat.color, border:`1px solid ${borderColor}`,
                     display:"flex", alignItems:"center", justifyContent:"center",
                     fontSize:28, overflow:"hidden", position:"relative" }}>
@@ -226,7 +226,7 @@ export default function CategoryPage() {
                       <div style={{ position:"absolute", inset:0,
                         background:"rgba(8,8,6,0.6)", display:"flex",
                         alignItems:"center", justifyContent:"center",
-                        fontSize:18, borderRadius:14 }}>🔴</div>
+                        fontSize:18, borderRadius:"50%" }}>🔴</div>
                     )}
                   </div>
 

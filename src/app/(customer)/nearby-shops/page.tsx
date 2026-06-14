@@ -229,7 +229,7 @@ export default function NearbyShopsPage() {
                   display:"flex", alignItems:"center", gap:12,
                 }}>
                   {/* Logo */}
-                  <div style={{ width:54, height:54, borderRadius:13, flexShrink:0,
+                  <div style={{ width:54, height:54, borderRadius:"50%", flexShrink:0,
                     background: cat.color, border:"1px solid rgba(255,255,255,0.08)",
                     display:"flex", alignItems:"center", justifyContent:"center",
                     fontSize:26, position:"relative", overflow:"hidden" }}>

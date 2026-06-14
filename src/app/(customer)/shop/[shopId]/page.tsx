@@ -1028,7 +1028,7 @@ export default function ShopPage() {
                 marginTop:-36, marginBottom:12, position:"relative", zIndex:10 }}>
 
                 {/* Avatar */}
-                <div style={{ flexShrink:0, width:80, height:80, borderRadius:20,
+                <div style={{ flexShrink:0, width:80, height:80, borderRadius:"50%",
                   border:"3px solid #080806", overflow:"hidden",
                   background:"linear-gradient(135deg,rgba(255,107,0,0.15),rgba(255,107,0,0.04))",
                   display:"flex", alignItems:"center", justifyContent:"center", fontSize:36,

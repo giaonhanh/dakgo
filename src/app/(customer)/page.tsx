@@ -1512,7 +1512,7 @@ export default function HomePage() {
                     display:"flex", alignItems:"center", gap:11, cursor:"pointer",
                   }}>
                     {/* Logo */}
-                    <div style={{ width:56, height:56, borderRadius:13, flexShrink:0, position:"relative",
+                    <div style={{ width:56, height:56, borderRadius:"50%", flexShrink:0, position:"relative",
                       background:"rgba(255,107,0,0.07)", border:"1px solid rgba(255,255,255,0.08)",
                       display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, overflow:"hidden" }}>
                       {s.logo_url
@@ -1521,7 +1521,7 @@ export default function HomePage() {
                       {/* Closed overlay */}
                       {!shopOpen && (
                         <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.45)",
-                          display:"flex", alignItems:"center", justifyContent:"center", borderRadius:13 }}>
+                          display:"flex", alignItems:"center", justifyContent:"center", borderRadius:"50%" }}>
                           <span style={{ fontSize:15 }}>🔒</span>
                         </div>
                       )}
