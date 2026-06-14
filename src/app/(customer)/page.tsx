@@ -337,7 +337,7 @@ export default function HomePage() {
             .eq("is_active", true).eq("discount_type", "freeship")
             .not("shop_id", "is", null).gte("valid_to", now2).in("shop_id", shopIds),
           supabase.from("vouchers").select("shop_id")
-            .eq("is_active", true).eq("discount_type", "percent")
+            .eq("is_active", true).in("discount_type", ["percent", "fixed"])
             .not("shop_id", "is", null).gte("valid_to", now2).in("shop_id", shopIds),
         ])
         if (fsData)  setFreeshipsShopIds(new Set(fsData.map((v: { shop_id: string }) => v.shop_id)))
