@@ -187,18 +187,26 @@ export default function AdminUsersPage() {
   const [importAutoShop,   setImportAutoShop]   = useState(false)
   const importFileRef = useRef<HTMLInputElement>(null)
 
+  // Tách "Tên - 25000" hoặc "Tên:25000" hoặc "Tên : 25 000" → { name, price }
+  const splitNamePrice = (s: string): { label: string; price: number } => {
+    const norm = s.replace(/：/g, ":").trim()
+    // Tìm separator cuối: " - số" hoặc ":số" ở cuối chuỗi
+    const m = norm.match(/^(.+?)\s*(?:-|:)\s*([\d.,\s]+)$/)
+    if (m) {
+      const price = parseInt(m[2].replace(/\D/g, "")) || 0
+      return { label: m[1].trim(), price }
+    }
+    return { label: norm, price: 0 }
+  }
+
   const splitImportOptions = (raw: string) =>
-    // Hỗ trợ cả "," và "|" làm separator; chuẩn hoá fullwidth colon "：" → ":"
-    raw.replace(/：/g, ":").split(/[,|]/).map(s => s.trim()).filter(Boolean)
+    raw.replace(/：/g, ":").split(/[,|;\n]/).map(s => s.trim()).filter(Boolean)
 
   const parseImportSizes = (raw: string) => {
     if (!raw.trim()) return null
-    const opts = splitImportOptions(raw)
-    const items = opts.map((s, i) => {
-      const colonIdx = s.lastIndexOf(":")          // lấy ":" CUỐI để tránh "Nhỏ (2 ng):25000"
-      const label    = colonIdx > 0 ? s.slice(0, colonIdx).trim() : s
-      const priceStr = colonIdx > 0 ? s.slice(colonIdx + 1).trim() : ""
-      return { id: `s${i}`, label, _abs: parseInt(priceStr.replace(/\D/g, "")) || 0 }
+    const items = splitImportOptions(raw).map((s, i) => {
+      const { label, price } = splitNamePrice(s)
+      return { id: `s${i}`, label, _abs: price }
     })
     return items.map((s, _, arr) => ({ id: s.id, label: s.label, priceDiff: s._abs - (arr[0]?._abs ?? 0) }))
   }
@@ -206,10 +214,8 @@ export default function AdminUsersPage() {
   const parseImportToppings = (raw: string) => {
     if (!raw.trim()) return null
     return splitImportOptions(raw).map((s, i) => {
-      const colonIdx = s.lastIndexOf(":")
-      const name     = colonIdx > 0 ? s.slice(0, colonIdx).trim() : s
-      const priceStr = colonIdx > 0 ? s.slice(colonIdx + 1).trim() : ""
-      return { id: `t${i}`, name, price: parseInt(priceStr.replace(/\D/g, "")) || 0 }
+      const { label, price } = splitNamePrice(s)
+      return { id: `t${i}`, name: label, price }
     })
   }
 
