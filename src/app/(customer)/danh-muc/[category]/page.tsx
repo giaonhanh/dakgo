@@ -209,7 +209,7 @@ export default function CategoryPage() {
                 <div style={{
                   background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
                   border:`1px solid ${open ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)"}`,
-                  borderRadius:16, padding:"12px 13px",
+                  borderRadius:16, padding:"6px 10px",
                   display:"flex", alignItems:"center", gap:12,
                   opacity: open ? 1 : 0.55, cursor:"pointer", position:"relative",
                 }}>

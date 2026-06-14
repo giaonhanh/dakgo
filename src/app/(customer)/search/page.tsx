@@ -555,7 +555,7 @@ function ShopCard({ shop, onClick }: { shop: ShopResult; onClick: () => void }) 
   return (
     <div onClick={onClick} style={{
       background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-      borderRadius: 14, padding: "12px 14px", marginBottom: 10, cursor: "pointer",
+      borderRadius: 14, padding: "6px 10px", marginBottom: 10, cursor: "pointer",
       display: "flex", gap: 12, alignItems: "center",
     }}>
       <div style={{

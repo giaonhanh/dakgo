@@ -1514,7 +1514,7 @@ export default function HomePage() {
                   <div className="shop-card" style={{
                     background:"rgba(255,255,255,0.06)", backdropFilter:"blur(10px)",
                     border:`1px solid ${isFav ? "rgba(255,64,64,0.25)" : "rgba(255,255,255,0.08)"}`,
-                    borderRadius:14, padding:"11px 12px",
+                    borderRadius:14, padding:"6px 10px",
                     display:"flex", alignItems:"center", gap:11, cursor:"pointer",
                   }}>
                     {/* Logo */}

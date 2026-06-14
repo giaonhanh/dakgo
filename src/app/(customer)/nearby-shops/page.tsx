@@ -225,7 +225,7 @@ export default function NearbyShopsPage() {
                 <div style={{
                   background: s.isOpen ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
                   border:"1px solid rgba(255,255,255,0.08)", borderRadius:16,
-                  padding:"11px 12px", opacity: s.isOpen ? 1 : 0.6,
+                  padding:"6px 10px", opacity: s.isOpen ? 1 : 0.6,
                   display:"flex", alignItems:"center", gap:12,
                 }}>
                   {/* Logo */}
