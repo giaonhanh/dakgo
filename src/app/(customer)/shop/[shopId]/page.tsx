@@ -1042,16 +1042,17 @@ export default function ShopPage() {
 
                 {/* Tên + nhãn + mô tả */}
                 <div style={{ flex:1, minWidth:0, paddingBottom:2 }}>
-                  {/* Tên + badge nhãn loại cùng hàng */}
-                  <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:4, flexWrap:"wrap" }}>
-                    <span style={{ color:"#f8f0e0", fontSize:17, fontWeight:800, lineHeight:1.2,
-                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:160 }}>
-                      {shop.name}
-                    </span>
-                    {shop.shop_type && (
-                      <Badge layer={1} variant={shop.shop_type === "delivery" ? "proxy" : "partner"} size="sm" />
-                    )}
+                  {/* Tên — full width, không cắt */}
+                  <div style={{ color:"#f8f0e0", fontSize:17, fontWeight:800, lineHeight:1.2,
+                    marginBottom: shop.shop_type ? 5 : 4 }}>
+                    {shop.name}
                   </div>
+                  {/* Badge loại cửa hàng — dòng riêng */}
+                  {shop.shop_type && (
+                    <div style={{ marginBottom:4 }}>
+                      <Badge layer={1} variant={shop.shop_type === "delivery" ? "proxy" : "partner"} size="sm" />
+                    </div>
+                  )}
                   {/* Mô tả */}
                   {shop.description && (
                     <div style={{ color:"#6a5a40", fontSize:10.5, lineHeight:1.4,
