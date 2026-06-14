@@ -31,7 +31,7 @@ import Badge from "@/components/ui/Badge"
 import NotifDot from "@/components/ui/NotifDot"
 
 // --- Types -------------------------------------------------
-type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null; category?: string; categories?: string[] | null }
+type ShopRow    = { id: string; name: string; is_open: boolean; rating_avg: number | null; address: string; logo_url: string | null; lat: number | null; lng: number | null; location: { type: string; coordinates: [number, number] } | null; opening_hours: { open?: string; close?: string } | null; category?: string; categories?: string[] | null }
 type ProductRow = { id: string; name: string; price: number; original_price?: number | null; sold_count: number; shop_id: string; image_url: string | null; shops: { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null } | { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null }[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 type PromoProductRow = ProductRow & { promoTag: 'discount' | 'combo' | 'freeship' }
 type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
@@ -305,7 +305,7 @@ export default function HomePage() {
           .limit(10),
         supabase
           .from("shops")
-          .select("id,name,is_open,rating_avg,address,logo_url,location,opening_hours,category,categories")
+          .select("id,name,is_open,rating_avg,address,logo_url,lat,lng,location,opening_hours,category,categories")
           .eq("status", "approved")
           .order("rating_avg", { ascending: false })
           .limit(30),
@@ -1470,17 +1470,18 @@ export default function HomePage() {
               const cats = Array.isArray(s.categories) && s.categories.length > 0 ? s.categories : s.category ? [s.category] : []
               return (cats.map((v: string) => normalizeCategoryValue(v)) as string[]).includes(nearbyFilter)
             })
+            const shopDistKm = (s: ShopRow) => {
+              if (!uLat || !uLng) return 9999
+              // Ưu tiên lat/lng trực tiếp, fallback GeoJSON coordinates
+              const sLat = s.lat ?? s.location?.coordinates?.[1] ?? null
+              const sLng = s.lng ?? s.location?.coordinates?.[0] ?? null
+              return (sLat && sLng) ? distKm(uLat, uLng, sLat, sLng) : 9999
+            }
             const filteredShops = [...baseShops].sort((a, b) => {
               const aOpen = isShopInHours(a) ? 0 : 1
               const bOpen = isShopInHours(b) ? 0 : 1
               if (aOpen !== bOpen) return aOpen - bOpen
-              if (uLat && uLng) {
-                const aC = a.location?.coordinates
-                const bC = b.location?.coordinates
-                const aDist = aC ? distKm(uLat, uLng, aC[1], aC[0]) : 9999
-                const bDist = bC ? distKm(uLat, uLng, bC[1], bC[0]) : 9999
-                return aDist - bDist
-              }
+              if (uLat && uLng) return shopDistKm(a) - shopDistKm(b)
               return (b.rating_avg ?? 0) - (a.rating_avg ?? 0)
             })
             return (
@@ -1492,9 +1493,10 @@ export default function HomePage() {
               </div>
             ) : filteredShops.map(s => {
               const isFav    = favoriteIds.includes(s.id)
-              const coords   = s.location?.coordinates  // GeoJSON: [lng, lat]
-              const dist     = (uLat && uLng && coords)
-                ? distKm(uLat, uLng, coords[1], coords[0])
+              const sLat     = s.lat ?? s.location?.coordinates?.[1] ?? null
+              const sLng     = s.lng ?? s.location?.coordinates?.[0] ?? null
+              const dist     = (uLat && uLng && sLat && sLng)
+                ? distKm(uLat, uLng, sLat, sLng)
                 : null
               const distLabel = dist != null
                 ? dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`
