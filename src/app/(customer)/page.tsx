@@ -1465,9 +1465,23 @@ export default function HomePage() {
           })()}
 
           {(() => {
-            const filteredShops = nearbyFilter === "all" ? nearbyShops : nearbyShops.filter(s => {
+            const uLat = locationData.lat, uLng = locationData.lng
+            const baseShops = nearbyFilter === "all" ? nearbyShops : nearbyShops.filter(s => {
               const cats = Array.isArray(s.categories) && s.categories.length > 0 ? s.categories : s.category ? [s.category] : []
               return (cats.map((v: string) => normalizeCategoryValue(v)) as string[]).includes(nearbyFilter)
+            })
+            const filteredShops = [...baseShops].sort((a, b) => {
+              const aOpen = isShopInHours(a) ? 0 : 1
+              const bOpen = isShopInHours(b) ? 0 : 1
+              if (aOpen !== bOpen) return aOpen - bOpen
+              if (uLat && uLng) {
+                const aC = a.location?.coordinates
+                const bC = b.location?.coordinates
+                const aDist = aC ? distKm(uLat, uLng, aC[1], aC[0]) : 9999
+                const bDist = bC ? distKm(uLat, uLng, bC[1], bC[0]) : 9999
+                return aDist - bDist
+              }
+              return (b.rating_avg ?? 0) - (a.rating_avg ?? 0)
             })
             return (
           <div style={{ padding:"0 16px", display:"flex", flexDirection:"column",
@@ -1478,7 +1492,6 @@ export default function HomePage() {
               </div>
             ) : filteredShops.map(s => {
               const isFav    = favoriteIds.includes(s.id)
-              const uLat     = locationData.lat, uLng = locationData.lng
               const coords   = s.location?.coordinates  // GeoJSON: [lng, lat]
               const dist     = (uLat && uLng && coords)
                 ? distKm(uLat, uLng, coords[1], coords[0])
