@@ -634,27 +634,29 @@ function ShopCard({ shop, onClick, userLat }: { shop: ShopResult; onClick: () =>
       borderRadius: 16, marginBottom: 10, cursor: "pointer", overflow: "hidden",
       opacity: shop.is_open ? 1 : 0.6,
     }}>
-      {/* Ảnh bìa — tỷ lệ 2:1 như Grab/Shopee */}
-      <div style={{ position: "relative", width: "100%", paddingTop: "50%", background: "rgba(30,20,10,1)", overflow: "hidden" }}>
-        {shop.cover_image_url
-          ? <img src={shop.cover_image_url} alt={shop.name}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-          : <div style={{ position: "absolute", inset: 0,
-              background: "linear-gradient(135deg,rgba(255,107,0,0.15),rgba(255,107,0,0.04))",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40 }}>🏪</div>
-        }
-        {/* Gradient mờ phía dưới để text đè lên dễ đọc */}
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 48,
-          background: "linear-gradient(to top,rgba(8,8,6,0.75),transparent)" }} />
-        {!shop.is_open && (
-          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)",
-            display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ color: "#b0956a", fontSize: 12, fontWeight: 700,
-              background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: 6 }}>Đóng cửa</span>
-          </div>
-        )}
-        {/* Logo tròn đè lên góc trái dưới */}
-        <div style={{ position: "absolute", bottom: -18, left: 12,
+      {/* Ảnh bìa + Logo wrapper */}
+      <div style={{ position: "relative" }}>
+        {/* Ảnh bìa — tỷ lệ 2:1 */}
+        <div style={{ position: "relative", width: "100%", paddingTop: "50%", background: "rgba(30,20,10,1)", overflow: "hidden" }}>
+          {shop.cover_image_url
+            ? <img src={shop.cover_image_url} alt={shop.name}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            : <div style={{ position: "absolute", inset: 0,
+                background: "linear-gradient(135deg,rgba(255,107,0,0.15),rgba(255,107,0,0.04))",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40 }}>🏪</div>
+          }
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 48,
+            background: "linear-gradient(to top,rgba(8,8,6,0.75),transparent)" }} />
+          {!shop.is_open && (
+            <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)",
+              display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ color: "#b0956a", fontSize: 12, fontWeight: 700,
+                background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: 6 }}>Đóng cửa</span>
+            </div>
+          )}
+        </div>
+        {/* Logo tròn — nằm ngoài overflow:hidden, đè lên đường viền ảnh/info */}
+        <div style={{ position: "absolute", bottom: -18, left: 12, zIndex: 2,
           width: 52, height: 52, borderRadius: "50%", overflow: "hidden",
           border: "2.5px solid #080806", background: "rgba(255,255,255,0.08)",
           display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
