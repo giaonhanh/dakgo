@@ -126,14 +126,14 @@ export default function ShopPreviewPage() {
     const localUrl = URL.createObjectURL(file)
     setCoverUrl(localUrl)
     setUploading("cover")
-    const ext = file.name.split(".").pop() ?? "jpg"
-    const path = `${shopId}/cover.${ext}`
-    const { error: upErr } = await supabase.storage.from("shop-covers").upload(path, file, { upsert: true })
+    const path = `${shopId}/cover`
+    const { error: upErr } = await supabase.storage.from("shop-covers").upload(path, file, { upsert: true, contentType: file.type })
     if (upErr) { fire("❌ Lỗi tải ảnh bìa: " + upErr.message); setUploading(null); return }
     const { data: { publicUrl } } = supabase.storage.from("shop-covers").getPublicUrl(path)
-    const { error: dbErr } = await supabase.from("shops").update({ cover_image_url: publicUrl }).eq("id", shopId)
+    const urlWithBust = `${publicUrl}?t=${Date.now()}`
+    const { error: dbErr } = await supabase.from("shops").update({ cover_image_url: urlWithBust }).eq("id", shopId)
     if (dbErr) { fire("❌ Không lưu được vào DB: " + dbErr.message); setUploading(null); return }
-    setCoverUrl(publicUrl)
+    setCoverUrl(urlWithBust)
     setUploading(null)
     fire("Đã cập nhật ảnh bìa")
   }
@@ -143,14 +143,14 @@ export default function ShopPreviewPage() {
     const localUrl = URL.createObjectURL(file)
     setLogoUrl(localUrl)
     setUploading("logo")
-    const ext = file.name.split(".").pop() ?? "jpg"
-    const path = `${shopId}/logo.${ext}`
-    const { error: upErr } = await supabase.storage.from("shop-logos").upload(path, file, { upsert: true })
+    const path = `${shopId}/logo`
+    const { error: upErr } = await supabase.storage.from("shop-logos").upload(path, file, { upsert: true, contentType: file.type })
     if (upErr) { fire("❌ Lỗi tải logo: " + upErr.message); setUploading(null); return }
     const { data: { publicUrl } } = supabase.storage.from("shop-logos").getPublicUrl(path)
-    const { error: dbErr } = await supabase.from("shops").update({ logo_url: publicUrl }).eq("id", shopId)
+    const logoWithBust = `${publicUrl}?t=${Date.now()}`
+    const { error: dbErr } = await supabase.from("shops").update({ logo_url: logoWithBust }).eq("id", shopId)
     if (dbErr) { fire("❌ Không lưu được vào DB: " + dbErr.message); setUploading(null); return }
-    setLogoUrl(publicUrl)
+    setLogoUrl(logoWithBust)
     setUploading(null)
     fire("Đã cập nhật logo cửa hàng")
   }
