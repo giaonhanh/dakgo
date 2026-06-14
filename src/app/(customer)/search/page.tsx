@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { calcDeliveryFee, calcDeliveryFeeFromPricing, haversineKm } from "@/lib/vietmapRoute"
+import { useLocationStore } from "@/store/locationStore"
 
 const supabase = createClient()
 
@@ -185,8 +186,8 @@ function SearchContent() {
   const [query, setQuery]           = useState(params.get("q") ?? "")
   const [results, setResults]       = useState<SearchResult[]>([])
   const [loading, setLoading]       = useState(false)
-  const [userLat, setUserLat]       = useState<number | null>(null)
-  const [userLng, setUserLng]       = useState<number | null>(null)
+  const { lat: userLat, lng: userLng, denied: gpsBlocked } = useLocationStore()
+
   const [showFilter, setShowFilter] = useState(params.get("filter") === "open")
   const [filter, setFilter]         = useState<FilterState>({
     ...DEFAULT_FILTER,
@@ -194,46 +195,10 @@ function SearchContent() {
   })
   const [activeTab, setActiveTab]   = useState<"all" | "shops" | "products">("all")
   const [recentSearches, setRecentSearches] = useState<string[]>([])
-  const [gpsBlocked, setGpsBlocked] = useState(false)
 
   const isNewest = params.get("sort") === "newest"
 
   useEffect(() => { setRecentSearches(loadHistory()) }, [])
-
-  const requestGps = useCallback(() => {
-    if (!navigator.geolocation) { setGpsBlocked(true); return }
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        setUserLat(pos.coords.latitude)
-        setUserLng(pos.coords.longitude)
-        setGpsBlocked(false)
-      },
-      () => setGpsBlocked(true),
-      { timeout: 15000, enableHighAccuracy: false, maximumAge: 60000 }
-    )
-  }, [])
-
-  useEffect(() => {
-    if (!navigator.geolocation) { setGpsBlocked(true); return }
-    // Kiểm tra permission state trước — tránh hỏi lại nếu đã granted
-    if (navigator.permissions) {
-      navigator.permissions.query({ name: "geolocation" }).then(status => {
-        if (status.state === "denied") {
-          setGpsBlocked(true)
-        } else {
-          // "granted" hoặc "prompt" — thử lấy luôn
-          requestGps()
-          // Lắng nghe nếu user thay đổi quyền trong Settings
-          status.onchange = () => {
-            if (status.state === "granted") requestGps()
-            else if (status.state === "denied") setGpsBlocked(true)
-          }
-        }
-      })
-    } else {
-      requestGps()
-    }
-  }, [requestGps])
 
   // Auto-load newest products khi vào từ "Vừa lên menu > Xem thêm"
   useEffect(() => {
@@ -413,19 +378,16 @@ function SearchContent() {
             >⚙️</button>
           </div>
 
-          {/* Banner yêu cầu GPS */}
+          {/* Banner GPS bị từ chối */}
           {gpsBlocked && (
             <div style={{ display:"flex", alignItems:"center", gap:10, margin:"0 0 10px",
               background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.25)",
               borderRadius:10, padding:"8px 12px" }}>
               <span style={{ fontSize:18 }}>📍</span>
               <div style={{ flex:1 }}>
-                <div style={{ color:"#FF8C00", fontSize:11, fontWeight:700 }}>Chưa có vị trí GPS</div>
-                <div style={{ color:"#b0956a", fontSize:10 }}>Cấp quyền vị trí để xem phí ship chính xác</div>
+                <div style={{ color:"#FF8C00", fontSize:11, fontWeight:700 }}>GPS bị chặn</div>
+                <div style={{ color:"#b0956a", fontSize:10 }}>Vào Cài đặt trình duyệt → cấp quyền vị trí để xem phí ship</div>
               </div>
-              <button onClick={requestGps} style={{ fontSize:10, fontWeight:700, color:"#FF8C00", background:"rgba(255,107,0,0.15)",
-                border:"1px solid rgba(255,107,0,0.3)", borderRadius:6, padding:"4px 8px", cursor:"pointer",
-                whiteSpace:"nowrap" }}>Cấp quyền</button>
             </div>
           )}
 
