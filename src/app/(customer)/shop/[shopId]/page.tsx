@@ -1069,8 +1069,20 @@ export default function ShopPage() {
                   { icon:"⭐", val: shop.rating?.toFixed(1) ?? "Mới", sub:`${shop.rating_count ?? 0} đánh giá` },
                   { icon:"⏱️", val: shop.prep_time ? `${shop.prep_time} phút` : "10–15 phút", sub:"Chuẩn bị" },
                   { icon:"🕐", val: (() => {
-                      if (!shop.opening_hours) return "07:00–21:00"
-                      const h = shop.opening_hours as { open?: string; close?: string } | null
+                      const raw = shop.opening_hours
+                      if (!raw) return "07:00–21:00"
+                      // Format mới: DayHours[] — [{ day, open, slots:[{from,to}] }]
+                      if (Array.isArray(raw)) {
+                        const today = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date().getDay()]
+                        const todayRow = (raw as {day:string;open:boolean;slots:{from:string;to:string}[]}[])
+                          .find(r => r.day === today && r.open && r.slots?.[0])
+                        const firstOpen = (raw as {day:string;open:boolean;slots:{from:string;to:string}[]}[])
+                          .find(r => r.open && r.slots?.[0])
+                        const slot = todayRow?.slots?.[0] ?? firstOpen?.slots?.[0]
+                        return slot ? `${slot.from}–${slot.to}` : "07:00–21:00"
+                      }
+                      // Format cũ: { open, close }
+                      const h = raw as { open?: string; close?: string }
                       return h?.open && h?.close ? `${h.open}–${h.close}` : "07:00–21:00"
                     })(), sub:"Mở cửa" },
                 ].map(s => (
