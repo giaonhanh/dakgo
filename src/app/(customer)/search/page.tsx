@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, Suspense } from "react
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
-import { calcDeliveryFee, haversineKm } from "@/lib/vietmapRoute"
+import { calcDeliveryFee, calcDeliveryFeeFromPricing, haversineKm } from "@/lib/vietmapRoute"
 
 const supabase = createClient()
 
@@ -67,15 +67,26 @@ interface RpcShop {
 }
 interface RpcResult { products: RpcProduct[] | null; shops: RpcShop[] | null }
 
+let _pricingRows: string[] | null = null
+let _pricingExtra = "3500"
+async function loadPricing() {
+  if (_pricingRows) return
+  const { data } = await supabase.from("app_settings").select("value").eq("key", "pricing").maybeSingle()
+  const food = (data?.value as Record<string, { rows?: string[]; extra?: string }> | null)?.food
+  if (food?.rows) { _pricingRows = food.rows; _pricingExtra = food.extra ?? "3500" }
+}
+
 function shopDeliveryFee(lat: number | null, lng: number | null, userLat: number | null, userLng: number | null): number {
   if (lat && lng && userLat && userLng) {
     const km = haversineKm(userLat, userLng, lat, lng)
+    if (_pricingRows) return calcDeliveryFeeFromPricing(km, _pricingRows, _pricingExtra)
     return calcDeliveryFee(km)
   }
-  return 15000
+  return 0
 }
 
 async function searchSupabase(query: string, userLat: number | null, userLng: number | null): Promise<SearchResult[]> {
+  await loadPricing()
   const q = query.trim()
   if (!q) return []
 
@@ -185,16 +196,19 @@ function SearchContent() {
   })
   const [activeTab, setActiveTab]   = useState<"all" | "shops" | "products">("all")
   const [recentSearches, setRecentSearches] = useState<string[]>([])
+  const [gpsBlocked, setGpsBlocked] = useState(false)
 
   const isNewest = params.get("sort") === "newest"
 
   useEffect(() => { setRecentSearches(loadHistory()) }, [])
 
   useEffect(() => {
-    navigator.geolocation?.getCurrentPosition(pos => {
-      setUserLat(pos.coords.latitude)
-      setUserLng(pos.coords.longitude)
-    })
+    if (!navigator.geolocation) { setGpsBlocked(true); return }
+    navigator.geolocation.getCurrentPosition(
+      pos => { setUserLat(pos.coords.latitude); setUserLng(pos.coords.longitude) },
+      () => setGpsBlocked(true),
+      { timeout: 6000 }
+    )
   }, [])
 
   // Auto-load newest products khi vào từ "Vừa lên menu > Xem thêm"
@@ -375,6 +389,28 @@ function SearchContent() {
             >⚙️</button>
           </div>
 
+          {/* Banner yêu cầu GPS */}
+          {gpsBlocked && (
+            <div style={{ display:"flex", alignItems:"center", gap:10, margin:"0 0 10px",
+              background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.25)",
+              borderRadius:10, padding:"8px 12px" }}>
+              <span style={{ fontSize:18 }}>📍</span>
+              <div style={{ flex:1 }}>
+                <div style={{ color:"#FF8C00", fontSize:11, fontWeight:700 }}>Chưa có vị trí GPS</div>
+                <div style={{ color:"#b0956a", fontSize:10 }}>Cấp quyền vị trí để xem phí ship chính xác</div>
+              </div>
+              <button onClick={() => {
+                navigator.geolocation.getCurrentPosition(
+                  pos => { setUserLat(pos.coords.latitude); setUserLng(pos.coords.longitude); setGpsBlocked(false) },
+                  () => alert("Vui lòng bật GPS trong cài đặt trình duyệt và thử lại"),
+                  { timeout: 10000 }
+                )
+              }} style={{ fontSize:10, fontWeight:700, color:"#FF8C00", background:"rgba(255,107,0,0.15)",
+                border:"1px solid rgba(255,107,0,0.3)", borderRadius:6, padding:"4px 8px", cursor:"pointer",
+                whiteSpace:"nowrap" }}>Cấp quyền</button>
+            </div>
+          )}
+
           {/* Tabs */}
           {!isNewest && results.length > 0 && (
             <div style={{ display: "flex", gap: 8, paddingBottom: 12 }}>
@@ -518,7 +554,7 @@ function SearchContent() {
                     transition={{ delay: idx * 0.04 }}
                   >
                     {r.type === "shop"
-                      ? <ShopCard shop={r as ShopResult} onClick={() => { addToHistory(query); router.push(`/shop/${r.id}`) }} />
+                      ? <ShopCard shop={r as ShopResult} userLat={userLat} onClick={() => { addToHistory(query); router.push(`/shop/${r.id}`) }} />
                       : <ProductCard product={r as ProductResult} onClick={() => { addToHistory(query); router.push(`/shop/${(r as ProductResult).shop_id}`) }} />
                     }
                   </motion.div>
@@ -590,7 +626,7 @@ export default function SearchPage() {
 }
 
 // --- Shop Card ---
-function ShopCard({ shop, onClick }: { shop: ShopResult; onClick: () => void }) {
+function ShopCard({ shop, onClick, userLat }: { shop: ShopResult; onClick: () => void; userLat: number | null }) {
   const etaMin = shop.distance_km > 0 ? Math.round(shop.distance_km * 3 + 5) : null
   return (
     <div onClick={onClick} style={{
@@ -598,14 +634,14 @@ function ShopCard({ shop, onClick }: { shop: ShopResult; onClick: () => void }) 
       borderRadius: 16, marginBottom: 10, cursor: "pointer", overflow: "hidden",
       opacity: shop.is_open ? 1 : 0.6,
     }}>
-      {/* Ảnh bìa */}
-      <div style={{ position: "relative", height: 110, background: "rgba(255,107,0,0.06)", overflow: "hidden" }}>
+      {/* Ảnh bìa — tỷ lệ 2:1 như Grab/Shopee */}
+      <div style={{ position: "relative", width: "100%", paddingTop: "50%", background: "rgba(30,20,10,1)", overflow: "hidden" }}>
         {shop.cover_image_url
           ? <img src={shop.cover_image_url} alt={shop.name}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          : <div style={{ width: "100%", height: "100%",
-              background: "linear-gradient(135deg,rgba(255,107,0,0.12),rgba(255,107,0,0.04))",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36 }}>🏪</div>
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          : <div style={{ position: "absolute", inset: 0,
+              background: "linear-gradient(135deg,rgba(255,107,0,0.15),rgba(255,107,0,0.04))",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40 }}>🏪</div>
         }
         {/* Gradient mờ phía dưới để text đè lên dễ đọc */}
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 48,
@@ -639,10 +675,13 @@ function ShopCard({ shop, onClick }: { shop: ShopResult; onClick: () => void }) 
             {shop.total_reviews > 0 && <span style={{ color: "#6a5a40" }}> ({shop.total_reviews})</span>}
           </span>
           {etaMin && <span>🕐 ~{etaMin} phút</span>}
-          <span>{shop.delivery_fee === 0
+          <span>{!userLat
+            ? <span style={{ color:"#6a5a40" }}>📍 Cần GPS</span>
+            : shop.delivery_fee === 0
             ? <span style={{ color: "#3ecf6e" }}>🚚 Free ship</span>
             : `🛵 ${formatPrice(shop.delivery_fee)}`}
           </span>
+
         </div>
         {shop.promo && (
           <span style={{
