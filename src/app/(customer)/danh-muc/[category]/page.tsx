@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/client"
 import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/lib/categories"
 import { useCartStore } from "@/store/cartStore"
 
+type DayHours = { day: string; open: boolean; slots: { from: string; to: string }[] }
+type OpeningHours = { open?: string; close?: string } | DayHours[] | null
+
 interface ShopRow {
   id: string
   name: string
@@ -14,29 +17,51 @@ interface ShopRow {
   rating_avg: number | null
   logo_url: string | null
   is_open: boolean
-  opening_hours: { open?: string; close?: string } | null
+  opening_hours: OpeningHours
   category: string | null
   categories: string[] | null
 }
 
 function isShopOpen(shop: ShopRow): boolean {
-  const h = shop.opening_hours
-  if (!h?.open || !h?.close) return shop.is_open
-  const now = new Date()
-  const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
-  const [oh, om] = h.open.split(":").map(Number)
-  const [ch, cm] = h.close.split(":").map(Number)
-  const openMin  = oh * 60 + om
-  const closeMin = ch * 60 + cm
-  return closeMin > openMin
-    ? vnMin >= openMin && vnMin < closeMin
-    : vnMin >= openMin || vnMin < closeMin
+  if (!shop.is_open) return false
+  const oh = shop.opening_hours
+  if (!oh) return true
+  const now    = new Date()
+  const vnMin  = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+  const toMin  = (t: string) => { const [h,m] = t.split(":").map(Number); return (h??0)*60+(m??0) }
+  const inSlot = (f: string, t: string) => { const o = toMin(f), c = toMin(t); return c > o ? vnMin >= o && vnMin < c : vnMin >= o || vnMin < c }
+  if (Array.isArray(oh)) {
+    const dayNames = ["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"]
+    const today    = dayNames[new Date(now.getTime() + 7*3600000).getUTCDay()]
+    const entry    = (oh as DayHours[]).find(d => d.day === today)
+    if (!entry?.open) return false
+    return entry.slots.some(s => inSlot(s.from, s.to))
+  }
+  const old = oh as { open?: string; close?: string }
+  if (!old.open || !old.close) return true
+  return inSlot(old.open, old.close)
 }
 
 function openLabel(shop: ShopRow): string {
-  const h = shop.opening_hours
-  if (!h?.open) return ""
-  return `Mở lúc ${h.open}`
+  const oh = shop.opening_hours
+  if (!oh) return ""
+  if (Array.isArray(oh)) {
+    const now      = new Date()
+    const vnDate   = new Date(now.getTime() + 7*3600000)
+    const dayNames = ["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"]
+    for (let offset = 0; offset < 7; offset++) {
+      const d     = new Date(vnDate.getTime() + offset*86400000)
+      const entry = (oh as DayHours[]).find(x => x.day === dayNames[d.getUTCDay()])
+      if (!entry?.open || !entry.slots.length) continue
+      const f = entry.slots[0].from
+      if (!f) continue
+      return offset === 0 ? `Mở lúc ${f}` : `${entry.day.replace("Thứ ","T")} ${f}`
+    }
+    return ""
+  }
+  const old = oh as { open?: string; close?: string }
+  if (!old.open) return ""
+  return `Mở lúc ${old.open}`
 }
 
 export default function CategoryPage() {

@@ -127,7 +127,30 @@ function isShopInHours(shop: ShopRow): boolean {
 // Giờ mở cửa tiếp theo để hiển thị "Mở lúc HH:mm"
 function nextOpenLabel(shop: ShopRow): string {
   const oh = shop.opening_hours
-  if (oh?.open) return `Mở lúc ${oh.open}`
+  if (!oh) return "Tạm đóng"
+  // Format mới: DayHours[]
+  if (Array.isArray(oh)) {
+    const now      = new Date()
+    const vnDate   = new Date(now.getTime() + 7 * 3600 * 1000)
+    const dayNames = ["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"]
+    type DayEntry  = { day: string; open: boolean; slots: { from: string; to: string }[] }
+    const days     = oh as DayEntry[]
+    // Tìm giờ mở tiếp theo trong 7 ngày tới
+    for (let offset = 0; offset < 7; offset++) {
+      const d   = new Date(vnDate.getTime() + offset * 86400000)
+      const key = dayNames[d.getUTCDay()]
+      const entry = days.find(x => x.day === key)
+      if (!entry?.open || !entry.slots.length) continue
+      const slot = entry.slots[0]
+      if (!slot.from) continue
+      if (offset === 0) return `Mở lúc ${slot.from}`
+      return `${key.replace("Thứ ","T")} ${slot.from}`
+    }
+    return "Tạm đóng"
+  }
+  // Format cũ: { open: "HH:mm", close: "HH:mm" }
+  const old = oh as { open?: string; close?: string }
+  if (old.open) return `Mở lúc ${old.open}`
   return "Tạm đóng"
 }
 
