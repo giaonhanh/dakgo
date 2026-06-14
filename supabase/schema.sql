@@ -905,7 +905,9 @@ BEGIN
   SELECT COALESCE(jsonb_agg(r ORDER BY r.score DESC, r.rating_avg DESC), '[]'::jsonb)
   INTO shops_result
   FROM (
-    SELECT s.id, s.name, s.logo_url, s.rating_avg, s.is_open,
+    SELECT s.id, s.name, s.category, s.logo_url, s.cover_image_url,
+           s.rating_avg, s.total_reviews, s.is_open,
+           s.lat, s.lng,
            GREATEST(similarity(s.name, query), 0) AS score
     FROM shops s
     WHERE s.status = 'approved'

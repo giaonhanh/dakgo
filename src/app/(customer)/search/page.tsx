@@ -63,6 +63,7 @@ interface RpcProduct {
 interface RpcShop {
   id: string; name: string; category?: string; logo_url: string | null
   cover_image_url?: string | null; total_reviews?: number
+  lat?: number | null; lng?: number | null
   location?: { coordinates: [number, number] } | null
   rating_avg: number; is_open: boolean; score?: number
 }
@@ -95,9 +96,8 @@ async function searchSupabase(query: string, userLat: number | null, userLng: nu
 
   if (!error && rpc) {
     const shopResults: ShopResult[] = (rpc.shops ?? []).map(s => {
-      const coords = s.location?.coordinates
-      const lat = coords ? coords[1] : null
-      const lng = coords ? coords[0] : null
+      const lat = s.lat ?? s.location?.coordinates?.[1] ?? null
+      const lng = s.lng ?? s.location?.coordinates?.[0] ?? null
       return {
         id: s.id, type: "shop" as const,
         name: s.name, category: s.category ?? "",
@@ -124,7 +124,7 @@ async function searchSupabase(query: string, userLat: number | null, userLng: nu
   const [{ data: shops }, { data: products }] = await Promise.all([
     supabase
       .from("shops")
-      .select("id, name, logo_url, cover_image_url, rating_avg, total_reviews, is_open, location")
+      .select("id, name, logo_url, cover_image_url, rating_avg, total_reviews, is_open, lat, lng, location")
       .eq("status", "approved")
       .ilike("name", `%${q}%`)
       .limit(20),
@@ -136,9 +136,9 @@ async function searchSupabase(query: string, userLat: number | null, userLng: nu
       .limit(20),
   ])
   const shopResults: ShopResult[] = (shops ?? []).map(s => {
-    const loc = (s as { location?: { coordinates: [number,number] } | null }).location
-    const lat = loc?.coordinates ? loc.coordinates[1] : null
-    const lng = loc?.coordinates ? loc.coordinates[0] : null
+    const row = s as { lat?: number | null; lng?: number | null; location?: { coordinates: [number,number] } | null }
+    const lat = row.lat ?? row.location?.coordinates?.[1] ?? null
+    const lng = row.lng ?? row.location?.coordinates?.[0] ?? null
     return {
       id: s.id, type: "shop" as const,
       name: s.name, category: "",
