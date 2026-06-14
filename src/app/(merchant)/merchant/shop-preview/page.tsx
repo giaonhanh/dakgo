@@ -121,13 +121,30 @@ export default function ShopPreviewPage() {
     activeTab === "Tất cả" ? products : products.filter(p => p.category === activeTab),
   [products, activeTab])
 
+  const compressImage = (file: File, maxW: number, maxH: number, quality: number): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width, maxH / img.height)
+        const w = Math.round(img.width * scale)
+        const h = Math.round(img.height * scale)
+        const canvas = document.createElement("canvas")
+        canvas.width = w; canvas.height = h
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h)
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error("compress failed")), "image/webp", quality)
+      }
+      img.onerror = reject
+      img.src = URL.createObjectURL(file)
+    })
+
   const onCoverFile = async (file: File) => {
     if (!shopId) return
     const localUrl = URL.createObjectURL(file)
     setCoverUrl(localUrl)
     setUploading("cover")
+    const compressed = await compressImage(file, 1200, 480, 0.85).catch(() => file)
     const path = `${shopId}/cover`
-    const { error: upErr } = await supabase.storage.from("shop-covers").upload(path, file, { upsert: true, contentType: file.type })
+    const { error: upErr } = await supabase.storage.from("shop-covers").upload(path, compressed, { upsert: true, contentType: "image/webp" })
     if (upErr) { fire("❌ Lỗi tải ảnh bìa: " + upErr.message); setUploading(null); return }
     const { data: { publicUrl } } = supabase.storage.from("shop-covers").getPublicUrl(path)
     const urlWithBust = `${publicUrl}?t=${Date.now()}`
@@ -143,8 +160,9 @@ export default function ShopPreviewPage() {
     const localUrl = URL.createObjectURL(file)
     setLogoUrl(localUrl)
     setUploading("logo")
+    const compressed = await compressImage(file, 400, 400, 0.85).catch(() => file)
     const path = `${shopId}/logo`
-    const { error: upErr } = await supabase.storage.from("shop-logos").upload(path, file, { upsert: true, contentType: file.type })
+    const { error: upErr } = await supabase.storage.from("shop-logos").upload(path, compressed, { upsert: true, contentType: "image/webp" })
     if (upErr) { fire("❌ Lỗi tải logo: " + upErr.message); setUploading(null); return }
     const { data: { publicUrl } } = supabase.storage.from("shop-logos").getPublicUrl(path)
     const logoWithBust = `${publicUrl}?t=${Date.now()}`
