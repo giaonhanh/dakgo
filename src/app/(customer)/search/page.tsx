@@ -78,7 +78,8 @@ async function loadPricing() {
 }
 
 function shopDeliveryFee(lat: number | null, lng: number | null, userLat: number | null, userLng: number | null): number | null {
-  if (!lat || !lng || !userLat || !userLng) return null
+  if (!userLat || !userLng) return null           // thiếu GPS user → hiện "Cần GPS"
+  if (!lat || !lng) return calcDeliveryFee(3)     // quán chưa có tọa độ → ước 3km (~20k)
   const km = haversineKm(userLat, userLng, lat, lng)
   if (_pricingRows) return calcDeliveryFeeFromPricing(km, _pricingRows, _pricingExtra)
   return calcDeliveryFee(km)
