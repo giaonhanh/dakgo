@@ -1661,8 +1661,8 @@ export default function AdminUsersPage() {
                           new:        { bg:"linear-gradient(90deg,#4a8ff5,#3ecf6e)", color:"#fff", label:"✨ MỚI" },
                         }
                         const bc = item.badge ? badgeColors[item.badge] : null
-                        const sizeCount = item.sizesRaw ? item.sizesRaw.split(",").filter(Boolean).length : 0
-                        const toppingCount = item.toppingsRaw ? item.toppingsRaw.split(";").filter(Boolean).length : 0
+                        const sizeCount    = item.sizesRaw    ? splitImportOptions(item.sizesRaw).length    : 0
+                        const toppingCount = item.toppingsRaw ? splitImportOptions(item.toppingsRaw).length : 0
                         return (
                           <div key={idx}>
                             {importEditIdx === idx ? (
