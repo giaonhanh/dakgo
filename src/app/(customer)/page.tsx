@@ -1700,7 +1700,7 @@ export default function HomePage() {
                           backgroundClip:"text", fontSize:11, fontWeight:700, marginTop:3 }}>{fmt(p.price)}</div>
                         <div style={{ display:"flex", alignItems:"center",
                           justifyContent:"space-between", marginTop:4 }}>
-                          <span style={{ color:"#6a5a40", fontSize: 10 }}>🔥 {p.sold_count} dă bán</span>
+                          <span style={{ color:"#6a5a40", fontSize: 10 }}>🔥 {p.sold_count} đã bán</span>
                           <button
                             onClick={e => { e.preventDefault(); e.stopPropagation();
                               handleAdd(e.currentTarget as HTMLElement,
@@ -1806,7 +1806,7 @@ export default function HomePage() {
                       <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
                         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
                       <div style={{ color:"#3ecf6e", fontSize: 10, fontWeight:600, marginTop:3 }}>
-                        🔥 {b.sold_count.toLocaleString("vi-VN")} dă bán
+                        🔥 {b.sold_count.toLocaleString("vi-VN")} đã bán
                       </div>
                       <div style={{ display:"flex", justifyContent:"space-between",
                         alignItems:"center", marginTop:4 }}>
