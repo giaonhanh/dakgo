@@ -227,7 +227,8 @@ export default function HomePage() {
   const [favoriteIds,   setFavoriteIds]   = useState<string[]>([])
   const [favoriteShops, setFavoriteShops] = useState<ShopRow[]>([])
   const [adminBanners,   setAdminBanners]   = useState<BannerRow[]>([])
-  const [comboShopIds,   setComboShopIds]   = useState<Set<string>>(new Set())
+  const [freeshipsShopIds, setFreeshipsShopIds] = useState<Set<string>>(new Set())
+  const [discountShopIds,  setDiscountShopIds]  = useState<Set<string>>(new Set())
   const [adminBannerIdx, setAdminBannerIdx] = useState(0)
   const [newMenuItems,   setNewMenuItems]   = useState<NewMenuRow[]>([])
   const [searchSuggest,  setSearchSuggest]  = useState<ProductRow[]>([])
@@ -327,18 +328,20 @@ export default function HomePage() {
       ).slice(0, 6).map(v => ({ ...v, shopName: v.shop_id ? (shopNameMap[v.shop_id] ?? null) : null }))
       setVouchers(filteredVouchers as VoucherRow[])
 
-      // Combo vouchers đang active — đánh dấu quán nào có combo
+      // Badge ưu tiên cho card quán: Free Ship > Giảm % > không hiện
       if (shopData && shopData.length > 0) {
         const shopIds = (shopData as ShopRow[]).map(s => s.id)
-        const now = new Date().toISOString()
-        const { data: comboData } = await supabase
-          .from("vouchers")
-          .select("shop_id")
-          .eq("is_active", true)
-          .eq("is_combo", true)
-          .gte("valid_to", now)
-          .in("shop_id", shopIds)
-        if (comboData) setComboShopIds(new Set(comboData.map((v: { shop_id: string }) => v.shop_id)))
+        const now2 = new Date().toISOString()
+        const [{ data: fsData }, { data: pctData }] = await Promise.all([
+          supabase.from("vouchers").select("shop_id")
+            .eq("is_active", true).eq("discount_type", "freeship")
+            .not("shop_id", "is", null).gte("valid_to", now2).in("shop_id", shopIds),
+          supabase.from("vouchers").select("shop_id")
+            .eq("is_active", true).eq("discount_type", "percent")
+            .not("shop_id", "is", null).gte("valid_to", now2).in("shop_id", shopIds),
+        ])
+        if (fsData)  setFreeshipsShopIds(new Set(fsData.map((v: { shop_id: string }) => v.shop_id)))
+        if (pctData) setDiscountShopIds(new Set(pctData.map((v: { shop_id: string }) => v.shop_id)))
       }
 
       // Best sellers — top bán chạy, không lọc theo giờ (sold_count >= 0)
@@ -1544,8 +1547,16 @@ export default function HomePage() {
                           ? <Badge layer={3} variant="open" size="sm" label="Đang mở" />
                           : <Badge layer={3} variant="closed" size="sm" label={nextOpenLabel(s)} icon={false} />
                         }
-                        {/* Combo badge */}
-                        {comboShopIds.has(s.id) && <Badge layer={2} variant="has-combo" size="sm" />}
+                        {/* Badge ưu tiên: Free Ship > Giảm % */}
+                        {freeshipsShopIds.has(s.id)
+                          ? <span style={{ fontSize:9, fontWeight:800, padding:"1px 6px", borderRadius:4,
+                              background:"rgba(62,207,110,0.15)", border:"1px solid rgba(62,207,110,0.35)",
+                              color:"#3ecf6e", lineHeight:1.5 }}>🚚 Free Ship</span>
+                          : discountShopIds.has(s.id)
+                          ? <span style={{ fontSize:9, fontWeight:800, padding:"1px 6px", borderRadius:4,
+                              background:"rgba(255,107,0,0.12)", border:"1px solid rgba(255,107,0,0.3)",
+                              color:"#FF8C00", lineHeight:1.5 }}>🏷️ Đang giảm giá</span>
+                          : null}
                       </div>
                     </div>
                   </div>
