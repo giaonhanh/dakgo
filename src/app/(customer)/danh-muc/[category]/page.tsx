@@ -214,10 +214,10 @@ export default function CategoryPage() {
                   opacity: open ? 1 : 0.55, cursor:"pointer", position:"relative",
                 }}>
                   {/* Avatar */}
-                  <div style={{ width:62, height:62, borderRadius:"50%", flexShrink:0,
+                  <div style={{ width:74, height:74, borderRadius:"50%", flexShrink:0,
                     background: cat.color, border:`1px solid ${borderColor}`,
                     display:"flex", alignItems:"center", justifyContent:"center",
-                    fontSize:28, overflow:"hidden", position:"relative" }}>
+                    fontSize:32, overflow:"hidden", position:"relative" }}>
                     {shop.logo_url
                       ? <img src={shop.logo_url} alt={shop.name}
                           style={{ width:"100%", height:"100%", objectFit:"cover" }} />

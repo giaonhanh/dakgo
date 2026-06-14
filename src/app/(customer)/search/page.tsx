@@ -559,7 +559,7 @@ function ShopCard({ shop, onClick }: { shop: ShopResult; onClick: () => void }) 
       display: "flex", gap: 12, alignItems: "center",
     }}>
       <div style={{
-        width: 54, height: 54, borderRadius: "50%", flexShrink: 0,
+        width: 68, height: 68, borderRadius: "50%", flexShrink: 0,
         background: shop.logo_url ? "transparent" : "rgba(255,255,255,0.06)",
         border: "1px solid rgba(255,255,255,0.08)",
         display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26,

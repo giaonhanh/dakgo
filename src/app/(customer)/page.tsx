@@ -1381,12 +1381,18 @@ export default function HomePage() {
                       border:"1px solid rgba(255,107,0,0.18)", borderRadius:14, overflow:"hidden",
                       opacity: shopOpen ? 1 : 0.6,
                     }}>
-                      <div style={{ height:64, background:"rgba(255,107,0,0.06)",
+                      <div style={{ height:80, background:"rgba(255,107,0,0.06)",
                         display:"flex", alignItems:"center", justifyContent:"center",
-                        fontSize:36, position:"relative" }}>
-                        {s.logo_url
-                          ? <Image src={s.logo_url} alt={s.name} fill sizes="64px" style={{ objectFit:"cover" }} />
-                          : "🏪"}
+                        position:"relative" }}>
+                        {/* Logo tròn */}
+                        <div style={{ width:58, height:58, borderRadius:"50%", overflow:"hidden",
+                          border:"2px solid rgba(255,107,0,0.25)", position:"relative",
+                          background:"rgba(255,255,255,0.06)", flexShrink:0,
+                          display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>
+                          {s.logo_url
+                            ? <Image src={s.logo_url} alt={s.name} fill sizes="58px" style={{ objectFit:"cover" }} />
+                            : "🏪"}
+                        </div>
                         {!shopOpen && (
                           <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.45)",
                             display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -1512,11 +1518,11 @@ export default function HomePage() {
                     display:"flex", alignItems:"center", gap:11, cursor:"pointer",
                   }}>
                     {/* Logo */}
-                    <div style={{ width:56, height:56, borderRadius:"50%", flexShrink:0, position:"relative",
+                    <div style={{ width:70, height:70, borderRadius:"50%", flexShrink:0, position:"relative",
                       background:"rgba(255,107,0,0.07)", border:"1px solid rgba(255,255,255,0.08)",
-                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, overflow:"hidden" }}>
+                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:32, overflow:"hidden" }}>
                       {s.logo_url
-                        ? <Image src={s.logo_url} alt={s.name} fill sizes="56px" style={{ objectFit:"cover" }} />
+                        ? <Image src={s.logo_url} alt={s.name} fill sizes="70px" style={{ objectFit:"cover" }} />
                         : "🏪"}
                       {/* Closed overlay */}
                       {!shopOpen && (
