@@ -13,7 +13,6 @@ import type { AddressPickerResult } from "@/types"
 import { formatPrice } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { getRouteKm, calcDeliveryFee, calcDeliveryFeeFromPricing } from "@/lib/vietmapRoute"
-import SmartVoucherPicker from "@/components/ui/SmartVoucherPicker"
 import VoucherNudgeBar, { findNextThreshold } from "@/components/ui/VoucherNudgeBar"
 import VoucherInlineHint from "@/components/ui/VoucherInlineHint"
 import type { VoucherItem } from "@/components/ui/VoucherCard"
@@ -1196,9 +1195,6 @@ export default function CheckoutPage() {
   const [deliveryFee,    setDeliveryFee]    = useState(15000)
   const [feeLoading,     setFeeLoading]     = useState(false)
   const [foodPricing,    setFoodPricing]    = useState<{ rows: string[]; extra: string } | null>(null)
-  const [comboHint,      setComboHint]      = useState<string | null>(null)
-  const [smartDismissed, setSmartDismissed] = useState(false)
-
   // ── Load user, saved addresses, xu balance ──
   useEffect(() => {
     async function loadData() {
@@ -1368,43 +1364,6 @@ export default function CheckoutPage() {
 
   // Chỉ giữ voucher toàn hệ thống + voucher đúng quán trong giỏ hàng
   const relevantVouchers = dbVouchers.filter(v => !v.shop_id || v.shop_id === shopId)
-
-  // ── Auto-detect combo voucher conditions ──
-  useEffect(() => {
-    if (!relevantVouchers.length || !cartItems.length) { setComboHint(null); return }
-    const cartMap: Record<string, number> = {}
-    for (const item of cartItems) {
-      const pid = item.id.split("__")[0]
-      cartMap[pid] = (cartMap[pid] ?? 0) + item.qty
-    }
-
-    for (const v of relevantVouchers) {
-      if (!v.is_combo || !v.combo_items?.length) continue
-      if (appliedVouchers.some(av => av.code === v.code)) continue
-
-      const unmet = v.combo_items.filter(ci => (cartMap[ci.product_id] ?? 0) < ci.min_quantity)
-      if (unmet.length === 0) {
-        // Đủ điều kiện → tự động apply nếu chưa có conflict
-        const vType = dbVoucherType(v)
-        if (!appliedVouchers.some(av => av.type === vType)) {
-          const disc = calcVoucherDiscount(v, subtotal, deliveryFee)
-          setAppliedVouchers(prev => [...prev, { code: v.code, type: vType, label: v.title, discount: disc }])
-          setToast(`🎉 Tự động áp dụng combo "${v.title}" · Giảm ${fmt(disc)}`)
-          setTimeout(() => setToast(""), 3500)
-          setComboHint(null)
-          return
-        }
-      } else if (unmet.length < v.combo_items.length) {
-        // Thiếu một phần → gợi ý mua thêm
-        const names = unmet.map(ci => ci.products?.name ?? "món còn thiếu").join(", ")
-        const discLabel = v.discount_type === "percent" ? `-${v.discount_value}%` : `-${fmt(v.discount_value)}`
-        setComboHint(`🛒 Thêm ${names} để được combo "${v.title}" · Giảm ${discLabel}`)
-        return
-      }
-    }
-    setComboHint(null)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartItems, relevantVouchers, appliedVouchers])
 
   const applyVoucherCode = (rawCode: string, fromPicker = false) => {
     const code = rawCode.trim().toUpperCase()
@@ -2061,59 +2020,6 @@ export default function CheckoutPage() {
           </SectionCard>
           )}
 
-          {/* Combo progress banner */}
-          {comboHint && (() => {
-            // Tính % tiến trình: đếm số món đã có / tổng món cần
-            const comboV = relevantVouchers.find(v => v.is_combo && v.combo_items?.length && !appliedVouchers.some(av => av.code === v.code))
-            const cartMap: Record<string, number> = {}
-            for (const item of cartItems) {
-              const pid = item.id.split("__")[0]
-              cartMap[pid] = (cartMap[pid] ?? 0) + item.qty
-            }
-            const total = comboV?.combo_items?.length ?? 1
-            const done  = comboV?.combo_items?.filter(ci => (cartMap[ci.product_id] ?? 0) >= ci.min_quantity).length ?? 0
-            const pct   = Math.round((done / total) * 100)
-            return (
-              <div style={{ margin:"0 0 10px", padding:"10px 13px 11px", borderRadius:13,
-                background:"rgba(168,85,247,0.07)", border:"1px solid rgba(168,85,247,0.25)" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:7 }}>
-                  <span style={{ fontSize:15 }}>🎁</span>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ color:"#a855f7", fontSize:11.5, fontWeight:700, lineHeight:1.4 }}>
-                      {comboHint}
-                    </div>
-                  </div>
-                </div>
-                {/* Progress bar */}
-                <div style={{ height:5, borderRadius:99, background:"rgba(168,85,247,0.15)", overflow:"hidden" }}>
-                  <div style={{ height:"100%", width:`${pct}%`, borderRadius:99,
-                    background:"linear-gradient(90deg,#a855f7,#7c3aed)",
-                    transition:"width 0.4s ease" }} />
-                </div>
-                <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
-                  <span style={{ color:"#6a5a40", fontSize:9.5 }}>Tiến trình combo</span>
-                  <span style={{ color:"#a855f7", fontSize:9.5, fontWeight:700 }}>{done}/{total} món ✓</span>
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* 4. Voucher — SmartVoucherPicker banner */}
-          {!smartDismissed && (() => {
-            const voucherItems = relevantVouchers.map(v => dbVoucherToVoucherItem(v, appliedVouchers.map(av => av.code), userUsageMap))
-            return (
-              <div style={{ marginBottom: 10 }}>
-                <SmartVoucherPicker
-                  cartTotal={subtotal}
-                  shippingFee={deliveryFee}
-                  vouchers={voucherItems}
-                  appliedVoucherId={appliedVouchers[0]?.code}
-                  onSuggest={() => setShowVoucherPicker(true)}
-                  onDismiss={() => setSmartDismissed(true)}
-                />
-              </div>
-            )
-          })()}
 
           <SectionCard title="Mã giảm giá" icon="🏷️">
             {/* VoucherNudgeBar — nudge mua thêm để đạt ngưỡng */}

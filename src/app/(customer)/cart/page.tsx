@@ -105,6 +105,7 @@ export default function CartPage() {
                 background: "rgba(255,255,255,0.06)", border: "none",
                 color: "#f8f0e0", fontSize: 18, cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
               }}
             >←</button>
             <div style={{ flex: 1 }}>
@@ -117,14 +118,19 @@ export default function CartPage() {
                 </p>
               )}
             </div>
-            {items.length > 0 && (
-              <span style={{
-                fontSize: 11, fontWeight: 700, color: "#FF8C00",
-                background: "rgba(255,107,0,0.1)", border: "1px solid rgba(255,107,0,0.25)",
-                borderRadius: 8, padding: "4px 10px",
-              }}>
-                {items.reduce((s, i) => s + i.qty, 0)} món
-              </span>
+            {shopId && (
+              <button
+                type="button"
+                onClick={() => router.push(`/shop/${shopId}`)}
+                style={{
+                  height: 34, padding: "0 12px", borderRadius: 10,
+                  background: "rgba(255,107,0,0.1)", border: "1px solid rgba(255,107,0,0.3)",
+                  color: "#FF8C00", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 5, flexShrink: 0,
+                }}
+              >
+                <span style={{ fontSize: 14 }}>+</span> Thêm món
+              </button>
             )}
           </div>
         </div>
