@@ -426,8 +426,13 @@ export default function DriverConfirmPage() {
         .eq("id", orderId)
     }
 
-    // RPC atomic: cập nhật status + trừ hoa hồng quán + cộng ví tài xế (COD)
-    // Đơn online: ví tài xế đã được cộng qua PayOS webhook, RPC này bỏ qua
+    // Bước 1: Luôn cập nhật status → delivered trước (trigger realtime cho merchant + khách)
+    await supabase.from("orders").update({
+      status:       "delivered",
+      delivered_at: new Date().toISOString(),
+    }).eq("id", orderId)
+
+    // Bước 2: RPC xử lý hoa hồng quán + cộng ví tài xế (COD) — lỗi ví không block giao hàng
     type CompleteResult = { success?: boolean; error?: string; shop_commission_amount?: number; driver_earning?: number }
     const { data: result } = await supabase.rpc("complete_order_with_commission", {
       p_order_id:  orderId,
@@ -435,41 +440,31 @@ export default function DriverConfirmPage() {
     })
     const res = result as CompleteResult | null
 
-    // Thông báo in-app cho khách
-    const { data: o } = await supabase
-      .from("orders")
-      .select("customer_id, total_amount")
-      .eq("id", orderId)
-      .single()
+    // Bước 3: Push notification + in-app cho khách
+    fetch("/api/orders/notify-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_id: orderId, status: "delivered" }),
+    }).catch(() => {})
 
-    if (o?.customer_id) {
-      await supabase.from("notifications").insert({
-        user_id: o.customer_id,
-        type:    "order",
-        title:   "✅ Đơn hàng đã được giao!",
-        body:    `Đơn ${Number(o.total_amount).toLocaleString("vi-VN")}đ đã giao thành công. Cảm ơn bạn!`,
-        data:    { order_id: orderId, url: "/orders" },
-      }).then(({ error }) => { if (error) console.error("notify customer:", error) })
-    }
-
-    // Reload stats hôm nay (đã có đơn này)
+    // Reload stats hôm nay
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-    const { data: delivered } = await supabase
+    const { data: deliveredOrders } = await supabase
       .from("orders")
       .select("ship_fee, driver_commission_amount")
       .eq("driver_id", user.id)
       .eq("status", "delivered")
       .gte("created_at", todayStart.toISOString())
 
-    const todayEarning = (delivered ?? []).reduce((s, d) =>
+    const todayEarning = (deliveredOrders ?? []).reduce((s, d) =>
       s + Math.max(0, (d.ship_fee ?? 0) - (d.driver_commission_amount ?? 0)), 0)
-    setToday({ orders: (delivered ?? []).length, earning: todayEarning })
+    setToday({ orders: (deliveredOrders ?? []).length, earning: todayEarning })
 
     setSaving(false)
     if (res?.error) {
-      fireToast("⚠️ Giao hàng xong nhưng có lỗi xử lý ví")
+      fireToast("✅ Đã giao thành công! (lưu ý: lỗi xử lý hoa hồng)")
     } else {
-      fireToast("Đã xác nhận giao hàng thành công!")
+      fireToast("✅ Đã xác nhận giao hàng thành công!")
     }
     setTimeout(() => setPhase("done"), 600)
   }

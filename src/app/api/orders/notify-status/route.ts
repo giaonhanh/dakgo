@@ -66,6 +66,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    else if (status === "delivered") {
+      // Thông báo khách: đơn đã giao xong
+      await sendPushToUser(order.customer_id, {
+        title: "✅ Đơn hàng đã được giao!",
+        body:  `Đơn #${shortId} đã giao thành công. Cảm ơn bạn đã tin dùng!`,
+        url:   `/review/${order_id}`,
+        tag:   `order-delivered-${order_id}`,
+      })
+      await db.from("notifications").insert({
+        user_id: order.customer_id,
+        type:    "order",
+        title:   "✅ Đơn hàng đã được giao!",
+        body:    `Đơn #${shortId} đã giao thành công. Để lại đánh giá nhé!`,
+        data:    { order_id, url: `/review/${order_id}` },
+      })
+    }
+
     else if (status === "driver_accepted") {
       // Thông báo khách: tài xế đã nhận đơn, đang trên đường đến quán
       await sendPushToUser(order.customer_id, {
