@@ -992,16 +992,17 @@ export default function DriverDashboard() {
   const buildOrderData = useCallback(async (o: {
     id: string; shop_id: string; customer_id: string
     delivery_address: string; total: number; ship_fee: number
-    subtotal: number; total_amount: number; pay_method: string
+    subtotal?: number; total_amount: number; pay_method: string
   }): Promise<OrderData | null> => {
     const [{ data: shop }, { data: customer }, { data: items }] = await Promise.all([
       supabase.from("shops").select("name, address, commission_rate").eq("id", o.shop_id).single(),
       supabase.from("profiles").select("full_name").eq("id", o.customer_id).single(),
       supabase.from("order_items").select("name, qty, price").eq("order_id", o.id),
     ])
-    // payShop = subtotal - shop_commission (ước tính, số chính xác trong orders.shop_commission_amount)
+    // subtotal = tiền hàng (không bao gồm ship_fee)
+    // Fallback: dùng total (cột cũ) nếu subtotal chưa có trong DB
     const shopRate = Number(shop?.commission_rate ?? 15)
-    const subtotal = o.subtotal ?? 0
+    const subtotal = o.subtotal ?? o.total ?? 0
     const payShop  = Math.round(subtotal * (1 - shopRate / 100))
     return {
       id: o.id.slice(0, 8).toUpperCase(), fullId: o.id, orderTable: "orders",
@@ -1063,7 +1064,7 @@ export default function DriverDashboard() {
         const o = payload.new as {
           id: string; shop_id: string; customer_id: string
           delivery_address: string; total: number; ship_fee: number
-          subtotal: number; total_amount: number; pay_method: string
+          subtotal?: number; total_amount: number; pay_method: string
         }
         const orderData = await buildOrderData(o)
         if (!orderData) return
@@ -1137,7 +1138,7 @@ export default function DriverDashboard() {
         event: "UPDATE", schema: "public", table: "orders",
         filter: "status=eq.preparing",
       }, async (payload) => {
-        const o = payload.new as { id: string; status: string; driver_id: string | null; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; subtotal: number; total_amount: number; pay_method: string }
+        const o = payload.new as { id: string; status: string; driver_id: string | null; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; subtotal?: number; total_amount: number; pay_method: string }
         // Bỏ qua nếu đơn đã có tài xế, hoặc đang xử lý
         if (o.driver_id !== null || acceptedRef.current) return
         const orderData = await buildOrderData(o)
@@ -1154,7 +1155,7 @@ export default function DriverDashboard() {
         event: "UPDATE", schema: "public", table: "orders",
         filter: `driver_id=eq.${driverId}`,
       }, async (payload) => {
-        const o = payload.new as { id: string; status: string; driver_id: string; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; subtotal: number; total_amount: number; pay_method: string }
+        const o = payload.new as { id: string; status: string; driver_id: string; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; subtotal?: number; total_amount: number; pay_method: string }
         // Hiện popup khi đơn có driver_id là tài xế này và còn có thể nhận
         if (!["pending", "accepted"].includes(o.status) || acceptedRef.current) return
         const orderData = await buildOrderData(o)

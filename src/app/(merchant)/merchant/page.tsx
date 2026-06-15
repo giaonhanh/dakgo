@@ -805,112 +805,84 @@ export default function MerchantDashboard() {
                             ) : order.itemList.map((item, i) => {
                               const { base, size, toppings } = parseItemName(item.name)
                               const bd = item.breakdown
+                              // Size hiển thị
                               const displaySz = bd?.sizeLabel
                                 ? (/^size/i.test(bd.sizeLabel) ? bd.sizeLabel : `Size ${bd.sizeLabel}`)
                                 : size ? (/^size/i.test(size) ? size : `Size ${size}`) : null
-                              const hasBd = !!(bd && ((bd.sizeDiff ?? 0) > 0 || (bd.toppings?.length ?? 0) > 0))
-                              const hasOptions = !!(displaySz || toppings.length > 0 || hasBd)
+                              // Giá size
+                              const sizePrice = bd?.sizeDiff ?? 0
+                              // Toppings list: ưu tiên breakdown, fallback parse từ tên
+                              const toppingList: { name: string; price: number }[] = bd?.toppings?.length
+                                ? bd.toppings
+                                : toppings.map(t => ({ name: t, price: 0 }))
+                              // Giá gốc món (không size, không topping)
+                              const basePrice = bd?.basePrice ?? item.price
+                              // Đơn giá sau option
+                              const unitPrice = basePrice + sizePrice + toppingList.reduce((s, t) => s + t.price, 0)
+
                               return (
                                 <div key={i} style={{ padding: "10px 12px",
                                   borderBottom: i < order.itemList.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
 
-                                  {/* Số thứ tự + Tên món + Giá gốc */}
-                                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
+                                  {/* Dòng 1: Số thứ tự + Tên món + Giá gốc */}
+                                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
                                     <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
                                       background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.3)",
                                       display: "flex", alignItems: "center", justifyContent: "center",
                                       color: "#FF8C00", fontSize: 9, fontWeight: 800 }}>{i + 1}</span>
                                     <span style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700, flex: 1 }}>{base}</span>
                                     <span style={{ color: "#b0956a", fontSize: 10, fontWeight: 600, flexShrink: 0 }}>
-                                      {fmt(bd?.basePrice ?? item.price)}
+                                      {fmt(basePrice)}
                                     </span>
                                   </div>
 
-                                  {/* Bảng tùy chọn */}
-                                  {hasOptions && (
-                                    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                                      borderRadius: 8, overflow: "hidden", marginBottom: 6 }}>
-                                      {hasBd ? (
-                                        <>
-                                          {displaySz && (bd?.sizeDiff ?? 0) > 0 && (
-                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                                              padding: "5px 9px", borderBottom: (bd?.toppings?.length ?? 0) > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                                              <span style={{ color: "#4a8ff5", fontSize: 9 }}>▸ {displaySz}</span>
-                                              <span style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700 }}>+{fmt(bd!.sizeDiff!)}</span>
-                                            </div>
-                                          )}
-                                          {bd?.toppings?.map((tp, ti) => (
-                                            <div key={ti} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                                              padding: "5px 9px",
-                                              borderBottom: ti < (bd?.toppings?.length ?? 0) - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                                              <span style={{ color: "#3ecf6e", fontSize: 9 }}>+ {tp.name}</span>
-                                              <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 700 }}>+{fmt(tp.price)}</span>
-                                            </div>
-                                          ))}
-                                        </>
-                                      ) : (
-                                        <>
-                                          {displaySz && (
-                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                                              padding: "5px 9px", borderBottom: toppings.length > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                                              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                                <span style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 700 }}>▸</span>
-                                                <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700,
-                                                  background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.25)",
-                                                  color: "#4a8ff5" }}>{displaySz}</span>
-                                              </div>
-                                            </div>
-                                          )}
-                                          {toppings.map((t, ti) => (
-                                            <div key={ti} style={{ display: "flex", alignItems: "center",
-                                              padding: "5px 9px",
-                                              borderBottom: ti < toppings.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                                              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                                <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 700 }}>+</span>
-                                                <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600,
-                                                  background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.2)",
-                                                  color: "#3ecf6e" }}>{t}</span>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </>
-                                      )}
+                                  {/* Dòng 2: Size (nếu có) */}
+                                  {displaySz && (
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                      paddingLeft: 27, paddingBottom: 4 }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                        <span style={{ color: "#4a8ff5", fontSize: 9 }}>▸</span>
+                                        <span style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 600 }}>{displaySz}</span>
+                                      </div>
+                                      <span style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 600 }}>
+                                        {sizePrice > 0 ? `+${fmt(sizePrice)}` : "đã tính"}
+                                      </span>
                                     </div>
                                   )}
 
-                                  {/* Bảng giá */}
-                                  {(() => {
-                                    const perUnit = bd
-                                      ? (bd.basePrice) + (bd.sizeDiff ?? 0) + (bd.toppings ?? []).reduce((s, t) => s + t.price, 0)
-                                      : item.price
-                                    return (
-                                      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
-                                        borderRadius: 8, overflow: "hidden" }}>
-                                        <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
-                                          borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                          <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Thành tiền</span>
-                                          <span style={{ fontSize: 9.5, color: "#b0956a", fontWeight: 600 }}>{fmt(perUnit)}</span>
-                                        </div>
-                                        <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px",
-                                          borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                                          <span style={{ fontSize: 9.5, color: "#6a5a40" }}>Số lượng</span>
-                                          <span style={{ fontSize: 11, color: "#f8f0e0", fontWeight: 700 }}>×{item.qty}</span>
-                                        </div>
-                                        <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 9px" }}>
-                                          <span style={{ fontSize: 10, color: "#b0956a", fontWeight: 600 }}>Tổng tiền</span>
-                                          <span style={{ fontSize: 12, color: "#FF8C00", fontWeight: 800 }}>{fmt(perUnit * item.qty)}</span>
-                                        </div>
+                                  {/* Dòng 3+: Toppings (nếu có) */}
+                                  {toppingList.map((tp, ti) => (
+                                    <div key={ti} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                      paddingLeft: 27, paddingBottom: 4 }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                        <span style={{ color: "#3ecf6e", fontSize: 9 }}>+</span>
+                                        <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>{tp.name}</span>
                                       </div>
-                                    )
-                                  })()}
+                                      <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>
+                                        {tp.price > 0 ? `+${fmt(tp.price)}` : "đã tính"}
+                                      </span>
+                                    </div>
+                                  ))}
 
-                                  {/* Ghi chú của item */}
+                                  {/* Thành tiền món */}
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                    paddingLeft: 27, paddingTop: 4,
+                                    borderTop: (displaySz || toppingList.length > 0) ? "1px solid rgba(255,255,255,0.05)" : "none",
+                                    marginTop: (displaySz || toppingList.length > 0) ? 4 : 0 }}>
+                                    <span style={{ color: "#6a5a40", fontSize: 9 }}>
+                                      Thành tiền{item.qty > 1 ? ` ×${item.qty}` : ""}
+                                    </span>
+                                    <span style={{ color: "#FF8C00", fontSize: 11, fontWeight: 800 }}>
+                                      {fmt(unitPrice * item.qty)}
+                                    </span>
+                                  </div>
+
+                                  {/* Ghi chú món */}
                                   {item.note && (
-                                    <div style={{ marginTop: 6, padding: "5px 9px", borderRadius: 7,
-                                      background: "rgba(245,197,66,0.08)", border: "1px solid rgba(245,197,66,0.2)",
-                                      color: "#f5c542", fontSize: 9, display: "flex", gap: 5, alignItems: "flex-start" }}>
-                                      <span style={{ flexShrink: 0, fontWeight: 700 }}>📝 Ghi chú:</span>
-                                      <span>{item.note}</span>
+                                    <div style={{ marginTop: 6, paddingLeft: 27,
+                                      display: "flex", gap: 5, alignItems: "flex-start" }}>
+                                      <span style={{ color: "#f5c542", fontSize: 9, flexShrink: 0 }}>📝</span>
+                                      <span style={{ color: "#f5c542", fontSize: 9 }}>{item.note}</span>
                                     </div>
                                   )}
                                 </div>
