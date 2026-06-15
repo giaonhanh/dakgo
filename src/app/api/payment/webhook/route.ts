@@ -36,17 +36,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ code: "00" })
     }
 
-    // Idempotency: đã xử lý rồi thì bỏ qua (tránh cộng ví 2 lần)
-    if (order.payment_status === "paid") {
-      console.log(`[Webhook] Duplicate webhook for orderCode ${data.orderCode}, skipping`)
-      return NextResponse.json({ code: "00" })
-    }
-
-    // Cập nhật trạng thái thanh toán đơn hàng
-    await supabase
+    // Atomic idempotency: chỉ update nếu payment_status chưa phải 'paid'
+    // Nếu 2 webhook đến cùng lúc, chỉ 1 cái thành công (tránh double credit)
+    const { data: claimed } = await supabase
       .from("orders")
       .update({ payment_status: "paid" })
       .eq("id", order.id)
+      .neq("payment_status", "paid")
+      .select("id")
+      .maybeSingle()
+
+    if (!claimed) {
+      console.log(`[Webhook] Duplicate webhook for orderCode ${data.orderCode}, skipping`)
+      return NextResponse.json({ code: "00" })
+    }
 
     // Cộng ví tài xế: phí ship (merchant thanh toán trực tiếp, không qua ví)
     if (order.driver_id) {

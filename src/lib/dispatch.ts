@@ -167,8 +167,20 @@ export async function dispatchOrder(
     return { dispatched: false, triedIds }
   }
 
-  // Gán tài xế vào đơn
-  await db.from(table).update({ driver_id: driverId }).eq("id", id)
+  // Gán tài xế — chỉ update nếu driver_id vẫn NULL (tránh race condition 2 dispatch cùng lúc)
+  const statusCol = table === "rides" ? "searching" : "pending"
+  const { data: claimed } = await db
+    .from(table)
+    .update({ driver_id: driverId })
+    .eq("id", id)
+    .eq("status", statusCol)
+    .is("driver_id", null)
+    .select("id")
+
+  // Nếu không có row nào được update → tài xế khác đã nhận trước
+  if (!claimed?.length) {
+    return { dispatched: false, triedIds, driverId: undefined }
+  }
 
   // Push notification + DB notification
   const { title, body } = await buildNotifContent(db, table, id)
