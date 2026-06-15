@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { dispatchOrder } from "@/lib/dispatch"
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Loại dịch vụ không hợp lệ" }, { status: 400 })
     }
 
-    // Lấy phí dịch vụ từ app_settings, dùng giá trị frontend gửi lên nếu hợp lệ
+    // Lấy phí dịch vụ từ app_settings
     const { data: pricingRow } = await supabase
       .from("app_settings").select("value").eq("key", "pricing").maybeSingle()
     const pricingCfg = pricingRow?.value as Record<string, { rows?: string[]; extra?: string }> | null
@@ -67,6 +68,11 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error || !errand) return NextResponse.json({ error: "Không thể tạo yêu cầu" }, { status: 500 })
+
+    // Dispatch:
+    // - buy_for_me  → tìm tài xế gần địa điểm MUA HÀNG nhất (pickup = nơi mua)
+    // - deliver_for_me → tìm tài xế gần người GỬI nhất (pickup = địa chỉ lấy hàng)
+    dispatchOrder("errands", errand.id, []).catch(() => {})
 
     return NextResponse.json({ errandId: errand.id }, { status: 201 })
   } catch {

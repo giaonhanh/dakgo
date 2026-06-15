@@ -1169,9 +1169,20 @@ export default function DriverDashboard() {
   }
 
   const handleReject = () => {
+    const rejected = pendingOrder
     showOrderRef.current = false
     setShowOrder(false)
     setPendingOrder(null)
+
+    // Báo server để dispatch sang tài xế tiếp theo
+    if (rejected) {
+      fetch("/api/dispatch/reject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ table: rejected.orderTable, id: rejected.fullId }),
+      }).catch(() => {})
+    }
+
     const next = orderQueueRef.current.shift()
     if (next) {
       setTimeout(() => {

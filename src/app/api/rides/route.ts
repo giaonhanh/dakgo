@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { sendPushToDrivers } from "@/lib/webpush"
+import { dispatchOrder } from "@/lib/dispatch"
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
     const { data: ride, error } = await supabase
       .from("rides")
       .insert({
-        customer_id:     user.id,
-        status:          "searching",
+        customer_id:    user.id,
+        status:         "searching",
         vehicle_type,
         pickup_address,
         pickup_lat,
@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
         dropoff_address,
         dropoff_lat,
         dropoff_lng,
-        distance_km:     distance_km ?? null,
-        estimated_fare:  estimated_fare ?? null,
+        distance_km:    distance_km ?? null,
+        estimated_fare: estimated_fare ?? null,
         payment_method,
       })
       .select("id")
@@ -47,27 +47,8 @@ export async function POST(req: NextRequest) {
 
     if (error || !ride) return NextResponse.json({ error: "Không thể tạo chuyến xe" }, { status: 500 })
 
-    // ── Notify all drivers ────────────────────────────────
-    try {
-      const typeLabel: Record<string, string> = {
-        xe_om: "🛵 Xe ôm", taxi: "🚕 Taxi", car: "🚗 Xe hơi",
-      }
-      const soundMap: Record<string, string> = {
-        xe_om: "xe_om", taxi: "taxi", car: "buy_for",
-      }
-      const label   = typeLabel[vehicle_type] ?? "🚗 Chuyến"
-      const from    = pickup_address.split(",")[0]
-      const to      = dropoff_address.split(",")[0]
-      const fareStr = estimated_fare
-        ? ` · ${Number(estimated_fare).toLocaleString("vi-VN")}đ` : ""
-      await sendPushToDrivers({
-        title: `${label} mới!`,
-        body:  `${from} → ${to}${fareStr}`,
-        url:   "/driver",
-        tag:   `ride-${ride.id}`,
-        sound: soundMap[vehicle_type] ?? "xe_om",
-      })
-    } catch { /* never fail */ }
+    // Dispatch: tìm tài xế gần điểm ĐÓN KHÁCH nhất (taxi + xe ôm đều dùng pickup)
+    dispatchOrder("rides", ride.id, []).catch(() => {})
 
     return NextResponse.json({ rideId: ride.id }, { status: 201 })
   } catch {
