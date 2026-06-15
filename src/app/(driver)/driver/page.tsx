@@ -1129,12 +1129,12 @@ export default function DriverDashboard() {
       })
       .subscribe()
 
-    // ── Lắng nghe khi merchant xác nhận (UPDATE status → accepted, driver_id vẫn null) ──
+    // ── Lắng nghe khi merchant bắt đầu làm (UPDATE status → preparing, driver_id vẫn null) ──
     const chAccepted = supabase
-      .channel("driver-merchant-accepted")
+      .channel("driver-merchant-preparing")
       .on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "orders",
-        filter: "status=eq.accepted",
+        filter: "status=eq.preparing",
       }, async (payload) => {
         const o = payload.new as { id: string; status: string; driver_id: string | null; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; total_amount: number; pay_method: string }
         // Bỏ qua nếu đơn đã có tài xế, hoặc đang xử lý

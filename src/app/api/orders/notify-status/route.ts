@@ -101,13 +101,31 @@ export async function POST(req: NextRequest) {
     }
 
     else if (status === "cancelled") {
-      // Hoàn hoa hồng tài xế
+      // Hoàn hoa hồng tài xế nếu đã trừ
       if (order.driver_id && (order.driver_commission_amount ?? 0) > 0) {
         await db.rpc("refund_driver_commission", { p_order_id: order_id })
       }
 
-      // Thông báo khách hàng
       const reason = cancel_reason ?? "Đơn hàng bị hủy"
+
+      // Thông báo tài xế nếu đã nhận đơn
+      if (order.driver_id) {
+        await sendPushToUser(order.driver_id, {
+          title: "❌ Đơn bị hủy",
+          body:  `Đơn #${shortId} bị hủy: ${reason}. Hoa hồng đã hoàn về ví.`,
+          url:   "/driver",
+          tag:   `order-cancelled-driver-${order_id}`,
+        }).catch(() => {})
+        await db.from("notifications").insert({
+          user_id: order.driver_id,
+          type:    "order",
+          title:   "❌ Đơn bị hủy",
+          body:    `Đơn #${shortId} bị hủy: ${reason}. Hoa hồng đã hoàn về ví.`,
+          data:    { order_id, url: "/driver", cancelled: true },
+        })
+      }
+
+      // Thông báo khách hàng
       await sendPushToUser(order.customer_id, {
         title: "❌ Đơn hàng bị hủy",
         body:  `Đơn #${shortId}: ${reason}`,

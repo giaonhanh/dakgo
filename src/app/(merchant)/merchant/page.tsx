@@ -300,37 +300,16 @@ export default function MerchantDashboard() {
     fireToast(next ? "✅ Quán đã mở cửa" : "🔒 Quán đã đóng cửa")
   }
 
-  const handleAccept = async (order: MOrder) => {
-    setOrderStatus(order.id, "accepted")
+  // Parallel model: merchant chỉ cần bắt đầu làm — dispatch đã được checkout kích hoạt
+  const handlePreparing = async (order: MOrder) => {
+    setOrderStatus(order.id, "preparing")
     const { error } = await supabase.from("orders").update({
-      status:       "accepted",
+      status:       "preparing",
       accepted_at:  new Date().toISOString(),
       preparing_at: new Date().toISOString(),
     }).eq("id", order.id)
-    if (error) { setOrderStatus(order.id, "pending"); fireToast("❌ Không thể xác nhận, thử lại", false); return }
-    fireToast(`✅ Đã xác nhận #${order.shortId}`)
-
-    // Notify khách hàng
-    fetch("/api/orders/notify-status", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ order_id: order.id, status: "accepted" }),
-    }).catch(() => {})
-
-    // Dispatch ngay — tìm tài xế gần nhất và gửi thông báo push
-    setDispatchStatus(prev => ({ ...prev, [order.id]: "dispatching" }))
-    const dispRes = await fetch("/api/orders/dispatch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ order_id: order.id }),
-    }).catch(() => null)
-
-    if (dispRes?.ok) {
-      setDispatchStatus(prev => ({ ...prev, [order.id]: "sent" }))
-    } else {
-      setDispatchStatus(prev => ({ ...prev, [order.id]: "none" }))
-      fireToast(`⚠️ #${order.shortId}: Không có tài xế gần. Đang tìm tiếp...`, false)
-    }
+    if (error) { setOrderStatus(order.id, "pending"); fireToast("❌ Không thể cập nhật, thử lại", false); return }
+    fireToast(`✅ Đang chuẩn bị #${order.shortId}`)
   }
 
   const openRejectModal = (order: MOrder) => {
@@ -1013,7 +992,7 @@ export default function MerchantDashboard() {
                                     fontFamily: "Lexend", cursor: "pointer" }}>
                                   ✕ Từ chối
                                 </button>
-                                <button onClick={() => handleAccept(order)}
+                                <button onClick={() => handlePreparing(order)}
                                   style={{ flex: 2, height: 40, borderRadius: 10, border: "none",
                                     background: "linear-gradient(90deg,#FF6B00,#FF8C00)",
                                     color: "#fff", fontSize: 11, fontWeight: 700,
@@ -1022,7 +1001,7 @@ export default function MerchantDashboard() {
                                   <div style={{ position: "absolute", top: 0, left: "-60%", width: "35%", height: "100%",
                                     background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)",
                                     animation: "mShim 2.5s infinite" }} />
-                                  <span style={{ position: "relative", zIndex: 1 }}>✓ Xác nhận &amp; Chuẩn bị</span>
+                                  <span style={{ position: "relative", zIndex: 1 }}>🍳 Bắt đầu làm</span>
                                 </button>
                               </>
                             )}

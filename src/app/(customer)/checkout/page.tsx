@@ -1555,8 +1555,12 @@ export default function CheckoutPage() {
         }
       }
 
-      // Dispatch do merchant kích hoạt sau khi xác nhận — KHÔNG dispatch từ checkout
-      // để tránh tài xế nhận 2 thông báo (1 từ checkout + 1 từ merchant accept)
+      // Parallel dispatch: notify merchant + tìm tài xế cùng lúc (fire & forget)
+      fetch("/api/orders/parallel-dispatch", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ order_id: order.id }),
+      }).catch(() => {})
 
       clearCart()
       router.push(`/order-success?orderId=${order.id}`)
