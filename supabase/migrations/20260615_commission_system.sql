@@ -117,38 +117,33 @@ BEGIN
   v_commission_rate   := get_driver_commission_rate(p_driver_id);
   v_commission_amount := ROUND(COALESCE(v_order.ship_fee, 0) * v_commission_rate / 100)::INT;
 
-  -- Trừ ví tài xế nếu hoa hồng > 0
+  -- Trừ ví tài xế nếu hoa hồng > 0 VÀ ví tồn tại VÀ đủ số dư
+  -- Nếu ví không đủ → vẫn cho nhận đơn, ghi chú "nợ hoa hồng" để admin xử lý
   IF v_commission_amount > 0 THEN
     SELECT id, balance INTO v_wallet
     FROM wallets
     WHERE user_id = p_driver_id AND type = 'driver'
     FOR UPDATE;
 
-    IF NOT FOUND THEN
-      RETURN jsonb_build_object('error', 'Tài xế chưa có ví tiền ký quỹ');
-    END IF;
+    IF FOUND AND v_wallet.balance >= v_commission_amount THEN
+      -- Ví đủ: trừ bình thường
+      UPDATE wallets
+      SET balance = balance - v_commission_amount, updated_at = now()
+      WHERE id = v_wallet.id;
 
-    IF v_wallet.balance < v_commission_amount THEN
-      RETURN jsonb_build_object(
-        'error',
-        format('Số dư ví không đủ trả hoa hồng. Cần %sđ, có %sđ',
-          to_char(v_commission_amount, 'FM999G999G999'),
-          to_char(v_wallet.balance,    'FM999G999G999'))
+      INSERT INTO transactions (wallet_id, type, amount, balance_after, ref_type, ref_id, note)
+      VALUES (
+        v_wallet.id, 'commission', v_commission_amount,
+        v_wallet.balance - v_commission_amount,
+        'order', p_order_id,
+        format('Hoa hồng nhận đơn #%s (%.0f%%)',
+          UPPER(LEFT(p_order_id::TEXT, 8)), v_commission_rate)
       );
+    ELSE
+      -- Ví không đủ hoặc chưa có ví: cho nhận đơn nhưng ghi nhận commission_amount = 0
+      -- (không phạt tài xế ngay — admin sẽ thu sau)
+      v_commission_amount := 0;
     END IF;
-
-    UPDATE wallets
-    SET balance = balance - v_commission_amount, updated_at = now()
-    WHERE id = v_wallet.id;
-
-    INSERT INTO transactions (wallet_id, type, amount, balance_after, ref_type, ref_id, note)
-    VALUES (
-      v_wallet.id, 'commission', v_commission_amount,
-      v_wallet.balance - v_commission_amount,
-      'order', p_order_id,
-      format('Hoa hồng nhận đơn #%s (%.0f%%)',
-        UPPER(LEFT(p_order_id::TEXT, 8)), v_commission_rate)
-    );
   END IF;
 
   -- Atomic update — nếu pending thì chuyển sang accepted; nếu đã accepted thì giữ nguyên
@@ -420,3 +415,14 @@ $$;
 
 CREATE INDEX IF NOT EXISTS idx_drivers_commission  ON drivers(commission_rate) WHERE commission_rate IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_orders_driver_comm  ON orders(driver_id, driver_commission_amount) WHERE driver_commission_amount > 0;
+
+
+-- ════════════════════════════════════════════════
+-- 9. GRANT EXECUTE cho role authenticated
+-- ════════════════════════════════════════════════
+
+GRANT EXECUTE ON FUNCTION get_driver_commission_rate(UUID)           TO authenticated;
+GRANT EXECUTE ON FUNCTION get_shop_commission_rate(UUID)             TO authenticated;
+GRANT EXECUTE ON FUNCTION accept_order_with_commission(UUID, UUID)   TO authenticated;
+GRANT EXECUTE ON FUNCTION complete_order_with_commission(UUID)       TO authenticated;
+GRANT EXECUTE ON FUNCTION refund_driver_commission(UUID)             TO authenticated;

@@ -1199,28 +1199,29 @@ export default function DriverDashboard() {
     const res = result as AcceptResult | null
 
     if (rpcErr || res?.error) {
-      // Nếu RPC lỗi SQL (cột chưa tồn tại / migration chưa chạy) → fallback direct update
-      if (rpcErr) {
-        console.warn("[Driver] RPC error, fallback direct update:", rpcErr.message)
-        const { error: directErr, data: claimed } = await supabase
-          .from("orders")
-          .update({ driver_id: driverId, accepted_at: new Date().toISOString() })
-          .eq("id", orderId)
-          .is("driver_id", null)
-          .in("status", ["pending", "accepted"])
-          .select("id")
-        if (directErr || !claimed?.length) {
-          alert("Đơn đã được tài xế khác nhận!")
-          setShowOrder(false); showOrderRef.current = false; setPendingOrder(null)
-          return
-        }
-        // Fallback thành công — tiếp tục mà không có commission tracking
-      } else {
-        // Business logic error từ RPC (ví không đủ, đơn đã nhận...)
-        alert(res?.error ?? "Không thể nhận đơn, thử lại")
+      const errMsg = (res?.error as string | undefined) ?? rpcErr?.message ?? "Không thể nhận đơn"
+      console.error("[Driver] accept error:", { rpcErr, res })
+
+      // Nếu lỗi là "đơn đã nhận" → bỏ qua
+      if (errMsg.includes("đã được tài xế") || errMsg.includes("không còn có thể")) {
+        alert("Đơn đã được tài xế khác nhận!")
         setShowOrder(false); showOrderRef.current = false; setPendingOrder(null)
         return
       }
+
+      // Các lỗi khác (SQL, network...) → thử fallback SECURITY DEFINER via API
+      const fbRes = await fetch("/api/driver/accept-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId, driver_id: driverId }),
+      })
+      if (!fbRes.ok) {
+        const fbErr = await fbRes.json().catch(() => ({}))
+        alert(fbErr?.error ?? errMsg)
+        setShowOrder(false); showOrderRef.current = false; setPendingOrder(null)
+        return
+      }
+      // Fallback thành công — tiếp tục
     }
 
     setShowOrder(false); showOrderRef.current = false; orderQueueRef.current = []

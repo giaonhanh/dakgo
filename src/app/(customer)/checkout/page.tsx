@@ -1555,12 +1555,8 @@ export default function CheckoutPage() {
         }
       }
 
-      // Trigger auto-dispatch (fire & forget — không chặn nếu thất bại)
-      fetch("/api/orders/trigger-dispatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: order.id }),
-      }).catch(() => {/* driver tự nhận nếu dispatch thất bại */})
+      // Dispatch do merchant kích hoạt sau khi xác nhận — KHÔNG dispatch từ checkout
+      // để tránh tài xế nhận 2 thông báo (1 từ checkout + 1 từ merchant accept)
 
       clearCart()
       router.push(`/order-success?orderId=${order.id}`)
