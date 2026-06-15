@@ -937,18 +937,15 @@ export default function MerchantDashboard() {
                               <div style={{ background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.07)",
                                 borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
                                 {[
-                                  { label: "Tiền hàng",        value: order.subtotal,       color: "#f8f0e0", prefix: "" },
+                                  { label: "Tiền hàng", value: order.subtotal, color: "#f8f0e0", prefix: "" },
                                   { label: `Hoa hồng app ${Math.round(commRate * 100)}%`, value: commission, color: "#ff6060", prefix: "−" },
-                                  ...(order.shipFee > 0
-                                    ? [{ label: "Phụ phí giao hàng", value: order.shipFee,   color: "#b0956a", prefix: "" }]
-                                    : []),
                                   ...(order.discountAmount > 0
-                                    ? [{ label: "Voucher giảm giá", value: order.discountAmount, color: "#FFB347", prefix: "−" }]
+                                    ? [{ label: "🎫 Voucher quán giảm", value: order.discountAmount, color: "#FFB347", prefix: "−" }]
                                     : []),
-                                ].map(r => (
+                                ].map((r, ri, arr) => (
                                   <div key={r.label} style={{ display: "flex", justifyContent: "space-between",
                                     alignItems: "center", padding: "4px 0",
-                                    borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                                    borderBottom: ri < arr.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                                     <span style={{ color: "#6a5a40", fontSize: 9.5 }}>{r.label}</span>
                                     <span style={{ color: r.color, fontSize: 9.5, fontWeight: 600 }}>
                                       {r.prefix}{fmt(r.value)}
@@ -958,9 +955,9 @@ export default function MerchantDashboard() {
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
                                   marginTop: 8, paddingTop: 7, borderTop: "1px solid rgba(62,207,110,0.3)" }}>
                                   <div>
-                                    <div style={{ color: "#3ecf6e", fontSize: 10.5, fontWeight: 800 }}>✓ Thực nhận từ tài xế</div>
+                                    <div style={{ color: "#3ecf6e", fontSize: 10.5, fontWeight: 800 }}>✓ Tài xế trả quán</div>
                                     <div style={{ color: "#6a5a40", fontSize: 8, marginTop: 1 }}>
-                                      {order.payMethod === "wallet" ? "💙 Khách đã trả qua ví" : "💵 Tài xế trả khi lấy hàng"}
+                                      💵 Tài xế trả tiền mặt khi lấy hàng
                                     </div>
                                   </div>
                                   <div style={{ color: "#3ecf6e", fontSize: 16, fontWeight: 800 }}>{fmt(netReceive)}</div>
