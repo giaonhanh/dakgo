@@ -1199,17 +1199,24 @@ export default function DriverDashboard() {
     const res = result as AcceptResult | null
 
     if (rpcErr || res?.error) {
-      const errMsg = (res?.error as string | undefined) ?? rpcErr?.message ?? "Không thể nhận đơn"
+      const errMsg = (res?.error as string | undefined) ?? rpcErr?.message ?? "Không thể nhận đơn, thử lại"
       console.error("[Driver] accept error:", { rpcErr, res })
 
-      // Nếu lỗi là "đơn đã nhận" → bỏ qua
+      // Lỗi ví không đủ → báo nạp tiền, không thử fallback
+      if (errMsg.includes("Số dư ví") || errMsg.includes("chưa có ví")) {
+        alert(errMsg + "\n\nVào mục Thu nhập → Ví để nạp tiền.")
+        setShowOrder(false); showOrderRef.current = false; setPendingOrder(null)
+        return
+      }
+
+      // Đơn đã có tài xế khác → bỏ qua
       if (errMsg.includes("đã được tài xế") || errMsg.includes("không còn có thể")) {
         alert("Đơn đã được tài xế khác nhận!")
         setShowOrder(false); showOrderRef.current = false; setPendingOrder(null)
         return
       }
 
-      // Các lỗi khác (SQL, network...) → thử fallback SECURITY DEFINER via API
+      // Lỗi SQL / kỹ thuật → thử API fallback (service role bypass RLS)
       const fbRes = await fetch("/api/driver/accept-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

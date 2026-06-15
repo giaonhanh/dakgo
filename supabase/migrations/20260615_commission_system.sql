@@ -117,33 +117,38 @@ BEGIN
   v_commission_rate   := get_driver_commission_rate(p_driver_id);
   v_commission_amount := ROUND(COALESCE(v_order.ship_fee, 0) * v_commission_rate / 100)::INT;
 
-  -- Trừ ví tài xế nếu hoa hồng > 0 VÀ ví tồn tại VÀ đủ số dư
-  -- Nếu ví không đủ → vẫn cho nhận đơn, ghi chú "nợ hoa hồng" để admin xử lý
+  -- Trừ ví tài xế nếu hoa hồng > 0
   IF v_commission_amount > 0 THEN
     SELECT id, balance INTO v_wallet
     FROM wallets
     WHERE user_id = p_driver_id AND type = 'driver'
     FOR UPDATE;
 
-    IF FOUND AND v_wallet.balance >= v_commission_amount THEN
-      -- Ví đủ: trừ bình thường
-      UPDATE wallets
-      SET balance = balance - v_commission_amount, updated_at = now()
-      WHERE id = v_wallet.id;
-
-      INSERT INTO transactions (wallet_id, type, amount, balance_after, ref_type, ref_id, note)
-      VALUES (
-        v_wallet.id, 'commission', v_commission_amount,
-        v_wallet.balance - v_commission_amount,
-        'order', p_order_id,
-        format('Hoa hồng nhận đơn #%s (%.0f%%)',
-          UPPER(LEFT(p_order_id::TEXT, 8)), v_commission_rate)
-      );
-    ELSE
-      -- Ví không đủ hoặc chưa có ví: cho nhận đơn nhưng ghi nhận commission_amount = 0
-      -- (không phạt tài xế ngay — admin sẽ thu sau)
-      v_commission_amount := 0;
+    IF NOT FOUND THEN
+      RETURN jsonb_build_object('error', 'Tài xế chưa có ví tiền ký quỹ. Vui lòng liên hệ admin.');
     END IF;
+
+    IF v_wallet.balance < v_commission_amount THEN
+      RETURN jsonb_build_object(
+        'error',
+        format('Số dư ví không đủ. Cần %sđ hoa hồng, ví còn %sđ. Vui lòng nạp thêm tiền.',
+          to_char(v_commission_amount, 'FM999G999G999'),
+          to_char(v_wallet.balance,    'FM999G999G999'))
+      );
+    END IF;
+
+    UPDATE wallets
+    SET balance = balance - v_commission_amount, updated_at = now()
+    WHERE id = v_wallet.id;
+
+    INSERT INTO transactions (wallet_id, type, amount, balance_after, ref_type, ref_id, note)
+    VALUES (
+      v_wallet.id, 'commission', v_commission_amount,
+      v_wallet.balance - v_commission_amount,
+      'order', p_order_id,
+      format('Hoa hồng nhận đơn #%s (%.0f%%)',
+        UPPER(LEFT(p_order_id::TEXT, 8)), v_commission_rate)
+    );
   END IF;
 
   -- Atomic update — nếu pending thì chuyển sang accepted; nếu đã accepted thì giữ nguyên
