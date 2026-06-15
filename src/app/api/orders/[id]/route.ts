@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { maskPhone } from "@/lib/maskPhone"
+import { sendPushToUser } from "@/lib/webpush"
+
+function adminDb() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -61,12 +70,51 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Không có trường nào được cập nhật" }, { status: 400 })
     }
 
+    // Thêm cancelled_at + cancel_reason nếu status = cancelled
+    if (body.status === "cancelled") {
+      update.cancelled_at  = new Date().toISOString()
+      update.cancel_reason = body.cancel_reason ?? "Khách hàng hủy đơn"
+      update.cancelled_by  = user.id
+    }
+
     const { error } = await supabase
       .from("orders")
       .update(update)
       .eq("id", id)
 
     if (error) return NextResponse.json({ error: "Cập nhật thất bại" }, { status: 500 })
+
+    // Khi hủy đơn: hoàn hoa hồng tài xế + notify khách
+    if (body.status === "cancelled") {
+      const db = adminDb()
+      const { data: order } = await db
+        .from("orders")
+        .select("customer_id, driver_id, driver_commission_amount, total_amount")
+        .eq("id", id)
+        .single()
+
+      if (order) {
+        if (order.driver_id && (order.driver_commission_amount ?? 0) > 0) {
+          await db.rpc("refund_driver_commission", { p_order_id: id })
+        }
+
+        const reason   = body.cancel_reason ?? "Khách hàng hủy đơn"
+        const shortId  = id.slice(0, 8).toUpperCase()
+        await sendPushToUser(order.customer_id, {
+          title: "❌ Đơn hàng đã hủy",
+          body:  `Đơn #${shortId}: ${reason}`,
+          url:   "/orders",
+          tag:   `order-cancelled-${id}`,
+        })
+        await db.from("notifications").insert({
+          user_id: order.customer_id,
+          type:    "order",
+          title:   "❌ Đơn hàng đã hủy",
+          body:    `Đơn #${shortId}: ${reason}`,
+          data:    { order_id: id, url: "/orders", cancelled: true },
+        })
+      }
+    }
 
     return NextResponse.json({ success: true })
   } catch {

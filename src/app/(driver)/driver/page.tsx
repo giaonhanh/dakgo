@@ -1156,17 +1156,43 @@ export default function DriverDashboard() {
   const handleAccept = async () => {
     if (!pendingOrder || !driverId) return
     const orderId = pendingOrder.fullId
-    const table = pendingOrder.orderTable
-    setShowOrder(false)
-    showOrderRef.current = false
-    orderQueueRef.current = []
-    await supabase.from(table).update({
-      status:      "accepted",
-      driver_id:   driverId,
-      accepted_at: new Date().toISOString(),
-    }).eq("id", orderId)
-    setAccepted(orderId)
-    acceptedRef.current = orderId
+    const table   = pendingOrder.orderTable
+
+    // Đơn errand/ride: dùng direct update (chưa có commission cho errand)
+    if (table === "errands") {
+      const { error } = await supabase.from("errands").update({
+        status:      "accepted",
+        driver_id:   driverId,
+        accepted_at: new Date().toISOString(),
+      }).eq("id", orderId).is("driver_id", null)
+
+      if (error) {
+        alert("Đơn đã được tài xế khác nhận!"); return
+      }
+      setShowOrder(false); showOrderRef.current = false; orderQueueRef.current = []
+      setAccepted(orderId); acceptedRef.current = orderId
+      router.push(`/driver/navigate/${orderId}`)
+      return
+    }
+
+    // Đơn đồ ăn: dùng RPC atomic — trừ hoa hồng + chống race condition
+    const { data: result, error: rpcErr } = await supabase.rpc("accept_order_with_commission", {
+      p_order_id:  orderId,
+      p_driver_id: driverId,
+    })
+    type AcceptResult = { success?: boolean; error?: string; commission_amount?: number }
+    const res = result as AcceptResult | null
+
+    if (rpcErr || res?.error) {
+      const msg = res?.error ?? "Không thể nhận đơn, thử lại"
+      alert(msg)
+      // Đơn đã bị nhận bởi người khác → đóng popup
+      setShowOrder(false); showOrderRef.current = false; setPendingOrder(null)
+      return
+    }
+
+    setShowOrder(false); showOrderRef.current = false; orderQueueRef.current = []
+    setAccepted(orderId); acceptedRef.current = orderId
     router.push(`/driver/navigate/${orderId}`)
   }
 

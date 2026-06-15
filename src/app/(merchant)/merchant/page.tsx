@@ -301,23 +301,20 @@ export default function MerchantDashboard() {
     setOrderStatus(order.id, "accepted")
     const { error } = await supabase.from("orders").update({ status: "accepted" }).eq("id", order.id)
     if (error) { setOrderStatus(order.id, "pending"); fireToast("❌ Không thể xác nhận, thử lại", false); return }
-    fireToast(`✅ Đã xác nhận #${order.shortId} · Đang điều phối tài xế...`)
+    fireToast(`✅ Đã xác nhận #${order.shortId}`)
 
-    // Move to preparing + dispatch drivers simultaneously
+    // Notify khách hàng
+    fetch("/api/orders/notify-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_id: order.id, status: "accepted" }),
+    }).catch(() => {})
+
+    // Chuyển sang preparing
     setTimeout(async () => {
       setOrderStatus(order.id, "preparing")
       await supabase.from("orders").update({ status: "preparing" }).eq("id", order.id)
-
-      // Dispatch to 3 nearest drivers (driver condition: < 3 incomplete orders)
-      setDispatchStatus(prev => ({ ...prev, [order.id]: "dispatching" }))
-      supabase.rpc("find_nearest_driver", {
-        order_lat: shopLat, order_lng: shopLng, max_distance_km: 5
-      }).then(() => {
-        setTimeout(() => {
-          setDispatchStatus(prev => ({ ...prev, [order.id]: "sent" }))
-          fireToast(`🛵 Đã gửi thông báo cho 3 tài xế gần nhất!`)
-        }, 1800)
-      })
+      setDispatchStatus(prev => ({ ...prev, [order.id]: "sent" }))
     }, 900)
   }
 
@@ -328,15 +325,23 @@ export default function MerchantDashboard() {
 
   const confirmReject = async () => {
     if (!rejectModal) return
-    const order = rejectModal
+    const order  = rejectModal
     const reason = rejectReason.trim() || "Cửa hàng từ chối đơn hàng"
     setOrderStatus(order.id, "rejected")
     const { error } = await supabase.from("orders").update({
-      status: "cancelled",
+      status:        "cancelled",
       cancel_reason: reason,
-      cancelled_at: new Date().toISOString()
+      cancelled_at:  new Date().toISOString(),
     }).eq("id", order.id)
     if (error) { setOrderStatus(order.id, "pending"); fireToast("❌ Không thể từ chối, thử lại", false); setRejectModal(null); return }
+
+    // Hoàn hoa hồng tài xế + notify khách
+    fetch("/api/orders/notify-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_id: order.id, status: "cancelled", cancel_reason: reason }),
+    }).catch(() => {})
+
     const refundMsg = order.payMethod === "wallet" ? ` · Hoàn ${fmt(order.total)} về ví` : ""
     fireToast(`❌ Từ chối #${order.shortId}${refundMsg}`, false)
     setRejectModal(null)
@@ -346,7 +351,14 @@ export default function MerchantDashboard() {
     setOrderStatus(order.id, "ready")
     const { error } = await supabase.from("orders").update({ status: "ready" }).eq("id", order.id)
     if (error) { setOrderStatus(order.id, "preparing"); fireToast("❌ Lỗi kết nối, thử lại", false); return }
-    fireToast(`📦 #${order.shortId} sẵn sàng · Đang tìm tài xế...`)
+    fireToast(`📦 #${order.shortId} sẵn sàng giao!`)
+
+    // Notify tài xế hàng đã xong
+    fetch("/api/orders/notify-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_id: order.id, status: "ready" }),
+    }).catch(() => {})
   }
 
   const activeOrders  = orders.filter(o => !["rejected"].includes(o.status))

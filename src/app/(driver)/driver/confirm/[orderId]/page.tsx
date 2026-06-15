@@ -407,9 +407,10 @@ export default function DriverConfirmPage() {
     if (!orderId || saving) return
     setSaving(true)
 
+    // Upload ảnh xác nhận
     let deliveryPhotoUrl: string | null = null
     if (photoFile) {
-      const ext = photoFile.name.split(".").pop() || "jpg"
+      const ext  = photoFile.name.split(".").pop() || "jpg"
       const path = `delivery-photos/${orderId}.${ext}`
       const { error: upErr } = await supabase.storage
         .from("delivery-photos")
@@ -421,71 +422,61 @@ export default function DriverConfirmPage() {
       }
     }
 
-    const { data: updatedOrder } = await supabase
-      .from("orders")
-      .update({
-        status: "delivered",
-        delivered_at: new Date().toISOString(),
-        ...(deliveryPhotoUrl ? { delivery_photo_url: deliveryPhotoUrl } : {}),
-      })
-      .eq("id", orderId)
-      .select("customer_id, total_amount, ship_fee, pay_method, shops(commission_rate)")
-      .single()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setSaving(false); return }
+
+    // Cập nhật ảnh xác nhận trước (nếu có)
+    if (deliveryPhotoUrl) {
+      await supabase.from("orders")
+        .update({ delivery_photo_url: deliveryPhotoUrl })
+        .eq("id", orderId)
+    }
+
+    // RPC atomic: cập nhật status + trừ hoa hồng quán + cộng ví tài xế (COD)
+    // Đơn online: ví tài xế đã được cộng qua PayOS webhook, RPC này bỏ qua
+    type CompleteResult = { success?: boolean; error?: string; shop_commission_amount?: number; driver_earning?: number }
+    const { data: result } = await supabase.rpc("complete_order_with_commission", {
+      p_order_id:  orderId,
+      p_driver_id: user.id,
+    })
+    const res = result as CompleteResult | null
 
     // Thông báo in-app cho khách
-    if (updatedOrder?.customer_id) {
+    const { data: o } = await supabase
+      .from("orders")
+      .select("customer_id, total_amount")
+      .eq("id", orderId)
+      .single()
+
+    if (o?.customer_id) {
       await supabase.from("notifications").insert({
-        user_id: updatedOrder.customer_id,
+        user_id: o.customer_id,
         type:    "order",
         title:   "✅ Đơn hàng đã được giao!",
-        body:    `Đơn hàng ${Number(updatedOrder.total_amount).toLocaleString("vi-VN")}đ đã giao thành công.`,
-        data:    { order_id: orderId, url: `/orders` },
-      }).then(({ error }) => { if (error) console.error("notify customer error:", error) })
+        body:    `Đơn ${Number(o.total_amount).toLocaleString("vi-VN")}đ đã giao thành công. Cảm ơn bạn!`,
+        data:    { order_id: orderId, url: "/orders" },
+      }).then(({ error }) => { if (error) console.error("notify customer:", error) })
     }
 
-    // Cộng ví tài xế (COD — tiền ship được cộng trực tiếp sau khi giao xong)
-    if (updatedOrder) {
-      const commRate = Array.isArray(updatedOrder.shops)
-        ? (updatedOrder.shops[0] as { commission_rate: number })?.commission_rate ?? 15
-        : (updatedOrder.shops as { commission_rate: number } | null)?.commission_rate ?? 15
-      const driverEarning = Math.round((updatedOrder.ship_fee ?? 0) * (1 - Number(commRate) / 100))
-      if (driverEarning > 0) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          await supabase.rpc("add_to_wallet", {
-            p_user_id: user.id,
-            p_type:    "driver",
-            p_amount:  driverEarning,
-            p_ref_id:  orderId,
-            p_note:    `Tiền công giao đơn #${orderId.slice(0, 8).toUpperCase()}`,
-            p_tx_type: "commission",
-          }).then(({ error }) => { if (error) console.error("driver wallet error:", error) })
-        }
-      }
-    }
+    // Reload stats hôm nay (đã có đơn này)
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+    const { data: delivered } = await supabase
+      .from("orders")
+      .select("ship_fee, driver_commission_amount")
+      .eq("driver_id", user.id)
+      .eq("status", "delivered")
+      .gte("created_at", todayStart.toISOString())
 
-    // Reload stats để hiển thị đúng sau khi giao
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const todayStart = new Date(); todayStart.setHours(0,0,0,0)
-      const { data: delivered } = await supabase
-        .from("orders")
-        .select("ship_fee, shops(commission_rate)")
-        .eq("driver_id", user.id)
-        .eq("status", "delivered")
-        .gte("created_at", todayStart.toISOString())
-
-      const todayEarning = (delivered ?? []).reduce((s, d) => {
-        const cr = Array.isArray(d.shops)
-          ? (d.shops[0] as { commission_rate: number })?.commission_rate ?? 15
-          : (d.shops as { commission_rate: number } | null)?.commission_rate ?? 15
-        return s + Math.round((d.ship_fee ?? 0) * (1 - Number(cr) / 100))
-      }, 0)
-      setToday({ orders: (delivered ?? []).length, earning: todayEarning })
-    }
+    const todayEarning = (delivered ?? []).reduce((s, d) =>
+      s + Math.max(0, (d.ship_fee ?? 0) - (d.driver_commission_amount ?? 0)), 0)
+    setToday({ orders: (delivered ?? []).length, earning: todayEarning })
 
     setSaving(false)
-    fireToast("Đã xác nhận giao hàng thành công!")
+    if (res?.error) {
+      fireToast("⚠️ Giao hàng xong nhưng có lỗi xử lý ví")
+    } else {
+      fireToast("Đã xác nhận giao hàng thành công!")
+    }
     setTimeout(() => setPhase("done"), 600)
   }
 
