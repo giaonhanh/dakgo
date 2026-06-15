@@ -66,6 +66,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    else if (status === "driver_accepted") {
+      // Thông báo khách: tài xế đã nhận đơn, đang trên đường đến quán
+      await sendPushToUser(order.customer_id, {
+        title: "🛵 Tài xế đang đến lấy đơn!",
+        body:  `Đơn #${shortId} đã có tài xế. Theo dõi trực tiếp nhé!`,
+        url:   `/tracking/${order_id}`,
+        tag:   `driver-accepted-${order_id}`,
+      })
+      await db.from("notifications").insert({
+        user_id: order.customer_id,
+        type:    "order",
+        title:   "🛵 Tài xế đang đến lấy đơn!",
+        body:    `Đơn #${shortId} đã có tài xế. Theo dõi trực tiếp nhé!`,
+        data:    { order_id, url: `/tracking/${order_id}` },
+      })
+    }
+
     else if (status === "cancelled") {
       // Hoàn hoa hồng tài xế
       if (order.driver_id && (order.driver_commission_amount ?? 0) > 0) {

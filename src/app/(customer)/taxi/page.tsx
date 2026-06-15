@@ -133,14 +133,22 @@ export default function TaxiPage() {
 
       // Service toggles
       const toggles = toggleRes.data?.value as Record<string, { enabled?: boolean; customerMsg?: string }> | null
-      if (toggles?.taxi_4cho?.enabled === false) {
+      const is4Locked = toggles?.taxi_4cho?.enabled === false
+      const is7Locked = toggles?.taxi_7cho?.enabled === false
+      if (is4Locked) {
         setTaxi4Enabled(false)
-        if (toggles.taxi_4cho.customerMsg) setTaxi4Msg(toggles.taxi_4cho.customerMsg)
+        if (toggles!.taxi_4cho.customerMsg) setTaxi4Msg(toggles!.taxi_4cho.customerMsg!)
       }
-      if (toggles?.taxi_7cho?.enabled === false) {
+      if (is7Locked) {
         setTaxi7Enabled(false)
-        if (toggles.taxi_7cho.customerMsg) setTaxi7Msg(toggles.taxi_7cho.customerMsg)
+        if (toggles!.taxi_7cho.customerMsg) setTaxi7Msg(toggles!.taxi_7cho.customerMsg!)
       }
+      // Tự chuyển sang loại còn mở nếu loại đang chọn bị khoá
+      setCarType(prev => {
+        if (prev === "4cho" && is4Locked && !is7Locked) return "7cho"
+        if (prev === "7cho" && is7Locked && !is4Locked) return "4cho"
+        return prev
+      })
 
       // Service hours
       const sh = hoursRes.data?.value as Record<string, { open:string; close:string; allDay:boolean }> | null

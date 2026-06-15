@@ -35,13 +35,15 @@ interface MOrder {
   driverRating?: number
 }
 
-const STATUS_CFG: Record<OrderStatus, { label: string; color: string; bg: string; bd: string }> = {
-  pending:   { label: "Chờ xác nhận",  color: "#f5c542", bg: "rgba(245,197,66,0.1)",  bd: "rgba(245,197,66,0.3)"  },
-  accepted:  { label: "Đã xác nhận",   color: "#4a8ff5", bg: "rgba(74,143,245,0.1)",  bd: "rgba(74,143,245,0.3)"  },
-  preparing: { label: "Đang chuẩn bị", color: "#4a8ff5", bg: "rgba(74,143,245,0.1)",  bd: "rgba(74,143,245,0.3)"  },
-  ready:     { label: "Sẵn sàng giao", color: "#3ecf6e", bg: "rgba(62,207,110,0.1)",  bd: "rgba(62,207,110,0.25)" },
-  delivered: { label: "Đã giao",       color: "#3ecf6e", bg: "rgba(62,207,110,0.06)", bd: "rgba(62,207,110,0.15)" },
-  rejected:  { label: "Đã từ chối",    color: "#ff4040", bg: "rgba(255,64,64,0.08)",  bd: "rgba(255,64,64,0.2)"   },
+const STATUS_CFG: Record<string, { label: string; color: string; bg: string; bd: string }> = {
+  pending:    { label: "Chờ xác nhận",  color: "#f5c542", bg: "rgba(245,197,66,0.1)",  bd: "rgba(245,197,66,0.3)"  },
+  accepted:   { label: "Đã xác nhận",   color: "#4a8ff5", bg: "rgba(74,143,245,0.1)",  bd: "rgba(74,143,245,0.3)"  },
+  preparing:  { label: "Đang chuẩn bị", color: "#4a8ff5", bg: "rgba(74,143,245,0.1)",  bd: "rgba(74,143,245,0.3)"  },
+  ready:      { label: "Sẵn sàng giao", color: "#3ecf6e", bg: "rgba(62,207,110,0.1)",  bd: "rgba(62,207,110,0.25)" },
+  delivering: { label: "Đang giao",     color: "#FF8C00", bg: "rgba(255,107,0,0.1)",   bd: "rgba(255,107,0,0.3)"   },
+  delivered:  { label: "Đã giao",       color: "#3ecf6e", bg: "rgba(62,207,110,0.06)", bd: "rgba(62,207,110,0.15)" },
+  cancelled:  { label: "Đã hủy",        color: "#ff4040", bg: "rgba(255,64,64,0.08)",  bd: "rgba(255,64,64,0.2)"   },
+  rejected:   { label: "Đã từ chối",    color: "#ff4040", bg: "rgba(255,64,64,0.08)",  bd: "rgba(255,64,64,0.2)"   },
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
@@ -632,7 +634,7 @@ export default function MerchantDashboard() {
             </div>
           ) : (
             activeOrders.map((order, idx) => {
-              const cfg    = STATUS_CFG[order.status]
+              const cfg    = STATUS_CFG[order.status] ?? { label: order.status, color: "#6a5a40", bg: "rgba(255,255,255,0.04)", bd: "rgba(255,255,255,0.1)" }
               const isOpen = expand === order.id
               return (
                 <motion.div key={order.id}

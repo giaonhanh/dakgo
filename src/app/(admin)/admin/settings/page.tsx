@@ -222,7 +222,22 @@ export default function AdminSettingsPage() {
       if (!data) return
       const map = Object.fromEntries(data.map(r => [r.key, r.value]))
       if (map.pricing)          setPricing(prev => ({ ...prev, ...(map.pricing as typeof prev) }))
-      if (map.commission)       setCommissionSettings(map.commission)
+      if (map.commission) {
+        const c = map.commission as Record<string, unknown>
+        setCommissionSettings(prev => ({
+          ...prev,
+          // Legacy fields
+          ...(typeof c.defaultRate === "string"          ? { defaultRate:          c.defaultRate }          : {}),
+          ...(typeof c.minRate === "string"              ? { minRate:              c.minRate }              : {}),
+          ...(typeof c.maxRate === "string"              ? { maxRate:              c.maxRate }              : {}),
+          ...(typeof c.driverSharePercent === "string"   ? { driverSharePercent:   c.driverSharePercent }   : {}),
+          ...(typeof c.platformSharePercent === "string" ? { platformSharePercent: c.platformSharePercent } : {}),
+          ...(typeof c.loyaltyPointsRate === "string"    ? { loyaltyPointsRate:    c.loyaltyPointsRate }    : {}),
+          // Hoa hồng thực tế (dùng bởi SQL functions)
+          ...(c.driver_rate !== undefined ? { driverRate: String(c.driver_rate) } : {}),
+          ...(c.shop_rate   !== undefined ? { shopRate:   String(c.shop_rate)   } : {}),
+        }))
+      }
       if (map.features) {
         const f = map.features as Record<string, boolean>
         setFeatures(prev => prev.map(item => ({ ...item, value: f[item.key] ?? item.value })))
@@ -264,6 +279,8 @@ export default function AdminSettingsPage() {
   const [commissionSettings, setCommissionSettings] = useState({
     defaultRate: "15", minRate: "10", maxRate: "25",
     driverSharePercent: "80", platformSharePercent: "20", loyaltyPointsRate: "1",
+    // Hoa hồng thực tế đọc/ghi bởi SQL functions (get_driver_commission_rate, get_shop_commission_rate)
+    driverRate: "15", shopRate: "15",
   })
   const [applyingCommission, setApplyingCommission] = useState(false)
   const [applyCommissionMsg, setApplyCommissionMsg] = useState("")
@@ -349,7 +366,12 @@ export default function AdminSettingsPage() {
       const serviceToggleMap = Object.fromEntries(serviceToggles.map(s => [s.key, { enabled: s.enabled, reason: s.reason, customerMsg: s.customerMsg }]))
       const upsertRows = [
         { key: "pricing",           value: pricing },
-        { key: "commission",        value: commissionSettings },
+        { key: "commission",        value: {
+          ...commissionSettings,
+          // Đảm bảo SQL functions đọc được đúng key
+          driver_rate: parseFloat(commissionSettings.driverRate) || 15,
+          shop_rate:   parseFloat(commissionSettings.shopRate)   || 15,
+        }},
         { key: "features",          value: featuresMap },
         { key: "service_toggles",   value: serviceToggleMap },
         { key: "area",              value: areaSettings },
@@ -869,6 +891,35 @@ export default function AdminSettingsPage() {
             <div style={{ animation:"fadeUp .3s ease" }}>
               <div style={{ color:"#f0eaff", fontSize:15, fontWeight:700, marginBottom:4 }}>💰 Hoa hồng</div>
               <div style={{ color:"#6a5a40", fontSize:11, marginBottom:20 }}>Tỉ lệ hoa hồng mặc định và chia sẻ doanh thu</div>
+
+              {/* ── Hoa hồng thực tế (dùng bởi hệ thống) ── */}
+              <div style={{ marginBottom:12, padding:"12px 16px", background:"rgba(255,107,0,0.06)", border:"1px solid rgba(255,107,0,0.2)", borderRadius:14 }}>
+                <div style={{ color:"#FF8C00", fontSize:11, fontWeight:700, marginBottom:2 }}>⚙️ Hoa hồng hệ thống (toàn cầu)</div>
+                <div style={{ color:"#6a5a40", fontSize:10, marginBottom:12 }}>Áp dụng cho tài xế / quán chưa có tỉ lệ riêng. Tài xế và quán có thể có override riêng trong trang Tài xế / Cửa hàng.</div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                  <div>
+                    <div style={{ color:"#b0956a", fontSize:9, marginBottom:4 }}>🛵 Hoa hồng tài xế (% phí ship)</div>
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      <input type="number" min="0" max="100" value={commissionSettings.driverRate}
+                        onChange={e => setCommissionSettings(p=>({...p, driverRate: e.target.value}))}
+                        style={{ flex:1, height:36, padding:"0 10px", borderRadius:8, border:"1px solid rgba(255,107,0,0.3)", background:"rgba(255,107,0,0.06)", color:"#FF8C00", fontSize:14, fontWeight:700, fontFamily:"Lexend", outline:"none" }} />
+                      <span style={{ color:"#6a5a40", fontSize:12 }}>%</span>
+                    </div>
+                    <div style={{ color:"#6a5a40", fontSize:9, marginTop:4 }}>Trừ vào ví tài xế khi nhận đơn</div>
+                  </div>
+                  <div>
+                    <div style={{ color:"#b0956a", fontSize:9, marginBottom:4 }}>🏪 Hoa hồng quán (% tiền đồ ăn)</div>
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      <input type="number" min="0" max="100" value={commissionSettings.shopRate}
+                        onChange={e => setCommissionSettings(p=>({...p, shopRate: e.target.value}))}
+                        style={{ flex:1, height:36, padding:"0 10px", borderRadius:8, border:"1px solid rgba(62,207,110,0.3)", background:"rgba(62,207,110,0.06)", color:"#3ecf6e", fontSize:14, fontWeight:700, fontFamily:"Lexend", outline:"none" }} />
+                      <span style={{ color:"#6a5a40", fontSize:12 }}>%</span>
+                    </div>
+                    <div style={{ color:"#6a5a40", fontSize:9, marginTop:4 }}>Trừ ví merchant khi đơn hoàn thành</div>
+                  </div>
+                </div>
+              </div>
+
               <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px" }}>
                 {renderInput("Tỉ lệ hoa hồng mặc định",   "Áp dụng cho cửa hàng mới, chưa đàm phán riêng",           commissionSettings.defaultRate,          v => setCommissionSettings(p=>({...p,defaultRate:v})),          "%")}
                 {renderInput("Tỉ lệ tối thiểu",             "Không được đặt dưới mức này cho bất kỳ cửa hàng",         commissionSettings.minRate,              v => setCommissionSettings(p=>({...p,minRate:v})),              "%")}

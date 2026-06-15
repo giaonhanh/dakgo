@@ -820,7 +820,7 @@ export default function HomePage() {
                   <span style={{ maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                     {location}
                   </span>
-                  <span style={{ color:"#FF8C00", fontSize:10 }}>?</span>
+                  <span style={{ color:"#FF8C00", fontSize:10 }}>▾</span>
                 </div>
               </div>
             </div>
@@ -1008,7 +1008,7 @@ export default function HomePage() {
                               borderRadius:8, padding:"4px 9px",
                               color:statusColor, fontSize: 11, fontWeight:600,
                               position:"relative", zIndex:1, flexShrink:0,
-                            }}>Xem ?</div>
+                            }}>Xem →</div>
                           </div>
                         </a>
                       )

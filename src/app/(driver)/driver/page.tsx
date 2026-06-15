@@ -1208,6 +1208,14 @@ export default function DriverDashboard() {
 
     setShowOrder(false); showOrderRef.current = false; orderQueueRef.current = []
     setAccepted(orderId); acceptedRef.current = orderId
+
+    // Push notification khách: tài xế đã nhận đơn
+    fetch("/api/orders/notify-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_id: orderId, status: "driver_accepted" }),
+    }).catch(() => {})
+
     router.push(`/driver/navigate/${orderId}`)
   }
 
