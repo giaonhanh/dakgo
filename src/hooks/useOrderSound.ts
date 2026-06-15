@@ -44,11 +44,13 @@ export function useOrderSound(
     audio.play().catch(() => null)
   }
 
-  // ── Nguồn 1: SW postMessage (app mở ở tab khác / background) ──
+  // ── Nguồn 1: SW postMessage — chỉ play khi app ở background (tránh trùng với Realtime) ──
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return
     const handler = (e: MessageEvent) => {
       if (e.data?.type === "PLAY_ORDER_SOUND" && e.data.sound) {
+        // Nếu app đang foreground → Realtime đã handle rồi, bỏ qua
+        if (document.visibilityState === "visible") return
         play(e.data.sound)
       }
     }

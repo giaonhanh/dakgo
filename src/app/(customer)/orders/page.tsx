@@ -224,12 +224,12 @@ export default function OrdersPage() {
       // Fetch order_items riêng (tránh nested join RLS)
       const { data: allItems } = orderIds.length ? await supabase
         .from("order_items")
-        .select("order_id, id, product_id, name, price, qty, note, breakdown")
+        .select("order_id, id, product_id, name, price, qty, note, options")
         .in("order_id", orderIds) : { data: [] }
       const itemsByOrder: Record<string, { id: string; product_id: string | null; name: string; price: number; qty: number; note?: string; breakdown?: ItemBreakdown }[]> = {}
-      ;(allItems ?? []).forEach((item: { order_id: string; id: string; product_id: string | null; name: string; price: number; qty: number; note?: string; breakdown?: ItemBreakdown }) => {
+      ;(allItems ?? []).forEach((item: { order_id: string; id: string; product_id: string | null; name: string; price: number; qty: number; note?: string; options?: ItemBreakdown }) => {
         if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = []
-        itemsByOrder[item.order_id].push({ id: item.id, product_id: item.product_id, name: item.name, price: item.price, qty: item.qty, note: item.note, breakdown: item.breakdown })
+        itemsByOrder[item.order_id].push({ id: item.id, product_id: item.product_id, name: item.name, price: item.price, qty: item.qty, note: item.note, breakdown: item.options })
       })
 
       // Fetch driver profiles for orders that have a driver

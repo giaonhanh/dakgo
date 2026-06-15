@@ -73,16 +73,20 @@ export async function POST(req: NextRequest) {
 
     const priceMap = Object.fromEntries(products.map(p => [p.id, p]))
 
-    const orderItems = items.map((item: { product_id: string; quantity: number; note?: string }) => {
+    const orderItems = items.map((item: { product_id: string; quantity: number; note?: string; breakdown?: { basePrice: number; sizeLabel?: string; sizeDiff?: number; toppings?: { name: string; price: number }[] } | null }) => {
       const product = priceMap[item.product_id]
       if (!product?.is_available) throw new Error(`Sản phẩm không còn bán`)
+      const bd = item.breakdown ?? null
+      const extraPrice = (bd?.sizeDiff ?? 0) + (bd?.toppings?.reduce((s, t) => s + t.price, 0) ?? 0)
+      const unitPrice  = product.price + extraPrice
       return {
         product_id: item.product_id,
         name:       product.name ?? "",
-        price:      product.price,
+        price:      unitPrice,
         qty:        item.quantity,
-        subtotal:   product.price * item.quantity,
+        subtotal:   unitPrice * item.quantity,
         note:       item.note ?? null,
+        options:    bd,
       }
     })
 
@@ -205,16 +209,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Không thể tạo đơn hàng", detail: orderErr?.message }, { status: 500 })
     }
 
-    // Tạo order_items — không insert subtotal vì column có thể không tồn tại
+    // Tạo order_items
     const { error: itemsErr } = await supabase
       .from("order_items")
-      .insert(orderItems.map((i: { product_id: string; name: string; price: number; qty: number; subtotal: number; note: string | null }) => ({
+      .insert(orderItems.map((i: { product_id: string; name: string; price: number; qty: number; subtotal: number; note: string | null; options: unknown }) => ({
         order_id:   order.id,
         product_id: i.product_id,
         name:       i.name,
         price:      i.price,
         qty:        i.qty,
         note:       i.note,
+        options:    i.options ?? null,
       })))
 
     if (itemsErr) {

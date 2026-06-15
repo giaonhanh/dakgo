@@ -166,7 +166,7 @@ export default function MerchantDashboard() {
     // Fetch orders (không join order_items để tránh RLS join issue)
     const { data: rows } = await supabase
       .from("orders")
-      .select("id, status, total_amount, total, ship_fee, pay_method, note, created_at, scheduled_at, customer_id, driver_id")
+      .select("id, status, total_amount, total, ship_fee, discount_amount, pay_method, note, created_at, scheduled_at, customer_id, driver_id")
       .eq("shop_id", sid)
       .gte("created_at", today.toISOString())
       .order("created_at", { ascending: false })
@@ -177,24 +177,32 @@ export default function MerchantDashboard() {
     const orderIds = rows.map(o => o.id)
 
     // Fetch order_items riêng (tránh nested join RLS)
+    type RawItem = { order_id: string; name: string; price: number; qty: number; note?: string; options?: MOrder["itemList"][number]["breakdown"] }
     let { data: allItems, error: itemsErr } = await supabase
       .from("order_items")
-      .select("order_id, name, price, qty, note, breakdown")
+      .select("order_id, name, price, qty, note, options")
       .in("order_id", orderIds)
     if (itemsErr) {
       console.error("[Merchant] order_items error:", itemsErr.message, itemsErr.code, itemsErr.details)
       const { data: fallback } = await supabase
         .from("order_items")
-        .select("order_id, name, price, qty")
+        .select("order_id, name, price, qty, note")
         .in("order_id", orderIds)
       allItems = fallback as typeof allItems
       itemsErr = null
     }
 
-    const itemsByOrder: Record<string, { name: string; price: number; qty: number; note?: string }[]> = {}
-    ;(allItems ?? []).forEach(item => {
+    const itemsByOrder: Record<string, RawItem[]> = {}
+    ;(allItems ?? []).forEach((item: RawItem) => {
       if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = []
-      itemsByOrder[item.order_id].push({ name: item.name, price: item.price, qty: item.qty, note: (item as {note?:string}).note ?? undefined })
+      itemsByOrder[item.order_id].push({
+        order_id: item.order_id,
+        name: item.name,
+        price: item.price,
+        qty: item.qty,
+        note: item.note ?? undefined,
+        options: (item as RawItem).options ?? undefined,
+      })
     })
 
     // Get customer profiles
@@ -236,11 +244,11 @@ export default function MerchantDashboard() {
         customerName: profile.full_name ?? "Khách hàng",
         customerPhone: profile.phone ?? "",
         items: itemStr || "—",
-        itemList: items.map(i => ({ name: i.name, qty: i.qty, price: i.price, note: i.note, breakdown: (i as { breakdown?: unknown }).breakdown as MOrder["itemList"][number]["breakdown"] ?? null })),
+        itemList: items.map(i => ({ name: i.name, qty: i.qty, price: i.price, note: i.note, breakdown: i.options ?? null })),
         total: o.total_amount,
         subtotal: o.total ?? o.total_amount,
         shipFee: o.ship_fee ?? 0,
-        discountAmount: 0,
+        discountAmount: (o as { discount_amount?: number }).discount_amount ?? 0,
         driverId: o.driver_id ?? undefined,
         driverName: dp?.full_name ?? undefined,
         driverPhone: dp?.phone ?? undefined,
