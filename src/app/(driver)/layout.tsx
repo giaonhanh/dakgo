@@ -25,7 +25,7 @@ function ActiveOrderCard() {
         .select("id, status")
         .eq("driver_id", user.id)
         .in("status", ["accepted", "delivering"])
-        .order("updated_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()
       setOrder(data ?? null)
