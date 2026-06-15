@@ -426,8 +426,8 @@ CREATE INDEX IF NOT EXISTS idx_orders_driver_comm  ON orders(driver_id, driver_c
 -- 9. GRANT EXECUTE cho role authenticated
 -- ════════════════════════════════════════════════
 
-GRANT EXECUTE ON FUNCTION get_driver_commission_rate(UUID)           TO authenticated;
-GRANT EXECUTE ON FUNCTION get_shop_commission_rate(UUID)             TO authenticated;
-GRANT EXECUTE ON FUNCTION accept_order_with_commission(UUID, UUID)   TO authenticated;
-GRANT EXECUTE ON FUNCTION complete_order_with_commission(UUID)       TO authenticated;
-GRANT EXECUTE ON FUNCTION refund_driver_commission(UUID)             TO authenticated;
+GRANT EXECUTE ON FUNCTION get_driver_commission_rate(UUID)         TO authenticated;
+GRANT EXECUTE ON FUNCTION get_shop_commission_rate(UUID)           TO authenticated;
+GRANT EXECUTE ON FUNCTION accept_order_with_commission(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION complete_order_with_commission(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION refund_driver_commission(UUID)           TO authenticated;
