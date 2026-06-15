@@ -34,7 +34,7 @@ interface Order {
   createdAt: string; createdAtRaw: string; address: string; note?: string
   driver?: { name: string; plate: string; phone: string; rating: number; eta: number }
   payMethod: string; payMethodRaw: string; rating?: number; cancelReason?: string
-  paymentStatus: string; xuUsed: number
+  paymentStatus: string; xuUsed: number; xuBonusUsed: number
   senderName?: string; senderPhone?: string
   recipientName?: string; recipientPhone?: string
   packagePhotoUrl?: string; pickupAddress?: string
@@ -210,7 +210,7 @@ export default function OrdersPage() {
         .select(`
           id, status, delivery_address, note, total, ship_fee,
           pay_method, cancel_reason, created_at, driver_id, shop_id,
-          payment_status, xu_used,
+          payment_status, xu_used, xu_bonus_used, discount_amount,
           shops(id, name)
         `)
         .eq("customer_id", user.id)
@@ -287,7 +287,8 @@ export default function OrdersPage() {
           subtotal:    (o as any).total    ?? 0,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           deliveryFee: (o as any).ship_fee ?? 0,
-          discount:    0,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          discount:    (o as any).discount_amount ?? 0,
           createdAt: fmtDate(o.created_at),
           createdAtRaw: o.created_at,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -307,7 +308,8 @@ export default function OrdersPage() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           paymentStatus: (o as any).payment_status ?? "pending",
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          xuUsed:        (o as any).xu_used ?? 0,
+          xuUsed:        (o as any).xu_used       ?? 0,
+          xuBonusUsed:   (o as any).xu_bonus_used ?? 0,
           rating: reviewMap[o.id] ?? undefined,
           cancelReason: o.cancel_reason ?? undefined,
         }
@@ -350,6 +352,7 @@ export default function OrdersPage() {
         payMethodRaw:  e.payment_method ?? "cash",
         paymentStatus: "pending",
         xuUsed:        0,
+        xuBonusUsed:   0,
         senderName:    e.sender_name    ?? undefined,
         senderPhone:   e.sender_phone   ?? undefined,
         recipientName: e.recipient_name ?? undefined,
@@ -396,6 +399,7 @@ export default function OrdersPage() {
           payMethodRaw: r.payment_method ?? "cash",
           paymentStatus:"pending",
           xuUsed:       0,
+          xuBonusUsed:  0,
           customerName:  myName,
           customerPhone: myPhone,
           distanceKm:    r.distance_km ?? undefined,
@@ -1102,25 +1106,28 @@ export default function OrdersPage() {
 
                             {/* ── 2. Thông tin thanh toán ── */}
                             {(() => {
-                              const xuUsed = order.xuUsed ?? 0
-                              const payable = total - xuUsed
-                              const raw = order.payMethodRaw ?? "cash"
+                              const xuUsed      = order.xuUsed      ?? 0
+                              const xuBonusUsed = order.xuBonusUsed ?? 0
+                              const totalXu     = xuUsed + xuBonusUsed
+                              const cashPayable = Math.max(0, total - totalXu)
+                              const raw   = order.payMethodRaw  ?? "cash"
                               const pStat = order.paymentStatus ?? "pending"
-                              let statusText = ""
-                              let statusColor = "#6a5a40"
+                              let statusText = ""; let statusColor = "#6a5a40"
                               if (pStat === "paid") { statusText = "✅ Đã thanh toán"; statusColor = "#3ecf6e" }
-                              else if (raw === "cash") { statusText = `💵 Chưa thanh toán · ${formatPrice(payable)}`; statusColor = "#ff6060" }
-                              else { statusText = `⏳ Chờ chuyển khoản · ${formatPrice(payable)}`; statusColor = "#FFB347" }
+                              else if (cashPayable === 0) { statusText = "✅ Đã trả bằng xu"; statusColor = "#3ecf6e" }
+                              else if (raw === "cash") { statusText = `💵 Chưa thanh toán`; statusColor = "#ff6060" }
+                              else { statusText = `⏳ Chờ chuyển khoản`; statusColor = "#FFB347" }
                               return (
                                 <>
                                   <SLabel>Thông tin thanh toán</SLabel>
                                   <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
                                     borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
                                     {[
-                                      { label: (isRideType(order.serviceType)) ? "Cước phí xe" : "Tiền món", val: order.subtotal, c: "#b0956a" },
-                                      order.deliveryFee > 0 ? { label: "Phí giao hàng", val: order.deliveryFee, c: "#b0956a" } : null,
-                                      order.discount > 0    ? { label: "Voucher giảm",  val: -order.discount,   c: "#3ecf6e" } : null,
-                                      xuUsed > 0            ? { label: "🪙 Xu đã dùng", val: -xuUsed,           c: "#FFB347" } : null,
+                                      { label: isRideType(order.serviceType) ? "Cước phí xe" : "Tiền hàng", val: order.subtotal,    c: "#b0956a" },
+                                      order.deliveryFee > 0 ? { label: "Phí giao hàng",  val: order.deliveryFee,  c: "#b0956a" } : null,
+                                      order.discount > 0    ? { label: "Voucher giảm",   val: -order.discount,    c: "#3ecf6e" } : null,
+                                      xuUsed > 0            ? { label: "🪙 Xu Giao Nhanh", val: -xuUsed,          c: "#FFB347" } : null,
+                                      xuBonusUsed > 0       ? { label: "🎁 Xu thưởng",   val: -xuBonusUsed,       c: "#FFB347" } : null,
                                     ].filter((r): r is { label: string; val: number; c: string } => r !== null)
                                      .map((r, ri) => (
                                       <div key={ri} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
@@ -1129,14 +1136,20 @@ export default function OrdersPage() {
                                       </div>
                                     ))}
                                     <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "6px 0" }} />
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                                       <span style={{ color: "#f8f0e0", fontSize: 11, fontWeight: 600 }}>Tổng cộng</span>
                                       <span style={{ background: "linear-gradient(135deg,#FF6B00,#FFB347)",
                                         WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
                                         backgroundClip: "text", fontSize: 14, fontWeight: 700 }}>{formatPrice(total)}</span>
                                     </div>
+                                    {cashPayable > 0 && pStat !== "paid" && (
+                                      <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
+                                        <span style={{ color: "#6a5a40", fontSize: 11 }}>Còn phải trả</span>
+                                        <span style={{ color: "#ff6060", fontSize: 11, fontWeight: 700 }}>{formatPrice(cashPayable)}</span>
+                                      </div>
+                                    )}
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                                      padding: "6px 0", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                                      padding: "6px 0", borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 4 }}>
                                       <span style={{ color: "#6a5a40", fontSize: 11 }}>{order.payMethod}</span>
                                       <span style={{ color: statusColor, fontSize: 11, fontWeight: 600 }}>{statusText}</span>
                                     </div>

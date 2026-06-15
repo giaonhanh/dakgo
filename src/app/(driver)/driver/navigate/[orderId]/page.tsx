@@ -25,22 +25,49 @@ const DEFAULT_LNG = 108.5073
 
 type Phase = "pickup" | "delivery"
 
+interface ItemOption {
+  name:  string
+  price: number
+}
+
+interface ItemOptions {
+  size?:     ItemOption
+  toppings?: ItemOption[]
+}
+
+interface OrderItem {
+  name:     string
+  qty:      number
+  price:    number
+  subtotal: number
+  note?:    string
+  options?: ItemOptions
+}
+
 interface OrderInfo {
-  id:       string
-  fullId:   string
-  shopName: string
-  shopAddr: string
-  shopLat:  number
-  shopLng:  number
-  custName: string
-  custAddr: string
-  custNote: string
-  custLat:  number
-  custLng:  number
-  items:    { name: string; qty: number; emoji: string }[]
-  total:    number
-  earning:  number
-  payment:  string
+  id:               string
+  fullId:           string
+  shopName:         string
+  shopAddr:         string
+  shopLat:          number
+  shopLng:          number
+  custName:         string
+  custAddr:         string
+  custNote:         string
+  custLat:          number
+  custLng:          number
+  items:            OrderItem[]
+  total:            number
+  subtotal:         number
+  payShop:          number   // tiền trả quán = subtotal - shopCommission
+  shopCommission:   number   // hoa hồng quán (đã trừ từ ví tài xế)
+  driverCommission: number   // hoa hồng tài xế (đã trừ từ ví)
+  xuUsed:           number
+  xuBonusUsed:      number
+  discount:         number
+  payment:          string
+  paymentRaw:       string
+  paymentStatus:    string
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
@@ -186,38 +213,116 @@ function PickupPhase({ onDone, onCall, onChat, fireToast, order, distKm }: {
           📍 {order.shopAddr}
         </div>
 
-        <div style={{ background:"rgba(255,255,255,0.03)",
+        {/* Chi tiết món ăn */}
+        <div style={{ background:"rgba(255,255,255,0.02)",
           border:"1px solid rgba(255,255,255,0.06)",
           borderRadius:10, padding:"8px 11px", marginBottom:10 }}>
-          <div style={{ color:"#6a5a40", fontSize:8.5, fontWeight:600,
-            marginBottom:6 }}>Đơn #{order.id} · {order.items.length} món</div>
+          <div style={{ color:"#6a5a40", fontSize:8.5, fontWeight:700,
+            textTransform:"uppercase", letterSpacing:.5, marginBottom:7 }}>
+            Đơn #{order.id} · {order.items.length} món
+          </div>
           {order.items.map((it, i) => (
-            <div key={i} style={{ display:"flex", justifyContent:"space-between",
-              padding:"4px 0",
+            <div key={i} style={{
+              padding:"6px 0",
               borderBottom: i < order.items.length - 1
                 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-              <span style={{ color:"#b0956a", fontSize:10 }}>
-                {it.emoji} {it.name}
-              </span>
-              <span style={{ color:"#6a5a40", fontSize:9.5 }}>×{it.qty}</span>
+              {/* Tên món + tổng */}
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                <span style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:700, flex:1 }}>
+                  {i + 1}. {it.name}
+                </span>
+                <span style={{ color:"#FF8C00", fontSize:10, fontWeight:700, flexShrink:0, marginLeft:8 }}>
+                  ×{it.qty} · {fmt(it.subtotal)}
+                </span>
+              </div>
+              {/* Giá gốc */}
+              <div style={{ color:"#6a5a40", fontSize:8.5, marginTop:1, paddingLeft:12 }}>
+                {fmt(it.price)}/món
+              </div>
+              {/* Size — màu xanh dương */}
+              {it.options?.size && (
+                <div style={{ display:"flex", justifyContent:"space-between",
+                  paddingLeft:16, paddingTop:3 }}>
+                  <span style={{ color:"#4a8ff5", fontSize:9 }}>
+                    ↳ Size: {it.options.size.name}
+                  </span>
+                  {it.options.size.price > 0 && (
+                    <span style={{ color:"#4a8ff5", fontSize:9 }}>+{fmt(it.options.size.price)}</span>
+                  )}
+                </div>
+              )}
+              {/* Toppings — màu tím */}
+              {it.options?.toppings?.map((tp, ti) => (
+                <div key={ti} style={{ display:"flex", justifyContent:"space-between",
+                  paddingLeft:16, paddingTop:2 }}>
+                  <span style={{ color:"#b464ff", fontSize:9 }}>
+                    ↳ {tp.name}
+                  </span>
+                  {tp.price > 0 && (
+                    <span style={{ color:"#b464ff", fontSize:9 }}>+{fmt(tp.price)}</span>
+                  )}
+                </div>
+              ))}
+              {/* Ghi chú — vàng */}
+              {it.note && (
+                <div style={{ color:"#f5c542", fontSize:9, marginTop:4, paddingLeft:12,
+                  display:"flex", alignItems:"center", gap:4 }}>
+                  <span>📝</span>
+                  <span>{it.note}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
 
-        <div style={{ display:"flex", gap:8 }}>
+        {/* Bảng thanh toán cho tài xế */}
+        <div style={{ background:"rgba(255,255,255,0.02)",
+          border:"1px solid rgba(255,255,255,0.06)",
+          borderRadius:10, padding:"8px 11px", marginBottom:10 }}>
+          <div style={{ color:"#6a5a40", fontSize:8.5, fontWeight:700,
+            textTransform:"uppercase", letterSpacing:.5, marginBottom:7 }}>
+            Thông tin thanh toán
+          </div>
           {[
-            { label:"Tiền công", val:fmt(order.earning), color:"#FF8C00" },
-            { label:"Thanh toán", val:order.payment, color:"#4a8ff5" },
-          ].map(s => (
-            <div key={s.label} style={{ flex:1, background:"rgba(255,255,255,0.03)",
-              border:"1px solid rgba(255,255,255,0.06)",
-              borderRadius:9, padding:"6px 9px", textAlign:"center" }}>
-              <div style={{ color:"#6a5a40", fontSize:8 }}>{s.label}</div>
-              <div style={{ color:s.color, fontSize:11, fontWeight:700, marginTop:2 }}>
-                {s.val}
-              </div>
+            { label:"Tiền hàng (subtotal)",      val: order.subtotal,         c:"#b0956a", bold:false },
+            order.discount > 0
+              ? { label:"Voucher giảm",           val:-order.discount,        c:"#3ecf6e", bold:false }
+              : null,
+            { label:"Phí ship",                   val: order.total - order.subtotal + order.discount, c:"#b0956a", bold:false },
+            { label:"Trả cho quán (tiền mặt)",    val: order.payShop,         c:"#FF8C00", bold:true  },
+            { label:`HH quán (${order.shopCommission > 0 ? Math.round(order.shopCommission * 100 / (order.subtotal || 1)) : "?"}%) — đã trừ ví`, val: order.shopCommission, c:"#ff6060", bold:false },
+            { label:"HH tài xế — đã trừ ví",     val: order.driverCommission, c:"#ff6060", bold:false },
+          ].filter((r): r is { label:string; val:number; c:string; bold:boolean } => r !== null)
+           .map((r, ri) => (
+            <div key={ri} style={{ display:"flex", justifyContent:"space-between",
+              padding:"3px 0",
+              borderBottom: ri === 2 ? "1px solid rgba(255,255,255,0.06)" : "none",
+              paddingBottom: ri === 2 ? 5 : undefined,
+              marginBottom: ri === 2 ? 2 : undefined,
+            }}>
+              <span style={{ color:"#6a5a40", fontSize:9 }}>{r.label}</span>
+              <span style={{ color: r.c, fontSize:9, fontWeight: r.bold ? 700 : 500 }}>
+                {r.val < 0 ? "−" : ""}{fmt(Math.abs(r.val))}
+              </span>
             </div>
           ))}
+          <div style={{ height:1, background:"rgba(255,255,255,0.07)", margin:"5px 0" }} />
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <span style={{ color:"#b0956a", fontSize:9 }}>{order.payment}</span>
+            {(() => {
+              const totalXu = order.xuUsed + order.xuBonusUsed
+              const cashPay = Math.max(0, order.total - totalXu)
+              if (order.paymentStatus === "paid") return <span style={{ color:"#3ecf6e", fontSize:9, fontWeight:700 }}>✅ Đã TT</span>
+              if (totalXu > 0 && cashPay === 0) return <span style={{ color:"#3ecf6e", fontSize:9, fontWeight:700 }}>✅ Toàn bộ bằng xu</span>
+              if (totalXu > 0) return (
+                <div style={{ textAlign:"right" }}>
+                  <div style={{ color:"#FFB347", fontSize:9 }}>🪙 Xu: {fmt(totalXu)}</div>
+                  <div style={{ color:"#ff6060", fontSize:9, fontWeight:700 }}>💵 Thu: {fmt(cashPay)}</div>
+                </div>
+              )
+              return <span style={{ color:"#ff6060", fontSize:9, fontWeight:700 }}>💵 Thu: {fmt(order.total)}</span>
+            })()}
+          </div>
         </div>
       </div>
 
@@ -296,24 +401,47 @@ function DeliveryPhase({ onDone, onCall, onChat, paymentPaid, order, distKm }: {
         </div>
       </div>
 
-      <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-        <div style={{ flex:1, background:"rgba(255,107,0,0.07)",
-          border:"1px solid rgba(255,107,0,0.2)",
-          borderRadius:12, padding:"10px 12px" }}>
-          <div style={{ color:"#6a5a40", fontSize:9, marginBottom:4 }}>Khách trả</div>
-          <div style={{ color:"#FF8C00", fontSize:17, fontWeight:800, lineHeight:1 }}>
-            {fmt(order.total)}
+      {/* Tóm tắt thu tiền */}
+      {(() => {
+        const totalXu = order.xuUsed + order.xuBonusUsed
+        const cashCollect = Math.max(0, order.total - totalXu)
+        const alreadyPaid = order.paymentStatus === "paid" || paymentPaid
+        return (
+          <div style={{ background:"rgba(255,255,255,0.02)",
+            border:"1px solid rgba(255,255,255,0.07)",
+            borderRadius:12, padding:"10px 12px", marginBottom:10 }}>
+            <div style={{ color:"#6a5a40", fontSize:8.5, fontWeight:700,
+              textTransform:"uppercase", letterSpacing:.5, marginBottom:7 }}>
+              Thu tiền
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <div style={{ flex:1, background: cashCollect > 0 && !alreadyPaid
+                  ? "rgba(255,107,0,0.09)" : "rgba(62,207,110,0.07)",
+                border: `1px solid ${cashCollect > 0 && !alreadyPaid
+                  ? "rgba(255,107,0,0.25)" : "rgba(62,207,110,0.22)"}`,
+                borderRadius:10, padding:"8px 11px" }}>
+                <div style={{ color:"#6a5a40", fontSize:8 }}>
+                  {alreadyPaid ? "Đã TT online" : cashCollect === 0 ? "Đã TT bằng xu" : "Thu tiền mặt"}
+                </div>
+                <div style={{ color: cashCollect > 0 && !alreadyPaid ? "#FF8C00" : "#3ecf6e",
+                  fontSize:17, fontWeight:800, lineHeight:1.2, marginTop:2 }}>
+                  {alreadyPaid || cashCollect === 0 ? "✅ Xong" : fmt(cashCollect)}
+                </div>
+              </div>
+              {totalXu > 0 && (
+                <div style={{ flex:1, background:"rgba(245,197,66,0.07)",
+                  border:"1px solid rgba(245,197,66,0.2)",
+                  borderRadius:10, padding:"8px 11px" }}>
+                  <div style={{ color:"#6a5a40", fontSize:8 }}>🪙 Xu đã trừ</div>
+                  <div style={{ color:"#FFB347", fontSize:17, fontWeight:800, lineHeight:1.2, marginTop:2 }}>
+                    {fmt(totalXu)}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-        <div style={{ flex:1, background:"rgba(62,207,110,0.07)",
-          border:"1px solid rgba(62,207,110,0.2)",
-          borderRadius:12, padding:"10px 12px" }}>
-          <div style={{ color:"#6a5a40", fontSize:9, marginBottom:4 }}>Tiền công</div>
-          <div style={{ color:"#3ecf6e", fontSize:17, fontWeight:800, lineHeight:1 }}>
-            {fmt(order.earning)}
-          </div>
-        </div>
-      </div>
+        )
+      })()}
 
       <div style={{ marginBottom:10 }}>
         <SectionLabel>Nhắn nhanh cho khách</SectionLabel>
@@ -419,7 +547,11 @@ export default function DriverNavigatePage() {
       if (!orderId) return
       const { data: o } = await supabase
         .from("orders")
-        .select("id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng, total, ship_fee, total_amount, pay_method, note, order_items(name, qty, price)")
+        .select(`id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng,
+          ship_fee, subtotal, total_amount, pay_method, payment_status, note,
+          discount_amount, xu_used, xu_bonus_used,
+          driver_commission_amount, shop_commission_amount,
+          order_items(name, qty, price, subtotal, note, options)`)
         .eq("id", orderId)
         .single()
 
@@ -430,29 +562,43 @@ export default function DriverNavigatePage() {
         supabase.from("profiles").select("full_name").eq("id", o.customer_id).single(),
       ])
 
-      const commRate = Number(shop?.commission_rate ?? 15)
-      const earning  = Math.round((o.ship_fee ?? 0) * (1 - commRate / 100))
-      const shopLat  = (shop as { lat?: number } | null)?.lat ?? 0
-      const shopLng  = (shop as { lng?: number } | null)?.lng ?? 0
+      const shopCommission   = Number((o as Record<string, unknown>).shop_commission_amount   ?? 0)
+      const driverCommission = Number((o as Record<string, unknown>).driver_commission_amount ?? 0)
+      const sub              = Number((o as Record<string, unknown>).subtotal                 ?? 0)
+      const shopLat          = (shop as { lat?: number } | null)?.lat ?? 0
+      const shopLng          = (shop as { lng?: number } | null)?.lng ?? 0
 
       const ord: OrderInfo = {
-        id:       o.id.slice(0, 8).toUpperCase(),
-        fullId:   o.id,
-        shopName: shop?.name ?? "Cửa hàng",
-        shopAddr: shop?.address ?? "—",
+        id:               o.id.slice(0, 8).toUpperCase(),
+        fullId:           o.id,
+        shopName:         shop?.name ?? "Cửa hàng",
+        shopAddr:         shop?.address ?? "—",
         shopLat,
         shopLng,
-        custName: customer?.full_name ?? "Khách hàng",
-        custAddr: o.delivery_address ?? "—",
-        custNote: o.note ?? "",
-        custLat:  (o.delivery_lat as number | null) ?? 0,
-        custLng:  (o.delivery_lng as number | null) ?? 0,
-        items:    (o.order_items ?? []).map((i: { name: string; qty: number; price: number }) => ({
-          name: i.name, qty: i.qty, emoji: "🍜",
+        custName:         customer?.full_name ?? "Khách hàng",
+        custAddr:         o.delivery_address ?? "—",
+        custNote:         o.note ?? "",
+        custLat:          (o.delivery_lat as number | null) ?? 0,
+        custLng:          (o.delivery_lng as number | null) ?? 0,
+        items:            (o.order_items ?? []).map((i: { name: string; qty: number; price: number; subtotal: number; note?: string; options?: ItemOptions }) => ({
+          name:     i.name,
+          qty:      i.qty,
+          price:    i.price,
+          subtotal: i.subtotal ?? (i.price * i.qty),
+          note:     i.note,
+          options:  i.options,
         })),
-        total:   o.total_amount ?? 0,
-        earning,
-        payment: o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+        total:            Number(o.total_amount ?? 0),
+        subtotal:         sub,
+        payShop:          Math.max(0, sub - shopCommission),
+        shopCommission,
+        driverCommission,
+        xuUsed:           Number((o as Record<string, unknown>).xu_used      ?? 0),
+        xuBonusUsed:      Number((o as Record<string, unknown>).xu_bonus_used ?? 0),
+        discount:         Number((o as Record<string, unknown>).discount_amount ?? 0),
+        payment:          o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+        paymentRaw:       String(o.pay_method ?? "cash"),
+        paymentStatus:    String((o as Record<string, unknown>).payment_status ?? "pending"),
       }
       setOrder(ord)
 
