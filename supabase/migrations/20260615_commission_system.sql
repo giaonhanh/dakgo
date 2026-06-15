@@ -108,8 +108,9 @@ BEGIN
     RETURN jsonb_build_object('error', 'Đơn đã được tài xế khác nhận');
   END IF;
 
-  IF v_order.status != 'pending' THEN
-    RETURN jsonb_build_object('error', 'Đơn không còn ở trạng thái chờ');
+  -- Cho phép nhận đơn ở trạng thái pending (khách đặt) hoặc accepted (merchant đã xác nhận)
+  IF v_order.status NOT IN ('pending', 'accepted') THEN
+    RETURN jsonb_build_object('error', 'Đơn không còn có thể nhận');
   END IF;
 
   -- Tính hoa hồng tài xế
@@ -150,16 +151,16 @@ BEGIN
     );
   END IF;
 
-  -- Atomic update đơn hàng — double-check driver_id IS NULL
+  -- Atomic update — nếu pending thì chuyển sang accepted; nếu đã accepted thì giữ nguyên
   UPDATE orders SET
-    status                   = 'accepted',
+    status                   = CASE WHEN status = 'pending' THEN 'accepted' ELSE status END,
     driver_id                = p_driver_id,
-    accepted_at              = now(),
+    accepted_at              = COALESCE(accepted_at, now()),
     driver_commission_rate   = v_commission_rate,
     driver_commission_amount = v_commission_amount
   WHERE id = p_order_id
     AND driver_id IS NULL
-    AND status = 'pending';
+    AND status IN ('pending', 'accepted');
 
   GET DIAGNOSTICS v_rows = ROW_COUNT;
 

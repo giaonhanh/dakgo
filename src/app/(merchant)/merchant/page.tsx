@@ -301,8 +301,9 @@ export default function MerchantDashboard() {
   const handleAccept = async (order: MOrder) => {
     setOrderStatus(order.id, "accepted")
     const { error } = await supabase.from("orders").update({
-      status:      "accepted",
-      accepted_at: new Date().toISOString(),
+      status:       "accepted",
+      accepted_at:  new Date().toISOString(),
+      preparing_at: new Date().toISOString(),
     }).eq("id", order.id)
     if (error) { setOrderStatus(order.id, "pending"); fireToast("❌ Không thể xác nhận, thử lại", false); return }
     fireToast(`✅ Đã xác nhận #${order.shortId}`)
@@ -314,29 +315,20 @@ export default function MerchantDashboard() {
       body: JSON.stringify({ order_id: order.id, status: "accepted" }),
     }).catch(() => {})
 
-    // Chuyển sang preparing + dispatch tài xế
-    setTimeout(async () => {
-      setOrderStatus(order.id, "preparing")
-      await supabase.from("orders").update({
-        status:      "preparing",
-        preparing_at: new Date().toISOString(),
-      }).eq("id", order.id)
+    // Dispatch ngay — tìm tài xế gần nhất và gửi thông báo push
+    setDispatchStatus(prev => ({ ...prev, [order.id]: "dispatching" }))
+    const dispRes = await fetch("/api/orders/dispatch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_id: order.id }),
+    }).catch(() => null)
 
-      // Trigger dispatch — tìm tài xế gần nhất và gửi thông báo
-      setDispatchStatus(prev => ({ ...prev, [order.id]: "dispatching" }))
-      const dispRes = await fetch("/api/orders/dispatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: order.id }),
-      }).catch(() => null)
-
-      if (dispRes?.ok) {
-        setDispatchStatus(prev => ({ ...prev, [order.id]: "sent" }))
-      } else {
-        setDispatchStatus(prev => ({ ...prev, [order.id]: "none" }))
-        fireToast(`⚠️ #${order.shortId}: Không có tài xế gần. Đang tìm tiếp...`, false)
-      }
-    }, 900)
+    if (dispRes?.ok) {
+      setDispatchStatus(prev => ({ ...prev, [order.id]: "sent" }))
+    } else {
+      setDispatchStatus(prev => ({ ...prev, [order.id]: "none" }))
+      fireToast(`⚠️ #${order.shortId}: Không có tài xế gần. Đang tìm tiếp...`, false)
+    }
   }
 
   const openRejectModal = (order: MOrder) => {

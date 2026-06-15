@@ -1129,7 +1129,24 @@ export default function DriverDashboard() {
       })
       .subscribe()
 
-    // ── Lắng nghe UPDATE khi auto-dispatch gán driver_id ──────────
+    // ── Lắng nghe khi merchant xác nhận (UPDATE status → accepted, driver_id vẫn null) ──
+    const chAccepted = supabase
+      .channel("driver-merchant-accepted")
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "orders",
+        filter: "status=eq.accepted",
+      }, async (payload) => {
+        const o = payload.new as { id: string; status: string; driver_id: string | null; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; total_amount: number; pay_method: string }
+        // Bỏ qua nếu đơn đã có tài xế, hoặc đang xử lý
+        if (o.driver_id !== null || acceptedRef.current) return
+        const orderData = await buildOrderData(o)
+        if (!orderData) return
+        if (showOrderRef.current) { orderQueueRef.current.push(orderData); return }
+        setPendingOrder(orderData); setShowOrder(true); showOrderRef.current = true
+      })
+      .subscribe()
+
+    // ── Lắng nghe UPDATE khi dispatch gán driver_id cho đơn ──────────
     const chAssigned = supabase
       .channel("driver-assigned-orders")
       .on("postgres_changes", {
@@ -1137,7 +1154,8 @@ export default function DriverDashboard() {
         filter: `driver_id=eq.${driverId}`,
       }, async (payload) => {
         const o = payload.new as { id: string; status: string; driver_id: string; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; total_amount: number; pay_method: string }
-        if (o.status !== "pending" || acceptedRef.current) return
+        // Hiện popup khi đơn có driver_id là tài xế này và còn có thể nhận
+        if (!["pending", "accepted"].includes(o.status) || acceptedRef.current) return
         const orderData = await buildOrderData(o)
         if (!orderData) return
         if (showOrderRef.current) { orderQueueRef.current.push(orderData); return }
@@ -1146,7 +1164,7 @@ export default function DriverDashboard() {
       .subscribe()
 
     channelRef.current = ch
-    return () => { ch.unsubscribe(); chErrands.unsubscribe(); chAssigned.unsubscribe(); channelRef.current = null }
+    return () => { ch.unsubscribe(); chErrands.unsubscribe(); chAccepted.unsubscribe(); chAssigned.unsubscribe(); channelRef.current = null }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, driverId])
 

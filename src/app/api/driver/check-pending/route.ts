@@ -33,11 +33,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ order: null })
     }
 
+    // Trả về đơn pending hoặc accepted (merchant đã xác nhận) chưa có tài xế
     const { data: rows } = await db
       .from("orders")
       .select("id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng, total, ship_fee, total_amount, pay_method")
-      .eq("status", "pending")
-      .or(`driver_id.is.null,driver_id.eq.${user.id}`)
+      .in("status", ["pending", "accepted"])
+      .is("driver_id", null)
       .order("created_at", { ascending: true })
       .limit(1)
 

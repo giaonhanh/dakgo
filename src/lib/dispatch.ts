@@ -167,22 +167,21 @@ export async function dispatchOrder(
     return { dispatched: false, triedIds }
   }
 
-  // Gán tài xế — chỉ update nếu driver_id vẫn NULL (tránh race condition 2 dispatch cùng lúc)
-  const statusCol = table === "rides" ? "searching" : "pending"
-  const { data: claimed } = await db
+  // Kiểm tra đơn chưa bị nhận hoặc hủy
+  const { data: orderRow } = await db
     .from(table)
-    .update({ driver_id: driverId })
+    .select("id, driver_id, status")
     .eq("id", id)
-    .eq("status", statusCol)
-    .is("driver_id", null)
-    .select("id")
+    .single()
 
-  // Nếu không có row nào được update → tài xế khác đã nhận trước
-  if (!claimed?.length) {
-    return { dispatched: false, triedIds, driverId: undefined }
+  if (orderRow?.driver_id) {
+    return { dispatched: false, triedIds }
+  }
+  if (["delivered", "cancelled"].includes(orderRow?.status ?? "")) {
+    return { dispatched: false, triedIds }
   }
 
-  // Push notification + DB notification
+  // Push notification + DB notification — không gán driver_id trước (tài xế tự nhận qua RPC)
   const { title, body } = await buildNotifContent(db, table, id)
   try {
     await db.from("notifications").insert({
