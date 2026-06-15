@@ -121,8 +121,11 @@ $$;
 
 
 -- ════════════════════════════════════════════════
--- 2. complete_order_with_commission — chỉ cập nhật status, không đổi ví
---    (hoa hồng đã trừ lúc nhận đơn, driver giữ tiền mặt từ khách)
+-- 2. complete_order_with_commission
+--    - Cập nhật status = delivered
+--    - Nếu khách trả xu (xu_used / xu_bonus_used > 0):
+--      cộng đúng số xu đó vào ví tài xế
+--      (khách đã bị trừ lúc đặt đơn, giờ chuyển sang tài xế)
 -- ════════════════════════════════════════════════
 
 CREATE OR REPLACE FUNCTION complete_order_with_commission(
@@ -130,9 +133,12 @@ CREATE OR REPLACE FUNCTION complete_order_with_commission(
   p_driver_id UUID
 ) RETURNS JSONB
 LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE v_order RECORD;
+DECLARE
+  v_order        RECORD;
+  v_driver_wallet RECORD;
+  v_xu_credit    INT;
 BEGIN
-  SELECT id, shop_commission_amount
+  SELECT id, status, xu_used, xu_bonus_used
   INTO v_order
   FROM orders
   WHERE id = p_order_id AND driver_id = p_driver_id;
@@ -142,7 +148,7 @@ BEGIN
   END IF;
 
   -- Idempotency
-  IF (SELECT status FROM orders WHERE id = p_order_id) = 'delivered' THEN
+  IF v_order.status = 'delivered' THEN
     RETURN jsonb_build_object('success', true, 'skipped', true);
   END IF;
 
@@ -151,7 +157,34 @@ BEGIN
     delivered_at = COALESCE(delivered_at, now())
   WHERE id = p_order_id;
 
-  RETURN jsonb_build_object('success', true);
+  -- Cộng xu tài xế = phần khách đã trả bằng xu
+  -- (xu_used = xu chính, xu_bonus_used = xu thưởng — cả hai đều có giá trị thật)
+  v_xu_credit := COALESCE(v_order.xu_used, 0) + COALESCE(v_order.xu_bonus_used, 0);
+
+  IF v_xu_credit > 0 THEN
+    SELECT id, balance INTO v_driver_wallet
+    FROM wallets WHERE user_id = p_driver_id AND type = 'driver'
+    FOR UPDATE;
+
+    IF FOUND THEN
+      UPDATE wallets
+      SET balance = balance + v_xu_credit, updated_at = now()
+      WHERE id = v_driver_wallet.id;
+
+      INSERT INTO transactions (wallet_id, type, amount, balance_after, ref_type, ref_id, note)
+      VALUES (
+        v_driver_wallet.id, 'commission', v_xu_credit,
+        v_driver_wallet.balance + v_xu_credit,
+        'order', p_order_id,
+        format('Xu khách thanh toán đơn #%s', UPPER(LEFT(p_order_id::TEXT, 8)))
+      );
+    END IF;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'success',    true,
+    'xu_credit',  v_xu_credit
+  );
 END;
 $$;
 
