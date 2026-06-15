@@ -32,7 +32,7 @@ interface OrderData {
   subtotal:            number
   deliveryFee:         number
   total:               number
-  earnerFee:           number
+  payShop:             number  // Số tiền trả quán = subtotal - shop_commission
   payMethod:           string
   // Errand-specific
   packagePhotoUrl?: string
@@ -301,9 +301,9 @@ function OrderPopup({
           {/* ── fare summary ── */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:16 }}>
             {[
-              { label:"Khách trả",      value: fmt(o.total),       color:"#f8f0e0", bg:"rgba(255,255,255,0.04)" },
-              { label:"Tiền công (~)", value: fmt(o.earnerFee),   color:"#3ecf6e", bg:"rgba(62,207,110,0.08)"  },
-              { label:"Thanh toán",  value: o.payMethod,         color:"#4a8ff5", bg:"rgba(74,143,245,0.08)"  },
+              { label:"Khách trả",   value: fmt(o.total),    color:"#f8f0e0", bg:"rgba(255,255,255,0.04)" },
+              { label:"Trả quán (~)", value: fmt(o.payShop), color:"#FFB347",  bg:"rgba(255,107,0,0.08)"  },
+              { label:"Thanh toán",  value: o.payMethod,     color:"#4a8ff5", bg:"rgba(74,143,245,0.08)"  },
             ].map(c => (
               <div key={c.label} style={{
                 background:c.bg, border:"1px solid rgba(255,255,255,0.06)",
@@ -999,17 +999,18 @@ export default function DriverDashboard() {
       supabase.from("profiles").select("full_name").eq("id", o.customer_id).single(),
       supabase.from("order_items").select("name, qty, price").eq("order_id", o.id),
     ])
-    // earnerFee ước tính từ commission quán — số thực trừ khi nhận đơn
-    const commRate  = Number(shop?.commission_rate ?? 15)
-    const earnerFee = Math.round((o.ship_fee ?? 0) * (1 - commRate / 100))
+    // payShop = subtotal - shop_commission (ước tính, số chính xác trong orders.shop_commission_amount)
+    const shopRate = Number(shop?.commission_rate ?? 15)
+    const subtotal = o.subtotal ?? 0
+    const payShop  = Math.round(subtotal * (1 - shopRate / 100))
     return {
       id: o.id.slice(0, 8).toUpperCase(), fullId: o.id, orderTable: "orders",
       shopName: shop?.name ?? "Cửa hàng", shopAddress: shop?.address ?? "",
       customerName: customer?.full_name ?? "Khách hàng", customerAddress: o.delivery_address ?? "",
       distanceToShop: -1, distanceToCustomer: -1,
       items: (items ?? []).map(i => ({ name: i.name, qty: i.qty ?? 1, price: i.price })),
-      subtotal: o.total ?? 0, deliveryFee: o.ship_fee ?? 0, total: o.total_amount ?? 0,
-      earnerFee, payMethod: o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+      subtotal, deliveryFee: o.ship_fee ?? 0, total: o.total_amount ?? 0,
+      payShop, payMethod: o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
     }
   }, [supabase])
 
@@ -1116,7 +1117,7 @@ export default function DriverDashboard() {
           subtotal:    fee,
           deliveryFee: 0,
           total:       fee,
-          earnerFee:   Math.round(fee * 0.85),
+          payShop:     0,
           payMethod:   e.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
           packagePhotoUrl: e.package_photo_url ?? undefined,
           senderName:      e.sender_name    ?? undefined,
