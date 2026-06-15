@@ -301,8 +301,8 @@ function OrderPopup({
           {/* ── fare summary ── */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:16 }}>
             {[
-              { label:"Khách trả",   value: fmt(o.total),       color:"#f8f0e0", bg:"rgba(255,255,255,0.04)" },
-              { label:"Tiền công",   value: fmt(o.earnerFee),   color:"#3ecf6e", bg:"rgba(62,207,110,0.08)"  },
+              { label:"Khách trả",      value: fmt(o.total),       color:"#f8f0e0", bg:"rgba(255,255,255,0.04)" },
+              { label:"Tiền công (~)", value: fmt(o.earnerFee),   color:"#3ecf6e", bg:"rgba(62,207,110,0.08)"  },
               { label:"Thanh toán",  value: o.payMethod,         color:"#4a8ff5", bg:"rgba(74,143,245,0.08)"  },
             ].map(c => (
               <div key={c.label} style={{
@@ -920,21 +920,17 @@ export default function DriverDashboard() {
         setIsApproved(false)
       }
 
-      // Today's delivered orders
+      // Today's delivered orders — dùng driver_commission_amount đã lưu (chính xác với per-driver rate)
       const today = new Date().toISOString().split("T")[0]
       const { count, data: delivered } = await supabase
         .from("orders")
-        .select("ship_fee, shops(commission_rate)", { count: "exact" })
+        .select("ship_fee, driver_commission_amount", { count: "exact" })
         .eq("driver_id", user.id)
         .eq("status", "delivered")
         .gte("created_at", `${today}T00:00:00`)
 
-      const earnings = (delivered ?? []).reduce((sum, o) => {
-        const commission = Array.isArray(o.shops)
-          ? (o.shops[0] as { commission_rate: number })?.commission_rate ?? 15
-          : (o.shops as { commission_rate: number } | null)?.commission_rate ?? 15
-        return sum + Math.round(o.ship_fee * (1 - commission / 100))
-      }, 0)
+      const earnings = (delivered ?? []).reduce((sum, o) =>
+        sum + Math.max(0, (o.ship_fee ?? 0) - (o.driver_commission_amount ?? 0)), 0)
       setTodayStats(s => ({ ...s, orders: count ?? 0, earnings }))
 
       // ── Setup gate checks ──
@@ -1003,6 +999,7 @@ export default function DriverDashboard() {
       supabase.from("profiles").select("full_name").eq("id", o.customer_id).single(),
       supabase.from("order_items").select("name, qty, price").eq("order_id", o.id),
     ])
+    // earnerFee ước tính từ commission quán — số thực trừ khi nhận đơn
     const commRate  = Number(shop?.commission_rate ?? 15)
     const earnerFee = Math.round((o.ship_fee ?? 0) * (1 - commRate / 100))
     return {

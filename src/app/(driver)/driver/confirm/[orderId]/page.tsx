@@ -342,16 +342,14 @@ export default function DriverConfirmPage() {
 
       const { data: o } = await supabase
         .from("orders")
-        .select("id, customer_id, delivery_address, ship_fee, total_amount, shops(commission_rate)")
+        .select("id, customer_id, delivery_address, ship_fee, total_amount, driver_commission_amount")
         .eq("id", orderId)
         .eq("driver_id", user?.id ?? "")
         .single()
 
       if (o) {
-        const commRate = Array.isArray(o.shops)
-          ? (o.shops[0] as { commission_rate: number })?.commission_rate ?? 15
-          : (o.shops as { commission_rate: number } | null)?.commission_rate ?? 15
-        const earning = Math.round((o.ship_fee ?? 0) * (1 - Number(commRate) / 100))
+        // Dùng driver_commission_amount đã lưu — chính xác với per-driver rate
+        const earning = Math.max(0, (o.ship_fee ?? 0) - (o.driver_commission_amount ?? 0))
 
         const { data: customer } = await supabase
           .from("profiles").select("full_name").eq("id", o.customer_id).single()
@@ -366,22 +364,18 @@ export default function DriverConfirmPage() {
         })
       }
 
-      // Today stats
+      // Today stats — dùng driver_commission_amount (không join shops)
       if (user) {
         const todayStart = new Date(); todayStart.setHours(0,0,0,0)
         const { data: delivered } = await supabase
           .from("orders")
-          .select("ship_fee, shops(commission_rate)")
+          .select("ship_fee, driver_commission_amount")
           .eq("driver_id", user.id)
           .eq("status", "delivered")
           .gte("created_at", todayStart.toISOString())
 
-        const todayEarning = (delivered ?? []).reduce((s, d) => {
-          const cr = Array.isArray(d.shops)
-            ? (d.shops[0] as { commission_rate: number })?.commission_rate ?? 15
-            : (d.shops as { commission_rate: number } | null)?.commission_rate ?? 15
-          return s + Math.round((d.ship_fee ?? 0) * (1 - Number(cr) / 100))
-        }, 0)
+        const todayEarning = (delivered ?? []).reduce((s, d) =>
+          s + Math.max(0, (d.ship_fee ?? 0) - (d.driver_commission_amount ?? 0)), 0)
 
         setToday({ orders: (delivered ?? []).length, earning: todayEarning })
       }

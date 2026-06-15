@@ -205,7 +205,7 @@ DECLARE
   v_merchant_wallet        RECORD;
   v_driver_wallet          RECORD;
 BEGIN
-  SELECT o.id, o.ship_fee, o.total, o.pay_method, o.shop_id,
+  SELECT o.id, o.ship_fee, o.subtotal, o.total_amount, o.pay_method, o.shop_id,
          o.driver_commission_amount, o.status,
          s.commission_rate AS shop_comm_rate
   INTO v_order
@@ -217,9 +217,9 @@ BEGIN
     RETURN jsonb_build_object('error', 'Không tìm thấy đơn');
   END IF;
 
-  -- Hoa hồng quán: tính trên subtotal (tiền đồ ăn)
+  -- Hoa hồng quán: tính trên subtotal (tiền đồ ăn, không bao gồm ship)
   v_shop_commission_rate   := get_shop_commission_rate(v_order.shop_id);
-  v_shop_commission_amount := ROUND(COALESCE(v_order.total, 0) * v_shop_commission_rate / 100)::INT;
+  v_shop_commission_amount := ROUND(COALESCE(v_order.subtotal, 0) * v_shop_commission_rate / 100)::INT;
 
   -- Cập nhật đơn: delivered + ghi nhận commission quán
   UPDATE orders SET

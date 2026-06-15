@@ -9,7 +9,7 @@ import Link from "next/link"
 import { formatPrice } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 
-type OrderStatus = "pending" | "accepted" | "preparing" | "ready" | "rejected"
+type OrderStatus = "pending" | "accepted" | "preparing" | "ready" | "delivered" | "rejected"
 type PayMethod   = "cash" | "wallet" | "vietqr" | "momo" | "zalopay"
 
 interface MOrder {
@@ -40,6 +40,7 @@ const STATUS_CFG: Record<OrderStatus, { label: string; color: string; bg: string
   accepted:  { label: "Đã xác nhận",   color: "#4a8ff5", bg: "rgba(74,143,245,0.1)",  bd: "rgba(74,143,245,0.3)"  },
   preparing: { label: "Đang chuẩn bị", color: "#4a8ff5", bg: "rgba(74,143,245,0.1)",  bd: "rgba(74,143,245,0.3)"  },
   ready:     { label: "Sẵn sàng giao", color: "#3ecf6e", bg: "rgba(62,207,110,0.1)",  bd: "rgba(62,207,110,0.25)" },
+  delivered: { label: "Đã giao",       color: "#3ecf6e", bg: "rgba(62,207,110,0.06)", bd: "rgba(62,207,110,0.15)" },
   rejected:  { label: "Đã từ chối",    color: "#ff4040", bg: "rgba(255,64,64,0.08)",  bd: "rgba(255,64,64,0.2)"   },
 }
 
@@ -244,7 +245,7 @@ export default function MerchantDashboard() {
         driverPlate: di?.license_plate ?? undefined,
         driverRating: di?.rating_avg ?? undefined,
         payMethod: pm === "wallet" ? "wallet" : pm === "vietqr" ? "vietqr" : "cash",
-        status: (o.status === "delivered" ? "ready" : o.status === "cancelled" ? "rejected" : o.status) as OrderStatus,
+        status: (o.status === "cancelled" ? "rejected" : o.status) as OrderStatus,
         time: fmtTime(o.created_at),
         note: o.note ?? undefined,
         scheduledAt: o.scheduled_at ?? null,
@@ -299,7 +300,10 @@ export default function MerchantDashboard() {
 
   const handleAccept = async (order: MOrder) => {
     setOrderStatus(order.id, "accepted")
-    const { error } = await supabase.from("orders").update({ status: "accepted" }).eq("id", order.id)
+    const { error } = await supabase.from("orders").update({
+      status:      "accepted",
+      accepted_at: new Date().toISOString(),
+    }).eq("id", order.id)
     if (error) { setOrderStatus(order.id, "pending"); fireToast("❌ Không thể xác nhận, thử lại", false); return }
     fireToast(`✅ Đã xác nhận #${order.shortId}`)
 
@@ -310,11 +314,28 @@ export default function MerchantDashboard() {
       body: JSON.stringify({ order_id: order.id, status: "accepted" }),
     }).catch(() => {})
 
-    // Chuyển sang preparing
+    // Chuyển sang preparing + dispatch tài xế
     setTimeout(async () => {
       setOrderStatus(order.id, "preparing")
-      await supabase.from("orders").update({ status: "preparing" }).eq("id", order.id)
-      setDispatchStatus(prev => ({ ...prev, [order.id]: "sent" }))
+      await supabase.from("orders").update({
+        status:      "preparing",
+        preparing_at: new Date().toISOString(),
+      }).eq("id", order.id)
+
+      // Trigger dispatch — tìm tài xế gần nhất và gửi thông báo
+      setDispatchStatus(prev => ({ ...prev, [order.id]: "dispatching" }))
+      const dispRes = await fetch("/api/orders/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: order.id }),
+      }).catch(() => null)
+
+      if (dispRes?.ok) {
+        setDispatchStatus(prev => ({ ...prev, [order.id]: "sent" }))
+      } else {
+        setDispatchStatus(prev => ({ ...prev, [order.id]: "none" }))
+        fireToast(`⚠️ #${order.shortId}: Không có tài xế gần. Đang tìm tiếp...`, false)
+      }
     }, 900)
   }
 
@@ -361,7 +382,7 @@ export default function MerchantDashboard() {
     }).catch(() => {})
   }
 
-  const activeOrders  = orders.filter(o => !["rejected"].includes(o.status))
+  const activeOrders  = orders.filter(o => !["rejected", "delivered"].includes(o.status))
   const pendingCount  = orders.filter(o => o.status === "pending").length
 
   // ── Pending / Suspended gate ──
