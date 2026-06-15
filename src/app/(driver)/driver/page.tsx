@@ -982,7 +982,7 @@ export default function DriverDashboard() {
     if (!setupDone) { setShowSetupGate(true); return }
     setToggling(true)
     const next = !online
-    await supabase.from("drivers").update({ status: next ? "online" : "offline", is_online: next }).eq("id", driverId)
+    await supabase.from("drivers").update({ status: next ? "online" : "offline" }).eq("id", driverId)
     setOnline(next)
     if (!next) setShowOrder(false)
     setToggling(false)
