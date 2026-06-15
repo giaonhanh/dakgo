@@ -84,8 +84,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: msg }, { status: 400 })
     }
 
-    // ── Cập nhật withdrawal → success (chờ admin chuyển khoản) ──────────────
-    await db.from("withdrawals").update({ status: "success" }).eq("id", withdrawalId)
+    // ── Cập nhật withdrawal → pending_transfer (chờ admin chuyển khoản) ────
+    await db.from("withdrawals").update({ status: "pending_transfer" }).eq("id", withdrawalId)
 
     // ── Lấy tên tài xế ───────────────────────────────────────────────────────
     const { data: profile } = await db.from("profiles").select("full_name, phone").eq("id", user.id).single()

@@ -310,6 +310,13 @@ export default function MerchantDashboard() {
     }).eq("id", order.id)
     if (error) { setOrderStatus(order.id, "pending"); fireToast("❌ Không thể cập nhật, thử lại", false); return }
     fireToast(`✅ Đang chuẩn bị #${order.shortId}`)
+
+    // Notify khách: quán đã bắt đầu làm
+    fetch("/api/orders/notify-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_id: order.id, status: "accepted" }),
+    }).catch(() => {})
   }
 
   const openRejectModal = (order: MOrder) => {

@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     // Lấy thông tin đơn + tài xế
     const { data: order } = await db
       .from("orders")
-      .select("id, customer_id, driver_id, shop_id, total_amount, driver_commission_amount")
+      .select("id, customer_id, driver_id, shop_id, total_amount, driver_commission_amount, xu_used, xu_bonus_used")
       .eq("id", order_id)
       .single()
 
@@ -104,6 +104,28 @@ export async function POST(req: NextRequest) {
       // Hoàn hoa hồng tài xế nếu đã trừ
       if (order.driver_id && (order.driver_commission_amount ?? 0) > 0) {
         await db.rpc("refund_driver_commission", { p_order_id: order_id })
+      }
+
+      // Hoàn xu khách nếu đã trừ (merchant hủy hoặc system hủy)
+      const xuUsed      = Number(order.xu_used       ?? 0)
+      const xuBonusUsed = Number(order.xu_bonus_used ?? 0)
+      if (xuUsed > 0 || xuBonusUsed > 0) {
+        try {
+          const { data: wallet } = await db
+            .from("wallets").select("id, balance, bonus_balance")
+            .eq("user_id", order.customer_id).eq("type", "customer").single()
+          if (wallet) {
+            await db.from("wallets").update({
+              balance:       (wallet.balance       ?? 0) + xuUsed,
+              bonus_balance: (wallet.bonus_balance  ?? 0) + xuBonusUsed,
+              updated_at:    new Date().toISOString(),
+            }).eq("id", wallet.id)
+            const txRows = []
+            if (xuUsed > 0)      txRows.push({ wallet_id: wallet.id, type: "refund", amount: xuUsed,      balance_after: (wallet.balance ?? 0) + xuUsed,      ref_type: "order", ref_id: order_id, note: "Hoàn xu do đơn bị hủy" })
+            if (xuBonusUsed > 0) txRows.push({ wallet_id: wallet.id, type: "refund", amount: xuBonusUsed, balance_after: (wallet.bonus_balance ?? 0) + xuBonusUsed, ref_type: "order", ref_id: order_id, note: "Hoàn xu thưởng do đơn bị hủy" })
+            if (txRows.length) await db.from("transactions").insert(txRows)
+          }
+        } catch (e) { console.error("[notify-status] xu refund error:", e) }
       }
 
       const reason = cancel_reason ?? "Đơn hàng bị hủy"

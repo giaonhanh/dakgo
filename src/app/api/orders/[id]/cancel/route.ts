@@ -33,8 +33,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Không có quyền hủy đơn này" }, { status: 403 })
     }
 
-    if (!["pending", "accepted"].includes(order.status)) {
-      return NextResponse.json({ error: "Đơn hàng không thể hủy ở trạng thái này" }, { status: 400 })
+    // Chỉ cho hủy khi chưa có tài xế đến lấy hàng
+    if (!["pending", "accepted", "preparing"].includes(order.status)) {
+      return NextResponse.json({ error: "Đơn hàng không thể hủy — tài xế đang trên đường giao" }, { status: 400 })
     }
 
     // Hủy đơn — set cancelled_by để blacklist trigger hoạt động

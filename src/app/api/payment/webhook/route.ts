@@ -51,21 +51,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ code: "00" })
     }
 
-    // Cộng ví tài xế: phí ship (merchant thanh toán trực tiếp, không qua ví)
-    if (order.driver_id) {
-      await supabase.rpc("add_to_wallet", {
-        p_user_id: order.driver_id,
-        p_type:    "driver",
-        p_amount:  order.ship_fee,
-        p_ref_id:  order.id,
-        p_note:    `Phí giao đơn #${data.orderCode}`,
-        p_tx_type: "commission",
-      }).then(({ error }) => {
-        if (error) console.error("[Webhook] driver wallet error:", error)
-      })
-    }
-
     // Notify merchant: đơn đã được thanh toán
+    // (Không cộng xu driver ở đây — driver nhận xu khi xác nhận giao hàng xong qua complete_order_with_commission)
     try {
       const { data: shop } = await supabase
         .from("shops").select("owner_id").eq("id", order.shop_id).single()

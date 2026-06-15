@@ -41,7 +41,7 @@ export async function PATCH(req: NextRequest) {
       .single()
 
     if (!wd) return NextResponse.json({ error: "Không tìm thấy yêu cầu" }, { status: 404 })
-    if (!["success", "processing"].includes(wd.status)) {
+    if (!["pending_transfer", "processing"].includes(wd.status)) {
       return NextResponse.json({ error: "Yêu cầu này đã được xử lý rồi" }, { status: 400 })
     }
 
