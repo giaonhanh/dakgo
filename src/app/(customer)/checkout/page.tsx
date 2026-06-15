@@ -1497,8 +1497,9 @@ export default function CheckoutPage() {
       const shopId = cartItems[0]?.shopId
       if (!shopId) { fireToast("Lỗi giỏ hàng"); setLoading(false); return }
 
-      const deliveryLat = currentAddr.lat ?? 12.683
-      const deliveryLng = currentAddr.lng ?? 108.480
+      // Tọa độ = 0 hoặc null đều không hợp lệ — dùng trung tâm Phước An làm fallback
+      const deliveryLat = (currentAddr.lat && currentAddr.lat !== 0) ? currentAddr.lat : 12.6521
+      const deliveryLng = (currentAddr.lng && currentAddr.lng !== 0) ? currentAddr.lng : 108.5073
 
       const scheduledAt = (!deliveryNow && scheduledTime)
         ? `${new Date().toISOString().split("T")[0]}T${scheduledTime.start}:00`

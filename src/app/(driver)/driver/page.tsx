@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { usePushNotification } from "@/hooks/usePushNotification"
 import { useOrderSound } from "@/hooks/useOrderSound"
+import { useDriverLocation } from "@/hooks/useDriverLocation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -889,6 +890,7 @@ export default function DriverDashboard() {
   const [showTopup,     setShowTopup]     = useState(false)
   const [isApproved,    setIsApproved]    = useState<boolean | null>(null)
   const [unreadNotif,   setUnreadNotif]   = useState(0)
+  useDriverLocation(driverId, online)  // lưu GPS realtime vào drivers.location trong DB
   const channelRef    = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const gpsWatchRef   = useRef<number | null>(null)
   const gpsRef        = useRef({ lat: 0, lng: 0 })

@@ -421,11 +421,68 @@ export default function DriverConfirmPage() {
       }
     }
 
-    await supabase.from("orders").update({
-      status: "delivered",
-      delivered_at: new Date().toISOString(),
-      ...(deliveryPhotoUrl ? { delivery_photo_url: deliveryPhotoUrl } : {}),
-    }).eq("id", orderId)
+    const { data: updatedOrder } = await supabase
+      .from("orders")
+      .update({
+        status: "delivered",
+        delivered_at: new Date().toISOString(),
+        ...(deliveryPhotoUrl ? { delivery_photo_url: deliveryPhotoUrl } : {}),
+      })
+      .eq("id", orderId)
+      .select("customer_id, total_amount, ship_fee, pay_method, shops(commission_rate)")
+      .single()
+
+    // Thông báo in-app cho khách
+    if (updatedOrder?.customer_id) {
+      await supabase.from("notifications").insert({
+        user_id: updatedOrder.customer_id,
+        type:    "order",
+        title:   "✅ Đơn hàng đã được giao!",
+        body:    `Đơn hàng ${Number(updatedOrder.total_amount).toLocaleString("vi-VN")}đ đã giao thành công.`,
+        data:    { order_id: orderId, url: `/orders` },
+      }).then(({ error }) => { if (error) console.error("notify customer error:", error) })
+    }
+
+    // Cộng ví tài xế (COD — tiền ship được cộng trực tiếp sau khi giao xong)
+    if (updatedOrder) {
+      const commRate = Array.isArray(updatedOrder.shops)
+        ? (updatedOrder.shops[0] as { commission_rate: number })?.commission_rate ?? 15
+        : (updatedOrder.shops as { commission_rate: number } | null)?.commission_rate ?? 15
+      const driverEarning = Math.round((updatedOrder.ship_fee ?? 0) * (1 - Number(commRate) / 100))
+      if (driverEarning > 0) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          await supabase.rpc("add_to_wallet", {
+            p_user_id: user.id,
+            p_type:    "driver",
+            p_amount:  driverEarning,
+            p_ref_id:  orderId,
+            p_note:    `Tiền công giao đơn #${orderId.slice(0, 8).toUpperCase()}`,
+            p_tx_type: "commission",
+          }).then(({ error }) => { if (error) console.error("driver wallet error:", error) })
+        }
+      }
+    }
+
+    // Reload stats để hiển thị đúng sau khi giao
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0)
+      const { data: delivered } = await supabase
+        .from("orders")
+        .select("ship_fee, shops(commission_rate)")
+        .eq("driver_id", user.id)
+        .eq("status", "delivered")
+        .gte("created_at", todayStart.toISOString())
+
+      const todayEarning = (delivered ?? []).reduce((s, d) => {
+        const cr = Array.isArray(d.shops)
+          ? (d.shops[0] as { commission_rate: number })?.commission_rate ?? 15
+          : (d.shops as { commission_rate: number } | null)?.commission_rate ?? 15
+        return s + Math.round((d.ship_fee ?? 0) * (1 - Number(cr) / 100))
+      }, 0)
+      setToday({ orders: (delivered ?? []).length, earning: todayEarning })
+    }
 
     setSaving(false)
     fireToast("Đã xác nhận giao hàng thành công!")

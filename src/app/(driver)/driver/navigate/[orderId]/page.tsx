@@ -357,8 +357,10 @@ export default function DriverNavigatePage() {
   const [distKm,        setDistKm]        = useState<number | null>(null)
   const speed = useSpeed()
 
+  // Ref giữ vị trí GPS thật — tránh closure stale trong useEffect
+  const driverPosRef = useRef({ lat: DEFAULT_LAT, lng: DEFAULT_LNG })
   // Tránh tính lại khoảng cách quá thường xuyên (chỉ khi di chuyển >50m)
-  const lastCalcPos = useRef({ lat: 0, lng: 0 })
+  const lastCalcPos  = useRef({ lat: 0, lng: 0 })
 
   const fireToast = (msg: string) => {
     setToast(msg); setTimeout(() => setToast(""), 2400)
@@ -385,6 +387,7 @@ export default function DriverNavigatePage() {
           const lng = pos.coords.longitude
           setDriverLat(lat)
           setDriverLng(lng)
+          driverPosRef.current = { lat, lng }
 
           // Broadcast vị trí tài xế để tracking page cập nhật realtime
           if (orderId) {
@@ -453,8 +456,11 @@ export default function DriverNavigatePage() {
       }
       setOrder(ord)
 
-      // Tính khoảng cách lần đầu
-      await calcDist(driverLat, driverLng, ord, "pickup")
+      // Tính khoảng cách lần đầu — dùng ref thay vì state để tránh stale closure
+      // Nếu GPS chưa có (vẫn ở DEFAULT), không tính — watchPosition sẽ gọi khi có GPS thật
+      const pos = driverPosRef.current
+      const hasRealGps = pos.lat !== DEFAULT_LAT || pos.lng !== DEFAULT_LNG
+      if (hasRealGps) await calcDist(pos.lat, pos.lng, ord, "pickup")
     }
     load()
 
