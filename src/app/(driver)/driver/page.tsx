@@ -1199,11 +1199,28 @@ export default function DriverDashboard() {
     const res = result as AcceptResult | null
 
     if (rpcErr || res?.error) {
-      const msg = res?.error ?? "Không thể nhận đơn, thử lại"
-      alert(msg)
-      // Đơn đã bị nhận bởi người khác → đóng popup
-      setShowOrder(false); showOrderRef.current = false; setPendingOrder(null)
-      return
+      // Nếu RPC lỗi SQL (cột chưa tồn tại / migration chưa chạy) → fallback direct update
+      if (rpcErr) {
+        console.warn("[Driver] RPC error, fallback direct update:", rpcErr.message)
+        const { error: directErr, data: claimed } = await supabase
+          .from("orders")
+          .update({ driver_id: driverId, accepted_at: new Date().toISOString() })
+          .eq("id", orderId)
+          .is("driver_id", null)
+          .in("status", ["pending", "accepted"])
+          .select("id")
+        if (directErr || !claimed?.length) {
+          alert("Đơn đã được tài xế khác nhận!")
+          setShowOrder(false); showOrderRef.current = false; setPendingOrder(null)
+          return
+        }
+        // Fallback thành công — tiếp tục mà không có commission tracking
+      } else {
+        // Business logic error từ RPC (ví không đủ, đơn đã nhận...)
+        alert(res?.error ?? "Không thể nhận đơn, thử lại")
+        setShowOrder(false); showOrderRef.current = false; setPendingOrder(null)
+        return
+      }
     }
 
     setShowOrder(false); showOrderRef.current = false; orderQueueRef.current = []
