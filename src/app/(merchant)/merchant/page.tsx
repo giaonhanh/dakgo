@@ -1027,13 +1027,24 @@ export default function MerchantDashboard() {
                               </>
                             )}
                             {(order.status === "accepted" || order.status === "preparing") && (
-                              <button onClick={() => handleReady(order)}
-                                style={{ flex: 1, height: 40, borderRadius: 10, border: "none",
-                                  background: "rgba(62,207,110,0.12)", outline: "1px solid rgba(62,207,110,0.3)",
-                                  color: "#3ecf6e", fontSize: 11, fontWeight: 700,
-                                  fontFamily: "Lexend", cursor: "pointer" }}>
-                                📦 Đã xong · Tìm tài xế
-                              </button>
+                              order.driverId ? (
+                                <button onClick={() => handleReady(order)}
+                                  style={{ flex: 1, height: 40, borderRadius: 10, border: "none",
+                                    background: "rgba(62,207,110,0.12)", outline: "1px solid rgba(62,207,110,0.3)",
+                                    color: "#3ecf6e", fontSize: 11, fontWeight: 700,
+                                    fontFamily: "Lexend", cursor: "pointer" }}>
+                                  📦 Đã xong, báo tài xế lấy hàng
+                                </button>
+                              ) : (
+                                <div style={{ flex: 1, height: 40, borderRadius: 10,
+                                  background: "rgba(245,197,66,0.06)", border: "1px solid rgba(245,197,66,0.2)",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  color: "#f5c542", fontSize: 10, gap: 5 }}>
+                                  <div style={{ width: 6, height: 6, borderRadius: "50%",
+                                    background: "#f5c542", animation: "mPulse 1.5s infinite" }} />
+                                  Đang tìm tài xế — chờ nhận đơn
+                                </div>
+                              )
                             )}
                             {order.status === "ready" && (
                               <div style={{ flex: 1, height: 40, borderRadius: 10,
