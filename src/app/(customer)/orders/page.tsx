@@ -1020,7 +1020,7 @@ export default function OrdersPage() {
                                     </div>
                                     {cashPayable > 0 && pStat !== "paid" && (
                                       <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
-                                        <span style={{ color: "#6a5a40", fontSize: 11 }}>Còn phải trả</span>
+                                        <span style={{ color: "#6a5a40", fontSize: 11 }}>Số tiền cần phải thanh toán</span>
                                         <span style={{ color: "#ff6060", fontSize: 11, fontWeight: 700 }}>{formatPrice(cashPayable)}</span>
                                       </div>
                                     )}

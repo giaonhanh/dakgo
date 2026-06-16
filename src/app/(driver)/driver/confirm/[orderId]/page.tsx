@@ -9,12 +9,13 @@ import { createClient } from "@/lib/supabase/client"
 type Phase = "capture" | "preview" | "done"
 
 interface OrderInfo {
-  id:       string
-  fullId:   string
-  custName: string
-  custAddr: string
-  total:    number
-  earning:  number
+  id:         string
+  fullId:     string
+  custName:   string
+  custAddr:   string
+  total:      number
+  earning:    number
+  payMethod:  string
 }
 
 interface TodayStats {
@@ -359,7 +360,7 @@ export default function DriverConfirmPage() {
 
       const { data: o } = await supabase
         .from("orders")
-        .select("id, customer_id, delivery_address, ship_fee, total_amount, driver_commission_amount")
+        .select("id, customer_id, delivery_address, ship_fee, total_amount, driver_commission_amount, pay_method")
         .eq("id", orderId)
         .eq("driver_id", user?.id ?? "")
         .single()
@@ -372,12 +373,13 @@ export default function DriverConfirmPage() {
           .from("profiles").select("full_name").eq("id", o.customer_id).single()
 
         setOrder({
-          id:       o.id.slice(0, 8).toUpperCase(),
-          fullId:   o.id,
-          custName: customer?.full_name ?? "Khách hàng",
-          custAddr: o.delivery_address ?? "—",
-          total:    o.total_amount ?? 0,
+          id:        o.id.slice(0, 8).toUpperCase(),
+          fullId:    o.id,
+          custName:  customer?.full_name ?? "Khách hàng",
+          custAddr:  o.delivery_address ?? "—",
+          total:     o.total_amount ?? 0,
           earning,
+          payMethod: o.pay_method ?? "cash",
         })
       }
 
@@ -447,9 +449,13 @@ export default function DriverConfirmPage() {
     }
 
     // Bước 1: Luôn cập nhật status → delivered trước (trigger realtime cho merchant + khách)
+    // Đơn tiền mặt: tài xế thu tiền ngay lúc giao -> đánh dấu payment_status = paid
+    // luôn (trước đó không có bước nào set lại nên đơn COD giao xong vẫn hiện
+    // "Chưa thanh toán" mãi).
     const { error: updateErr } = await supabase.from("orders").update({
-      status:       "delivered",
-      delivered_at: new Date().toISOString(),
+      status:         "delivered",
+      delivered_at:   new Date().toISOString(),
+      ...(order?.payMethod === "cash" ? { payment_status: "paid" } : {}),
     }).eq("id", orderId)
 
     if (updateErr) {
