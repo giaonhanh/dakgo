@@ -197,6 +197,7 @@ export default function AdminOrdersPage() {
   const [newDriverId,    setNewDriverId]    = useState("")
   const [driverList,     setDriverList]     = useState<{id:string;name:string;phone:string}[]>([])
   const [changingDriver, setChangingDriver] = useState(false)
+  const [drvWalletWarn,  setDrvWalletWarn]  = useState<string | null>(null)
 
   // Pricing from app_settings
   const [pricing, setPricing] = useState<PricingMap | null>(null)
@@ -548,8 +549,38 @@ export default function AdminOrdersPage() {
 
   const handleChangeDriver = async (order: Order, newDrvId: string, reason: string) => {
     setChangingDriver(true)
+    setDrvWalletWarn(null)
     const supabase  = createClient()
     const finalRsn  = reason === "Khác" ? (drvCustom.trim() || "Không có lý do") : reason
+
+    // Kiểm tra ví tài xế mới trước khi gán — admin gán tay không đi qua RPC
+    // accept_order_with_commission (RPC đó chặn vì driver_id của đơn đã có giá trị
+    // khi đổi tài xế), nên phải tự tính hoa hồng cần trừ và so với số dư ví.
+    const { data: orderRow }   = await supabase.from("orders").select("shop_id").eq("id", order.id).single()
+    const { data: driverRate } = await supabase.rpc("get_driver_commission_rate", { p_driver_id: newDrvId })
+    const { data: shopRate }   = orderRow?.shop_id
+      ? await supabase.rpc("get_shop_commission_rate", { p_shop_id: orderRow.shop_id })
+      : { data: null }
+    const { data: wallet }     = await supabase.from("wallets").select("balance").eq("user_id", newDrvId).eq("type", "driver").single()
+
+    // Đơn ở trang admin không truy vấn riêng subtotal — ước lượng = tổng - ship,
+    // chỉ dùng để cảnh báo admin (không phải số trừ thật, RPC nhận đơn mới trừ chính xác).
+    const estSubtotal       = Math.max(0, (order.total_amount ?? 0) - (order.ship_fee ?? 0))
+    const driverCommission = Math.round((order.ship_fee ?? 0) * Number(driverRate ?? 15) / 100)
+    const shopCommission   = Math.round(estSubtotal * Number(shopRate ?? 15) / 100)
+    const totalDeduction   = driverCommission + shopCommission
+    const balance          = wallet?.balance ?? 0
+
+    if (totalDeduction > 0 && balance < totalDeduction) {
+      setDrvWalletWarn(
+        `⚠️ Tài xế không đủ số dư ví để nhận đơn này — cần ${totalDeduction.toLocaleString("vi-VN")}đ ` +
+        `(HH tài xế ${driverCommission.toLocaleString("vi-VN")}đ + HH quán ${shopCommission.toLocaleString("vi-VN")}đ), ` +
+        `ví hiện còn ${balance.toLocaleString("vi-VN")}đ. Hãy chọn tài xế khác hoặc yêu cầu nạp thêm trước khi gán.`
+      )
+      setChangingDriver(false)
+      return
+    }
+
     await supabase.from("orders").update({ driver_id: newDrvId }).eq("id", order.id)
     const newDrv = driverList.find(d => d.id === newDrvId)
     const notifs: { user_id:string; type:string; title:string; body:string; data:object }[] = [
@@ -1456,7 +1487,7 @@ export default function AdminOrdersPage() {
           {drvModal && (
             <>
               <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-                onClick={() => { setDrvModal(null); setDrvReason(""); setDrvCustom(""); setNewDriverId("") }}
+                onClick={() => { setDrvModal(null); setDrvReason(""); setDrvCustom(""); setNewDriverId(""); setDrvWalletWarn(null) }}
                 style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.72)", zIndex:70, backdropFilter:"blur(4px)" }} />
               <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}} transition={{type:"spring",damping:22,stiffness:300}}
                 style={{ position:"fixed", bottom:0, left:0, right:0, background:"#0e0c09", borderRadius:"20px 20px 0 0",
@@ -1466,7 +1497,7 @@ export default function AdminOrdersPage() {
                     <div style={{ color:"#4a8ff5", fontSize:15, fontWeight:800 }}>🔄 Đổi tài xế</div>
                     <div style={{ color:"#6a5a40", fontSize:9 }}>#{drvModal.id.slice(0,8).toUpperCase()} · Hiện tại: {drvModal.driverName ?? "Chưa có tài xế"}</div>
                   </div>
-                  <button onClick={() => { setDrvModal(null); setDrvReason(""); setDrvCustom(""); setNewDriverId("") }}
+                  <button onClick={() => { setDrvModal(null); setDrvReason(""); setDrvCustom(""); setNewDriverId(""); setDrvWalletWarn(null) }}
                     style={{ width:32, height:32, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
                 </div>
 
@@ -1494,7 +1525,7 @@ export default function AdminOrdersPage() {
                 ) : (
                   <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:16 }}>
                     {driverList.filter(d => d.id !== drvModal.driver_id).map(d => (
-                      <button key={d.id} onClick={() => setNewDriverId(d.id)}
+                      <button key={d.id} onClick={() => { setNewDriverId(d.id); setDrvWalletWarn(null) }}
                         style={{ padding:"10px 14px", borderRadius:10, textAlign:"left", fontFamily:"Lexend", cursor:"pointer",
                           display:"flex", alignItems:"center", gap:10,
                           border:newDriverId===d.id?"1px solid rgba(62,207,110,0.4)":"1px solid rgba(255,255,255,0.08)",
@@ -1507,6 +1538,13 @@ export default function AdminOrdersPage() {
                         {newDriverId===d.id && <span style={{ color:"#3ecf6e", fontSize:16 }}>✓</span>}
                       </button>
                     ))}
+                  </div>
+                )}
+
+                {drvWalletWarn && (
+                  <div style={{ background:"rgba(255,64,64,0.1)", border:"1px solid rgba(255,64,64,0.35)",
+                    borderRadius:10, padding:"10px 12px", marginBottom:12, color:"#ff8080", fontSize:11, lineHeight:1.5 }}>
+                    {drvWalletWarn}
                   </div>
                 )}
 
