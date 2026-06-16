@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     // Trả về đơn pending hoặc accepted (merchant đã xác nhận) chưa có tài xế, bỏ qua đơn tài xế đã từ chối
     let q = db
       .from("orders")
-      .select("id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng, subtotal, ship_fee, total_amount, payment_method")
+      .select("id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng, subtotal, ship_fee, total_amount, pay_method")
       .in("status", ["pending", "accepted"])
       .is("driver_id", null)
       .order("created_at", { ascending: true })
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     const [{ data: shop }, { data: customer }, { data: items }] = await Promise.all([
       db.from("shops").select("name, address, commission_rate, lat, lng").eq("id", o.shop_id).single(),
       db.from("profiles").select("full_name").eq("id", o.customer_id).single(),
-      db.from("order_items").select("name, quantity, price").eq("order_id", o.id),
+      db.from("order_items").select("name, qty, price").eq("order_id", o.id),
     ])
 
     const shopLat = (shop as { lat?: number } | null)?.lat ?? null
@@ -91,12 +91,12 @@ export async function GET(request: Request) {
         distanceToShop,
         distanceToCustomer,
         shopNeedsCoords,
-        items:              (items ?? []).map(i => ({ name: i.name, qty: (i as { quantity?: number }).quantity ?? 1, price: i.price })),
+        items:              (items ?? []).map(i => ({ name: i.name, qty: (i as { qty?: number }).qty ?? 1, price: i.price })),
         subtotal:           o.subtotal ?? 0,
         deliveryFee:        o.ship_fee ?? 0,
         total:              o.total_amount ?? 0,
         earnerFee,
-        payMethod:          o.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+        payMethod:          o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
       },
     })
   } catch {

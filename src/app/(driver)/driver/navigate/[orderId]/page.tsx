@@ -516,7 +516,7 @@ export default function DriverNavigatePage() {
       const { data: o, error: coreErr } = await supabase
         .from("orders")
         .select(`id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng,
-          ship_fee, subtotal, total_amount, payment_method, payment_status, note`)
+          ship_fee, subtotal, total_amount, pay_method, payment_status, note`)
         .eq("id", orderId)
         .single()
 
@@ -528,7 +528,7 @@ export default function DriverNavigatePage() {
         supabase.from("orders")
           .select("discount_amount, xu_used, xu_bonus_used, driver_commission_amount, shop_commission_amount")
           .eq("id", orderId).single(),
-        supabase.from("order_items").select("name, quantity, price, subtotal, note, options").eq("order_id", orderId),
+        supabase.from("order_items").select("name, qty, price, subtotal, note, options").eq("order_id", orderId),
       ])
 
       const extra            = (extraRes.data ?? {}) as Record<string, unknown>
@@ -553,11 +553,11 @@ export default function DriverNavigatePage() {
         custLat:          (o.delivery_lat as number | null) ?? 0,
         custLng:          (o.delivery_lng as number | null) ?? 0,
         custPhone:        (customer as { phone?: string } | null)?.phone ?? "",
-        items:            (orderItems ?? []).map((i: { name: string; quantity: number; price: number; subtotal: number; note?: string; options?: ItemBreakdown | null }) => ({
+        items:            (orderItems ?? []).map((i: { name: string; qty: number; price: number; subtotal: number; note?: string; options?: ItemBreakdown | null }) => ({
           name:      i.name,
-          qty:       i.quantity ?? 1,
+          qty:       i.qty ?? 1,
           price:     i.price,
-          subtotal:  i.subtotal ?? (i.price * (i.quantity ?? 1)),
+          subtotal:  i.subtotal ?? (i.price * (i.qty ?? 1)),
           note:      i.note,
           breakdown: i.options ?? null,
         })),
@@ -569,8 +569,8 @@ export default function DriverNavigatePage() {
         xuUsed:           Number(extra.xu_used       ?? 0),
         xuBonusUsed:      Number(extra.xu_bonus_used ?? 0),
         discount:         Number(extra.discount_amount ?? 0),
-        payment:          o.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
-        paymentRaw:       String(o.payment_method ?? "cash"),
+        payment:          o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+        paymentRaw:       String(o.pay_method ?? "cash"),
         paymentStatus:    String((o as Record<string, unknown>).payment_status ?? "pending"),
       }
       setOrder(ord)
