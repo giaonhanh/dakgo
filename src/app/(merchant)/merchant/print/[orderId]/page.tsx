@@ -22,8 +22,6 @@ interface PrintOrder {
   shopName: string
   note: string | null
   subtotal: number
-  discountAmount: number
-  totalAmount: number
   merchantReceives: number
   createdAt: string
   items: PrintItem[]
@@ -49,7 +47,7 @@ export default function PrintPage() {
 
       const { data: o, error: oErr } = await supabase
         .from("orders")
-        .select("id, shop_id, note, subtotal, discount_amount, total_amount, created_at")
+        .select("id, shop_id, note, subtotal, created_at")
         .eq("id", orderId)
         .single()
 
@@ -60,9 +58,7 @@ export default function PrintPage() {
         supabase.from("order_items").select("name, qty, price, note, options").eq("order_id", orderId),
       ])
 
-      const commRate       = Number(shop?.commission_rate ?? 0) / 100
-      const discount       = o.discount_amount ?? 0
-      // Quán nhận: tiền món trừ hoa hồng quán, không liên quan phí ship và giảm giá
+      const commRate         = Number(shop?.commission_rate ?? 0) / 100
       const merchantReceives = Math.round(o.subtotal * (1 - commRate))
 
       setOrder({
@@ -70,8 +66,6 @@ export default function PrintPage() {
         shopName:        shop?.name ?? "Cửa hàng",
         note:            o.note,
         subtotal:        o.subtotal,
-        discountAmount:  discount,
-        totalAmount:     o.total_amount,
         merchantReceives,
         createdAt:       o.created_at,
         items: (items ?? []).map(i => ({
@@ -195,16 +189,12 @@ export default function PrintPage() {
         )}
 
         {/* Totals */}
-        <div style={{ borderTop: "1px dashed #000", paddingTop: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-            <span style={{ color: "#555" }}>Tổng tiền món:</span>
-            <span>{fmt(order.subtotal)}</span>
+        <div style={{ borderTop: "1px solid #000", paddingTop: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5, fontSize: 13 }}>
+            <span>Tổng tiền đơn hàng:</span>
+            <span style={{ fontWeight: 700 }}>{fmt(order.subtotal)}</span>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-            <span style={{ color: "#555" }}>Tổng tiền đơn hàng:</span>
-            <span>{fmt(order.totalAmount)}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #000", paddingTop: 6, marginTop: 4 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #000", paddingTop: 6, marginTop: 4 }}>
             <span style={{ fontWeight: 900, fontSize: 14 }}>Thực nhận từ tài xế:</span>
             <span style={{ fontWeight: 900, fontSize: 14 }}>{fmt(order.merchantReceives)}</span>
           </div>
