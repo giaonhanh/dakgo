@@ -50,13 +50,13 @@ export async function GET(request: Request) {
     const o = rows[0]
 
     const [{ data: shop }, { data: customer }, { data: items }] = await Promise.all([
-      db.from("shops").select("name, address, commission_rate").eq("id", o.shop_id).single(),
+      db.from("shops").select("name, address, commission_rate, lat, lng").eq("id", o.shop_id).single(),
       db.from("profiles").select("full_name").eq("id", o.customer_id).single(),
       db.from("order_items").select("name, quantity, price").eq("order_id", o.id),
     ])
 
-    const shopLat = null
-    const shopLng = null
+    const shopLat = (shop as { lat?: number } | null)?.lat ?? null
+    const shopLng = (shop as { lng?: number } | null)?.lng ?? null
     const custLat = (o.delivery_lat as number | null) ?? null
     const custLng = (o.delivery_lng as number | null) ?? null
 
