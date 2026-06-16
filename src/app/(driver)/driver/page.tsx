@@ -938,14 +938,19 @@ export default function DriverDashboard() {
         setIsApproved(false)
       }
 
-      // Today's delivered orders — dùng driver_commission_amount đã lưu (chính xác với per-driver rate)
-      const today = new Date().toISOString().split("T")[0]
+      // Today's delivered orders — lọc theo delivered_at, dùng múi giờ VN (UTC+7)
+      // new Date().toISOString() trả UTC, phải tính lại ngày VN để tránh sai khi
+      // qua nửa đêm VN (17:00 UTC) mà UTC vẫn đang ngày hôm trước.
+      const now = new Date()
+      const vnNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
+      const vnToday = vnNow.toISOString().split("T")[0]
+      const startOfDayVN = new Date(`${vnToday}T00:00:00+07:00`)
       const { count, data: delivered } = await supabase
         .from("orders")
         .select("ship_fee, driver_commission_amount", { count: "exact" })
         .eq("driver_id", user.id)
         .eq("status", "delivered")
-        .gte("created_at", `${today}T00:00:00`)
+        .gte("delivered_at", startOfDayVN.toISOString())
 
       const earnings = (delivered ?? []).reduce((sum, o) =>
         sum + Math.max(0, (o.ship_fee ?? 0) - (o.driver_commission_amount ?? 0)), 0)
@@ -1546,19 +1551,6 @@ export default function DriverDashboard() {
             </div>
           </div>
 
-          {/* ── tips card ── */}
-          <div style={{
-            background:"rgba(255,107,0,0.06)", border:"1px dashed rgba(255,107,0,0.2)",
-            borderRadius:14, padding:"12px 14px", display:"flex", gap:10, alignItems:"flex-start",
-          }}>
-            <div style={{ fontSize:20, flexShrink:0 }}>💡</div>
-            <div>
-              <div style={{ color:"#FF8C00", fontSize:11, fontWeight:700, marginBottom:2 }}>Mẹo hôm nay</div>
-              <div style={{ color:"#b0956a", fontSize:9, lineHeight:1.5 }}>
-                Giờ cao điểm 11h–13h và 17h–19h thường có nhiều đơn nhất. Hãy bật trạng thái đúng giờ để nhận nhiều đơn hơn!
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* ── bottom nav ── */}

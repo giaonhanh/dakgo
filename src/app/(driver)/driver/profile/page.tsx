@@ -326,8 +326,15 @@ const TX_CFG: Record<string, { label: string; color: string; sign: string }> = {
   topup:      { label: "Nạp tiền",   color: "#3ecf6e", sign: "+" },
   withdrawal: { label: "Rút tiền",   color: "#ff4040", sign: "−" },
   payment:    { label: "Thanh toán", color: "#4a8ff5", sign: "−" },
-  commission: { label: "Hoa hồng",   color: "#b464ff", sign: "−" },
+  commission: { label: "Phí nền tảng", color: "#ff4040", sign: "−" },
   refund:     { label: "Hoàn tiền",  color: "#FFB347", sign: "+" },
+}
+
+function txCfg(tx: WalletTx) {
+  if (tx.type === "commission" && tx.amount > 0) {
+    return { label: "Thu nhập đơn hàng", color: "#3ecf6e", sign: "+" }
+  }
+  return TX_CFG[tx.type] ?? { label: tx.type, color: "#6a5a40", sign: "" }
 }
 
 function WalletHistorySheet({ onClose, walletBalance }: { onClose: () => void; walletBalance: number }) {
@@ -391,7 +398,7 @@ function WalletHistorySheet({ onClose, walletBalance }: { onClose: () => void; w
               <div style={{ color: "#6a5a40", fontSize: 12 }}>Chưa có giao dịch nào</div>
             </div>
           ) : txs.map((tx, i) => {
-            const cfg = TX_CFG[tx.type] ?? { label: tx.type, color: "#6a5a40", sign: "" }
+            const cfg = txCfg(tx)
             const isIncome = cfg.sign === "+"
             return (
               <div key={tx.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 0", borderBottom: i < txs.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>

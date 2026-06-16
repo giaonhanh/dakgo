@@ -387,7 +387,10 @@ export default function DriverConfirmPage() {
       // Lọc theo delivered_at (lúc giao xong), không phải created_at (lúc đặt) —
       // đơn đặt hôm qua nhưng giao hôm nay vẫn phải tính vào "hôm nay"
       if (user) {
-        const todayStart = new Date(); todayStart.setHours(0,0,0,0)
+        const _now = new Date()
+        const _vnNow = new Date(_now.getTime() + 7 * 60 * 60 * 1000)
+        const _vnToday = _vnNow.toISOString().split("T")[0]
+        const todayStart = new Date(`${_vnToday}T00:00:00+07:00`)
         const { data: delivered } = await supabase
           .from("orders")
           .select("ship_fee, driver_commission_amount")
@@ -480,8 +483,11 @@ export default function DriverConfirmPage() {
       body: JSON.stringify({ order_id: orderId, status: "delivered" }),
     }).catch(() => {})
 
-    // Reload stats hôm nay
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+    // Reload stats hôm nay (dùng VN timezone UTC+7)
+    const _now2 = new Date()
+    const _vnNow2 = new Date(_now2.getTime() + 7 * 60 * 60 * 1000)
+    const _vnToday2 = _vnNow2.toISOString().split("T")[0]
+    const todayStart = new Date(`${_vnToday2}T00:00:00+07:00`)
     const { data: deliveredOrders } = await supabase
       .from("orders")
       .select("ship_fee, driver_commission_amount")

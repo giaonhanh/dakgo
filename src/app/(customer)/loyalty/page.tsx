@@ -9,8 +9,24 @@ type TierLevel = "bronze" | "silver" | "gold" | "platinum"
 interface PointTx {
   id: string
   points: number
-  reason: string
+  reason: string | null
+  ref_id: string | null
   created_at: string
+}
+
+const REASON_LABEL: Record<string, string> = {
+  order_complete:  "Đơn hàng hoàn thành",
+  ride_complete:   "Chuyến xe hoàn thành",
+  errand_complete: "Mua hộ / Giao hộ hoàn thành",
+  referral:        "Giới thiệu bạn bè",
+  bonus:           "Thưởng đặc biệt",
+  adjustment:      "Điều chỉnh điểm",
+  redeem:          "Đổi quà",
+}
+
+function reasonLabel(reason: string | null): string {
+  if (!reason) return "Cộng điểm"
+  return REASON_LABEL[reason] ?? reason
 }
 
 const TIER_CFG: Record<TierLevel, {
@@ -53,11 +69,14 @@ export default function LoyaltyPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
 
-      const [{ data: loyalty }, { data: txs }] = await Promise.all([
+      const [{ data: loyalty, error: lpErr }, { data: txs, error: txErr }] = await Promise.all([
         supabase.from("loyalty_points").select("total_points").eq("user_id", user.id).single(),
-        supabase.from("point_transactions").select("id, points, reason, created_at")
+        supabase.from("point_transactions").select("id, points, reason, ref_id, created_at")
           .eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
       ])
+
+      if (lpErr && lpErr.code !== "PGRST116") console.error("[loyalty] loyalty_points:", lpErr)
+      if (txErr) console.error("[loyalty] point_transactions:", txErr)
 
       setPoints(loyalty?.total_points ?? 0)
       setHistory(txs ?? [])
@@ -195,8 +214,11 @@ export default function LoyaltyPage() {
                               {tx.points > 0 ? "⭐" : "🔻"}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ color: "#f8f0e0", fontSize: 10.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tx.reason}</div>
-                              <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 2 }}>{fmtTime(tx.created_at)}</div>
+                              <div style={{ color: "#f8f0e0", fontSize: 10.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{reasonLabel(tx.reason)}</div>
+                              <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 2 }}>
+                                {fmtTime(tx.created_at)}
+                                {tx.ref_id && <span style={{ marginLeft: 6, opacity: 0.6 }}>· #{tx.ref_id.slice(-6).toUpperCase()}</span>}
+                              </div>
                             </div>
                             <div style={{ color: tx.points > 0 ? "#b464ff" : "#ff4040", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
                               {tx.points > 0 ? "+" : ""}{tx.points.toLocaleString()}

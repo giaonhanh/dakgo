@@ -31,9 +31,13 @@ export default function DriverEarningsPage() {
       if (!user) return
 
       const now = new Date()
-      const startOfDay = new Date(now); startOfDay.setHours(0,0,0,0)
-      const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - 6); startOfWeek.setHours(0,0,0,0)
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      // Dùng VN timezone (UTC+7) để tính đúng ngày/tuần/tháng tại Việt Nam
+      const vnNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
+      const vnToday = vnNow.toISOString().split("T")[0]
+      const startOfDay  = new Date(`${vnToday}T00:00:00+07:00`)
+      const startOfWeek = new Date(startOfDay.getTime() - 6 * 24 * 60 * 60 * 1000)
+      const vnMonth = vnNow.toISOString().slice(0, 7)
+      const startOfMonth = new Date(`${vnMonth}-01T00:00:00+07:00`)
 
       // Driver rating and completion rate
       const { data: driverRow } = await supabase
@@ -59,7 +63,7 @@ export default function DriverEarningsPage() {
       // tinh vao thu nhap thang nay, va nguoc lai.
       const { data: orders } = await supabase
         .from("orders")
-        .select("id, ship_fee, status, delivery_address, delivered_at, shop_id, shops!inner(commission_rate)")
+        .select("id, ship_fee, status, delivery_address, delivered_at, shop_id, driver_commission_amount, shops!inner(name, commission_rate)")
         .eq("driver_id", user.id)
         .eq("status", "delivered")
         .gte("delivered_at", startOfMonth.toISOString())
@@ -68,11 +72,16 @@ export default function DriverEarningsPage() {
       if (!orders) return
 
       type OrderRow = typeof orders[number]
+      const shopOf = (o: OrderRow) => {
+        const s = o.shops as { name?: string; commission_rate?: number } | { name?: string; commission_rate?: number }[] | null
+        return Array.isArray(s) ? s[0] : s
+      }
       const netFee = (o: OrderRow) => {
         const fee = o.ship_fee ?? 0
-        const shops = o.shops as { commission_rate?: number } | { commission_rate?: number }[] | null
-        const shop = Array.isArray(shops) ? shops[0] : shops
-        const commRate = Number(shop?.commission_rate ?? 15)
+        const driverComm = Number((o as Record<string, unknown>).driver_commission_amount ?? 0)
+        if (driverComm > 0) return fee - driverComm
+        // Fallback nếu chưa có cột driver_commission_amount
+        const commRate = Number(shopOf(o)?.commission_rate ?? 15)
         return Math.round(fee * (1 - commRate / 100))
       }
 
@@ -106,7 +115,7 @@ export default function DriverEarningsPage() {
       // Recent trips
       setTrips(orders.slice(0, 10).map(o => ({
         id: o.id.slice(0, 6).toUpperCase(),
-        from: "Cửa hàng",
+        from: shopOf(o)?.name ?? "Cửa hàng",
         to: o.delivery_address ?? "—",
         time: o.delivered_at ? new Date(o.delivered_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "—",
         amount: netFee(o),
