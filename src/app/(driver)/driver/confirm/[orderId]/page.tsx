@@ -382,6 +382,8 @@ export default function DriverConfirmPage() {
       }
 
       // Today stats — dùng driver_commission_amount (không join shops)
+      // Lọc theo delivered_at (lúc giao xong), không phải created_at (lúc đặt) —
+      // đơn đặt hôm qua nhưng giao hôm nay vẫn phải tính vào "hôm nay"
       if (user) {
         const todayStart = new Date(); todayStart.setHours(0,0,0,0)
         const { data: delivered } = await supabase
@@ -389,7 +391,7 @@ export default function DriverConfirmPage() {
           .select("ship_fee, driver_commission_amount")
           .eq("driver_id", user.id)
           .eq("status", "delivered")
-          .gte("created_at", todayStart.toISOString())
+          .gte("delivered_at", todayStart.toISOString())
 
         const todayEarning = (delivered ?? []).reduce((s, d) =>
           s + Math.max(0, (d.ship_fee ?? 0) - (d.driver_commission_amount ?? 0)), 0)
@@ -445,10 +447,17 @@ export default function DriverConfirmPage() {
     }
 
     // Bước 1: Luôn cập nhật status → delivered trước (trigger realtime cho merchant + khách)
-    await supabase.from("orders").update({
+    const { error: updateErr } = await supabase.from("orders").update({
       status:       "delivered",
       delivered_at: new Date().toISOString(),
     }).eq("id", orderId)
+
+    if (updateErr) {
+      console.error("[confirm] update status=delivered error:", updateErr.code, updateErr.message, updateErr.details)
+      setSaving(false)
+      fireToast("❌ Không thể xác nhận giao hàng, vui lòng thử lại")
+      return
+    }
 
     // Bước 2: RPC xử lý hoa hồng quán + cộng ví tài xế (COD) — lỗi ví không block giao hàng
     type CompleteResult = { success?: boolean; error?: string; shop_commission_amount?: number; driver_earning?: number }
@@ -472,7 +481,7 @@ export default function DriverConfirmPage() {
       .select("ship_fee, driver_commission_amount")
       .eq("driver_id", user.id)
       .eq("status", "delivered")
-      .gte("created_at", todayStart.toISOString())
+      .gte("delivered_at", todayStart.toISOString())
 
     const todayEarning = (deliveredOrders ?? []).reduce((s, d) =>
       s + Math.max(0, (d.ship_fee ?? 0) - (d.driver_commission_amount ?? 0)), 0)
