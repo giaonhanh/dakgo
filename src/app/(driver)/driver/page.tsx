@@ -1031,7 +1031,7 @@ export default function DriverDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, driverId])
 
-  // ── Poll đơn pending mỗi 20 giây khi online (dự phòng nếu realtime miss) ──
+  // ── Poll đơn pending mỗi 8 giây khi online (dự phòng nếu realtime miss) ──
   useEffect(() => {
     if (!online || !driverId) return
     const interval = setInterval(async () => {
@@ -1042,7 +1042,7 @@ export default function DriverDashboard() {
         const { order } = await res.json()
         if (order) { setPendingOrder(order); setShowOrder(true); showOrderRef.current = true }
       } catch { /* ignore */ }
-    }, 20_000)
+    }, 8_000)
     return () => clearInterval(interval)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, driverId])
