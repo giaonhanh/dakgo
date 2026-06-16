@@ -24,6 +24,7 @@ interface PrintOrder {
   subtotal: number
   discountAmount: number
   totalAmount: number
+  merchantReceives: number
   createdAt: string
   items: PrintItem[]
 }
@@ -55,18 +56,24 @@ export default function PrintPage() {
       if (oErr || !o) { setError("Không tìm thấy đơn hàng"); return }
 
       const [{ data: shop }, { data: items }] = await Promise.all([
-        supabase.from("shops").select("name").eq("id", o.shop_id).single(),
+        supabase.from("shops").select("name, commission_rate").eq("id", o.shop_id).single(),
         supabase.from("order_items").select("name, qty, price, note, options").eq("order_id", orderId),
       ])
 
+      const commRate       = Number(shop?.commission_rate ?? 0) / 100
+      const discount       = o.discount_amount ?? 0
+      // Quán nhận: tiền món trừ hoa hồng quán, không liên quan phí ship và giảm giá
+      const merchantReceives = Math.round(o.subtotal * (1 - commRate))
+
       setOrder({
-        id:             o.id.slice(-6).toUpperCase(),
-        shopName:       shop?.name ?? "Cửa hàng",
-        note:           o.note,
-        subtotal:       o.subtotal,
-        discountAmount: o.discount_amount ?? 0,
-        totalAmount:    o.total_amount,
-        createdAt:      o.created_at,
+        id:              o.id.slice(-6).toUpperCase(),
+        shopName:        shop?.name ?? "Cửa hàng",
+        note:            o.note,
+        subtotal:        o.subtotal,
+        discountAmount:  discount,
+        totalAmount:     o.total_amount,
+        merchantReceives,
+        createdAt:       o.created_at,
         items: (items ?? []).map(i => ({
           name:    i.name,
           qty:     i.qty ?? 1,
@@ -190,18 +197,16 @@ export default function PrintPage() {
         {/* Totals */}
         <div style={{ borderTop: "1px dashed #000", paddingTop: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-            <span style={{ color: "#555" }}>Tiền món:</span>
+            <span style={{ color: "#555" }}>Tổng tiền món:</span>
             <span>{fmt(order.subtotal)}</span>
           </div>
-          {order.discountAmount > 0 && (
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-              <span style={{ color: "#555" }}>Mã giảm giá:</span>
-              <span>-{fmt(order.discountAmount)}</span>
-            </div>
-          )}
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+            <span style={{ color: "#555" }}>Tổng tiền đơn hàng:</span>
+            <span>{fmt(order.totalAmount)}</span>
+          </div>
           <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #000", paddingTop: 6, marginTop: 4 }}>
-            <span style={{ fontWeight: 900, fontSize: 14 }}>Tài xế thu:</span>
-            <span style={{ fontWeight: 900, fontSize: 14 }}>{fmt(order.totalAmount)}</span>
+            <span style={{ fontWeight: 900, fontSize: 14 }}>Thực nhận từ tài xế:</span>
+            <span style={{ fontWeight: 900, fontSize: 14 }}>{fmt(order.merchantReceives)}</span>
           </div>
         </div>
 
