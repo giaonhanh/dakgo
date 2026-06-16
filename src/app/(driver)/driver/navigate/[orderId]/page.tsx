@@ -518,11 +518,15 @@ export default function DriverNavigatePage() {
       const { data: o, error: coreErr } = await supabase
         .from("orders")
         .select(`id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng,
-          ship_fee, subtotal, total_amount, pay_method, payment_status, note`)
+          ship_fee, subtotal, total_amount, pay_method, payment_status, note, status`)
         .eq("id", orderId)
         .single()
 
       if (coreErr || !o) { console.error("[Driver] load order error:", coreErr); return }
+
+      // Khôi phục đúng giai đoạn (pickup/delivery) nếu tài xế đã "Lấy hàng xong"
+      // từ trước rồi rời trang — tránh phase bị reset về "pickup" mỗi lần vào lại.
+      if (o.status === "delivering") setPhase("delivery")
 
       const [{ data: shop }, { data: customer }, extraRes, itemsRes] = await Promise.all([
         supabase.from("shops").select("name, address, commission_rate, phone, lat, lng").eq("id", o.shop_id).single(),
@@ -580,7 +584,7 @@ export default function DriverNavigatePage() {
 
       const pos = driverPosRef.current
       const hasRealGps = pos.lat !== DEFAULT_LAT || pos.lng !== DEFAULT_LNG
-      if (hasRealGps) await calcDist(pos.lat, pos.lng, ord, "pickup")
+      if (hasRealGps) await calcDist(pos.lat, pos.lng, ord, o.status === "delivering" ? "delivery" : "pickup")
     }
     load()
 
