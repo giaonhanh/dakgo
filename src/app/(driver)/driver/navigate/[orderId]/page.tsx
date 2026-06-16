@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import dynamic from "next/dynamic"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { ChatDrawer } from "@/components/chat/ChatDrawer"
 import { getRouteKm } from "@/lib/vietmapRoute"
@@ -38,6 +38,7 @@ interface OrderItem {
 interface OrderInfo {
   id:               string
   fullId:           string
+  custId:           string
   shopName:         string
   shopAddr:         string
   shopLat:          number
@@ -417,6 +418,7 @@ function DeliveryPhase({ onDone, onCall, onChat, paymentPaid, order, distKm }: {
 
 export default function DriverNavigatePage() {
   const { orderId } = useParams<{ orderId: string }>()
+  const searchParams = useSearchParams()
   const supabase    = createClient()
 
   const [order,         setOrder]         = useState<OrderInfo | null>(null)
@@ -542,6 +544,7 @@ export default function DriverNavigatePage() {
       const ord: OrderInfo = {
         id:               o.id.slice(0, 8).toUpperCase(),
         fullId:           o.id,
+        custId:           o.customer_id,
         shopName:         shop?.name ?? "Cửa hàng",
         shopAddr:         shop?.address ?? "—",
         shopLat,
@@ -590,6 +593,11 @@ export default function DriverNavigatePage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
+
+  // Mở thẳng khung chat khi bấm vào từ push notification (?chat=1)
+  useEffect(() => {
+    if (searchParams.get("chat") === "1") setShowChat(true)
+  }, [searchParams])
 
   // Tính lại khi đổi phase
   useEffect(() => {
@@ -798,6 +806,7 @@ export default function DriverNavigatePage() {
         orderId={orderId ?? ""}
         currentUserId={currentUserId}
         currentRole="driver"
+        partnerId={order?.custId}
         partnerName={order?.custName ?? "Khách hàng"}
         isOpen={showChat}
         onClose={() => setShowChat(false)}

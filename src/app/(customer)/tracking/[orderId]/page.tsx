@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import dynamic from "next/dynamic"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { ChatDrawer } from "@/components/chat/ChatDrawer"
 import { getAdminContact } from "@/lib/adminContact"
@@ -74,7 +74,9 @@ function parseGeoPoint(loc: unknown): { lat: number; lng: number } | null {
 export default function TrackingPage() {
   const supabase = createClient()
   const { orderId } = useParams<{ orderId: string }>()
+  const searchParams = useSearchParams()
 
+  const [driverId,      setDriverId]      = useState("")
   const [orderData,     setOrderData]     = useState<{
     id: string; shopName: string; shopEmoji: string; destAddr: string
     destLat: number; destLng: number; total: number
@@ -174,6 +176,7 @@ export default function TrackingPage() {
 
       // Fetch driver
       if (order.driver_id) {
+        setDriverId(order.driver_id)
         const { data: driver } = await supabase
           .from("drivers")
           .select("id, license_plate, rating_avg, total_trips, location")
@@ -202,6 +205,11 @@ export default function TrackingPage() {
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
+
+  // Mở thẳng khung chat khi bấm vào từ push notification (?chat=1)
+  useEffect(() => {
+    if (searchParams.get("chat") === "1") setShowChat(true)
+  }, [searchParams])
 
   // ── Realtime: order status + driver location ──────────────
   useEffect(() => {
@@ -727,6 +735,7 @@ export default function TrackingPage() {
         orderId={orderId}
         currentUserId={currentUserId}
         currentRole="customer"
+        partnerId={driverId}
         partnerName={driverData?.name ?? "Tài xế"}
         isOpen={showChat}
         onClose={() => setShowChat(false)}

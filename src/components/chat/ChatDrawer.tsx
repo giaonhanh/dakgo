@@ -16,6 +16,7 @@ interface ChatDrawerProps {
   orderId: string
   currentUserId: string
   currentRole: "customer" | "driver"
+  partnerId?: string
   partnerName: string
   isOpen: boolean
   onClose: () => void
@@ -39,7 +40,7 @@ function fmtTime(iso: string): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
 }
 
-export function ChatDrawer({ orderId, currentUserId, currentRole, partnerName, isOpen, onClose }: ChatDrawerProps) {
+export function ChatDrawer({ orderId, currentUserId, currentRole, partnerId, partnerName, isOpen, onClose }: ChatDrawerProps) {
   const supabase    = createClient()
   const [messages, setMessages] = useState<Message[]>([])
   const [input,    setInput]    = useState("")
@@ -88,13 +89,31 @@ export function ChatDrawer({ orderId, currentUserId, currentRole, partnerName, i
     if (!content || sending) return
     setSending(true)
     if (!text) setInput("")
-    await supabase.from("chat_messages").insert({
+    const { error } = await supabase.from("chat_messages").insert({
       order_id:  orderId,
       sender_id: currentUserId,
       role:      currentRole,
       content,
     })
     setSending(false)
+    if (error || !partnerId) return
+
+    // Push thật cho người nhận — để họ biết có tin nhắn mới ngay cả khi app
+    // đang đóng/ở màn hình khác, bấm vào mở thẳng khung chat của đơn này.
+    const chatUrl = currentRole === "customer"
+      ? `/driver/navigate/${orderId}?chat=1`
+      : `/tracking/${orderId}?chat=1`
+    fetch("/api/notify/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: partnerId,
+        title:   currentRole === "customer" ? "💬 Khách hàng vừa nhắn tin" : "💬 Tài xế vừa nhắn tin",
+        body:    content.slice(0, 120),
+        url:     chatUrl,
+        tag:     `chat-${orderId}`,
+      }),
+    }).catch(() => {})
   }
 
   const quickReplies = currentRole === "customer" ? QUICK_REPLIES_CUSTOMER : QUICK_REPLIES_DRIVER
