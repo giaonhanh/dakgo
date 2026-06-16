@@ -8,18 +8,12 @@ import { useCartStore } from "@/store/cartStore"
 import { createClient } from "@/lib/supabase/client"
 import { getAdminContact } from "@/lib/adminContact"
 import { maskPhone } from "@/lib/maskPhone"
-import { OrderItemList } from "@/components/ui/OrderItemList"
+import { OrderItemList, type ItemBreakdown } from "@/components/ui/OrderItemList"
 
 // ─── Types ───────────────────────────────────────────────
 type Status = "delivering" | "preparing" | "pending" | "accepted" | "ready" | "completed" | "cancelled"
 type ServiceType = "food" | "errand_deliver" | "errand_buy" | "ride_motorbike" | "ride_car" | "ride_car_4" | "ride_car_7"
 
-interface ItemBreakdown {
-  basePrice: number
-  sizeLabel?: string
-  sizeDiff?: number
-  toppings?: { name: string; price: number }[]
-}
 interface Item {
   emoji: string; name: string; qty: number; price: number
   productId?: string; note?: string
@@ -93,16 +87,6 @@ function fmtPayMethod(pm: string): string {
   return map[pm] ?? pm
 }
 
-function parseItemName(fullName: string) {
-  const match = fullName.match(/^(.+?)\s*\((.+)\)$/)
-  if (!match) return { base: fullName, size: null, toppings: [] as string[] }
-  const base = match[1].trim()
-  const parts = match[2].split(/\s*·\s*/).map(s => s.trim()).filter(Boolean)
-  const sizeIdx = parts.findIndex(p => /^size/i.test(p))
-  const size = sizeIdx >= 0 ? parts[sizeIdx] : null
-  const toppings = parts.filter((_, i) => i !== sizeIdx)
-  return { base, size, toppings }
-}
 
 function fmtDate(iso: string): string {
   const d = new Date(iso)
