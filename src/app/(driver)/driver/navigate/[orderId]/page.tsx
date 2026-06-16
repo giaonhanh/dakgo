@@ -8,6 +8,7 @@ import { createBrowserClient } from "@supabase/ssr"
 import { createClient } from "@/lib/supabase/client"
 import { ChatDrawer } from "@/components/chat/ChatDrawer"
 import { getRouteKm } from "@/lib/vietmapRoute"
+import { OrderItemList, type ItemBreakdown } from "@/components/ui/OrderItemList"
 
 const NavMap = dynamic(() => import("@/components/map/NavMap"), {
   ssr: false,
@@ -25,23 +26,13 @@ const DEFAULT_LNG = 108.5073
 
 type Phase = "pickup" | "delivery"
 
-interface ItemOption {
-  name:  string
-  price: number
-}
-
-interface ItemOptions {
-  size?:     ItemOption
-  toppings?: ItemOption[]
-}
-
 interface OrderItem {
-  name:     string
-  qty:      number
-  price:    number
-  subtotal: number
-  note?:    string
-  options?: ItemOptions
+  name:      string
+  qty:       number
+  price:     number
+  subtotal:  number
+  note?:     string
+  breakdown?: ItemBreakdown | null
 }
 
 interface OrderInfo {
@@ -214,65 +205,12 @@ function PickupPhase({ onDone, onCall, onChat, fireToast, order, distKm }: {
         </div>
 
         {/* Chi tiết món ăn */}
-        <div style={{ background:"rgba(255,255,255,0.02)",
-          border:"1px solid rgba(255,255,255,0.06)",
-          borderRadius:10, padding:"8px 11px", marginBottom:10 }}>
+        <div style={{ marginBottom: 10 }}>
           <div style={{ color:"#6a5a40", fontSize:8.5, fontWeight:700,
             textTransform:"uppercase", letterSpacing:.5, marginBottom:7 }}>
             Đơn #{order.id} · {order.items.length} món
           </div>
-          {order.items.map((it, i) => (
-            <div key={i} style={{
-              padding:"6px 0",
-              borderBottom: i < order.items.length - 1
-                ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-              {/* Tên món + tổng */}
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                <span style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:700, flex:1 }}>
-                  {i + 1}. {it.name}
-                </span>
-                <span style={{ color:"#FF8C00", fontSize:10, fontWeight:700, flexShrink:0, marginLeft:8 }}>
-                  ×{it.qty} · {fmt(it.subtotal)}
-                </span>
-              </div>
-              {/* Giá gốc */}
-              <div style={{ color:"#6a5a40", fontSize:8.5, marginTop:1, paddingLeft:12 }}>
-                {fmt(it.price)}/món
-              </div>
-              {/* Size — màu xanh dương */}
-              {it.options?.size && (
-                <div style={{ display:"flex", justifyContent:"space-between",
-                  paddingLeft:16, paddingTop:3 }}>
-                  <span style={{ color:"#4a8ff5", fontSize:9 }}>
-                    ↳ Size: {it.options.size.name}
-                  </span>
-                  {it.options.size.price > 0 && (
-                    <span style={{ color:"#4a8ff5", fontSize:9 }}>+{fmt(it.options.size.price)}</span>
-                  )}
-                </div>
-              )}
-              {/* Toppings — màu tím */}
-              {it.options?.toppings?.map((tp, ti) => (
-                <div key={ti} style={{ display:"flex", justifyContent:"space-between",
-                  paddingLeft:16, paddingTop:2 }}>
-                  <span style={{ color:"#b464ff", fontSize:9 }}>
-                    ↳ {tp.name}
-                  </span>
-                  {tp.price > 0 && (
-                    <span style={{ color:"#b464ff", fontSize:9 }}>+{fmt(tp.price)}</span>
-                  )}
-                </div>
-              ))}
-              {/* Ghi chú — vàng */}
-              {it.note && (
-                <div style={{ color:"#f5c542", fontSize:9, marginTop:4, paddingLeft:12,
-                  display:"flex", alignItems:"center", gap:4 }}>
-                  <span>📝</span>
-                  <span>{it.note}</span>
-                </div>
-              )}
-            </div>
-          ))}
+          <OrderItemList items={order.items} />
         </div>
 
         {/* Bảng thanh toán cho tài xế */}
@@ -580,13 +518,13 @@ export default function DriverNavigatePage() {
         custNote:         o.note ?? "",
         custLat:          (o.delivery_lat as number | null) ?? 0,
         custLng:          (o.delivery_lng as number | null) ?? 0,
-        items:            (o.order_items ?? []).map((i: { name: string; qty: number; price: number; subtotal: number; note?: string; options?: ItemOptions }) => ({
-          name:     i.name,
-          qty:      i.qty,
-          price:    i.price,
-          subtotal: i.subtotal ?? (i.price * i.qty),
-          note:     i.note,
-          options:  i.options,
+        items:            (o.order_items ?? []).map((i: { name: string; qty: number; price: number; subtotal: number; note?: string; options?: ItemBreakdown | null }) => ({
+          name:      i.name,
+          qty:       i.qty,
+          price:     i.price,
+          subtotal:  i.subtotal ?? (i.price * i.qty),
+          note:      i.note,
+          breakdown: i.options ?? null,
         })),
         total:            Number(o.total_amount ?? 0),
         subtotal:         sub,

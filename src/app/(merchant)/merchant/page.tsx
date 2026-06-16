@@ -8,6 +8,7 @@ import { Power, ShoppingBag, TrendingUp, Star } from "lucide-react"
 import Link from "next/link"
 import { formatPrice } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { OrderItemList } from "@/components/ui/OrderItemList"
 
 type OrderStatus = "pending" | "accepted" | "preparing" | "ready" | "delivered" | "rejected"
 type PayMethod   = "cash" | "wallet" | "vietqr" | "momo" | "zalopay"
@@ -804,105 +805,8 @@ export default function MerchantDashboard() {
                             textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 5 }}>
                             Chi tiết đơn hàng
                           </div>
-                          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-                            borderRadius: 10, overflow: "hidden", marginBottom: 12 }}>
-                            {order.itemList.length === 0 ? (
-                              <div style={{ padding: "10px 12px", color: "#6a5a40", fontSize: 10, textAlign: "center" }}>
-                                Không có thông tin món
-                              </div>
-                            ) : order.itemList.map((item, i) => {
-                              const { base, size, toppings } = parseItemName(item.name)
-                              const bd = item.breakdown
-                              // Size hiển thị
-                              const displaySz = bd?.sizeLabel
-                                ? (/^size/i.test(bd.sizeLabel) ? bd.sizeLabel : `Size ${bd.sizeLabel}`)
-                                : size ? (/^size/i.test(size) ? size : `Size ${size}`) : null
-                              // Giá size
-                              const sizePrice = bd?.sizeDiff ?? 0
-                              // Toppings list: ưu tiên breakdown, fallback parse từ tên
-                              const toppingList: { name: string; price: number }[] = bd?.toppings?.length
-                                ? bd.toppings
-                                : toppings.map(t => ({ name: t, price: 0 }))
-                              // Giá gốc món (không size, không topping)
-                              const basePrice = bd?.basePrice ?? item.price
-                              // Đơn giá sau option
-                              const unitPrice = basePrice + sizePrice + toppingList.reduce((s, t) => s + t.price, 0)
-
-                              return (
-                                <div key={i} style={{ padding: "10px 12px",
-                                  borderBottom: i < order.itemList.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
-
-                                  {/* Dòng 1: Số thứ tự + Tên món + Giá gốc */}
-                                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
-                                    <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-                                      background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.3)",
-                                      display: "flex", alignItems: "center", justifyContent: "center",
-                                      color: "#FF8C00", fontSize: 9, fontWeight: 800 }}>{i + 1}</span>
-                                    <span style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 700, flex: 1 }}>{base}</span>
-                                    <span style={{ color: "#b0956a", fontSize: 10, fontWeight: 600, flexShrink: 0 }}>
-                                      {fmt(basePrice)}
-                                    </span>
-                                  </div>
-
-                                  {/* Dòng 2: Size (nếu có) */}
-                                  {displaySz && (
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                                      paddingLeft: 27, paddingBottom: 4 }}>
-                                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                        <span style={{ color: "#4a8ff5", fontSize: 9 }}>▸</span>
-                                        <span style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 600 }}>{displaySz}</span>
-                                      </div>
-                                      <span style={{ color: "#4a8ff5", fontSize: 9, fontWeight: 600 }}>
-                                        {sizePrice > 0 ? `+${fmt(sizePrice)}` : "đã tính"}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {/* Dòng 3+: Toppings (nếu có) */}
-                                  {toppingList.map((tp, ti) => (
-                                    <div key={ti} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                                      paddingLeft: 27, paddingBottom: 4 }}>
-                                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                        <span style={{ color: "#3ecf6e", fontSize: 9 }}>+</span>
-                                        <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>{tp.name}</span>
-                                      </div>
-                                      <span style={{ color: "#3ecf6e", fontSize: 9, fontWeight: 600 }}>
-                                        {tp.price > 0 ? `+${fmt(tp.price)}` : "đã tính"}
-                                      </span>
-                                    </div>
-                                  ))}
-
-                                  {/* Thành tiền món */}
-                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                                    paddingLeft: 27, paddingTop: 4,
-                                    borderTop: (displaySz || toppingList.length > 0) ? "1px solid rgba(255,255,255,0.05)" : "none",
-                                    marginTop: (displaySz || toppingList.length > 0) ? 4 : 0 }}>
-                                    <span style={{ color: "#6a5a40", fontSize: 9 }}>
-                                      Thành tiền{item.qty > 1 ? ` ×${item.qty}` : ""}
-                                    </span>
-                                    <span style={{ color: "#FF8C00", fontSize: 11, fontWeight: 800 }}>
-                                      {fmt(unitPrice * item.qty)}
-                                    </span>
-                                  </div>
-
-                                  {/* Ghi chú món */}
-                                  {item.note && (
-                                    <div style={{ marginTop: 6, paddingLeft: 27,
-                                      display: "flex", gap: 5, alignItems: "flex-start" }}>
-                                      <span style={{ color: "#f5c542", fontSize: 9, flexShrink: 0 }}>📝</span>
-                                      <span style={{ color: "#f5c542", fontSize: 9 }}>{item.note}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            })}
-                            {order.note && (
-                              <div style={{ padding: "7px 12px", borderTop: "1px solid rgba(255,255,255,0.04)",
-                                background: "rgba(245,197,66,0.04)", display: "flex", gap: 6, alignItems: "flex-start" }}>
-                                <span style={{ fontSize: 11, flexShrink: 0 }}>📝</span>
-                                <span style={{ color: "#b0956a", fontSize: 9 }}>{order.note}</span>
-                              </div>
-                            )}
+                          <div style={{ marginBottom: 12 }}>
+                            <OrderItemList items={order.itemList} orderNote={order.note} />
                           </div>
 
                           {/* ── Thông tin thanh toán ── */}
