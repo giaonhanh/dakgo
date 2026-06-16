@@ -8,8 +8,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+import type { RealtimeChannel } from "@supabase/supabase-js"
 
-const supabase = createClient()
 const COUNTDOWN_SEC = 30
 
 /* ── helpers ── */
@@ -32,6 +32,7 @@ interface OrderData {
   subtotal:            number
   deliveryFee:         number
   total:               number
+  earnerFee:           number  // Tài xế nhận = ship_fee - driver_commission
   payShop:             number  // Số tiền trả quán = subtotal - shop_commission
   payMethod:           string
   // Errand-specific
@@ -299,17 +300,29 @@ function OrderPopup({
           )}
 
           {/* ── fare summary ── */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:16 }}>
+          {/* Tiền tài xế nhận — to, nổi bật nhất */}
+          <div style={{ background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.35)",
+            borderRadius:14, padding:"10px 14px", marginBottom:10,
+            display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div>
+              <div style={{ color:"#6a5a40", fontSize:8.5, fontWeight:700, textTransform:"uppercase", letterSpacing:.5, marginBottom:2 }}>🏆 Tài xế nhận</div>
+              <div style={{ color:"#FF6B00", fontSize:26, fontWeight:800, lineHeight:1 }}>{fmt(o.earnerFee ?? 0)}</div>
+            </div>
+            <div style={{ textAlign:"right" }}>
+              <div style={{ color:"#6a5a40", fontSize:8 }}>Phương thức</div>
+              <div style={{ color:"#4a8ff5", fontSize:11, fontWeight:700, marginTop:2 }}>{o.payMethod}</div>
+            </div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:16 }}>
             {[
-              { label:"Khách trả",   value: fmt(o.total),    color:"#f8f0e0", bg:"rgba(255,255,255,0.04)" },
-              { label:"Trả quán (~)", value: fmt(o.payShop), color:"#FFB347",  bg:"rgba(255,107,0,0.08)"  },
-              { label:"Thanh toán",  value: o.payMethod,     color:"#4a8ff5", bg:"rgba(74,143,245,0.08)"  },
+              { label:"Khách trả",    value: fmt(o.total),    color:"#f8f0e0", bg:"rgba(255,255,255,0.04)" },
+              { label:"Trả quán (~)", value: fmt(o.payShop),  color:"#FFB347",  bg:"rgba(255,107,0,0.08)"  },
             ].map(c => (
               <div key={c.label} style={{
                 background:c.bg, border:"1px solid rgba(255,255,255,0.06)",
                 borderRadius:12, padding:"10px 8px", textAlign:"center",
               }}>
-                <div style={{ color:c.color, fontSize:11, fontWeight:800 }}>{c.value}</div>
+                <div style={{ color:c.color, fontSize:13, fontWeight:800 }}>{c.value}</div>
                 <div style={{ color:"#6a5a40", fontSize:8, marginTop:2 }}>{c.label}</div>
               </div>
             ))}
@@ -448,6 +461,7 @@ interface PayInfo {
 }
 
 function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const supabase = createClient()
   const [amount,    setAmount]    = useState(200000)
   const [custom,    setCustom]    = useState("")
   const [useCustom, setUseCustom] = useState(false)
@@ -871,11 +885,14 @@ function WithdrawSheet({ onClose, walletBalance, onSuccess }: {
 
 /* ── main page ── */
 export default function DriverDashboard() {
-  const router = useRouter()
+  const router   = useRouter()
+  const supabase = createClient()
   const [online,        setOnline]        = useState(false)
   const [showOrder,     setShowOrder]     = useState(false)
   const [pendingOrder,  setPendingOrder]  = useState<OrderData | null>(null)
   const [accepted,      setAccepted]      = useState<string | null>(null)
+  const [dashToast,     setDashToast]     = useState("")
+  const fireDashToast = (msg: string, ms = 3000) => { setDashToast(msg); setTimeout(() => setDashToast(""), ms) }
   const { requestPermission } = usePushNotification()
   useOrderSound("driver")
   const [driverName,    setDriverName]    = useState("Tài xế")
@@ -891,7 +908,7 @@ export default function DriverDashboard() {
   const [isApproved,    setIsApproved]    = useState<boolean | null>(null)
   const [unreadNotif,   setUnreadNotif]   = useState(0)
   useDriverLocation(driverId, online)  // lưu GPS realtime vào drivers.location trong DB
-  const channelRef    = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const channelRef    = useRef<RealtimeChannel | null>(null)
   const gpsWatchRef   = useRef<number | null>(null)
   const gpsRef        = useRef({ lat: 0, lng: 0 })
   const showOrderRef  = useRef(false)
@@ -980,38 +997,45 @@ export default function DriverDashboard() {
   const handleToggleOnline = async () => {
     if (!driverId || toggling) return
     if (!setupDone) { setShowSetupGate(true); return }
-    setToggling(true)
     const next = !online
-    await supabase.from("drivers").update({ status: next ? "online" : "offline" }).eq("id", driverId)
+    // Optimistic: cập nhật UI ngay, rollback nếu DB lỗi
     setOnline(next)
-    if (!next) setShowOrder(false)
+    if (!next) {
+      setShowOrder(false)
+      showOrderRef.current = false
+      setPendingOrder(null)
+      orderQueueRef.current = []
+    }
+    setToggling(true)
+    const { error } = await supabase.from("drivers").update({ status: next ? "online" : "offline" }).eq("id", driverId)
+    if (error) setOnline(!next) // rollback
     setToggling(false)
   }
 
   // ── Helper: build OrderData from a raw order row ──────────────
   const buildOrderData = useCallback(async (o: {
     id: string; shop_id: string; customer_id: string
-    delivery_address: string; total: number; ship_fee: number
-    subtotal?: number; total_amount: number; pay_method: string
+    delivery_address: string; ship_fee: number
+    subtotal?: number; total_amount: number; payment_method: string
   }): Promise<OrderData | null> => {
     const [{ data: shop }, { data: customer }, { data: items }] = await Promise.all([
       supabase.from("shops").select("name, address, commission_rate").eq("id", o.shop_id).single(),
       supabase.from("profiles").select("full_name").eq("id", o.customer_id).single(),
-      supabase.from("order_items").select("name, qty, price").eq("order_id", o.id),
+      supabase.from("order_items").select("name, quantity, price").eq("order_id", o.id),
     ])
-    // subtotal = tiền hàng (không bao gồm ship_fee)
-    // Fallback: dùng total (cột cũ) nếu subtotal chưa có trong DB
-    const shopRate = Number(shop?.commission_rate ?? 15)
-    const subtotal = o.subtotal ?? o.total ?? 0
-    const payShop  = Math.round(subtotal * (1 - shopRate / 100))
+    const shopRate  = Number(shop?.commission_rate ?? 15)
+    const subtotal  = o.subtotal ?? 0
+    const shipFee   = o.ship_fee ?? 0
+    const payShop   = Math.round(subtotal * (1 - shopRate / 100))
+    const earnerFee = Math.round(shipFee * (1 - shopRate / 100))
     return {
       id: o.id.slice(0, 8).toUpperCase(), fullId: o.id, orderTable: "orders",
       shopName: shop?.name ?? "Cửa hàng", shopAddress: shop?.address ?? "",
       customerName: customer?.full_name ?? "Khách hàng", customerAddress: o.delivery_address ?? "",
       distanceToShop: -1, distanceToCustomer: -1,
-      items: (items ?? []).map(i => ({ name: i.name, qty: i.qty ?? 1, price: i.price })),
-      subtotal, deliveryFee: o.ship_fee ?? 0, total: o.total_amount ?? 0,
-      payShop, payMethod: o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+      items: (items ?? []).map(i => ({ name: i.name, qty: (i as { quantity?: number }).quantity ?? 1, price: i.price })),
+      subtotal, deliveryFee: shipFee, total: o.total_amount ?? 0,
+      earnerFee, payShop, payMethod: o.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
     }
   }, [supabase])
 
@@ -1064,7 +1088,7 @@ export default function DriverDashboard() {
         const o = payload.new as {
           id: string; shop_id: string; customer_id: string
           delivery_address: string; total: number; ship_fee: number
-          subtotal?: number; total_amount: number; pay_method: string
+          subtotal?: number; total_amount: number; payment_method: string
         }
         const orderData = await buildOrderData(o)
         if (!orderData) return
@@ -1118,6 +1142,7 @@ export default function DriverDashboard() {
           subtotal:    fee,
           deliveryFee: 0,
           total:       fee,
+          earnerFee:   fee,
           payShop:     0,
           payMethod:   e.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
           packagePhotoUrl: e.package_photo_url ?? undefined,
@@ -1138,7 +1163,7 @@ export default function DriverDashboard() {
         event: "UPDATE", schema: "public", table: "orders",
         filter: "status=eq.preparing",
       }, async (payload) => {
-        const o = payload.new as { id: string; status: string; driver_id: string | null; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; subtotal?: number; total_amount: number; pay_method: string }
+        const o = payload.new as { id: string; status: string; driver_id: string | null; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; subtotal?: number; total_amount: number; payment_method: string }
         // Bỏ qua nếu đơn đã có tài xế, hoặc đang xử lý
         if (o.driver_id !== null || acceptedRef.current) return
         const orderData = await buildOrderData(o)
@@ -1155,7 +1180,7 @@ export default function DriverDashboard() {
         event: "UPDATE", schema: "public", table: "orders",
         filter: `driver_id=eq.${driverId}`,
       }, async (payload) => {
-        const o = payload.new as { id: string; status: string; driver_id: string; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; subtotal?: number; total_amount: number; pay_method: string }
+        const o = payload.new as { id: string; status: string; driver_id: string; shop_id: string; customer_id: string; delivery_address: string; total: number; ship_fee: number; subtotal?: number; total_amount: number; payment_method: string }
         // Hiện popup khi đơn có driver_id là tài xế này và còn có thể nhận
         if (!["pending", "accepted"].includes(o.status) || acceptedRef.current) return
         const orderData = await buildOrderData(o)
@@ -1184,7 +1209,7 @@ export default function DriverDashboard() {
       }).eq("id", orderId).is("driver_id", null)
 
       if (error) {
-        alert("Đơn đã được tài xế khác nhận!"); return
+        fireDashToast("⚠️ Đơn đã được tài xế khác nhận!"); return
       }
       setShowOrder(false); showOrderRef.current = false; orderQueueRef.current = []
       setAccepted(orderId); acceptedRef.current = orderId
@@ -1206,14 +1231,14 @@ export default function DriverDashboard() {
 
       // Lỗi ví không đủ → báo nạp tiền, không thử fallback
       if (errMsg.includes("Số dư ví") || errMsg.includes("chưa có ví")) {
-        alert(errMsg + "\n\nVào mục Thu nhập → Ví để nạp tiền.")
+        fireDashToast("💳 " + errMsg + " — Vào Thu nhập → Ví để nạp tiền", 5000)
         setShowOrder(false); showOrderRef.current = false; setPendingOrder(null)
         return
       }
 
       // Đơn đã có tài xế khác → bỏ qua
       if (errMsg.includes("đã được tài xế") || errMsg.includes("không còn có thể")) {
-        alert("Đơn đã được tài xế khác nhận!")
+        fireDashToast("⚠️ Đơn đã được tài xế khác nhận!")
         setShowOrder(false); showOrderRef.current = false; setPendingOrder(null)
         return
       }
@@ -1226,7 +1251,7 @@ export default function DriverDashboard() {
       })
       if (!fbRes.ok) {
         const fbErr = await fbRes.json().catch(() => ({}))
-        alert(fbErr?.error ?? errMsg)
+        fireDashToast("❌ " + (fbErr?.error ?? errMsg))
         setShowOrder(false); showOrderRef.current = false; setPendingOrder(null)
         return
       }
@@ -1280,7 +1305,31 @@ export default function DriverDashboard() {
         @keyframes shimmer{0%{left:-60%}100%{left:120%}}
         @keyframes radarRing{0%{transform:scale(.25);opacity:.8}100%{transform:scale(1);opacity:0}}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+        @keyframes slideDown{from{transform:translateY(-100%) translateX(-50%)}to{transform:translateY(0) translateX(-50%)}}
       `}</style>
+
+      {/* Dashboard toast */}
+      {dashToast && (
+        <div style={{ position:"fixed", top:"calc(env(safe-area-inset-top) + 12px)", left:"50%",
+          transform:"translateX(-50%)", zIndex:9999, whiteSpace:"nowrap",
+          background:"rgba(14,12,9,0.96)", border:"1px solid rgba(255,107,0,0.35)",
+          borderRadius:12, padding:"9px 20px",
+          color:"#FF8C00", fontSize:11, fontWeight:600,
+          backdropFilter:"blur(12px)", animation:"slideDown .25s ease",
+          boxShadow:"0 4px 16px rgba(0,0,0,0.4)" }}>
+          {dashToast}
+        </div>
+      )}
+
+      {/* ── Skeleton loading khi chưa biết trạng thái duyệt ── */}
+      {isApproved === null && (
+        <div style={{ minHeight:"100dvh", background:"#080806", padding:"0 16px", paddingTop:"calc(env(safe-area-inset-top) + 56px)", fontFamily:"'Lexend',sans-serif" }}>
+          <style>{`@keyframes skPulse{0%,100%{opacity:.5}50%{opacity:.15}}`}</style>
+          {[120, 80, 200, 140].map((h, i) => (
+            <div key={i} style={{ height:h, borderRadius:16, background:"rgba(255,255,255,0.06)", marginBottom:12, animation:"skPulse 1.4s infinite" }} />
+          ))}
+        </div>
+      )}
 
       {/* ── Chưa được duyệt ── */}
       {isApproved === false && (
@@ -1326,7 +1375,7 @@ export default function DriverDashboard() {
         </div>
       )}
 
-      {isApproved !== false && <div style={{ minHeight:"100dvh", background:"#080806", paddingBottom:80 }}>
+      {isApproved === true && <div style={{ minHeight:"100dvh", background:"#080806", paddingBottom:"calc(80px + env(safe-area-inset-bottom))" }}>
 
         {/* ── header ── */}
         <div style={{ position:"sticky", top:0, zIndex:40, background:"rgba(8,8,6,0.95)", backdropFilter:"blur(20px)", borderBottom:"1px solid rgba(255,107,0,0.08)", paddingTop:"env(safe-area-inset-top)" }}>
@@ -1510,7 +1559,7 @@ export default function DriverDashboard() {
 
         {/* ── bottom nav ── */}
         <nav style={{
-          position:"fixed", bottom:12, left:14, right:14, height:56,
+          position:"fixed", bottom:"calc(12px + env(safe-area-inset-bottom))", left:14, right:14, height:56,
           borderRadius:9999, zIndex:50,
           background:"rgba(8,8,6,0.92)", backdropFilter:"blur(20px)",
           border:"1px solid rgba(255,107,0,0.2)",

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -307,7 +308,12 @@ function DonePhase({ photoUrl, order, today }: {
         </button>
       </div>
 
-      <button onClick={() => { window.location.href = "/driver" }}
+      <button onClick={async () => {
+          const sb = createClient()
+          const { data: { user } } = await sb.auth.getUser()
+          if (user) await sb.from("drivers").update({ status: "offline" }).eq("id", user.id)
+          window.location.href = "/driver"
+        }}
         style={{ width:"100%", height:42, borderRadius:12,
           border:"1px solid rgba(255,64,64,0.2)", background:"rgba(255,64,64,0.07)",
           color:"#ff6060", fontSize:11, fontWeight:600, fontFamily:"Lexend", cursor:"pointer",
@@ -320,6 +326,7 @@ function DonePhase({ photoUrl, order, today }: {
 
 export default function DriverConfirmPage() {
   const { orderId } = useParams<{ orderId: string }>()
+  const router      = useRouter()
   const supabase    = createClient()
 
   const [order,     setOrder]     = useState<OrderInfo | null>(null)
@@ -333,6 +340,16 @@ export default function DriverConfirmPage() {
   const fireToast = (msg: string) => {
     setToast(msg); setTimeout(() => setToast(""), 2400)
   }
+
+  // Cleanup overflow:hidden khi rời trang
+  useEffect(() => {
+    document.documentElement.style.overflow = "hidden"
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.documentElement.style.overflow = ""
+      document.body.style.overflow = ""
+    }
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -401,6 +418,10 @@ export default function DriverConfirmPage() {
     if (!orderId || saving) return
     setSaving(true)
 
+    // Verify auth trước khi làm bất cứ thứ gì
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setSaving(false); return }
+
     // Upload ảnh xác nhận
     let deliveryPhotoUrl: string | null = null
     if (photoFile) {
@@ -415,9 +436,6 @@ export default function DriverConfirmPage() {
           .getPublicUrl(path).data.publicUrl
       }
     }
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
 
     // Cập nhật ảnh xác nhận trước (nếu có)
     if (deliveryPhotoUrl) {
@@ -473,7 +491,7 @@ export default function DriverConfirmPage() {
     <>
       <style>{`
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        html,body{background:#080806;font-family:'Lexend',sans-serif;height:100%;overflow:hidden}
+        html,body{background:#080806;font-family:'Lexend',sans-serif;height:100%}
         ::-webkit-scrollbar{width:3px}
         ::-webkit-scrollbar-thumb{background:rgba(255,107,0,0.25);border-radius:2px}
         @keyframes cfShim{0%{left:-60%}100%{left:120%}}
@@ -549,7 +567,7 @@ export default function DriverConfirmPage() {
         </div>
 
         {/* Scrollable content */}
-        <div style={{ flex:1, overflowY:"auto", padding:"12px 16px 88px",
+        <div style={{ flex:1, overflowY:"auto", padding:"12px 16px",paddingBottom:"calc(88px + env(safe-area-inset-bottom))",
           WebkitOverflowScrolling:"touch" } as React.CSSProperties}>
           <AnimatePresence mode="wait">
             {phase === "capture" && (
@@ -577,7 +595,7 @@ export default function DriverConfirmPage() {
           padding:"0 6px", zIndex:50, boxShadow:"0 0 20px rgba(255,107,0,0.1)" }}>
           {[
             { icon:"🏠", label:"Dashboard", href:"/driver"                   },
-            { icon:"🗺️", label:"Bản đồ",   href:"javascript:history.back()" },
+            { icon:"🗺️", label:"Bản đồ",   href:`/driver/navigate/${orderId}` },
             { icon:"💰", label:"Thu nhập",  href:"/driver/earnings"          },
             { icon:"🤝", label:"Hồ sơ",    href:"/driver/profile"           },
           ].map(tab => (

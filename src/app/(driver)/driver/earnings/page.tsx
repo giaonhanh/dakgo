@@ -56,7 +56,7 @@ export default function DriverEarningsPage() {
 
       const { data: orders } = await supabase
         .from("orders")
-        .select("id, ship_fee, status, delivery_address, created_at, shop_id")
+        .select("id, ship_fee, status, delivery_address, created_at, shop_id, shops!inner(commission_rate)")
         .eq("driver_id", user.id)
         .eq("status", "delivered")
         .gte("created_at", startOfMonth.toISOString())
@@ -64,9 +64,18 @@ export default function DriverEarningsPage() {
 
       if (!orders) return
 
-      const todayRevenue = orders.filter(o => new Date(o.created_at) >= startOfDay).reduce((s, o) => s + (o.ship_fee ?? 0), 0)
-      const weekRevenue  = orders.filter(o => new Date(o.created_at) >= startOfWeek).reduce((s, o) => s + (o.ship_fee ?? 0), 0)
-      const monthRevenue = orders.reduce((s, o) => s + (o.ship_fee ?? 0), 0)
+      type OrderRow = typeof orders[number]
+      const netFee = (o: OrderRow) => {
+        const fee = o.ship_fee ?? 0
+        const shops = o.shops as { commission_rate?: number } | { commission_rate?: number }[] | null
+        const shop = Array.isArray(shops) ? shops[0] : shops
+        const commRate = Number(shop?.commission_rate ?? 15)
+        return Math.round(fee * (1 - commRate / 100))
+      }
+
+      const todayRevenue = orders.filter(o => new Date(o.created_at) >= startOfDay).reduce((s, o) => s + netFee(o), 0)
+      const weekRevenue  = orders.filter(o => new Date(o.created_at) >= startOfWeek).reduce((s, o) => s + netFee(o), 0)
+      const monthRevenue = orders.reduce((s, o) => s + netFee(o), 0)
       const todayTrips   = orders.filter(o => new Date(o.created_at) >= startOfDay).length
       const weekTrips    = orders.filter(o => new Date(o.created_at) >= startOfWeek).length
 
@@ -84,7 +93,7 @@ export default function DriverEarningsPage() {
       for (const o of orders) {
         const key = new Date(o.created_at).toDateString()
         if (weekMap[key]) {
-          weekMap[key].amount += o.ship_fee ?? 0
+          weekMap[key].amount += netFee(o)
           weekMap[key].trips++
         }
       }
@@ -96,7 +105,7 @@ export default function DriverEarningsPage() {
         from: "Cửa hàng",
         to: o.delivery_address ?? "—",
         time: new Date(o.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
-        amount: o.ship_fee ?? 0,
+        amount: netFee(o),
         type: "food",
       })))
     }
@@ -133,7 +142,7 @@ export default function DriverEarningsPage() {
           </div>
         </div>
 
-        <div style={{ flex:1,overflowY:"auto",padding:"12px 16px 20px" }}>
+        <div style={{ flex:1,overflowY:"auto",padding:"12px 16px",paddingBottom:"calc(20px + env(safe-area-inset-bottom))" }}>
 
           {/* Big number */}
           <div style={{ textAlign:"center",padding:"24px 0",background:"rgba(255,107,0,0.05)",border:"1px solid rgba(255,107,0,0.15)",borderRadius:16,marginBottom:12 }}>

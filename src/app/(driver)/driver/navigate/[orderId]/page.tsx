@@ -4,11 +4,11 @@ import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import dynamic from "next/dynamic"
 import { useParams } from "next/navigation"
-import { createBrowserClient } from "@supabase/ssr"
 import { createClient } from "@/lib/supabase/client"
 import { ChatDrawer } from "@/components/chat/ChatDrawer"
 import { getRouteKm } from "@/lib/vietmapRoute"
 import { OrderItemList, type ItemBreakdown } from "@/components/ui/OrderItemList"
+import type { NavMapHandle } from "@/components/map/NavMap"
 
 const NavMap = dynamic(() => import("@/components/map/NavMap"), {
   ssr: false,
@@ -42,11 +42,13 @@ interface OrderInfo {
   shopAddr:         string
   shopLat:          number
   shopLng:          number
+  shopPhone:        string
   custName:         string
   custAddr:         string
   custNote:         string
   custLat:          number
   custLng:          number
+  custPhone:        string
   items:            OrderItem[]
   total:            number
   subtotal:         number
@@ -69,10 +71,15 @@ function googleNavUrl(destLat: number, destLng: number) {
 }
 
 function useSpeed() {
-  const [speed, setSpeed] = useState(22)
+  const [speed, setSpeed] = useState<number | null>(null)
   useEffect(() => {
-    const t = setInterval(() => setSpeed(Math.round(14 + Math.random() * 24)), 4000)
-    return () => clearInterval(t)
+    if (!navigator.geolocation) return
+    const id = navigator.geolocation.watchPosition(
+      pos => setSpeed(pos.coords.speed !== null ? Math.round(pos.coords.speed * 3.6) : null),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 3000 },
+    )
+    return () => navigator.geolocation.clearWatch(id)
   }, [])
   return speed
 }
@@ -424,9 +431,13 @@ export default function DriverNavigatePage() {
   const speed = useSpeed()
 
   // Ref giữ vị trí GPS thật — tránh closure stale trong useEffect
-  const driverPosRef = useRef({ lat: DEFAULT_LAT, lng: DEFAULT_LNG })
+  const driverPosRef    = useRef({ lat: DEFAULT_LAT, lng: DEFAULT_LNG })
   // Tránh tính lại khoảng cách quá thường xuyên (chỉ khi di chuyển >50m)
-  const lastCalcPos  = useRef({ lat: 0, lng: 0 })
+  const lastCalcPos     = useRef({ lat: 0, lng: 0 })
+  // Ref cho NavMap để gọi flyToDriver
+  const navMapRef       = useRef<NavMapHandle>(null)
+  // Ref cho broadcast channel GPS
+  const broadcastRef    = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const fireToast = (msg: string) => {
     setToast(msg); setTimeout(() => setToast(""), 2400)
@@ -444,8 +455,25 @@ export default function DriverNavigatePage() {
     } catch { /* giữ giá trị cũ */ }
   }
 
+  // Cleanup overflow:hidden khi rời trang
+  useEffect(() => {
+    document.documentElement.style.overflow = "hidden"
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.documentElement.style.overflow = ""
+      document.body.style.overflow = ""
+    }
+  }, [])
+
   useEffect(() => {
     let watchId: number | null = null
+
+    // Tạo broadcast channel một lần, giữ ref để cleanup đúng cách
+    if (orderId) {
+      broadcastRef.current = supabase.channel(`driver-location:${orderId}`)
+      broadcastRef.current.subscribe()
+    }
+
     if (navigator.geolocation) {
       watchId = navigator.geolocation.watchPosition(
         pos => {
@@ -456,8 +484,8 @@ export default function DriverNavigatePage() {
           driverPosRef.current = { lat, lng }
 
           // Broadcast vị trí tài xế để tracking page cập nhật realtime
-          if (orderId) {
-            supabase.channel(`driver-location:${orderId}`).send({
+          if (broadcastRef.current) {
+            broadcastRef.current.send({
               type: "broadcast",
               event: "location",
               payload: { lat, lng, orderId },
@@ -486,18 +514,18 @@ export default function DriverNavigatePage() {
       const { data: o } = await supabase
         .from("orders")
         .select(`id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng,
-          ship_fee, subtotal, total_amount, pay_method, payment_status, note,
+          ship_fee, subtotal, total_amount, payment_method, payment_status, note,
           discount_amount, xu_used, xu_bonus_used,
           driver_commission_amount, shop_commission_amount,
-          order_items(name, qty, price, subtotal, note, options)`)
+          order_items(name, quantity, price, subtotal, note, options)`)
         .eq("id", orderId)
         .single()
 
       if (!o) return
 
       const [{ data: shop }, { data: customer }] = await Promise.all([
-        supabase.from("shops").select("name, address, commission_rate, lat, lng").eq("id", o.shop_id).single(),
-        supabase.from("profiles").select("full_name").eq("id", o.customer_id).single(),
+        supabase.from("shops").select("name, address, commission_rate, phone, lat, lng").eq("id", o.shop_id).single(),
+        supabase.from("profiles").select("full_name, phone").eq("id", o.customer_id).single(),
       ])
 
       const shopCommission   = Number((o as Record<string, unknown>).shop_commission_amount   ?? 0)
@@ -513,16 +541,18 @@ export default function DriverNavigatePage() {
         shopAddr:         shop?.address ?? "—",
         shopLat,
         shopLng,
+        shopPhone:        (shop as { phone?: string } | null)?.phone ?? "",
         custName:         customer?.full_name ?? "Khách hàng",
         custAddr:         o.delivery_address ?? "—",
         custNote:         o.note ?? "",
         custLat:          (o.delivery_lat as number | null) ?? 0,
         custLng:          (o.delivery_lng as number | null) ?? 0,
-        items:            (o.order_items ?? []).map((i: { name: string; qty: number; price: number; subtotal: number; note?: string; options?: ItemBreakdown | null }) => ({
+        custPhone:        (customer as { phone?: string } | null)?.phone ?? "",
+        items:            (o.order_items ?? []).map((i: { name: string; quantity: number; price: number; subtotal: number; note?: string; options?: ItemBreakdown | null }) => ({
           name:      i.name,
-          qty:       i.qty,
+          qty:       i.quantity ?? 1,
           price:     i.price,
-          subtotal:  i.subtotal ?? (i.price * i.qty),
+          subtotal:  i.subtotal ?? (i.price * (i.quantity ?? 1)),
           note:      i.note,
           breakdown: i.options ?? null,
         })),
@@ -531,17 +561,15 @@ export default function DriverNavigatePage() {
         payShop:          Math.max(0, sub - shopCommission),
         shopCommission,
         driverCommission,
-        xuUsed:           Number((o as Record<string, unknown>).xu_used      ?? 0),
+        xuUsed:           Number((o as Record<string, unknown>).xu_used       ?? 0),
         xuBonusUsed:      Number((o as Record<string, unknown>).xu_bonus_used ?? 0),
         discount:         Number((o as Record<string, unknown>).discount_amount ?? 0),
-        payment:          o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
-        paymentRaw:       String(o.pay_method ?? "cash"),
+        payment:          o.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+        paymentRaw:       String(o.payment_method ?? "cash"),
         paymentStatus:    String((o as Record<string, unknown>).payment_status ?? "pending"),
       }
       setOrder(ord)
 
-      // Tính khoảng cách lần đầu — dùng ref thay vì state để tránh stale closure
-      // Nếu GPS chưa có (vẫn ở DEFAULT), không tính — watchPosition sẽ gọi khi có GPS thật
       const pos = driverPosRef.current
       const hasRealGps = pos.lat !== DEFAULT_LAT || pos.lng !== DEFAULT_LNG
       if (hasRealGps) await calcDist(pos.lat, pos.lng, ord, "pickup")
@@ -550,6 +578,10 @@ export default function DriverNavigatePage() {
 
     return () => {
       if (watchId !== null) navigator.geolocation.clearWatch(watchId)
+      if (broadcastRef.current) {
+        supabase.removeChannel(broadcastRef.current)
+        broadcastRef.current = null
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
@@ -563,11 +595,7 @@ export default function DriverNavigatePage() {
   // Realtime — payment status
   useEffect(() => {
     if (!orderId) return
-    const sb = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    )
-    const ch = sb.channel(`order-${orderId}`)
+    const ch = supabase.channel(`order-payment:${orderId}`)
       .on("broadcast", { event: "payment_status" }, ({ payload }) => {
         if (payload.status === "paid") {
           setPaymentPaid(true)
@@ -575,7 +603,7 @@ export default function DriverNavigatePage() {
         }
       })
       .subscribe()
-    return () => { sb.removeChannel(ch) }
+    return () => { supabase.removeChannel(ch) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
 
@@ -591,7 +619,7 @@ export default function DriverNavigatePage() {
     <>
       <style>{`
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        html,body{background:#080806;font-family:'Lexend',sans-serif;height:100%;overflow:hidden}
+        html,body{background:#080806;font-family:'Lexend',sans-serif;height:100%}
         ::-webkit-scrollbar{width:3px}
         ::-webkit-scrollbar-thumb{background:rgba(255,107,0,0.25);border-radius:2px}
         @keyframes navPulse{0%,100%{opacity:1}50%{opacity:.35}}
@@ -616,7 +644,7 @@ export default function DriverNavigatePage() {
 
         {/* MAP */}
         <div style={{ flexShrink:0, position:"relative" }}>
-          <NavMap driverLat={driverLat} driverLng={driverLng}
+          <NavMap ref={navMapRef} driverLat={driverLat} driverLng={driverLng}
             targetLat={targetLat} targetLng={targetLng}
             phase={phase} height={MAP_HEIGHT} />
 
@@ -625,7 +653,7 @@ export default function DriverNavigatePage() {
             background:"rgba(8,8,6,0.9)", border:"1px solid rgba(255,255,255,0.1)",
             borderRadius:10, padding:"5px 10px", textAlign:"center", backdropFilter:"blur(8px)" }}>
             <div style={{ color:"#f8f0e0", fontSize:20, fontWeight:800, lineHeight:1 }}>
-              {typeof window !== "undefined" ? 22 : 0}
+              {speed !== null ? speed : "—"}
             </div>
             <div style={{ color:"#6a5a40", fontSize:8 }}>km/h</div>
           </div>
@@ -641,7 +669,8 @@ export default function DriverNavigatePage() {
           </div>
 
           {/* Re-center button */}
-          <div style={{ position:"absolute", top:10, left:10, zIndex:10,
+          <div onClick={() => navMapRef.current?.flyToDriver(driverLat, driverLng)}
+            style={{ position:"absolute", top:10, left:10, zIndex:10,
             width:34, height:34, borderRadius:9,
             background:"rgba(8,8,6,0.88)", border:"1px solid rgba(255,255,255,0.1)",
             display:"flex", alignItems:"center", justifyContent:"center",
@@ -683,7 +712,8 @@ export default function DriverNavigatePage() {
         </div>
 
         {/* CONTENT */}
-        <div style={{ flex:1, overflowY:"auto", padding:"12px 16px 88px",
+        <div style={{ flex:1, overflowY:"auto", padding:"12px 16px",
+          paddingBottom:"calc(88px + env(safe-area-inset-bottom))",
           WebkitOverflowScrolling:"touch" } as React.CSSProperties}>
 
           {!order ? (
@@ -705,7 +735,7 @@ export default function DriverNavigatePage() {
                       }).eq("id", orderId)
                     }
                   }}
-                  onCall={() => fireToast("Đang gọi cho quán...")}
+                  onCall={() => { if (order.shopPhone) window.location.href = `tel:${order.shopPhone}`; else fireToast("Không có số điện thoại quán") }}
                   onChat={() => setShowChat(true)}
                   fireToast={fireToast}
                   order={order}
@@ -714,7 +744,7 @@ export default function DriverNavigatePage() {
               ) : (
                 <DeliveryPhase
                   onDone={() => { window.location.href = `/driver/confirm/${orderId}` }}
-                  onCall={() => fireToast("Đang gọi cho khách...")}
+                  onCall={() => { if (order.custPhone) window.location.href = `tel:${order.custPhone}`; else fireToast("Không có số điện thoại khách") }}
                   onChat={() => setShowChat(true)}
                   paymentPaid={paymentPaid}
                   order={order}
@@ -726,7 +756,7 @@ export default function DriverNavigatePage() {
         </div>
 
         {/* BOTTOM NAV */}
-        <div style={{ position:"absolute", bottom:16, left:14, right:14, height:56,
+        <div style={{ position:"absolute", bottom:"calc(16px + env(safe-area-inset-bottom))", left:14, right:14, height:56,
           background:"rgba(8,8,6,0.92)", backdropFilter:"blur(20px)",
           border:"1px solid rgba(255,107,0,0.2)", borderRadius:9999,
           display:"flex", alignItems:"center", justifyContent:"space-around",

@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     // Trả về đơn pending hoặc accepted (merchant đã xác nhận) chưa có tài xế
     const { data: rows } = await db
       .from("orders")
-      .select("id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng, total, ship_fee, total_amount, pay_method")
+      .select("id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng, subtotal, ship_fee, total_amount, payment_method")
       .in("status", ["pending", "accepted"])
       .is("driver_id", null)
       .order("created_at", { ascending: true })
@@ -47,13 +47,13 @@ export async function GET(request: Request) {
     const o = rows[0]
 
     const [{ data: shop }, { data: customer }, { data: items }] = await Promise.all([
-      db.from("shops").select("name, address, commission_rate, lat, lng").eq("id", o.shop_id).single(),
+      db.from("shops").select("name, address, commission_rate").eq("id", o.shop_id).single(),
       db.from("profiles").select("full_name").eq("id", o.customer_id).single(),
-      db.from("order_items").select("name, qty, price").eq("order_id", o.id),
+      db.from("order_items").select("name, quantity, price").eq("order_id", o.id),
     ])
 
-    const shopLat = (shop as { lat?: number } | null)?.lat ?? null
-    const shopLng = (shop as { lng?: number } | null)?.lng ?? null
+    const shopLat = null
+    const shopLng = null
     const custLat = (o.delivery_lat as number | null) ?? null
     const custLng = (o.delivery_lng as number | null) ?? null
 
@@ -88,12 +88,12 @@ export async function GET(request: Request) {
         distanceToShop,
         distanceToCustomer,
         shopNeedsCoords,
-        items:              (items ?? []).map(i => ({ name: i.name, qty: i.qty ?? 1, price: i.price })),
-        subtotal:           o.total ?? 0,
+        items:              (items ?? []).map(i => ({ name: i.name, qty: (i as { quantity?: number }).quantity ?? 1, price: i.price })),
+        subtotal:           o.subtotal ?? 0,
         deliveryFee:        o.ship_fee ?? 0,
         total:              o.total_amount ?? 0,
         earnerFee,
-        payMethod:          o.pay_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
+        payMethod:          o.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
       },
     })
   } catch {

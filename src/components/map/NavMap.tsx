@@ -1,9 +1,13 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { MAP_STYLE, vmTransform, VIETMAP_KEY_MISSING } from "@/lib/mapConfig"
 import MapKeyMissing from "@/components/map/MapKeyMissing"
+
+export interface NavMapHandle {
+  flyToDriver: (lat: number, lng: number) => void
+}
 
 interface NavMapProps {
   driverLat: number
@@ -37,15 +41,21 @@ function routeData(dlng: number, dlat: number, tlng: number, tlat: number) {
   }
 }
 
-export default function NavMap({
+const NavMap = forwardRef<NavMapHandle, NavMapProps>(function NavMap({
   driverLat, driverLng, targetLat, targetLng, phase, height = 225,
-}: NavMapProps) {
+}, ref) {
   const divRef    = useRef<HTMLDivElement>(null)
   const mapRef    = useRef<any>(null)
   const mlRef     = useRef<any>(null)
   const drMarker  = useRef<any>(null)
   const tgMarker  = useRef<any>(null)
   const loadedRef = useRef(false)
+
+  useImperativeHandle(ref, () => ({
+    flyToDriver: (lat: number, lng: number) => {
+      mapRef.current?.flyTo({ center: [lng, lat], zoom: 16, duration: 800 })
+    },
+  }))
 
   const isPickup   = phase === "pickup"
   const routeColor = isPickup ? "#FF6B00" : "#3ecf6e"
@@ -108,12 +118,11 @@ export default function NavMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Khi phase thay đổi: rebuild layer (màu + style khác) + fit bounds
   useEffect(() => {
     const map = mapRef.current
     const ml  = mlRef.current
-    if (!map || !ml) return
-
-    drMarker.current?.setLngLat([driverLng, driverLat])
+    if (!map || !ml || !loadedRef.current) return
 
     if (tgMarker.current) {
       tgMarker.current.remove()
@@ -121,19 +130,17 @@ export default function NavMap({
         .setLngLat([targetLng, targetLat]).addTo(map)
     }
 
-    if (loadedRef.current) {
-      if (map.getLayer("route")) map.removeLayer("route")
-      if (map.getSource("route")) map.removeSource("route")
-      map.addSource("route", { type: "geojson", data: routeData(driverLng, driverLat, targetLng, targetLat) })
-      map.addLayer({
-        id: "route", type: "line", source: "route",
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: {
-          "line-color": routeColor, "line-width": 4, "line-opacity": 0.9,
-          ...(isPickup ? { "line-dasharray": [2, 1.5] } : {}),
-        },
-      })
-    }
+    if (map.getLayer("route")) map.removeLayer("route")
+    if (map.getSource("route")) map.removeSource("route")
+    map.addSource("route", { type: "geojson", data: routeData(driverLng, driverLat, targetLng, targetLat) })
+    map.addLayer({
+      id: "route", type: "line", source: "route",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": routeColor, "line-width": 4, "line-opacity": 0.9,
+        ...(isPickup ? { "line-dasharray": [2, 1.5] } : {}),
+      },
+    })
 
     map.fitBounds(
       [[Math.min(driverLng, targetLng), Math.min(driverLat, targetLat)],
@@ -141,7 +148,19 @@ export default function NavMap({
       { padding: 36, animate: true }
     )
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [driverLat, driverLng, targetLat, targetLng, phase])
+  }, [phase])
+
+  // Khi chỉ GPS driver thay đổi: chỉ update marker + source data (không flash layer)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !loadedRef.current) return
+
+    drMarker.current?.setLngLat([driverLng, driverLat])
+
+    const src = map.getSource("route") as { setData?: (d: unknown) => void } | undefined
+    src?.setData?.(routeData(driverLng, driverLat, targetLng, targetLat))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driverLat, driverLng])
 
   return (
     <div style={{ position: "relative", width: "100%", height }}>
@@ -149,4 +168,6 @@ export default function NavMap({
       {VIETMAP_KEY_MISSING && <MapKeyMissing />}
     </div>
   )
-}
+})
+
+export default NavMap

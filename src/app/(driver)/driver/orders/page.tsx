@@ -14,7 +14,7 @@ interface Order {
   created_at: string
   commission_rate: number
   shop_name: string
-  customer_address: string
+  delivery_address: string
 }
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
@@ -73,7 +73,7 @@ export default function DriverOrdersPage() {
     const { data } = await supabase
       .from("orders")
       .select(`
-        id, status, ship_fee, total_amount, created_at, customer_address,
+        id, status, ship_fee, total_amount, created_at, delivery_address,
         shops ( name, commission_rate )
       `)
       .eq("driver_id", user.id)
@@ -90,7 +90,7 @@ export default function DriverOrdersPage() {
         ship_fee:         (o.ship_fee as number) ?? 0,
         total_amount:     (o.total_amount as number) ?? 0,
         created_at:       o.created_at as string,
-        customer_address: (o.customer_address as string) ?? "",
+        delivery_address: (o.delivery_address as string) ?? "",
         shop_name:        shop?.name ?? "Cửa hàng",
         commission_rate:  shop?.commission_rate ?? 15,
       }
@@ -114,7 +114,7 @@ export default function DriverOrdersPage() {
 
     if (error) { fireToast("Không thể hủy đơn, thử lại!"); setCancelling(false); return }
 
-    await supabase.from("cancel_logs").insert({ order_id: showCancelModal, user_id: driverId, role: "driver", reason: cancelReason })
+    await supabase.from("cancel_logs").insert({ order_id: showCancelModal, user_id: driverId, role: "driver", reason: cancelReason, cancelled_at: new Date().toISOString() })
 
     // Đếm hủy trong ngày hôm nay
     const startOfDay = new Date(); startOfDay.setHours(0,0,0,0)
@@ -259,7 +259,7 @@ export default function DriverOrdersPage() {
       </div>
 
       {/* List */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px 100px" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px", paddingBottom: "calc(100px + env(safe-area-inset-bottom))" }}>
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
             <div key={i} style={{ height: 80, borderRadius: 14, background: "rgba(255,255,255,0.04)", marginBottom: 8, animation: "pulse 1.5s infinite" }} />
@@ -295,7 +295,7 @@ export default function DriverOrdersPage() {
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ color: "#6a5a40", fontSize: 9, maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  📍 {o.customer_address}
+                  📍 {o.delivery_address}
                 </div>
                 <div style={{ color: o.status === "delivered" ? "#3ecf6e" : "#b0956a", fontSize: 12, fontWeight: 800 }}>
                   {fmt(earning)}
@@ -322,7 +322,7 @@ export default function DriverOrdersPage() {
       </div>
 
       {/* Bottom nav */}
-      <nav style={{ position: "fixed", bottom: 12, left: 14, right: 14, height: 56, borderRadius: 9999, zIndex: 50, background: "rgba(8,8,6,0.92)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,107,0,0.2)", boxShadow: "0 0 20px rgba(255,107,0,0.1)", display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 8px" }}>
+      <nav style={{ position: "fixed", bottom: "calc(12px + env(safe-area-inset-bottom))", left: 14, right: 14, height: 56, borderRadius: 9999, zIndex: 50, background: "rgba(8,8,6,0.92)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,107,0,0.2)", boxShadow: "0 0 20px rgba(255,107,0,0.1)", display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 8px" }}>
         {[
           { href: "/driver",          icon: "🏠", label: "Trang chủ", active: false },
           { href: "/driver/orders",   icon: "📋", label: "Đơn hàng",  active: true  },
