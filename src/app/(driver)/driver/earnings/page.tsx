@@ -54,13 +54,16 @@ export default function DriverEarningsPage() {
         setCompletionRate(Math.round((delivered / allMonthOrders.length) * 100))
       }
 
+      // Loc va sap xep theo delivered_at (luc giao xong), khong phai created_at
+      // (luc khach dat) - don dat thang truoc nhung giao thang nay van phai
+      // tinh vao thu nhap thang nay, va nguoc lai.
       const { data: orders } = await supabase
         .from("orders")
-        .select("id, ship_fee, status, delivery_address, created_at, shop_id, shops!inner(commission_rate)")
+        .select("id, ship_fee, status, delivery_address, delivered_at, shop_id, shops!inner(commission_rate)")
         .eq("driver_id", user.id)
         .eq("status", "delivered")
-        .gte("created_at", startOfMonth.toISOString())
-        .order("created_at", { ascending: false })
+        .gte("delivered_at", startOfMonth.toISOString())
+        .order("delivered_at", { ascending: false })
 
       if (!orders) return
 
@@ -73,11 +76,11 @@ export default function DriverEarningsPage() {
         return Math.round(fee * (1 - commRate / 100))
       }
 
-      const todayRevenue = orders.filter(o => new Date(o.created_at) >= startOfDay).reduce((s, o) => s + netFee(o), 0)
-      const weekRevenue  = orders.filter(o => new Date(o.created_at) >= startOfWeek).reduce((s, o) => s + netFee(o), 0)
+      const todayRevenue = orders.filter(o => o.delivered_at && new Date(o.delivered_at) >= startOfDay).reduce((s, o) => s + netFee(o), 0)
+      const weekRevenue  = orders.filter(o => o.delivered_at && new Date(o.delivered_at) >= startOfWeek).reduce((s, o) => s + netFee(o), 0)
       const monthRevenue = orders.reduce((s, o) => s + netFee(o), 0)
-      const todayTrips   = orders.filter(o => new Date(o.created_at) >= startOfDay).length
-      const weekTrips    = orders.filter(o => new Date(o.created_at) >= startOfWeek).length
+      const todayTrips   = orders.filter(o => o.delivered_at && new Date(o.delivered_at) >= startOfDay).length
+      const weekTrips    = orders.filter(o => o.delivered_at && new Date(o.delivered_at) >= startOfWeek).length
 
       setEarnings({ today: todayRevenue, week: weekRevenue, month: monthRevenue })
       setTripCount({ today: todayTrips, week: weekTrips, month: orders.length })
@@ -91,7 +94,8 @@ export default function DriverEarningsPage() {
         weekMap[key] = { day: label, amount: 0, trips: 0 }
       }
       for (const o of orders) {
-        const key = new Date(o.created_at).toDateString()
+        if (!o.delivered_at) continue
+        const key = new Date(o.delivered_at).toDateString()
         if (weekMap[key]) {
           weekMap[key].amount += netFee(o)
           weekMap[key].trips++
@@ -104,7 +108,7 @@ export default function DriverEarningsPage() {
         id: o.id.slice(0, 6).toUpperCase(),
         from: "Cửa hàng",
         to: o.delivery_address ?? "—",
-        time: new Date(o.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+        time: o.delivered_at ? new Date(o.delivered_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "—",
         amount: netFee(o),
         type: "food",
       })))
