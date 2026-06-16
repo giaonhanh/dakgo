@@ -118,7 +118,8 @@ const NavMap = forwardRef<NavMapHandle, NavMapProps>(function NavMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Khi phase thay đổi: rebuild layer (màu + style khác) + fit bounds
+  // Khi phase HOẶC tọa độ điểm đến thay đổi (vd. đơn hàng tải xong sau khi map
+  // đã mount với tọa độ mặc định) — rebuild marker/route + fit bounds lại.
   useEffect(() => {
     const map = mapRef.current
     const ml  = mlRef.current
@@ -148,7 +149,7 @@ const NavMap = forwardRef<NavMapHandle, NavMapProps>(function NavMap({
       { padding: 36, animate: true }
     )
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase])
+  }, [phase, targetLat, targetLng])
 
   // Khi chỉ GPS driver thay đổi: chỉ update marker + source data (không flash layer)
   useEffect(() => {
