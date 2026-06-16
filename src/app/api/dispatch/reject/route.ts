@@ -28,20 +28,19 @@ export async function POST(req: NextRequest) {
 
     if (!record) return NextResponse.json({ error: "Không tìm thấy đơn" }, { status: 404 })
 
-    // Chỉ xử lý nếu đơn vẫn đang pending/searching và chính tài xế này đang được gán
+    // Chỉ xử lý nếu đơn vẫn đang pending/searching và chưa có tài xế khác nhận
+    // LƯU Ý: dispatchOrder() không gán driver_id trước khi tài xế tự nhận qua RPC,
+    // nên record.driver_id luôn là null ở giai đoạn này — không thể dùng để xác minh "đang được gán".
     const isPending = table === "rides"
       ? record.status === "searching"
       : record.status === "pending"
 
-    if (!isPending || record.driver_id !== user.id) {
-      return NextResponse.json({ skipped: true, reason: "order_not_pending_or_not_assigned" })
+    if (!isPending || record.driver_id) {
+      return NextResponse.json({ skipped: true, reason: "order_not_pending_or_already_taken" })
     }
 
-    // Xóa driver_id khỏi đơn (reset về chưa có tài xế)
-    await supabase.from(table).update({ driver_id: null }).eq("id", id)
-
-    // Lấy danh sách tài xế đã thử (từ notifications)
-    const triedIds = await getTriedDriverIds(table, id)
+    // Lấy danh sách tài xế đã thử (từ notifications) — đảm bảo gồm chính tài xế vừa từ chối
+    const triedIds = [...new Set([...(await getTriedDriverIds(table, id)), user.id])]
 
     // Dispatch sang tài xế tiếp theo
     const result = await dispatchOrder(table, id, triedIds)

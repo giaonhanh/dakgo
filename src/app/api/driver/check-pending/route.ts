@@ -16,6 +16,7 @@ export async function GET(request: Request) {
     const driverLat = parseFloat(searchParams.get("driverLat") ?? "0")
     const driverLng = parseFloat(searchParams.get("driverLng") ?? "0")
     const hasDriverPos = driverLat !== 0 && driverLng !== 0
+    const excludeIds = (searchParams.get("excludeIds") ?? "").split(",").filter(Boolean)
 
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -33,14 +34,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ order: null })
     }
 
-    // Trả về đơn pending hoặc accepted (merchant đã xác nhận) chưa có tài xế
-    const { data: rows } = await db
+    // Trả về đơn pending hoặc accepted (merchant đã xác nhận) chưa có tài xế, bỏ qua đơn tài xế đã từ chối
+    let q = db
       .from("orders")
       .select("id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng, subtotal, ship_fee, total_amount, payment_method")
       .in("status", ["pending", "accepted"])
       .is("driver_id", null)
       .order("created_at", { ascending: true })
       .limit(1)
+    if (excludeIds.length > 0) q = q.not("id", "in", `(${excludeIds.join(",")})`)
+    const { data: rows } = await q
 
     if (!rows?.length) return NextResponse.json({ order: null })
 

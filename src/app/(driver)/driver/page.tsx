@@ -914,6 +914,7 @@ export default function DriverDashboard() {
   const showOrderRef  = useRef(false)
   const acceptedRef   = useRef<string | null>(null)
   const orderQueueRef = useRef<OrderData[]>([])
+  const rejectedIdsRef = useRef<Set<string>>(new Set())  // đơn đã từ chối — không hiện lại qua poll dự phòng
 
   // ── Load driver profile on mount ──
   useEffect(() => {
@@ -1045,10 +1046,11 @@ export default function DriverDashboard() {
     async function checkPendingOrders() {
       if (showOrderRef.current || acceptedRef.current) return
       try {
-        const res = await fetch(`/api/driver/check-pending?driverLat=${gpsRef.current.lat}&driverLng=${gpsRef.current.lng}`)
+        const exclude = [...rejectedIdsRef.current].join(",")
+        const res = await fetch(`/api/driver/check-pending?driverLat=${gpsRef.current.lat}&driverLng=${gpsRef.current.lng}&excludeIds=${exclude}`)
         if (!res.ok) return
         const { order } = await res.json()
-        if (order) { setPendingOrder(order); setShowOrder(true); showOrderRef.current = true }
+        if (order && !rejectedIdsRef.current.has(order.fullId)) { setPendingOrder(order); setShowOrder(true); showOrderRef.current = true }
       } catch { /* ignore */ }
     }
     checkPendingOrders()
@@ -1061,10 +1063,11 @@ export default function DriverDashboard() {
     const interval = setInterval(async () => {
       if (showOrderRef.current || acceptedRef.current) return
       try {
-        const res = await fetch(`/api/driver/check-pending?driverLat=${gpsRef.current.lat}&driverLng=${gpsRef.current.lng}`)
+        const exclude = [...rejectedIdsRef.current].join(",")
+        const res = await fetch(`/api/driver/check-pending?driverLat=${gpsRef.current.lat}&driverLng=${gpsRef.current.lng}&excludeIds=${exclude}`)
         if (!res.ok) return
         const { order } = await res.json()
-        if (order) { setPendingOrder(order); setShowOrder(true); showOrderRef.current = true }
+        if (order && !rejectedIdsRef.current.has(order.fullId)) { setPendingOrder(order); setShowOrder(true); showOrderRef.current = true }
       } catch { /* ignore */ }
     }, 8_000)
     return () => clearInterval(interval)
@@ -1279,6 +1282,7 @@ export default function DriverDashboard() {
 
     // Báo server để dispatch sang tài xế tiếp theo
     if (rejected) {
+      rejectedIdsRef.current.add(rejected.fullId)
       fetch("/api/dispatch/reject", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
