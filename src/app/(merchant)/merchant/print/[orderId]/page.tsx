@@ -102,9 +102,9 @@ export default function PrintPage() {
           body { margin: 0; }
           .no-print { display: none !important; }
         }
-        body {
-          background: #fff;
-          color: #000;
+        html, body {
+          background: #fff !important;
+          color: #000 !important;
           font-family: "Courier New", Courier, monospace;
           font-size: 12px;
           margin: 0;
