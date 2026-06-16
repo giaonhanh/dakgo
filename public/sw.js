@@ -1,4 +1,4 @@
-const CACHE_NAME = 'giaonhanh-v3'
+const CACHE_NAME = 'giaonhanh-v4'
 const MAP_CACHE  = 'giaonhanh-maps-v2'
 const OFFLINE_URL = '/offline'
 
@@ -8,6 +8,10 @@ const PRECACHE_URLS = [
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
+  '/driver',
+  '/driver/orders',
+  '/driver/earnings',
+  '/driver/profile',
 ]
 
 // ── Install: precache critical URLs ──

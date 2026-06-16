@@ -178,7 +178,7 @@ export default function DriverEarningsPage() {
                 const h = Math.max(4, Math.round((d.amount / maxAmt) * 72))
                 const isToday = i === weekly.length - 1
                 return (
-                  <div key={d.day} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4 }}>
+                  <div key={i} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4 }}>
                     <div style={{ width:"100%",height:h,borderRadius:"4px 4px 0 0",background:isToday?"linear-gradient(180deg,#FF6B00,#FF8C00)":"rgba(255,107,0,0.2)",transition:"height .3s" }} />
                     <div style={{ color:isToday?"#FF8C00":"#6a5a40",fontSize:8,fontWeight:isToday?700:400 }}>{d.day}</div>
                   </div>

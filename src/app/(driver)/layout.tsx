@@ -47,7 +47,7 @@ function ActiveOrderCard() {
 
   return (
     <a href={`/driver/navigate/${order.id}`} style={{
-      position: "fixed", bottom: 76, left: 14, right: 14, zIndex: 45,
+      position: "fixed", bottom: "calc(76px + env(safe-area-inset-bottom))", left: 14, right: 14, zIndex: 45,
       display: "flex", alignItems: "center", gap: 12,
       background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.35)",
       borderRadius: 14, padding: "10px 14px",
