@@ -898,6 +898,37 @@ export default function HomePage() {
           </div>
 
           {/* --------------------------------------
+              Banner: dịch vụ đặt đồ ăn bị admin khoá / ngoài giờ
+          -------------------------------------- */}
+          {(() => {
+            const foodToggle = svcToggleMap.food
+            const foodHours  = svcTimeMap.food
+            const manualOff  = foodToggle?.enabled === false
+            let outsideHours = false
+            if (foodHours && !foodHours.allDay) {
+              const now = new Date()
+              const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+              const [oh, om] = foodHours.open.split(":").map(Number)
+              const [ch, cm] = foodHours.close.split(":").map(Number)
+              const oMin = (oh ?? 0) * 60 + (om ?? 0)
+              const cMin = (ch ?? 0) * 60 + (cm ?? 0)
+              outsideHours = oMin <= cMin ? !(vnMin >= oMin && vnMin < cMin) : !(vnMin >= oMin || vnMin < cMin)
+            }
+            if (!manualOff && !outsideHours) return null
+            const msg = manualOff
+              ? (foodToggle?.customerMsg || "Dịch vụ đặt đồ ăn tạm ngừng phục vụ.")
+              : `Dịch vụ đặt đồ ăn hoạt động từ ${foodHours?.open} – ${foodHours?.close}. Vui lòng quay lại trong giờ phục vụ.`
+            return (
+              <div style={{ margin:"0 16px 12px", padding:"10px 13px", borderRadius:13,
+                background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.25)",
+                display:"flex", alignItems:"flex-start", gap:9 }}>
+                <span style={{ fontSize:16, flexShrink:0 }}>🍜🚫</span>
+                <div style={{ color:"#FFB347", fontSize:11, lineHeight:1.5 }}>{msg}</div>
+              </div>
+            )
+          })()}
+
+          {/* --------------------------------------
               S3 — LiveStatusBanner (carousel da don)
           -------------------------------------- */}
           <AnimatePresence>

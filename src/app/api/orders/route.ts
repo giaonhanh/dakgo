@@ -32,6 +32,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Địa chỉ giao hàng không hợp lệ" }, { status: 400 })
     }
 
+    // Kiểm tra dịch vụ đặt đồ ăn (toàn hệ thống) có đang mở không — admin có thể
+    // tắt thủ công kèm lý do, hoặc cấu hình giờ hoạt động tự khoá ngoài giờ
+    const { data: toggleRow } = await supabase
+      .from("app_settings").select("value").eq("key", "service_toggles").maybeSingle()
+    const foodToggle = (toggleRow?.value as Record<string, { enabled?: boolean; customerMsg?: string }> | null)?.food
+    if (foodToggle?.enabled === false) {
+      return NextResponse.json({ error: foodToggle.customerMsg || "Dịch vụ đặt đồ ăn tạm ngừng phục vụ." }, { status: 400 })
+    }
+    const { data: timeRow } = await supabase
+      .from("app_settings").select("value").eq("key", "service_time_pricing").maybeSingle()
+    const foodHours = (timeRow?.value as Record<string, { hours?: { open: string; close: string; allDay: boolean } }> | null)?.food?.hours
+    if (foodHours && !foodHours.allDay) {
+      const now = new Date()
+      const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+      const [oh, om] = foodHours.open.split(":").map(Number)
+      const [ch, cm] = foodHours.close.split(":").map(Number)
+      const oMin = (oh ?? 0) * 60 + (om ?? 0)
+      const cMin = (ch ?? 0) * 60 + (cm ?? 0)
+      const inHours = oMin <= cMin ? vnMin >= oMin && vnMin < cMin : vnMin >= oMin || vnMin < cMin
+      if (!inHours) {
+        return NextResponse.json({ error: `Dịch vụ đặt đồ ăn hoạt động từ ${foodHours.open} – ${foodHours.close}. Vui lòng quay lại trong giờ phục vụ.` }, { status: 400 })
+      }
+    }
+
     // Kiểm tra shop còn mở không
     const { data: shop } = await supabase
       .from("shops")

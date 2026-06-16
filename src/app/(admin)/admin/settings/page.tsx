@@ -11,6 +11,12 @@ interface ToggleSetting { key: string; label: string; description: string; value
 interface SvcToggle { key: string; label: string; icon: string; color: string; enabled: boolean; reason: string; customerMsg: string }
 
 const SERVICE_PRESETS: Record<string, { label: string; msg: string }[]> = {
+  food: [
+    { label:"Quá tải đơn",     msg:"Hệ thống đặt đồ ăn đang quá tải, tạm ngưng nhận đơn mới. Xin lỗi vì sự bất tiện." },
+    { label:"Ngoài giờ",       msg:"Dịch vụ đặt đồ ăn hoạt động từ 07:00 – 21:00. Vui lòng quay lại trong giờ phục vụ." },
+    { label:"Bảo trì",         msg:"Hệ thống đặt đồ ăn đang bảo trì, sẽ hoạt động trở lại sớm." },
+    { label:"Tạm nghỉ",        msg:"Dịch vụ đặt đồ ăn tạm ngừng phục vụ hôm nay. Xin lỗi vì sự bất tiện." },
+  ],
   motorbike: [
     { label:"Tài xế bận hết",  msg:"Hiện không có tài xế xe ôm khả dụng trong khu vực. Vui lòng thử lại sau ít phút." },
     { label:"Quá tải đơn",     msg:"Dịch vụ xe ôm đang quá tải, tạm ngưng nhận đơn mới. Xin lỗi vì sự bất tiện." },
@@ -180,6 +186,7 @@ export default function AdminSettingsPage() {
 
   // service toggle key → svcTime key
   const SVC_TOGGLE_TO_TIME_KEY: Record<string, string> = {
+    food: "food",
     motorbike: "motorbike", taxi_4cho: "taxi", taxi_7cho: "taxi7",
     mua_ho: "errand", giao_ho: "delivery_pkg",
   }
@@ -307,6 +314,7 @@ export default function AdminSettingsPage() {
 
   /* ── Service Toggles ── */
   const [serviceToggles, setServiceToggles] = useState<SvcToggle[]>([
+    { key:"food",      label:"Đặt đồ ăn",  icon:"🍜", color:"#FF6B00", enabled:true, reason:"", customerMsg:"" },
     { key:"motorbike", label:"Xe ôm",      icon:"🛵", color:"#4a8ff5", enabled:true, reason:"", customerMsg:"" },
     { key:"taxi_4cho", label:"Taxi 4 chỗ", icon:"🚕", color:"#FF8C00", enabled:true, reason:"", customerMsg:"" },
     { key:"taxi_7cho", label:"Taxi 7 chỗ", icon:"🚙", color:"#b464ff", enabled:true, reason:"", customerMsg:"" },
