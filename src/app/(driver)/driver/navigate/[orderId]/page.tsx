@@ -511,25 +511,30 @@ export default function DriverNavigatePage() {
 
     async function load() {
       if (!orderId) return
-      const { data: o } = await supabase
+      // Query cột lõi riêng — nếu các cột phụ (hoa hồng/xu/voucher) bị lỗi
+      // (vd. thiếu cột trên DB) thì vẫn không làm sập toàn bộ trang.
+      const { data: o, error: coreErr } = await supabase
         .from("orders")
         .select(`id, shop_id, customer_id, delivery_address, delivery_lat, delivery_lng,
-          ship_fee, subtotal, total_amount, payment_method, payment_status, note,
-          discount_amount, xu_used, xu_bonus_used,
-          driver_commission_amount, shop_commission_amount,
-          order_items(name, quantity, price, subtotal, note, options)`)
+          ship_fee, subtotal, total_amount, payment_method, payment_status, note`)
         .eq("id", orderId)
         .single()
 
-      if (!o) return
+      if (coreErr || !o) { console.error("[Driver] load order error:", coreErr); return }
 
-      const [{ data: shop }, { data: customer }] = await Promise.all([
+      const [{ data: shop }, { data: customer }, extraRes, itemsRes] = await Promise.all([
         supabase.from("shops").select("name, address, commission_rate, phone, lat, lng").eq("id", o.shop_id).single(),
         supabase.from("profiles").select("full_name, phone").eq("id", o.customer_id).single(),
+        supabase.from("orders")
+          .select("discount_amount, xu_used, xu_bonus_used, driver_commission_amount, shop_commission_amount")
+          .eq("id", orderId).single(),
+        supabase.from("order_items").select("name, quantity, price, subtotal, note, options").eq("order_id", orderId),
       ])
 
-      const shopCommission   = Number((o as Record<string, unknown>).shop_commission_amount   ?? 0)
-      const driverCommission = Number((o as Record<string, unknown>).driver_commission_amount ?? 0)
+      const extra            = (extraRes.data ?? {}) as Record<string, unknown>
+      const orderItems       = itemsRes.data ?? []
+      const shopCommission   = Number(extra.shop_commission_amount   ?? 0)
+      const driverCommission = Number(extra.driver_commission_amount ?? 0)
       const sub              = Number((o as Record<string, unknown>).subtotal                 ?? 0)
       const shopLat          = (shop as { lat?: number } | null)?.lat ?? 0
       const shopLng          = (shop as { lng?: number } | null)?.lng ?? 0
@@ -548,7 +553,7 @@ export default function DriverNavigatePage() {
         custLat:          (o.delivery_lat as number | null) ?? 0,
         custLng:          (o.delivery_lng as number | null) ?? 0,
         custPhone:        (customer as { phone?: string } | null)?.phone ?? "",
-        items:            (o.order_items ?? []).map((i: { name: string; quantity: number; price: number; subtotal: number; note?: string; options?: ItemBreakdown | null }) => ({
+        items:            (orderItems ?? []).map((i: { name: string; quantity: number; price: number; subtotal: number; note?: string; options?: ItemBreakdown | null }) => ({
           name:      i.name,
           qty:       i.quantity ?? 1,
           price:     i.price,
@@ -561,9 +566,9 @@ export default function DriverNavigatePage() {
         payShop:          Math.max(0, sub - shopCommission),
         shopCommission,
         driverCommission,
-        xuUsed:           Number((o as Record<string, unknown>).xu_used       ?? 0),
-        xuBonusUsed:      Number((o as Record<string, unknown>).xu_bonus_used ?? 0),
-        discount:         Number((o as Record<string, unknown>).discount_amount ?? 0),
+        xuUsed:           Number(extra.xu_used       ?? 0),
+        xuBonusUsed:      Number(extra.xu_bonus_used ?? 0),
+        discount:         Number(extra.discount_amount ?? 0),
         payment:          o.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản",
         paymentRaw:       String(o.payment_method ?? "cash"),
         paymentStatus:    String((o as Record<string, unknown>).payment_status ?? "pending"),

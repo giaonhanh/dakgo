@@ -560,15 +560,28 @@ export default function AdminOrdersPage() {
       { user_id: newDrvId, type:"order",
         title:"📦 Bạn nhận đơn hàng mới",
         body:`Admin đã phân công đơn #${order.id.slice(0,8).toUpperCase()} cho bạn`,
-        data:{ order_id: order.id } },
+        data:{ order_id: order.id, url: "/driver" } },
     ]
     if (order.driver_id) notifs.push({
       user_id: order.driver_id, type:"order",
       title:"🔄 Đơn hàng đã được chuyển",
       body:`Đơn #${order.id.slice(0,8).toUpperCase()} đã được chuyển cho tài xế khác. Lý do: ${finalRsn}`,
-      data:{ order_id: order.id },
+      data:{ order_id: order.id, url: "/driver" },
     })
     await supabase.from("notifications").insert(notifs)
+    // Push thật cho tài xế mới — nếu chỉ ghi vào bảng notifications thì tài xế
+    // sẽ không biết có đơn (không có popup/countdown như luồng dispatch tự động)
+    fetch("/api/notify/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: newDrvId,
+        title:   "📦 Bạn được phân công đơn mới",
+        body:    `Đơn #${order.id.slice(0,8).toUpperCase()} — vào app để nhận`,
+        url:     "/driver",
+        tag:     `admin-assign-${order.id}`,
+      }),
+    }).catch(() => {})
     setOrders(p => p.map(o => o.id === order.id ? {...o, driver_id:newDrvId, driverName:newDrv?.name ?? null} : o))
     setDrvModal(null); setDrvReason(""); setDrvCustom(""); setNewDriverId("")
     setChangingDriver(false)
