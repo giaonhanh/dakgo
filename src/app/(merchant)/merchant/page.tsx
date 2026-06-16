@@ -966,6 +966,17 @@ export default function MerchantDashboard() {
                             </div>
                           )}
 
+                          <div style={{ display: "flex", gap: 7, marginBottom: 6 }}>
+                            <button onClick={() => window.open(`/merchant/print/${order.id}`, "_blank")}
+                              style={{ flex: 1, height: 36, borderRadius: 10, border: "none",
+                                background: "rgba(255,255,255,0.04)", outline: "1px solid rgba(255,255,255,0.1)",
+                                color: "#b0956a", fontSize: 11, fontWeight: 700,
+                                fontFamily: "Lexend", cursor: "pointer", display: "flex",
+                                alignItems: "center", justifyContent: "center", gap: 5 }}>
+                              🖨️ In hóa đơn
+                            </button>
+                          </div>
+
                           <div style={{ display: "flex", gap: 7 }}>
                             {order.status === "pending" && (
                               <>
