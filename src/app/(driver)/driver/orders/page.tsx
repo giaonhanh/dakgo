@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { isBlacklisted, logCancelAndCheckLock } from "@/lib/cancelLock"
 
 type Filter = "all" | "active" | "delivered" | "cancelled"
 
@@ -67,8 +68,7 @@ export default function DriverOrdersPage() {
     if (!user) { setLoading(false); return }
     setDriverId(user.id)
 
-    const { data: prof } = await supabase.from("profiles").select("cancel_locked").eq("id", user.id).single()
-    if (prof?.cancel_locked) setCancelLocked(true)
+    if (await isBlacklisted(supabase, user.id)) setCancelLocked(true)
 
     const { data } = await supabase
       .from("orders")
@@ -114,19 +114,12 @@ export default function DriverOrdersPage() {
 
     if (error) { fireToast("Không thể hủy đơn, thử lại!"); setCancelling(false); return }
 
-    await supabase.from("cancel_logs").insert({ order_id: showCancelModal, user_id: driverId, role: "driver", reason: cancelReason, cancelled_at: new Date().toISOString() })
+    const { locked, count } = await logCancelAndCheckLock(supabase, "driver", driverId, showCancelModal, cancelReason)
 
-    // Đếm hủy trong ngày hôm nay
-    const startOfDay = new Date(); startOfDay.setHours(0,0,0,0)
-    const { count } = await supabase.from("cancel_logs").select("*", { count: "exact", head: true })
-      .eq("user_id", driverId).eq("role", "driver").gte("cancelled_at", startOfDay.toISOString())
-    const total = count ?? 0
-
-    if (total >= 4) {
-      await supabase.from("profiles").update({ cancel_locked: true, cancel_locked_at: new Date().toISOString(), cancel_locked_reason: "Hủy đơn quá nhiều lần trong ngày" }).eq("id", driverId)
+    if (locked) {
       setCancelLocked(true)
       fireToast("⚠️ Tài khoản bị khóa · Liên hệ admin để mở khóa")
-    } else if (total === 3) {
+    } else if (count === 3) {
       fireToast("⚠️ Lần hủy thứ 3 hôm nay · Hủy thêm 1 lần nữa sẽ bị khóa tài khoản!")
     } else {
       fireToast("Đã hủy nhận đơn · Đơn quay về hàng chờ tìm tài xế khác")

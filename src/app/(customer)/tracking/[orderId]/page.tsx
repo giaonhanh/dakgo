@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase/client"
 import { ChatDrawer } from "@/components/chat/ChatDrawer"
 import { getAdminContact } from "@/lib/adminContact"
 import { maskPhone } from "@/lib/maskPhone"
+import { haversineKm } from "@/lib/vietmapRoute"
+import { isBlacklisted, logCancelAndCheckLock } from "@/lib/cancelLock"
 
 const LiveTrackMap = dynamic(() => import("@/components/map/LiveTrackMap"), {
   ssr: false,
@@ -46,19 +48,28 @@ const STEPS: StatusStep[] = [
 const STATUS_ORDER: OrderStatus[] = ["accepted","ready","delivering","delivered"]
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
-function useCountdown(initMin: number) {
-  const [secs, setSecs] = useState(initMin * 60)
-  useEffect(() => {
-    if (initMin <= 0) return
-    const t = setInterval(() => setSecs(s => Math.max(0, s - 1)), 1000)
-    return () => clearInterval(t)
-  }, [initMin])
-  return { min: Math.floor(secs / 60), sec: secs % 60 }
-}
-
 // ─── Default coords (Phước An) khi chưa có GPS tài xế ────
 const DEFAULT_LAT = 12.6830
 const DEFAULT_LNG = 108.4800
+
+// Tốc độ trung bình xe máy trong thị trấn (đã trừ hao đèn đỏ/dừng đỗ) + hệ số cung đường
+const AVG_SPEED_KMH  = 22
+const ROAD_FACTOR     = 1.3
+const PREP_BUFFER_MIN = 8    // chuẩn bị món + điều phối tài xế (trước khi "delivering")
+const HANDOFF_MIN     = 1.5  // đỗ xe + giao tận tay
+
+function travelMinFromKm(distKm: number): number {
+  return (distKm * ROAD_FACTOR / AVG_SPEED_KMH) * 60
+}
+
+function parseGeoPoint(loc: unknown): { lat: number; lng: number } | null {
+  try {
+    const g = typeof loc === "string" ? JSON.parse(loc) : loc
+    const coords = (g as { coordinates?: [number, number] })?.coordinates
+    if (coords) return { lat: coords[1], lng: coords[0] }
+  } catch { /* ignore parse error */ }
+  return null
+}
 
 export default function TrackingPage() {
   const supabase = createClient()
@@ -66,7 +77,7 @@ export default function TrackingPage() {
 
   const [orderData,     setOrderData]     = useState<{
     id: string; shopName: string; shopEmoji: string; destAddr: string
-    destLat: number; destLng: number; total: number; etaMin: number
+    destLat: number; destLng: number; total: number
     items: { name: string; emoji: string }[]
     paymentMethod: string; paymentStatus?: string
   } | null>(null)
@@ -75,6 +86,10 @@ export default function TrackingPage() {
   } | null>(null)
   const [status,        setStatus]        = useState<OrderStatus>("preparing")
   const [driverPos,     setDriverPos]     = useState({ lat: DEFAULT_LAT, lng: DEFAULT_LNG })
+  const [hasDriverGps,  setHasDriverGps]  = useState(false)
+  const [shopPos,       setShopPos]       = useState<{ lat: number; lng: number } | null>(null)
+  const [etaTargetTs,   setEtaTargetTs]   = useState<number | null>(null)
+  const [now,           setNow]           = useState(() => Date.now())
   const [loading,       setLoading]       = useState(true)
   const [showCancel,    setShowCancel]    = useState(false)
   const [showContact,   setShowContact]   = useState(false)
@@ -114,7 +129,7 @@ export default function TrackingPage() {
         .select(`
           id, status, created_at, delivery_address, delivery_lat, delivery_lng,
           total_amount, pay_method, driver_id,
-          shops(name),
+          shops(name, location),
           order_items(name, qty)
         `)
         .eq("id", orderId)
@@ -123,12 +138,14 @@ export default function TrackingPage() {
       if (!order) { setLoading(false); return }
       setOrderCreatedAt(order.created_at)
 
-      // Kiểm tra cancel_locked
-      const { data: prof } = await supabase.from("profiles").select("cancel_locked").eq("id", user.id).maybeSingle()
-      if (prof?.cancel_locked) setCancelLocked(true)
+      // Kiểm tra đã bị blacklist (do hủy đơn quá nhiều lần) chưa
+      if (user && await isBlacklisted(supabase, user.id)) setCancelLocked(true)
 
       const shop = Array.isArray(order.shops) ? order.shops[0] : order.shops
       const items = (order.order_items ?? []) as { name: string; qty: number }[]
+
+      const shopGeo = parseGeoPoint(shop?.location)
+      if (shopGeo) setShopPos(shopGeo)
 
       setOrderData({
         id: order.id,
@@ -138,7 +155,6 @@ export default function TrackingPage() {
         destLat: order.delivery_lat ?? DEFAULT_LAT,
         destLng: order.delivery_lng ?? DEFAULT_LNG,
         total: order.total_amount,
-        etaMin: 20,
         items: items.map(i => ({ name: `${i.name} ×${i.qty}`, emoji: "🍽️" })),
         paymentMethod: order.pay_method,
       })
@@ -168,16 +184,8 @@ export default function TrackingPage() {
             plate: driver.license_plate ?? "",
           })
           // Parse driver location if available
-          if (driver.location) {
-            try {
-              const loc = typeof driver.location === "string"
-                ? JSON.parse(driver.location)
-                : driver.location
-              if (loc?.coordinates) {
-                setDriverPos({ lat: loc.coordinates[1], lng: loc.coordinates[0] })
-              }
-            } catch { /* ignore parse error */ }
-          }
+          const driverGeo = parseGeoPoint(driver.location)
+          if (driverGeo) { setDriverPos(driverGeo); setHasDriverGps(true) }
         }
       }
       setLoading(false)
@@ -210,6 +218,7 @@ export default function TrackingPage() {
       .on("broadcast", { event: "location" }, ({ payload }) => {
         if (payload.lat && payload.lng) {
           setDriverPos({ lat: payload.lat, lng: payload.lng })
+          setHasDriverGps(true)
         }
       })
       .subscribe()
@@ -221,9 +230,38 @@ export default function TrackingPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
 
-  const { min, sec } = useCountdown(orderData?.etaMin ?? 20)
   const currentIdx   = STATUS_ORDER.indexOf(status)
   const isDelivered  = status === "delivered"
+
+  // ── Tính ETA thực theo khoảng cách tài xế/quán ↔ khách ────
+  useEffect(() => {
+    if (!orderData) return
+    let etaMin: number
+    if (status === "delivering" && hasDriverGps) {
+      // Đã lấy hàng, đang trên đường đến khách → tính từ vị trí tài xế hiện tại
+      const distKm = haversineKm(driverPos.lat, driverPos.lng, orderData.destLat, orderData.destLng)
+      etaMin = travelMinFromKm(distKm) + HANDOFF_MIN
+    } else if (shopPos) {
+      // Chưa lấy hàng → thời gian chuẩn bị + đường từ quán đến khách
+      const distKm = haversineKm(shopPos.lat, shopPos.lng, orderData.destLat, orderData.destLng)
+      etaMin = PREP_BUFFER_MIN + travelMinFromKm(distKm)
+    } else {
+      etaMin = PREP_BUFFER_MIN + 12 // fallback khi chưa có toạ độ quán
+    }
+    etaMin = Math.min(60, Math.max(2, Math.round(etaMin)))
+
+    const newTarget = Date.now() + etaMin * 60_000
+    setEtaTargetTs(prev => (prev === null || Math.abs(newTarget - prev) > 60_000 ? newTarget : prev))
+  }, [orderData, status, hasDriverGps, driverPos, shopPos])
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  const remainingSec = etaTargetTs ? Math.max(0, Math.round((etaTargetTs - now) / 1000)) : 0
+  const min = Math.floor(remainingSec / 60)
+  const sec = remainingSec % 60
 
   // 30s countdown
   useEffect(() => {
@@ -251,19 +289,11 @@ export default function TrackingPage() {
     }).eq("id", orderId)
     if (error) { fireToast("Không thể hủy đơn. Thử lại sau."); return }
 
-    await supabase.from("cancel_logs").insert({ order_id: orderId, user_id: currentUserId, role: "customer", reason: "Khách hàng hủy" })
-
-    const since3d = new Date(Date.now() - 3 * 86400_000).toISOString()
-    const { count } = await supabase.from("cancel_logs").select("*", { count: "exact", head: true })
-      .eq("user_id", currentUserId).eq("role", "customer").gte("cancelled_at", since3d)
-    const total = count ?? 0
-    if (total >= 4) {
-      await supabase.from("profiles").update({ cancel_locked: true, cancel_locked_at: new Date().toISOString(), cancel_locked_reason: "Hủy đơn quá nhiều lần" }).eq("id", currentUserId)
-      setCancelLocked(true)
-    }
+    const { locked } = await logCancelAndCheckLock(supabase, "customer", currentUserId, orderId, "Khách hàng hủy")
+    if (locked) setCancelLocked(true)
 
     setStatus("delivered")
-    fireToast(total >= 4 ? "⚠️ Tài khoản bị khóa hủy đơn · Liên hệ admin" : "Đã hủy đơn hàng")
+    fireToast(locked ? "⚠️ Tài khoản bị khóa do hủy đơn quá nhiều lần · Liên hệ admin" : "Đã hủy đơn hàng")
     setShowCancel(false)
     setTimeout(() => { window.location.href = "/orders" }, 1200)
   }

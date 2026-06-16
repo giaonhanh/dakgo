@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatPrice } from "@/lib/utils"
+import { isBlacklisted, logCancelAndCheckLock } from "@/lib/cancelLock"
+
+const MERCHANT_CANCEL_REASONS = ["Hết nguyên liệu/món", "Quán quá tải, không kịp làm", "Sai thông tin đơn", "Khác"]
 
 type Status = "all" | "delivered" | "cancelled" | "pending" | "preparing" | "accepted" | "ready"
 type Period = "today" | "week" | "month" | "all"
@@ -77,6 +80,7 @@ export default function MerchantOrdersPage() {
 
   const [shopId,    setShopId]    = useState<string | null>(null)
   const [shopName,  setShopName]  = useState("")
+  const [ownerId,   setOwnerId]   = useState<string | null>(null)
   const [loading,   setLoading]   = useState(true)
   const [orders,    setOrders]    = useState<OrderRow[]>([])
   const [total,     setTotal]     = useState(0)
@@ -87,13 +91,21 @@ export default function MerchantOrdersPage() {
   const [expand,    setExpand]    = useState<string | null>(null)
   const [summary,   setSummary]   = useState({ count: 0, revenue: 0, cancelled: 0 })
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [cancelLocked,   setCancelLocked]   = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState<string | null>(null)
+  const [cancelReason,   setCancelReason]   = useState("")
+  const [toast,          setToast]          = useState("")
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
+  const fireToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2800) }
 
   // ── Load shop ────────────────────────────────────────────────
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
+      setOwnerId(user.id)
+      if (await isBlacklisted(supabase, user.id)) setCancelLocked(true)
       const { data: shop } = await supabase
         .from("shops").select("id,name").eq("owner_id", user.id).maybeSingle()
       if (!shop) { setLoading(false); return }
@@ -210,6 +222,38 @@ export default function MerchantOrdersPage() {
     await supabase.from("orders").update({ status: nextStatus }).eq("id", orderId)
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o))
     setUpdatingId(null)
+  }
+
+  // ── Từ chối đơn (huỷ) — ghi log + kiểm tra khoá tài khoản ─────
+  const handleMerchantCancel = async () => {
+    if (!showCancelModal || !cancelReason || !ownerId) return
+    if (cancelLocked) { fireToast("Cửa hàng bị khóa hủy đơn · Liên hệ admin!"); setShowCancelModal(null); return }
+    setUpdatingId(showCancelModal)
+
+    const { error } = await supabase.from("orders").update({
+      status: "cancelled",
+      cancel_reason: `Quán từ chối: ${cancelReason}`,
+      cancelled_at: new Date().toISOString(),
+    }).eq("id", showCancelModal)
+
+    if (error) { fireToast("Không thể từ chối đơn, thử lại!"); setUpdatingId(null); return }
+
+    const { locked, count } = await logCancelAndCheckLock(supabase, "merchant", ownerId, showCancelModal, cancelReason)
+
+    setOrders(prev => prev.map(o => o.id === showCancelModal ? { ...o, status: "cancelled" } : o))
+
+    if (locked) {
+      setCancelLocked(true)
+      fireToast("⚠️ Cửa hàng bị khóa do từ chối đơn quá nhiều lần · Liên hệ admin để mở khóa")
+    } else if (count === 4) {
+      fireToast("⚠️ Lần từ chối thứ 4 trong tuần · Từ chối thêm 1 lần nữa sẽ bị khóa cửa hàng!")
+    } else {
+      fireToast("Đã từ chối đơn hàng")
+    }
+
+    setUpdatingId(null)
+    setShowCancelModal(null)
+    setCancelReason("")
   }
 
   function loadMore() {
@@ -399,7 +443,7 @@ export default function MerchantOrdersPage() {
                       {order.status === "pending" && (
                         <div style={{ display:"flex", gap:8, marginTop:8 }}>
                           <button
-                            onClick={e => { e.stopPropagation(); updateStatus(order.id, "cancelled") }}
+                            onClick={e => { e.stopPropagation(); setCancelReason(""); setShowCancelModal(order.id) }}
                             disabled={updatingId === order.id}
                             style={{ flex:1, height:38, borderRadius:10, border:"1px solid rgba(255,64,64,0.3)", background:"rgba(255,64,64,0.07)", color:"#ff6060", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"Lexend", opacity: updatingId===order.id?0.5:1 }}>
                             ✕ Từ chối
@@ -451,10 +495,75 @@ export default function MerchantOrdersPage() {
         )}
       </div>
 
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 200,
+          background: "rgba(14,12,9,0.95)", border: "1px solid rgba(255,107,0,0.3)", borderRadius: 12,
+          padding: "8px 18px", color: "#FF8C00", fontSize: 11, fontWeight: 600, backdropFilter: "blur(10px)" }}>
+          {toast}
+        </div>
+      )}
+
+      {/* Cancel Modal */}
+      {showCancelModal && (
+        <>
+          <div onClick={() => { setShowCancelModal(null); setCancelReason("") }}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 190, backdropFilter: "blur(4px)" }} />
+          <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 191,
+            background: "#0e0c09", border: "1px solid rgba(255,64,64,0.2)", borderRadius: "20px 20px 0 0",
+            padding: "20px 18px 40px", animation: "slideUp .3s ease" }}>
+            <div style={{ width: 36, height: 4, background: "rgba(255,255,255,0.12)", borderRadius: 2, margin: "0 auto 18px" }} />
+            {cancelLocked ? (
+              <>
+                <div style={{ color: "#ff4040", fontSize: 14, fontWeight: 700, marginBottom: 12 }}>🔒 Cửa hàng bị khóa từ chối đơn</div>
+                <div style={{ background: "rgba(255,64,64,0.07)", border: "1px solid rgba(255,64,64,0.2)", borderRadius: 11, padding: "12px 13px", marginBottom: 16, color: "#ff6060", fontSize: 10, lineHeight: 1.6 }}>
+                  Cửa hàng đã từ chối quá nhiều đơn trong tuần. Liên hệ quản trị viên để mở khóa.
+                </div>
+                <button onClick={() => setShowCancelModal(null)}
+                  style={{ width: "100%", height: 44, borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "#6a5a40", fontSize: 11, fontFamily: "Lexend", cursor: "pointer" }}>Đóng</button>
+              </>
+            ) : (
+              <>
+                <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>✕ Từ chối đơn #{showCancelModal.slice(-6).toUpperCase()}</div>
+                <div style={{ background: "rgba(255,179,71,0.07)", border: "1px solid rgba(255,179,71,0.2)", borderRadius: 10, padding: "9px 12px", marginBottom: 14, color: "#FFB347", fontSize: 9.5, lineHeight: 1.6 }}>
+                  ⚠️ Đơn sẽ bị huỷ và khách hàng được thông báo. Từ chối nhiều lần có thể bị khóa cửa hàng.
+                </div>
+                <div style={{ color: "#b0956a", fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 9 }}>Lý do từ chối</div>
+                {MERCHANT_CANCEL_REASONS.map(r => (
+                  <div key={r} onClick={() => setCancelReason(r)}
+                    style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 11px", borderRadius: 10, marginBottom: 6, cursor: "pointer",
+                      background: cancelReason === r ? "rgba(255,64,64,0.08)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${cancelReason === r ? "rgba(255,64,64,0.35)" : "rgba(255,255,255,0.06)"}` }}>
+                    <div style={{ width: 15, height: 15, borderRadius: "50%", flexShrink: 0,
+                      border: `1.5px solid ${cancelReason === r ? "#ff4040" : "rgba(255,255,255,0.15)"}`,
+                      background: cancelReason === r ? "#ff4040" : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {cancelReason === r && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />}
+                    </div>
+                    <span style={{ color: cancelReason === r ? "#ff6060" : "#b0956a", fontSize: 11 }}>{r}</span>
+                  </div>
+                ))}
+                <button onClick={handleMerchantCancel} disabled={!cancelReason || updatingId === showCancelModal}
+                  style={{ width: "100%", height: 46, borderRadius: 12, border: "none", marginTop: 10,
+                    background: cancelReason ? "linear-gradient(90deg,#ff4040,#ff6060)" : "rgba(255,255,255,0.06)",
+                    color: cancelReason ? "#fff" : "#6a5a40", fontSize: 12, fontWeight: 700, fontFamily: "Lexend",
+                    cursor: cancelReason ? "pointer" : "default", opacity: cancelReason ? 1 : 0.55 }}>
+                  {updatingId === showCancelModal ? "Đang xử lý..." : cancelReason ? "✕ Xác nhận từ chối đơn" : "Chọn lý do để tiếp tục"}
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1 }
           50% { opacity: 0.4 }
+        }
+        @keyframes slideUp {
+          from { transform: translateY(100%) }
+          to { transform: translateY(0) }
         }
       `}</style>
     </div>

@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client"
 import { getAdminContact } from "@/lib/adminContact"
 import { maskPhone } from "@/lib/maskPhone"
 import { OrderItemList, type ItemBreakdown } from "@/components/ui/OrderItemList"
+import { isBlacklisted, logCancelAndCheckLock } from "@/lib/cancelLock"
 
 // ─── Types ───────────────────────────────────────────────
 type Status = "delivering" | "preparing" | "pending" | "accepted" | "ready" | "completed" | "cancelled"
@@ -183,10 +184,10 @@ export default function OrdersPage() {
       if (!user) { setLoading(false); return }
       setUserId(user.id)
 
-      // Profile: cancel_locked + tên + SĐT để hiện trong chi tiết rides
+      // Profile: tên + SĐT để hiện trong chi tiết rides
       const { data: prof } = await supabase
-        .from("profiles").select("cancel_locked, full_name, phone").eq("id", user.id).single()
-      if (prof?.cancel_locked) setCancelLocked(true)
+        .from("profiles").select("full_name, phone").eq("id", user.id).single()
+      if (await isBlacklisted(supabase, user.id)) setCancelLocked(true)
       const myName  = prof?.full_name ?? ""
       const myPhone = prof?.phone     ?? ""
 
@@ -507,31 +508,15 @@ export default function OrdersPage() {
       return
     }
 
-    // Ghi cancel_log
-    await supabase.from("cancel_logs").insert({
-      order_id: showCancel, user_id: userId, role: "customer", reason: cancelRsn,
-    })
+    const { locked, count } = await logCancelAndCheckLock(supabase, "customer", userId, showCancel, cancelRsn)
 
-    // Đếm số lần hủy trong 3 ngày
-    const since3d = new Date(Date.now() - 3 * 86400_000).toISOString()
-    const { count } = await supabase.from("cancel_logs")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", userId).eq("role", "customer")
-      .gte("cancelled_at", since3d)
-
-    const total = count ?? 0
-    if (total >= 4) {
-      await supabase.from("profiles").update({
-        cancel_locked: true,
-        cancel_locked_at: new Date().toISOString(),
-        cancel_locked_reason: "Hủy đơn quá nhiều lần",
-      }).eq("id", userId)
+    if (locked) {
       setCancelLocked(true)
-      fireToast("⚠️ Tài khoản bị khóa hủy đơn · Liên hệ admin để mở khóa")
+      fireToast("⚠️ Tài khoản bị khóa do hủy đơn quá nhiều lần · Liên hệ admin để mở khóa")
     } else {
       setOrders(prev => prev.map(o => o.id === showCancel ? { ...o, status: "cancelled" as Status, cancelReason: cancelRsn } : o))
       const msg = willRefundWallet ? "Đã hủy đơn · Hoàn tiền về ví GiaoNhanh!" : "Đã hủy đơn hàng!"
-      if (total === 3) fireToast(`${msg} · ⚠️ Đây là lần hủy thứ 3, lần tiếp theo sẽ khóa tài khoản!`)
+      if (count === 2) fireToast(`${msg} · ⚠️ Đây là lần hủy thứ 2, hủy thêm 1 lần nữa sẽ bị khóa tài khoản!`)
       else fireToast(msg)
     }
     setShowCancel(null)
