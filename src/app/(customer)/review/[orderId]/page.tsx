@@ -96,6 +96,7 @@ export default function ReviewPage() {
   const [photoFiles, setPhotoFiles] = useState<File[]>([])
   const [submitted,  setSubmitted]  = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [submitErr,  setSubmitErr]  = useState("")
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -170,6 +171,7 @@ export default function ReviewPage() {
   const handleSubmit = async () => {
     if (!canSubmit || !orderId || !userId || !order || submitting) return
     setSubmitting(true)
+    setSubmitErr("")
     try {
       // Upload photos
       const uploadedUrls: string[] = []
@@ -185,10 +187,10 @@ export default function ReviewPage() {
         }
       }
 
-      await supabase.from("reviews").insert({
+      const { error: insertErr } = await supabase.from("reviews").insert({
         order_id:     orderId,
         reviewer_id:  userId,
-        shop_id:      order.shopId,
+        shop_id:      order.shopId || null,
         driver_id:    order.driverId,
         food_rating:  foodStar,
         driver_rating: driverStar,
@@ -197,10 +199,20 @@ export default function ReviewPage() {
         tip_amount:   tip,
       })
 
+      if (insertErr) {
+        console.error("[review] insert error:", insertErr.code, insertErr.message, insertErr.details)
+        setSubmitErr(
+          insertErr.code === "23505"
+            ? "Đơn này đã được đánh giá rồi."
+            : `Không thể lưu đánh giá: ${insertErr.message}`
+        )
+        return
+      }
+
       setSubmitted(true)
-    } catch {
-      // still show success to avoid blocking UX
-      setSubmitted(true)
+    } catch (e) {
+      console.error("[review] unexpected error:", e)
+      setSubmitErr("Có lỗi xảy ra, vui lòng thử lại.")
     } finally {
       setSubmitting(false)
     }
@@ -441,6 +453,12 @@ export default function ReviewPage() {
           padding:"12px 16px 24px",
           background:"linear-gradient(to top,#080806 70%,transparent)",
           zIndex:50 }}>
+          {submitErr && (
+            <div style={{ background:"rgba(255,64,64,0.1)", border:"1px solid rgba(255,64,64,0.35)",
+              borderRadius:10, padding:"9px 12px", marginBottom:10, color:"#ff8080", fontSize:11 }}>
+              ⚠️ {submitErr}
+            </div>
+          )}
           <button onClick={handleSubmit}
             disabled={!canSubmit || submitting}
             style={{ width:"100%",height:50,borderRadius:14,border:"none",
