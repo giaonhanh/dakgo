@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { getAdminContact } from "@/lib/adminContact"
 import { createClient } from "@/lib/supabase/client"
+import AddressPicker from "@/components/map/AddressPicker"
+import type { AddressPickerResult } from "@/types"
 
 /* ── helpers ── */
 function Toggle({ on, onToggle, color = "#3ecf6e" }: { on: boolean; onToggle: () => void; color?: string }) {
@@ -351,6 +353,8 @@ export default function MerchantSettingsPage() {
   const [shopRating,       setShopRating]       = useState<number | null>(null)
   const [shopCommission,   setShopCommission]   = useState(15)
   const [isNegotiated,     setIsNegotiated]     = useState(false)
+  const [shopHasLocation,  setShopHasLocation]  = useState(false)
+  const [showLocationPicker, setShowLocationPicker] = useState(false)
 
   useEffect(() => {
     getAdminContact().then(c => {
@@ -362,7 +366,7 @@ export default function MerchantSettingsPage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       supabase.from("shops")
-        .select("id,name,address,is_open,rating_avg,commission_rate,is_negotiated_commission,prep_time,auto_accept,busy_mode,preorder_allow,show_rating,show_sold_count,opening_hours,notif_settings,privacy_settings")
+        .select("id,name,address,location,is_open,rating_avg,commission_rate,is_negotiated_commission,prep_time,auto_accept,busy_mode,preorder_allow,show_rating,show_sold_count,opening_hours,notif_settings,privacy_settings")
         .eq("owner_id", user.id).maybeSingle()
         .then(({ data }) => {
           if (!data) return
@@ -370,6 +374,7 @@ export default function MerchantSettingsPage() {
           setShopId(data.id)
           setShopName(data.name ?? "")
           setShopAddress(data.address ?? "")
+          setShopHasLocation(!!d.location)
           setShopIsOpen(data.is_open ?? false)
           setShopRating(data.rating_avg ?? null)
           setShopCommission(data.commission_rate ?? 15)
@@ -522,6 +527,13 @@ export default function MerchantSettingsPage() {
             <Row icon="🕐" label="Giờ mở cửa từng ngày" sub={summarizeHours(hours)} onClick={() => setShowHours(true)} arrow last />
           </Section>
 
+          {/* location */}
+          <Section title="Địa điểm">
+            <Row icon="📍" label="Vị trí quán trên bản đồ"
+              sub={shopHasLocation ? "Đã xác định — bấm để cập nhật lại" : "⚠️ Chưa xác định — tài xế/khách sẽ thấy sai vị trí trên bản đồ"}
+              onClick={() => setShowLocationPicker(true)} arrow last />
+          </Section>
+
           {/* quick links */}
           <Section title="Quản lý">
             <Row icon="🍽️" label="Quản lý thực đơn" sub="Thêm, sửa, xóa món ăn" onClick={() => { window.location.href = "/merchant/menu" }} arrow />
@@ -600,6 +612,34 @@ export default function MerchantSettingsPage() {
               .then(({ error }) => { if (error) console.error("prep_time save error:", error.message) })
           }
         }} onClose={() => setShowPrepSheet(false)} />}
+        {showLocationPicker && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: "fixed", inset: 0, zIndex: 220 }}>
+            <AddressPicker
+              height="100dvh"
+              onClose={() => setShowLocationPicker(false)}
+              onConfirm={(result: AddressPickerResult) => {
+                setShowLocationPicker(false)
+                if (!shopId) return
+                const sb = createClient()
+                sb.from("shops")
+                  .update({
+                    address:  result.address,
+                    lat:      result.lat,
+                    lng:      result.lng,
+                    location: `POINT(${result.lng} ${result.lat})`,
+                  })
+                  .eq("id", shopId)
+                  .then(({ error }) => {
+                    if (error) { console.error("shop location save error:", error.message); return }
+                    setShopAddress(result.address)
+                    setShopHasLocation(true)
+                    fire("✅ Đã cập nhật vị trí quán")
+                  })
+              }}
+            />
+          </motion.div>
+        )}
       </AnimatePresence>
     </>
   )

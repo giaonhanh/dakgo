@@ -4,13 +4,16 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { SHOP_CATEGORIES } from "@/lib/categories"
 import { createClient } from "@/lib/supabase/client"
+import AddressPicker from "@/components/map/AddressPicker"
+import type { AddressPickerResult } from "@/types"
 
 const ALL_DAYS = ["T2","T3","T4","T5","T6","T7","CN"]
 const STEPS = ["Thông tin quán","Địa điểm & giờ","Tài khoản","Xác nhận & gửi"]
 
 interface Form {
   name: string; phone: string; categories: string[]; description: string
-  address: string; openTime: string; closeTime: string; days: string[]
+  address: string; lat: number | null; lng: number | null
+  openTime: string; closeTime: string; days: string[]
   email: string; password: string; confirmPassword: string
 }
 
@@ -19,9 +22,10 @@ export default function MerchantRegisterPage() {
   const [submitted,  setSubmitted]  = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError,setSubmitError]= useState("")
+  const [showLocationPicker, setShowLocationPicker] = useState(false)
   const [form, setForm] = useState<Form>({
     name:"", phone:"", categories:[], description:"",
-    address:"", openTime:"07:00", closeTime:"22:00", days:[...ALL_DAYS],
+    address:"", lat:null, lng:null, openTime:"07:00", closeTime:"22:00", days:[...ALL_DAYS],
     email:"", password:"", confirmPassword:"",
   })
 
@@ -31,7 +35,7 @@ export default function MerchantRegisterPage() {
 
   const canNext = () => {
     if (step===0) return !!(form.name && form.phone && form.categories.length > 0)
-    if (step===1) return !!(form.address && form.days.length)
+    if (step===1) return !!(form.address && form.lat && form.lng && form.days.length)
     if (step===2) return !!(form.email && form.password.length >= 6 && form.password === form.confirmPassword)
     return true
   }
@@ -62,6 +66,9 @@ export default function MerchantRegisterPage() {
       phone: form.phone,
       description: form.description || null,
       address: form.address,
+      lat: form.lat,
+      lng: form.lng,
+      location: form.lat && form.lng ? `POINT(${form.lng} ${form.lat})` : null,
       category: form.categories[0] ?? "khac",
       categories: form.categories,
       opening_hours: { open: form.openTime, close: form.closeTime },
@@ -190,9 +197,18 @@ export default function MerchantRegisterPage() {
               <motion.div key="s1" initial={{ opacity:0,x:20 }} animate={{ opacity:1,x:0 }} exit={{ opacity:0,x:-20 }}>
                 <div style={{ marginBottom:12 }}>
                   <label style={{ color:"#6a5a40",fontSize:9,fontWeight:600,display:"block",marginBottom:6 }}>ĐỊA CHỈ CỬA HÀNG *</label>
-                  <input value={form.address} onChange={e=>update("address",e.target.value)}
-                    placeholder="VD: 22 Lê Hồng Phong, Phước An..."
-                    style={{ width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 14px",color:"#f8f0e0",fontSize:12,marginBottom:8 }} />
+                  <button onClick={() => setShowLocationPicker(true)}
+                    style={{ width:"100%",textAlign:"left",background:"rgba(255,255,255,0.04)",
+                      border:`1px solid ${form.lat ? "rgba(62,207,110,0.3)" : "rgba(255,107,0,0.3)"}`,
+                      borderRadius:12,padding:"12px 14px",color:form.address?"#f8f0e0":"#6a5a40",
+                      fontSize:12,marginBottom:4,cursor:"pointer",fontFamily:"Lexend",
+                      display:"flex",alignItems:"center",gap:8 }}>
+                    <span style={{ fontSize:14 }}>📍</span>
+                    <span style={{ flex:1 }}>{form.address || "Chọn vị trí quán trên bản đồ"}</span>
+                  </button>
+                  <div style={{ color: form.lat ? "#3ecf6e" : "#FF8C00",fontSize:8 }}>
+                    {form.lat ? "✓ Đã xác định vị trí trên bản đồ" : "⚠️ Bắt buộc chọn đúng vị trí — tài xế sẽ dựa vào đây để tới lấy hàng"}
+                  </div>
                 </div>
                 <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,marginBottom:12 }}>
                   <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:700,marginBottom:12 }}>🕐 Giờ mở cửa</div>
@@ -323,6 +339,24 @@ export default function MerchantRegisterPage() {
           </button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {showLocationPicker && (
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+            style={{ position:"fixed",inset:0,zIndex:300 }}>
+            <AddressPicker
+              height="100dvh"
+              initialLat={form.lat ?? undefined}
+              initialLng={form.lng ?? undefined}
+              onClose={() => setShowLocationPicker(false)}
+              onConfirm={(result: AddressPickerResult) => {
+                setForm(f => ({ ...f, address: result.address, lat: result.lat, lng: result.lng }))
+                setShowLocationPicker(false)
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }

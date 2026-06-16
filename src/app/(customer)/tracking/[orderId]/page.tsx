@@ -129,7 +129,7 @@ export default function TrackingPage() {
         .select(`
           id, status, created_at, delivery_address, delivery_lat, delivery_lng,
           total_amount, pay_method, driver_id,
-          shops(name, location),
+          shops(name, lat, lng, location),
           order_items(name, qty)
         `)
         .eq("id", orderId)
@@ -144,8 +144,17 @@ export default function TrackingPage() {
       const shop = Array.isArray(order.shops) ? order.shops[0] : order.shops
       const items = (order.order_items ?? []) as { name: string; qty: number }[]
 
-      const shopGeo = parseGeoPoint(shop?.location)
-      if (shopGeo) setShopPos(shopGeo)
+      // Ưu tiên cột lat/lng (đồng bộ với NearbyShops/trang chủ) — fallback sang
+      // cột geography location nếu lat/lng chưa có (tránh hiện sai vị trí quán)
+      const shopGeo = (shop?.lat != null && shop?.lng != null)
+        ? { lat: shop.lat as number, lng: shop.lng as number }
+        : parseGeoPoint(shop?.location)
+      if (shopGeo) {
+        setShopPos(shopGeo)
+        // Trước khi có GPS tài xế thật, dùng vị trí quán làm marker tạm —
+        // tránh hiện nhầm toạ độ mặc định DEFAULT_LAT/DEFAULT_LNG (tâm thị trấn)
+        setDriverPos(shopGeo)
+      }
 
       setOrderData({
         id: order.id,
