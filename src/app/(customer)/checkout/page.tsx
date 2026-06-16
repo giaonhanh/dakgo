@@ -1517,7 +1517,7 @@ export default function CheckoutPage() {
       router.push(`/order-success?orderId=${order.id}`)
     } catch (err) {
       console.error(err)
-      fireToast("Có lỗi xảy ra, vui lòng thử lại")
+      fireToast(err instanceof Error && err.message ? err.message : "Có lỗi xảy ra, vui lòng thử lại")
       setLoading(false)
     }
   }

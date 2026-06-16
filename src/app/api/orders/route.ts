@@ -63,12 +63,27 @@ export async function POST(req: NextRequest) {
     const productIds: string[] = items.map((i: { product_id: string }) => i.product_id)
     const { data: products, error: prodErr } = await supabase
       .from("products")
-      .select("id, name, price, is_available")
+      .select("id, name, price, is_available, all_day, start_hour, end_hour")
       .in("id", productIds)
       .eq("shop_id", shop_id)
 
     if (prodErr || !products?.length) {
       return NextResponse.json({ error: "Sản phẩm không hợp lệ" }, { status: 400 })
+    }
+
+    // Món chỉ bán trong khung giờ nhất định (vd. đồ ăn sáng) — chặn đặt ngoài giờ
+    function productInSellingHours(p: { all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }): boolean {
+      if (p.all_day !== false) return true
+      const now = new Date()
+      const cur = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+      const [sh, sm] = (p.start_hour ?? "00:00").split(":").map(Number)
+      const [eh, em] = (p.end_hour   ?? "23:59").split(":").map(Number)
+      const start = sh * 60 + sm, end = eh * 60 + em
+      return start <= end ? cur >= start && cur < end : cur >= start || cur < end
+    }
+    const outOfHoursProduct = products.find(p => !productInSellingHours(p))
+    if (outOfHoursProduct) {
+      return NextResponse.json({ error: `Xin lỗi, "${outOfHoursProduct.name}" hiện đang ngoài khung giờ bán của cửa hàng` }, { status: 400 })
     }
 
     const priceMap = Object.fromEntries(products.map(p => [p.id, p]))
