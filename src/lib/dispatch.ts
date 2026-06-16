@@ -3,7 +3,8 @@ import { sendPushToUser } from "@/lib/webpush"
 
 export type DispatchTable = "orders" | "rides" | "errands"
 
-const MAX_ATTEMPTS = 5
+const WAVE_SIZE = 2
+const MAX_ATTEMPTS = 6 // 3 wave x 2 tài xế
 
 function adminDb() {
   return createClient(
@@ -122,49 +123,51 @@ async function notifyCustomerNoDriver(
 }
 
 /**
- * Dispatch tài xế cho một đơn/chuyến/errand.
- * - Tìm tài xế gần điểm tham chiếu nhất (theo loại dịch vụ)
- * - Bỏ qua các tài xế đã được thử (triedIds)
- * - Gán driver_id vào record + push notification
- * - Sau MAX_ATTEMPTS lần thất bại: thông báo cho khách
+ * Dispatch tài xế cho một đơn/chuyến/errand — theo WAVE_SIZE tài xế gần nhất cùng lúc.
+ * - Tìm WAVE_SIZE tài xế gần điểm tham chiếu nhất (theo loại dịch vụ), bỏ qua đã thử (triedIds)
+ * - Gửi notification + push đồng thời cho cả wave, lưu wave hiện tại vào dispatch_waves
+ * - Tài xế nào nhận trước thì atomic-claim qua RPC accept_order_with_commission (không gán driver_id ở đây)
+ * - Wave kế tiếp chỉ được gửi khi TẤT CẢ tài xế trong wave hiện tại đã từ chối/hết giờ (xem /api/dispatch/reject)
+ * - Sau MAX_ATTEMPTS lần thử (= MAX_ATTEMPTS/WAVE_SIZE wave): thông báo cho khách
  */
 export async function dispatchOrder(
   table: DispatchTable,
   id: string,
   triedIds: string[] = [],
-): Promise<{ dispatched: boolean; driverId?: string; triedIds: string[] }> {
+): Promise<{ dispatched: boolean; driverIds: string[]; triedIds: string[] }> {
   const db = adminDb()
 
   // Tọa độ điểm tham chiếu tìm tài xế
   const ref = await getRefCoords(db, table, id)
 
-  // Tìm tài xế gần nhất (dùng RPC PostGIS)
-  let driverId: string | null = null
+  // Tìm WAVE_SIZE tài xế gần nhất (dùng RPC PostGIS)
+  let driverIds: string[] = []
 
   if (ref) {
-    const { data: nearest } = await db.rpc("dispatch_nearest_driver", {
+    const { data: nearest } = await db.rpc("dispatch_nearest_drivers", {
       ref_lat:     ref.lat,
       ref_lng:     ref.lng,
       exclude_ids: triedIds,
+      limit_n:     WAVE_SIZE,
     })
-    driverId = nearest as string | null
+    driverIds = ((nearest as string[] | null) ?? []).filter(Boolean)
   } else {
     // Fallback khi không có tọa độ: lấy tài xế online đầu tiên chưa thử
     let q = db.from("drivers")
       .select("id")
       .eq("status", "online")
       .eq("is_approved", true)
-      .limit(1)
+      .limit(WAVE_SIZE)
     if (triedIds.length > 0) {
       q = q.not("id", "in", `(${triedIds.join(",")})`)
     }
     const { data } = await q
-    driverId = data?.[0]?.id ?? null
+    driverIds = (data ?? []).map(d => d.id)
   }
 
-  if (!driverId) {
+  if (driverIds.length === 0) {
     await notifyCustomerNoDriver(db, table, id)
-    return { dispatched: false, triedIds }
+    return { dispatched: false, driverIds: [], triedIds }
   }
 
   // Kiểm tra đơn chưa bị nhận hoặc hủy
@@ -175,37 +178,47 @@ export async function dispatchOrder(
     .single()
 
   if (orderRow?.driver_id) {
-    return { dispatched: false, triedIds }
+    return { dispatched: false, driverIds: [], triedIds }
   }
   if (["delivered", "cancelled"].includes(orderRow?.status ?? "")) {
-    return { dispatched: false, triedIds }
+    return { dispatched: false, driverIds: [], triedIds }
   }
 
-  // Push notification + DB notification — không gán driver_id trước (tài xế tự nhận qua RPC)
+  // Push notification + DB notification cho cả wave — không gán driver_id trước
   const { title, body } = await buildNotifContent(db, table, id)
-  try {
-    await db.from("notifications").insert({
-      user_id: driverId,
-      type:    "order",
-      title,
-      body,
-      data:    { order_id: id, table, url: "/driver" },
-    })
-    await sendPushToUser(driverId, {
-      title, body,
-      url:   "/driver",
-      tag:   `dispatch-${id}`,
-      sound: "driver",
-    })
-  } catch { /* không block dispatch */ }
+  await Promise.all(driverIds.map(async driverId => {
+    try {
+      await db.from("notifications").insert({
+        user_id: driverId,
+        type:    "order",
+        title,
+        body,
+        data:    { order_id: id, table, url: "/driver" },
+      })
+      await sendPushToUser(driverId, {
+        title, body,
+        url:   "/driver",
+        tag:   `dispatch-${id}`,
+        sound: "driver",
+      })
+    } catch { /* không block dispatch */ }
+  }))
 
-  const newTriedIds = [...triedIds, driverId]
+  // Lưu wave hiện tại — dùng để biết khi nào cả wave đã từ chối hết
+  await db.from("dispatch_waves").upsert({
+    order_table: table,
+    order_id:    id,
+    driver_ids:  driverIds,
+    updated_at:  new Date().toISOString(),
+  })
+
+  const newTriedIds = [...triedIds, ...driverIds]
 
   if (newTriedIds.length >= MAX_ATTEMPTS) {
     await notifyCustomerNoDriver(db, table, id)
   }
 
-  return { dispatched: true, driverId, triedIds: newTriedIds }
+  return { dispatched: true, driverIds, triedIds: newTriedIds }
 }
 
 /**

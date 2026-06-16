@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createClient as adminClient } from "@supabase/supabase-js"
 import { dispatchOrder, getTriedDriverIds, type DispatchTable } from "@/lib/dispatch"
+
+function adminDb() {
+  return adminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 // Tài xế gọi endpoint này khi từ chối đơn (bấm từ chối hoặc hết 30s countdown)
 export async function POST(req: NextRequest) {
@@ -39,10 +47,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ skipped: true, reason: "order_not_pending_or_already_taken" })
     }
 
-    // Lấy danh sách tài xế đã thử (từ notifications) — đảm bảo gồm chính tài xế vừa từ chối
-    const triedIds = [...new Set([...(await getTriedDriverIds(table, id)), user.id])]
+    // Đơn được gửi theo wave 2 tài xế gần nhất cùng lúc — chỉ dispatch wave kế tiếp
+    // khi CẢ wave hiện tại đã từ chối/hết giờ, không phải ngay khi 1 người từ chối.
+    const admin = adminDb()
+    const { data: wave } = await admin
+      .from("dispatch_waves")
+      .select("driver_ids")
+      .eq("order_table", table)
+      .eq("order_id", id)
+      .single()
 
-    // Dispatch sang tài xế tiếp theo
+    const remaining = ((wave?.driver_ids as string[] | null) ?? []).filter(d => d !== user.id)
+
+    if (remaining.length > 0) {
+      // Vẫn còn tài xế khác trong wave chưa phản hồi — chỉ cập nhật wave, chưa dispatch tiếp
+      await admin
+        .from("dispatch_waves")
+        .update({ driver_ids: remaining, updated_at: new Date().toISOString() })
+        .eq("order_table", table)
+        .eq("order_id", id)
+      return NextResponse.json({ skipped: true, reason: "wave_still_pending" })
+    }
+
+    // Cả wave đã từ chối — dispatch sang wave tài xế tiếp theo
+    const triedIds = [...new Set([...(await getTriedDriverIds(table, id)), user.id])]
     const result = await dispatchOrder(table, id, triedIds)
 
     return NextResponse.json(result)

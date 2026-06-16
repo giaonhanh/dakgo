@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, message: "Không có tài xế gần đây" })
     }
 
-    return NextResponse.json({ ok: true, driverId: result.driverId })
+    return NextResponse.json({ ok: true, driverIds: result.driverIds })
   } catch (err) {
     console.error("orders/dispatch error:", err)
     return NextResponse.json({ error: "Lỗi server" }, { status: 500 })

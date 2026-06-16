@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok:         true,
       dispatched: dispatchResult.dispatched,
-      driverId:   dispatchResult.driverId,
+      driverIds:  dispatchResult.driverIds,
     })
   } catch (err) {
     console.error("parallel-dispatch error:", err)

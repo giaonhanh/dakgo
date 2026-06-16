@@ -42,6 +42,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Đơn không còn có thể nhận" }, { status: 409 })
     }
 
+    // Giới hạn tối đa 3 đơn đang xử lý cùng lúc
+    const { count: activeCount } = await db
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("driver_id", driver_id)
+      .not("status", "in", "(delivered,cancelled)")
+    if ((activeCount ?? 0) >= 3) {
+      return NextResponse.json({ error: "Bạn đang xử lý 3 đơn — hãy hoàn tất bớt trước khi nhận thêm" }, { status: 409 })
+    }
+
     // Assign driver (không trừ hoa hồng — đây là fallback)
     const { error: updateErr } = await db
       .from("orders")
