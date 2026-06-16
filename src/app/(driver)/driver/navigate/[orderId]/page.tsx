@@ -657,6 +657,7 @@ export default function DriverNavigatePage() {
       </AnimatePresence>
 
       <div style={{ position:"fixed", inset:0, background:"#080806",
+        paddingTop:"env(safe-area-inset-top)",
         display:"flex", flexDirection:"column", fontFamily:"'Lexend',sans-serif" }}>
 
         {/* MAP */}
