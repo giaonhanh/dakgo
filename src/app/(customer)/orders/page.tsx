@@ -876,7 +876,7 @@ export default function OrdersPage() {
                               <span style={{ color: "#6a5a40", fontSize: 11, marginLeft: 5 }}>{order.driver.plate}</span>
                             )}
                           </div>
-                          {order.driver.phone && (
+                          {order.driver.phone && !isCompleted && !isCancelled && (
                             <a href={`tel:${order.driver.phone}`}
                               onClick={e => e.stopPropagation()}
                               style={{ textDecoration: "none", width: 30, height: 30, borderRadius: 9, flexShrink: 0,
