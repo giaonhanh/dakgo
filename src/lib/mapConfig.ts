@@ -1,16 +1,34 @@
 import type { StyleSpecification } from "maplibre-gl"
 
 export const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ?? ""
+export const VIETMAP_KEY_MISSING = VIETMAP_KEY.trim() === ""
 
-// VietMap mã hóa vector tile (cần SDK riêng để giải mã) — maplibre-gl thuần không đọc được
-// (lỗi "Unimplemented type: 7"). Dùng RASTER tile PNG (không mã hóa) thay thế: đường + nhãn
-// đã render sẵn trong ảnh, render được ngay với maplibre-gl chuẩn. apikey do vmTransform inject.
-export const MAP_STYLE: StyleSpecification = {
+// CartoDB dark — fallback miễn phí khi VietMap key chưa có
+const CARTO_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    carto: {
+      type: "raster",
+      tiles: [
+        "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+        "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+        "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: "© OpenStreetMap © CARTO",
+    },
+  },
+  layers: [{ id: "carto-base", type: "raster", source: "carto" }],
+}
+
+// VietMap raster tile — cần NEXT_PUBLIC_VIETMAP_TILEMAP_KEY (baked in lúc build)
+const VIETMAP_STYLE: StyleSpecification = {
   version: 8,
   sources: {
     vietmap: {
       type: "raster",
-      tiles: ["https://maps.vietmap.vn/api/tm/{z}/{x}/{y}.png"],
+      tiles: [`https://maps.vietmap.vn/api/tm/{z}/{x}/{y}.png?apikey=${VIETMAP_KEY}`],
       tileSize: 256,
       maxzoom: 19,
       attribution: "© VietMap",
@@ -19,18 +37,10 @@ export const MAP_STYLE: StyleSpecification = {
   layers: [{ id: "vietmap-base", type: "raster", source: "vietmap" }],
 }
 
-// True khi build/deploy thiếu env NEXT_PUBLIC_VIETMAP_TILEMAP_KEY.
-// Tile của VietMap sẽ trả 401 → bản đồ trắng. Dùng cờ này để hiện overlay cảnh báo.
-export const VIETMAP_KEY_MISSING = VIETMAP_KEY.trim() === ""
+// Dùng VietMap nếu có key, ngược lại dùng CartoDB dark
+export const MAP_STYLE: StyleSpecification = VIETMAP_KEY_MISSING ? CARTO_STYLE : VIETMAP_STYLE
 
-if (VIETMAP_KEY_MISSING && typeof window !== "undefined") {
-  // eslint-disable-next-line no-console
-  console.error(
-    "[VietMap] Thiếu NEXT_PUBLIC_VIETMAP_TILEMAP_KEY — mọi tile sẽ trả 401 và bản đồ hiện trắng. " +
-    "Thêm biến này vào Vercel → Settings → Environment Variables rồi REDEPLOY (biến NEXT_PUBLIC_* inline lúc build)."
-  )
-}
-
+// vmTransform chỉ dùng khi có VietMap key — inject apikey vào runtime nếu cần
 export function vmTransform(url: string): { url: string } {
   if (!url.includes("vietmap.vn")) return { url }
   if (url.includes("apikey=")) return { url: url.replace(/apikey=[^&]*/, `apikey=${VIETMAP_KEY}`) }
