@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import AdminShell from "@/components/admin/AdminShell"
 
@@ -16,25 +15,24 @@ function getLast7Labels() {
   })
 }
 
-interface WeeklyRow   { day: string; rev: number; comm: number }
-interface DriverComm  { id: string; name: string; trips: number; shipTotal: number; commission: number }
-interface Withdrawal  { id: string; name: string; amount: number; bank: string; account: string; created_at: string }
+interface WeeklyRow  { day: string; rev: number; driverComm: number; shopComm: number }
+interface DriverComm { id: string; name: string; trips: number; shipTotal: number; commission: number }
+interface ShopComm   { id: string; name: string; orders: number; subtotal: number; commission: number; rate: number }
 
 export default function AdminFinancePage() {
   const supabase = createClient()
-  const router   = useRouter()
   const [period, setPeriod] = useState<"day"|"week"|"month">("week")
   const [loading, setLoading] = useState(true)
 
-  const [totalRevenue,    setTotalRevenue]    = useState(0)
-  const [totalCommission, setTotalCommission] = useState(0)
-  const [totalOrders,     setTotalOrders]     = useState(0)
-  const [avgOrderValue,   setAvgOrderValue]   = useState(0)
-  const [pendingWithdraw, setPendingWithdraw] = useState(0)
+  const [totalRevenue,     setTotalRevenue]     = useState(0)
+  const [totalDriverComm,  setTotalDriverComm]  = useState(0)
+  const [totalShopComm,    setTotalShopComm]    = useState(0)
+  const [totalOrders,      setTotalOrders]      = useState(0)
+  const [avgOrderValue,    setAvgOrderValue]    = useState(0)
 
-  const [weeklyData,    setWeeklyData]    = useState<WeeklyRow[]>([])
-  const [driverComms,   setDriverComms]   = useState<DriverComm[]>([])
-  const [withdrawals,   setWithdrawals]   = useState<Withdrawal[]>([])
+  const [weeklyData,  setWeeklyData]  = useState<WeeklyRow[]>([])
+  const [driverComms, setDriverComms] = useState<DriverComm[]>([])
+  const [shopComms,   setShopComms]   = useState<ShopComm[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -44,19 +42,26 @@ export default function AdminFinancePage() {
     const firstMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const periodStart = period === "day" ? today : period === "week" ? sevenAgo : firstMonth
 
-    // Orders trong kỳ — lấy driver_commission_amount (hoa hồng tài xế trả app)
     const { data: rawOrders } = await supabase
       .from("orders")
-      .select("id, total_amount, ship_fee, driver_id, driver_commission_amount, created_at")
+      .select("id, total_amount, subtotal, ship_fee, driver_id, driver_commission_amount, shop_id, created_at, shops!shop_id(name, commission_rate)")
       .gte("created_at", periodStart.toISOString())
       .neq("status", "cancelled")
 
     const orders = rawOrders ?? []
 
-    const rev  = orders.reduce((s, o) => s + (o.total_amount ?? 0), 0)
-    const comm = orders.reduce((s, o) => s + (o.driver_commission_amount ?? 0), 0)
+    const shopOf = (o: typeof orders[0]) => {
+      const s = Array.isArray(o.shops) ? o.shops[0] : o.shops as { name?: string; commission_rate?: number } | null
+      return s
+    }
+
+    const rev        = orders.reduce((s, o) => s + (o.total_amount ?? 0), 0)
+    const driverComm = orders.reduce((s, o) => s + (o.driver_commission_amount ?? 0), 0)
+    const shopComm   = orders.reduce((s, o) => s + Math.round((o.subtotal ?? 0) * ((shopOf(o)?.commission_rate ?? 0) / 100)), 0)
+
     setTotalRevenue(rev)
-    setTotalCommission(Math.round(comm))
+    setTotalDriverComm(Math.round(driverComm))
+    setTotalShopComm(Math.round(shopComm))
     setTotalOrders(orders.length)
     setAvgOrderValue(orders.length > 0 ? Math.round(rev / orders.length) : 0)
 
@@ -65,9 +70,10 @@ export default function AdminFinancePage() {
     setWeeklyData(last7.map(({ label, iso }) => {
       const dayOrders = orders.filter(o => o.created_at.startsWith(iso))
       return {
-        day:  label,
-        rev:  dayOrders.reduce((s, o) => s + (o.total_amount ?? 0), 0),
-        comm: dayOrders.reduce((s, o) => s + (o.driver_commission_amount ?? 0), 0),
+        day:        label,
+        rev:        dayOrders.reduce((s, o) => s + (o.total_amount ?? 0), 0),
+        driverComm: dayOrders.reduce((s, o) => s + (o.driver_commission_amount ?? 0), 0),
+        shopComm:   dayOrders.reduce((s, o) => s + Math.round((o.subtotal ?? 0) * ((shopOf(o)?.commission_rate ?? 0) / 100)), 0),
       }
     }))
 
@@ -92,27 +98,17 @@ export default function AdminFinancePage() {
         .sort((a, b) => b.commission - a.commission)
     )
 
-    // Yêu cầu rút tiền đang chờ
-    const { data: wds } = await supabase
-      .from("withdrawals")
-      .select("id, user_id, amount, bank_account, created_at, profiles!user_id(full_name)")
-      .eq("status", "pending_transfer")
-      .order("created_at", { ascending: false })
-      .limit(5)
-
-    const wdList: Withdrawal[] = (wds ?? []).map(w => {
-      const p = Array.isArray(w.profiles) ? w.profiles[0] : w.profiles as { full_name?: string } | null
-      return {
-        id:         w.id,
-        name:       p?.full_name ?? "Tài xế",
-        amount:     w.amount,
-        bank:       "",
-        account:    w.bank_account,
-        created_at: w.created_at,
-      }
+    // Hoa hồng theo quán
+    const shopAgg: Record<string, ShopComm> = {}
+    orders.forEach(o => {
+      const sh = shopOf(o)
+      if (!sh || !o.shop_id) return
+      if (!shopAgg[o.shop_id]) shopAgg[o.shop_id] = { id: o.shop_id, name: sh.name ?? "Quán", orders: 0, subtotal: 0, commission: 0, rate: sh.commission_rate ?? 0 }
+      shopAgg[o.shop_id].orders++
+      shopAgg[o.shop_id].subtotal   += o.subtotal ?? 0
+      shopAgg[o.shop_id].commission += Math.round((o.subtotal ?? 0) * ((sh.commission_rate ?? 0) / 100))
     })
-    setWithdrawals(wdList)
-    setPendingWithdraw(wdList.reduce((s, w) => s + w.amount, 0))
+    setShopComms(Object.values(shopAgg).sort((a, b) => b.commission - a.commission))
 
     setLoading(false)
   }, [period, supabase])
@@ -123,6 +119,9 @@ export default function AdminFinancePage() {
   const totalDrvComm  = driverComms.reduce((s, d) => s + d.commission, 0)
   const totalDrvTrips = driverComms.reduce((s, d) => s + d.trips, 0)
   const totalDrvShip  = driverComms.reduce((s, d) => s + d.shipTotal, 0)
+  const totalShopOrd  = shopComms.reduce((s, m) => s + m.orders, 0)
+  const totalShopSub  = shopComms.reduce((s, m) => s + m.subtotal, 0)
+  const totalShopC    = shopComms.reduce((s, m) => s + m.commission, 0)
 
   return (
     <>
@@ -153,11 +152,11 @@ export default function AdminFinancePage() {
           {/* KPI */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:12, marginBottom:20 }}>
             {[
-              { icon:"💵", label:"Doanh thu GMV",     value:fmtS(totalRevenue)+"đ",    sub: period==="day"?"Hôm nay":period==="week"?"7 ngày":"Tháng này", color:"#3ecf6e" },
-              { icon:"📦", label:"Tổng đơn",           value:totalOrders+" đơn",         sub:"Không bị hủy",       color:"#4a8ff5" },
-              { icon:"🏷️", label:"Hoa hồng từ tài xế", value:fmtS(totalCommission)+"đ", sub:"Phí nền tảng thu được", color:"#FF8C00" },
-              { icon:"📊", label:"Giá trị TB/đơn",     value:fmtS(avgOrderValue)+"đ",   sub:"Doanh thu trung bình",  color:"#b464ff" },
-              { icon:"⏳", label:"Chờ rút tiền",       value:fmtS(pendingWithdraw)+"đ", sub:`${withdrawals.length} yêu cầu`, color:"#FFB347" },
+              { icon:"💵", label:"Doanh thu GMV",      value:fmtS(totalRevenue)+"đ",    sub: period==="day"?"Hôm nay":period==="week"?"7 ngày":"Tháng này", color:"#3ecf6e" },
+              { icon:"📦", label:"Tổng đơn",            value:totalOrders+" đơn",         sub:"Không bị hủy",                color:"#4a8ff5" },
+              { icon:"🛵", label:"HH từ tài xế",        value:fmtS(totalDriverComm)+"đ", sub:"Phí ship × % tài xế",         color:"#FF8C00" },
+              { icon:"🏪", label:"HH từ quán",          value:fmtS(totalShopComm)+"đ",   sub:"Subtotal × % hoa hồng quán",  color:"#b464ff" },
+              { icon:"💰", label:"Tổng thu app",        value:fmtS(totalDriverComm + totalShopComm)+"đ", sub:"HH tài xế + HH quán", color:"#FFB347" },
             ].map((k, i) => (
               <div key={k.label} className="kpi-card" style={{ animationDelay:`${i*0.06}s`, background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"14px 16px" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
@@ -183,7 +182,10 @@ export default function AdminFinancePage() {
                     <span style={{ width:10, height:3, background:"#FF8C00", borderRadius:2, display:"inline-block" }} />Doanh thu
                   </span>
                   <span style={{ display:"flex", alignItems:"center", gap:5, color:"#6a5a40", fontSize:10 }}>
-                    <span style={{ width:10, height:3, background:"#3ecf6e", borderRadius:2, display:"inline-block" }} />Hoa hồng tài xế
+                    <span style={{ width:10, height:3, background:"#3ecf6e", borderRadius:2, display:"inline-block" }} />HH tài xế
+                  </span>
+                  <span style={{ display:"flex", alignItems:"center", gap:5, color:"#6a5a40", fontSize:10 }}>
+                    <span style={{ width:10, height:3, background:"#b464ff", borderRadius:2, display:"inline-block" }} />HH quán
                   </span>
                 </div>
               </div>
@@ -194,9 +196,10 @@ export default function AdminFinancePage() {
                   {weeklyData.map(d => (
                     <div key={d.day} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4, height:"100%" }}>
                       <div style={{ flex:1, width:"100%", display:"flex", flexDirection:"column", justifyContent:"flex-end", position:"relative" }}>
-                        <div style={{ position:"absolute", bottom:0, left:0, right:0, display:"flex", flexDirection:"column", gap:2 }}>
-                          <div style={{ width:"100%", height:`${(d.comm/maxRev)*100}%`, background:"rgba(62,207,110,0.65)", borderRadius:"3px 3px 0 0", minHeight:d.comm>0?3:0 }} />
-                          <div style={{ width:"100%", height:`${((d.rev-d.comm)/maxRev)*100}%`, background:"rgba(255,140,0,0.7)", borderRadius:"3px 3px 0 0", minHeight:d.rev>0?3:0 }} />
+                        <div style={{ position:"absolute", bottom:0, left:0, right:0, display:"flex", flexDirection:"column", gap:1 }}>
+                          <div style={{ width:"100%", height:`${(d.shopComm/maxRev)*100}%`, background:"rgba(180,100,255,0.65)", borderRadius:"3px 3px 0 0", minHeight:d.shopComm>0?3:0 }} />
+                          <div style={{ width:"100%", height:`${(d.driverComm/maxRev)*100}%`, background:"rgba(62,207,110,0.65)", borderRadius:"3px 3px 0 0", minHeight:d.driverComm>0?3:0 }} />
+                          <div style={{ width:"100%", height:`${((d.rev-d.driverComm-d.shopComm)/maxRev)*100}%`, background:"rgba(255,140,0,0.7)", borderRadius:"3px 3px 0 0", minHeight:d.rev>0?3:0 }} />
                         </div>
                       </div>
                       <div style={{ color:"#6a5a40", fontSize:9 }}>{d.day}</div>
@@ -206,10 +209,10 @@ export default function AdminFinancePage() {
               )}
               <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginTop:16, paddingTop:14, borderTop:"1px solid rgba(255,255,255,0.05)" }}>
                 {[
-                  { label:"Doanh thu",        value: fmt(weeklyData.reduce((s,d)=>s+d.rev,0)) },
-                  { label:"Hoa hồng tài xế",  value: fmt(weeklyData.reduce((s,d)=>s+d.comm,0)) },
-                  { label:"Đơn hàng",          value: totalOrders + " đơn" },
-                  { label:"Giá trị TB/đơn",    value: fmt(avgOrderValue) },
+                  { label:"Doanh thu GMV",  value: fmt(weeklyData.reduce((s,d)=>s+d.rev,0)) },
+                  { label:"HH từ tài xế",   value: fmt(weeklyData.reduce((s,d)=>s+d.driverComm,0)) },
+                  { label:"HH từ quán",      value: fmt(weeklyData.reduce((s,d)=>s+d.shopComm,0)) },
+                  { label:"Tổng thu app",    value: fmt(weeklyData.reduce((s,d)=>s+d.driverComm+d.shopComm,0)) },
                 ].map(item => (
                   <div key={item.label} style={{ textAlign:"center" }}>
                     <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700 }}>{item.value}</div>
@@ -219,81 +222,111 @@ export default function AdminFinancePage() {
               </div>
             </div>
 
-            {/* Pending withdrawals */}
+            {/* Top quán theo hoa hồng */}
             <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"18px 20px", display:"flex", flexDirection:"column" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-                <div style={{ color:"#f0eaff", fontSize:13, fontWeight:700 }}>Yêu cầu rút tiền chờ duyệt</div>
-                {withdrawals.length > 0 && (
-                  <span style={{ padding:"2px 8px", borderRadius:6, background:"rgba(255,179,71,0.12)", color:"#FFB347", fontSize:10, fontWeight:700 }}>{withdrawals.length}</span>
-                )}
+                <div style={{ color:"#f0eaff", fontSize:13, fontWeight:700 }}>Top quán · HH cao nhất</div>
+                <span style={{ padding:"2px 8px", borderRadius:6, background:"rgba(180,100,255,0.12)", color:"#b464ff", fontSize:10, fontWeight:700 }}>{shopComms.length} quán</span>
               </div>
-              {withdrawals.length === 0 ? (
-                <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", color:"#6a5a40", fontSize:11 }}>Không có yêu cầu nào đang chờ</div>
+              {shopComms.length === 0 ? (
+                <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", color:"#6a5a40", fontSize:11 }}>Chưa có dữ liệu</div>
               ) : (
-                <>
-                  <div style={{ display:"flex", flexDirection:"column", gap:2, flex:1 }}>
-                    {withdrawals.map(w => (
-                      <div key={w.id} className="table-row" style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 8px", borderRadius:10, transition:"background 0.15s" }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                          <div style={{ width:34, height:34, borderRadius:10, background:"rgba(255,179,71,0.1)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>🛵</div>
-                          <div>
-                            <div style={{ color:"#f0eaff", fontSize:11, fontWeight:600 }}>{w.name}</div>
-                            <div style={{ color:"#6a5a40", fontSize:9 }}>{w.account}</div>
-                          </div>
-                        </div>
-                        <div style={{ textAlign:"right" }}>
-                          <div style={{ color:"#FFB347", fontSize:12, fontWeight:700 }}>{fmt(w.amount)}</div>
-                          <div style={{ color:"#6a5a40", fontSize:9 }}>{new Date(w.created_at).toLocaleDateString("vi-VN")}</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                  {shopComms.slice(0, 6).map(m => (
+                    <div key={m.id} className="table-row" style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"9px 8px", borderRadius:10, transition:"background 0.15s" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+                        <div style={{ width:32, height:32, borderRadius:9, background:"rgba(180,100,255,0.1)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0 }}>🏪</div>
+                        <div>
+                          <div style={{ color:"#f0eaff", fontSize:11, fontWeight:600, maxWidth:130, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.name}</div>
+                          <div style={{ color:"#6a5a40", fontSize:9 }}>{m.orders} đơn · {m.rate}%</div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                  <div style={{ marginTop:10, padding:"10px 12px", background:"rgba(255,179,71,0.07)", borderRadius:10, border:"1px solid rgba(255,179,71,0.18)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <span style={{ color:"#6a5a40", fontSize:10 }}>Tổng chờ chuyển</span>
-                    <span style={{ color:"#FFB347", fontSize:13, fontWeight:800 }}>{fmt(pendingWithdraw)}</span>
-                  </div>
-                  <button
-                    onClick={() => router.push("/admin/withdrawals")}
-                    style={{ marginTop:10, width:"100%", height:36, borderRadius:10, background:"rgba(255,179,71,0.1)", border:"1px solid rgba(255,179,71,0.3)", color:"#FFB347", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Lexend" }}
-                  >
-                    Xem tất cả yêu cầu rút →
-                  </button>
-                </>
+                      <div style={{ textAlign:"right" }}>
+                        <div style={{ color:"#b464ff", fontSize:12, fontWeight:700 }}>{fmt(m.commission)}</div>
+                        <div style={{ color:"#6a5a40", fontSize:9 }}>{fmt(m.subtotal)} subtotal</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {shopComms.length > 0 && (
+                <div style={{ marginTop:10, padding:"10px 12px", background:"rgba(180,100,255,0.07)", borderRadius:10, border:"1px solid rgba(180,100,255,0.18)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <span style={{ color:"#6a5a40", fontSize:10 }}>Tổng HH từ quán</span>
+                  <span style={{ color:"#b464ff", fontSize:13, fontWeight:800 }}>{fmt(totalShopC)}</span>
+                </div>
               )}
             </div>
           </div>
 
-          {/* Driver commission table */}
-          <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, overflow:"hidden" }}>
-            <div style={{ padding:"14px 20px", borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <div style={{ color:"#f0eaff", fontSize:13, fontWeight:700 }}>Hoa hồng theo tài xế</div>
-              <div style={{ color:"#6a5a40", fontSize:10 }}>{driverComms.length} tài xế có đơn</div>
-            </div>
-            <div style={{ display:"grid", gridTemplateColumns:"2fr 80px 140px 160px", padding:"10px 20px", borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
-              {["Tài xế","Số chuyến","Phí giao (gross)","Hoa hồng nộp app"].map(h => (
-                <span key={h} style={{ color:"#6a5a40", fontSize:10, fontWeight:600 }}>{h}</span>
-              ))}
-            </div>
-            {driverComms.length === 0 ? (
-              <div style={{ padding:"24px", textAlign:"center", color:"#6a5a40", fontSize:11 }}>Chưa có dữ liệu cho kỳ này</div>
-            ) : (
-              <>
-                {driverComms.map(d => (
-                  <div key={d.id} className="table-row" style={{ display:"grid", gridTemplateColumns:"2fr 80px 140px 160px", padding:"12px 20px", borderBottom:"1px solid rgba(255,255,255,0.04)", alignItems:"center", transition:"background 0.15s" }}>
-                    <span style={{ color:"#f0eaff", fontSize:12, fontWeight:600 }}>🛵 {d.name}</span>
-                    <span style={{ color:"#b0956a", fontSize:12 }}>{d.trips} chuyến</span>
-                    <span style={{ color:"#f0eaff", fontSize:12 }}>{fmt(d.shipTotal)}</span>
-                    <span style={{ color:"#3ecf6e", fontSize:12, fontWeight:700 }}>{fmt(d.commission)}</span>
-                  </div>
+          {/* 2 bảng chi tiết */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+
+            {/* Driver commission table */}
+            <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, overflow:"hidden" }}>
+              <div style={{ padding:"14px 20px", borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div style={{ color:"#f0eaff", fontSize:13, fontWeight:700 }}>🛵 Hoa hồng từ tài xế</div>
+                <div style={{ color:"#6a5a40", fontSize:10 }}>{driverComms.length} tài xế</div>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1.8fr 60px 110px 110px", padding:"8px 16px", borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
+                {["Tài xế","Chuyến","Phí ship","HH nộp app"].map(h => (
+                  <span key={h} style={{ color:"#6a5a40", fontSize:10, fontWeight:600 }}>{h}</span>
                 ))}
-                <div style={{ padding:"12px 20px", display:"grid", gridTemplateColumns:"2fr 80px 140px 160px", alignItems:"center", borderTop:"1px solid rgba(255,107,0,0.1)", background:"rgba(255,107,0,0.03)" }}>
-                  <span style={{ color:"#6a5a40", fontSize:10 }}>Tổng cộng — {driverComms.length} tài xế</span>
-                  <span style={{ color:"#b0956a", fontSize:11 }}>{totalDrvTrips} chuyến</span>
-                  <span style={{ color:"#f0eaff", fontSize:11, fontWeight:600 }}>{fmt(totalDrvShip)}</span>
-                  <span style={{ color:"#3ecf6e", fontSize:12, fontWeight:800 }}>{fmt(totalDrvComm)}</span>
-                </div>
-              </>
-            )}
+              </div>
+              {driverComms.length === 0 ? (
+                <div style={{ padding:"20px", textAlign:"center", color:"#6a5a40", fontSize:11 }}>Chưa có dữ liệu</div>
+              ) : (
+                <>
+                  {driverComms.map(d => (
+                    <div key={d.id} className="table-row" style={{ display:"grid", gridTemplateColumns:"1.8fr 60px 110px 110px", padding:"10px 16px", borderBottom:"1px solid rgba(255,255,255,0.04)", alignItems:"center", transition:"background 0.15s" }}>
+                      <span style={{ color:"#f0eaff", fontSize:11, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{d.name}</span>
+                      <span style={{ color:"#b0956a", fontSize:11 }}>{d.trips}</span>
+                      <span style={{ color:"#f0eaff", fontSize:11 }}>{fmt(d.shipTotal)}</span>
+                      <span style={{ color:"#3ecf6e", fontSize:11, fontWeight:700 }}>{fmt(d.commission)}</span>
+                    </div>
+                  ))}
+                  <div style={{ padding:"10px 16px", display:"grid", gridTemplateColumns:"1.8fr 60px 110px 110px", alignItems:"center", borderTop:"1px solid rgba(255,107,0,0.1)", background:"rgba(255,107,0,0.03)" }}>
+                    <span style={{ color:"#6a5a40", fontSize:10 }}>Tổng</span>
+                    <span style={{ color:"#b0956a", fontSize:11 }}>{totalDrvTrips}</span>
+                    <span style={{ color:"#f0eaff", fontSize:11 }}>{fmt(totalDrvShip)}</span>
+                    <span style={{ color:"#3ecf6e", fontSize:12, fontWeight:800 }}>{fmt(totalDrvComm)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Shop commission table */}
+            <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, overflow:"hidden" }}>
+              <div style={{ padding:"14px 20px", borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div style={{ color:"#f0eaff", fontSize:13, fontWeight:700 }}>🏪 Hoa hồng từ quán</div>
+                <div style={{ color:"#6a5a40", fontSize:10 }}>{shopComms.length} quán</div>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1.8fr 50px 110px 110px", padding:"8px 16px", borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
+                {["Cửa hàng","Tỉ lệ","Subtotal","HH thu được"].map(h => (
+                  <span key={h} style={{ color:"#6a5a40", fontSize:10, fontWeight:600 }}>{h}</span>
+                ))}
+              </div>
+              {shopComms.length === 0 ? (
+                <div style={{ padding:"20px", textAlign:"center", color:"#6a5a40", fontSize:11 }}>Chưa có dữ liệu</div>
+              ) : (
+                <>
+                  {shopComms.map(m => (
+                    <div key={m.id} className="table-row" style={{ display:"grid", gridTemplateColumns:"1.8fr 50px 110px 110px", padding:"10px 16px", borderBottom:"1px solid rgba(255,255,255,0.04)", alignItems:"center", transition:"background 0.15s" }}>
+                      <span style={{ color:"#f0eaff", fontSize:11, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.name}</span>
+                      <span style={{ color:"#FF8C00", fontSize:11, fontWeight:700 }}>{m.rate}%</span>
+                      <span style={{ color:"#f0eaff", fontSize:11 }}>{fmt(m.subtotal)}</span>
+                      <span style={{ color:"#b464ff", fontSize:11, fontWeight:700 }}>{fmt(m.commission)}</span>
+                    </div>
+                  ))}
+                  <div style={{ padding:"10px 16px", display:"grid", gridTemplateColumns:"1.8fr 50px 110px 110px", alignItems:"center", borderTop:"1px solid rgba(255,107,0,0.1)", background:"rgba(255,107,0,0.03)" }}>
+                    <span style={{ color:"#6a5a40", fontSize:10 }}>Tổng</span>
+                    <span style={{ color:"#6a5a40", fontSize:11 }}>—</span>
+                    <span style={{ color:"#f0eaff", fontSize:11 }}>{fmt(totalShopSub)}</span>
+                    <span style={{ color:"#b464ff", fontSize:12, fontWeight:800 }}>{fmt(totalShopC)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
           </div>
 
         </div>
