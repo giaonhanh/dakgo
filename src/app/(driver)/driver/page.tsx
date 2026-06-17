@@ -747,9 +747,10 @@ function TopupSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
 }
 
 /* ── withdraw sheet ── */
-function WithdrawSheet({ onClose, walletBalance, onSuccess }: {
+function WithdrawSheet({ onClose, walletBalance, pendingWithdrawal, onSuccess }: {
   onClose: () => void
   walletBalance: number
+  pendingWithdrawal: number
   onSuccess: () => void
 }) {
   const supabase = createClient()
@@ -818,6 +819,19 @@ function WithdrawSheet({ onClose, walletBalance, onSuccess }: {
           <button onClick={onClose} style={{ width:30, height:30, borderRadius:8, background:"rgba(255,255,255,0.06)", border:"none", color:"#6a5a40", fontSize:16, cursor:"pointer" }}>×</button>
         </div>
 
+        {/* Banner đang có yêu cầu chờ xử lý */}
+        {pendingWithdrawal > 0 && !done && (
+          <div style={{ background:"rgba(255,179,71,0.08)", border:"1px solid rgba(255,179,71,0.3)", borderRadius:14, padding:"12px 14px", marginBottom:14, display:"flex", gap:10, alignItems:"center" }}>
+            <div style={{ width:8, height:8, borderRadius:"50%", background:"#FFB347", flexShrink:0, animation:"pulse 1.5s infinite" }} />
+            <div>
+              <div style={{ color:"#FFB347", fontSize:11, fontWeight:700 }}>Đang có yêu cầu rút tiền chờ xử lý</div>
+              <div style={{ color:"#6a5a40", fontSize:10, marginTop:2 }}>
+                {pendingWithdrawal.toLocaleString("vi-VN")}đ đang chờ admin chuyển khoản. Bạn có thể gửi thêm yêu cầu mới sau khi yêu cầu này hoàn tất.
+              </div>
+            </div>
+          </div>
+        )}
+
         {done ? (
           <div style={{ textAlign:"center", padding:"24px 0" }}>
             <div style={{ fontSize:56, marginBottom:12 }}>✅</div>
@@ -830,9 +844,17 @@ function WithdrawSheet({ onClose, walletBalance, onSuccess }: {
         ) : (
           <>
             {/* balance */}
-            <div style={{ background:"rgba(255,107,0,0.07)", border:"1px solid rgba(255,107,0,0.2)", borderRadius:14, padding:"12px 16px", marginBottom:16, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ color:"#6a5a40", fontSize:11 }}>Số dư ví hiện tại</span>
-              <span style={{ color:"#FF8C00", fontSize:16, fontWeight:800 }}>{walletBalance.toLocaleString("vi-VN")}đ</span>
+            <div style={{ background:"rgba(255,107,0,0.07)", border:"1px solid rgba(255,107,0,0.2)", borderRadius:14, padding:"12px 16px", marginBottom:16 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ color:"#6a5a40", fontSize:11 }}>Số dư khả dụng</span>
+                <span style={{ color:"#FF8C00", fontSize:16, fontWeight:800 }}>{walletBalance.toLocaleString("vi-VN")}đ</span>
+              </div>
+              {pendingWithdrawal > 0 && (
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:6, paddingTop:6, borderTop:"1px solid rgba(255,179,71,0.15)" }}>
+                  <span style={{ color:"#6a5a40", fontSize:10 }}>⏳ Đang rút (chờ admin)</span>
+                  <span style={{ color:"#FFB347", fontSize:12, fontWeight:700 }}>{pendingWithdrawal.toLocaleString("vi-VN")}đ</span>
+                </div>
+              )}
             </div>
 
             {/* bank info */}
@@ -899,8 +921,9 @@ export default function DriverDashboard() {
   const [driverId,      setDriverId]      = useState<string | null>(null)
   const [todayStats,    setTodayStats]    = useState({ orders: 0, earnings: 0, rating: 5.0 })
   const [toggling,      setToggling]      = useState(false)
-  const [walletBalance, setWalletBalance] = useState(0)
-  const [showWithdraw,  setShowWithdraw]  = useState(false)
+  const [walletBalance,     setWalletBalance]     = useState(0)
+  const [pendingWithdrawal, setPendingWithdrawal] = useState(0)
+  const [showWithdraw,      setShowWithdraw]      = useState(false)
   const [setupDone,     setSetupDone]     = useState(false)
   const [setupStatus,   setSetupStatus]   = useState({ bankLinked: false, vehicleDocs: false, depositDone: false })
   const [showSetupGate, setShowSetupGate] = useState(false)
@@ -959,10 +982,15 @@ export default function DriverDashboard() {
       // ── Setup gate checks ──
       const bankLinked = !!((driver as { bank_account_number?: string } | null)?.bank_account_number)
       const vehicleDocs = !!((driver as { license_plate?: string } | null)?.license_plate)
-      const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "driver").maybeSingle()
-      const walletBal = (wallet as { balance: number } | null)?.balance ?? 0
-      const depositDone = walletBal >= 200000
+      const [{ data: wallet }, { data: pendingWds }] = await Promise.all([
+        supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "driver").maybeSingle(),
+        supabase.from("withdrawals").select("amount").eq("user_id", user.id).in("status", ["processing", "pending_transfer"]),
+      ])
+      const walletBal    = (wallet as { balance: number } | null)?.balance ?? 0
+      const pendingTotal = (pendingWds ?? []).reduce((s, w) => s + ((w as { amount: number }).amount ?? 0), 0)
+      const depositDone  = walletBal >= 200000
       setWalletBalance(walletBal)
+      setPendingWithdrawal(pendingTotal)
       const status = { bankLinked, vehicleDocs, depositDone }
       setSetupStatus(status)
       const done = bankLinked && vehicleDocs && depositDone
@@ -1535,9 +1563,15 @@ export default function DriverDashboard() {
           }}>
             <div style={{ width:44, height:44, borderRadius:13, background:"rgba(62,207,110,0.12)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>💳</div>
             <div style={{ flex:1 }}>
-              <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px", marginBottom:2 }}>Số dư ví tài xế</div>
+              <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:".5px", marginBottom:2 }}>Số dư khả dụng</div>
               <div style={{ color:"#3ecf6e", fontSize:20, fontWeight:800 }}>{walletBalance.toLocaleString("vi-VN")}đ</div>
-              {walletBalance < 100000 && (
+              {pendingWithdrawal > 0 && (
+                <div style={{ display:"flex", alignItems:"center", gap:4, marginTop:3 }}>
+                  <div style={{ width:6, height:6, borderRadius:"50%", background:"#FFB347", flexShrink:0, animation:"pulse 1.5s infinite" }} />
+                  <div style={{ color:"#FFB347", fontSize:9, fontWeight:600 }}>Đang rút: {pendingWithdrawal.toLocaleString("vi-VN")}đ · chờ admin</div>
+                </div>
+              )}
+              {pendingWithdrawal === 0 && walletBalance < 100000 && (
                 <div style={{ color:"#ff4040", fontSize:9, marginTop:2 }}>⚠ Số dư thấp — nạp thêm để nhận đơn thoải mái</div>
               )}
             </div>
@@ -1633,16 +1667,20 @@ export default function DriverDashboard() {
         {showWithdraw && (
           <WithdrawSheet
             walletBalance={walletBalance}
+            pendingWithdrawal={pendingWithdrawal}
             onClose={() => setShowWithdraw(false)}
             onSuccess={async () => {
               setShowWithdraw(false)
               const { data: { user } } = await supabase.auth.getUser()
               if (!user) return
-              const { data: w } = await supabase
-                .from("wallets").select("balance")
-                .eq("user_id", user.id).eq("type", "driver").maybeSingle()
+              const [{ data: w }, { data: pWds }] = await Promise.all([
+                supabase.from("wallets").select("balance").eq("user_id", user.id).eq("type", "driver").maybeSingle(),
+                supabase.from("withdrawals").select("amount").eq("user_id", user.id).in("status", ["processing", "pending_transfer"]),
+              ])
               const newBal = (w as { balance: number } | null)?.balance ?? 0
+              const newPending = (pWds ?? []).reduce((s, x) => s + ((x as { amount: number }).amount ?? 0), 0)
               setWalletBalance(newBal)
+              setPendingWithdrawal(newPending)
               setSetupStatus(s => ({ ...s, depositDone: newBal >= 200000 }))
             }}
           />
