@@ -31,11 +31,12 @@ const fmtTime = (iso: string) => {
 }
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  processing:  { label: "Đang xử lý", color: "#FFB347", bg: "rgba(255,179,71,0.12)"   },
-  success:     { label: "Chờ chuyển", color: "#4a8ff5", bg: "rgba(74,143,245,0.12)"   },
-  transferred: { label: "Đã chuyển",  color: "#3ecf6e", bg: "rgba(62,207,110,0.12)"   },
-  failed:      { label: "Từ chối",    color: "#ff6060", bg: "rgba(255,64,64,0.10)"    },
-  refunded:    { label: "Hoàn lại",   color: "#9080b0", bg: "rgba(144,128,176,0.10)"  },
+  processing:       { label: "Đang xử lý", color: "#FFB347", bg: "rgba(255,179,71,0.12)"   },
+  pending_transfer: { label: "Chờ chuyển", color: "#4a8ff5", bg: "rgba(74,143,245,0.12)"   },
+  success:          { label: "Chờ chuyển", color: "#4a8ff5", bg: "rgba(74,143,245,0.12)"   },
+  transferred:      { label: "Đã chuyển",  color: "#3ecf6e", bg: "rgba(62,207,110,0.12)"   },
+  failed:           { label: "Từ chối",    color: "#ff6060", bg: "rgba(255,64,64,0.10)"    },
+  refunded:         { label: "Hoàn lại",   color: "#9080b0", bg: "rgba(144,128,176,0.10)"  },
 }
 
 export default function AdminWithdrawalsPage() {
@@ -62,7 +63,7 @@ export default function AdminWithdrawalsPage() {
       .order("created_at", { ascending: false })
       .limit(100)
 
-    if (filter === "pending") q = q.in("status", ["success", "processing"])
+    if (filter === "pending") q = q.in("status", ["pending_transfer", "success", "processing"])
 
     const { data } = await q
     const rows: Withdrawal[] = (data ?? []).map((r: Record<string, unknown>) => {
@@ -87,7 +88,7 @@ export default function AdminWithdrawalsPage() {
     const { count } = await supabase
       .from("withdrawals")
       .select("id", { count: "exact", head: true })
-      .in("status", ["success", "processing"])
+      .in("status", ["pending_transfer", "success", "processing"])
     setPendingCount(count ?? 0)
     setLoading(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -216,7 +217,7 @@ export default function AdminWithdrawalsPage() {
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
             {items.map(w => {
               const cfg   = STATUS_CFG[w.status] ?? STATUS_CFG.failed
-              const isPending = w.status === "success" || w.status === "processing"
+              const isPending = ["pending_transfer", "success", "processing"].includes(w.status)
               const unit  = w.wallet_type === "driver" ? "đ" : " xu"
 
               return (
