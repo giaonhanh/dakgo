@@ -466,8 +466,10 @@ export default function AdminUsersPage() {
       const mOrd = mOrdMap[p.id] ?? { count: 0, revenue: 0, commission: 0 }
       const wBal = walletByUser[p.id] ?? {}
       let status: UserStatus = "active"
-      if (bl) status = "blacklisted"
-      else if (!p.is_active) status = "inactive"
+      // Dùng cả is_active VÀ blacklist để xác định trạng thái khoá:
+      // - lockUser: set is_active=false + upsert blacklist
+      // - Nếu RLS chặn đọc blacklist thì vẫn dựa được vào is_active=false
+      if (bl || !p.is_active) status = "blacklisted"
       const points = loy?.total_points ?? 0
       let tier: TierLevel = "bronze"
       if (points >= 2000) tier = "platinum"
@@ -578,19 +580,25 @@ export default function AdminUsersPage() {
   const lockUser = async (id: string) => {
     setSaving(true)
     const supabase = createClient()
-    await supabase.from("profiles").update({ is_active: false }).eq("id", id)
-    await supabase.from("blacklist").upsert({ user_id: id, reason: "Khóa bởi admin", auto_triggered: false })
+    const { error: profileErr } = await supabase.from("profiles").update({ is_active: false }).eq("id", id)
+    if (profileErr) { fire("❌ Lỗi khoá tài khoản: " + profileErr.message, false); setSaving(false); return }
+    // Blacklist upsert — lỗi không block vì is_active=false đã đủ để khoá đăng nhập
+    const { error: blErr } = await supabase.from("blacklist").upsert({ user_id: id, reason: "Khóa bởi admin", auto_triggered: false })
+    if (blErr) console.warn("[lockUser] blacklist upsert failed (RLS?):", blErr.message)
     setUsers(p => p.map(u => u.id === id ? { ...u, status: "blacklisted" as UserStatus } : u))
     if (selected?.id === id) setSelected(s => s ? { ...s, status: "blacklisted" } : s)
+    fire("🔒 Đã khoá tài khoản")
     setSaving(false)
   }
   const unlockUser = async (id: string) => {
     setSaving(true)
     const supabase = createClient()
-    await supabase.from("profiles").update({ is_active: true }).eq("id", id)
+    const { error: profileErr } = await supabase.from("profiles").update({ is_active: true }).eq("id", id)
+    if (profileErr) { fire("❌ Lỗi mở khóa: " + profileErr.message, false); setSaving(false); return }
     await supabase.from("blacklist").delete().eq("user_id", id)
     setUsers(p => p.map(u => u.id === id ? { ...u, status: "active" as UserStatus, blacklistReason: undefined } : u))
     if (selected?.id === id) setSelected(s => s ? { ...s, status: "active", blacklistReason: undefined } : s)
+    fire("🔓 Đã mở khoá tài khoản")
     setSaving(false)
   }
   const unlockCancelLock = async (id: string) => {
