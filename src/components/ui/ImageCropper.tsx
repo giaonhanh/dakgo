@@ -139,7 +139,7 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
         display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
 
         {!bgRemoved ? (
-          <button onClick={handleRemoveBg} disabled={removing}
+          <button onClick={() => handleRemoveBg()} disabled={removing}
             style={{ display:"flex", alignItems:"center", gap:6,
               background: removing ? "rgba(180,100,255,0.1)" : "rgba(180,100,255,0.15)",
               border:"1px solid rgba(180,100,255,0.4)",
