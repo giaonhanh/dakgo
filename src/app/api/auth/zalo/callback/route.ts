@@ -85,19 +85,38 @@ export async function GET(request: NextRequest) {
     const fakeEmail   = `zalo_${zaloId}@giaonhanh.local`
 
     // ── 3. Tìm hoặc tạo user trong Supabase ────────────────────
-    const { data: existing } = await adminClient
+    // Ưu tiên: tìm theo zalo_id (tài khoản đã link trước đó)
+    let { data: existing } = await adminClient
       .from("profiles")
       .select("id, role")
-      .eq("phone", fakePhone)
+      .eq("zalo_id", zaloId)
       .maybeSingle()
+
+    // Fallback: tìm theo fakePhone (tài khoản Zalo cũ trước khi có cột zalo_id)
+    if (!existing) {
+      const { data: byPhone } = await adminClient
+        .from("profiles")
+        .select("id, role")
+        .eq("phone", fakePhone)
+        .maybeSingle()
+      existing = byPhone
+      // Cập nhật zalo_id nếu tìm thấy bằng phone
+      if (existing) {
+        await adminClient.from("profiles")
+          .update({ zalo_id: zaloId })
+          .eq("id", existing.id)
+      }
+    }
 
     let userId: string
     let role = "customer"
+    let isNewUser = false
 
     if (existing) {
       userId = existing.id
       role   = existing.role ?? "customer"
     } else {
+      isNewUser = true
       // Tạo auth user mới (random password — user chỉ login qua Zalo)
       const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
         email:         fakeEmail,
@@ -120,6 +139,7 @@ export async function GET(request: NextRequest) {
         avatar_url: avatarUrl,
         role:       "customer",
         is_active:  true,
+        zalo_id:    zaloId,
       }, { onConflict: "id" })
     }
 
@@ -127,9 +147,11 @@ export async function GET(request: NextRequest) {
     const tempPass = `zp_${crypto.randomBytes(20).toString("hex")}`
     await adminClient.auth.admin.updateUserById(userId, { password: tempPass })
 
-    const dest = role === "driver" ? "/driver"
+    // User Zalo mới → hỏi có muốn link với tài khoản SĐT cũ không
+    const dest = isNewUser ? "/link-account"
+               : role === "driver"   ? "/driver"
                : role === "merchant" ? "/merchant"
-               : role === "admin" ? "/admin"
+               : role === "admin"    ? "/admin"
                : "/"
 
     const redirectResponse = NextResponse.redirect(new URL(dest, appUrl))
