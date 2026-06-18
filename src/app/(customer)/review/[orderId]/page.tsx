@@ -210,6 +210,23 @@ export default function ReviewPage() {
         return
       }
 
+      // Xử lý tip payment (chỉ khi tip > 0 và không phải COD)
+      if (tip > 0 && order.payMethod !== "cash") {
+        const tipRes = await fetch("/api/reviews/tip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order_id: orderId, tip_amount: tip }),
+        })
+        if (!tipRes.ok) {
+          const tipData = await tipRes.json()
+          if (tipData?.insufficient) {
+            setSubmitErr(`Đánh giá đã lưu, nhưng ${tipData.error}. Nạp thêm ví để tip lần sau nhé!`)
+            setSubmitted(true)
+            return
+          }
+        }
+      }
+
       setSubmitted(true)
     } catch (e) {
       console.error("[review] unexpected error:", e)

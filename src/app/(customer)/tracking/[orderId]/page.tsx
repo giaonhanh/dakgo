@@ -102,9 +102,10 @@ export default function TrackingPage() {
   const [currentUserId, setCurrentUserId] = useState("")
   const [toast,         setToast]         = useState("")
   const [mapExpanded,   setMapExpanded]   = useState(false)
-  const [paymentStatus, setPaymentStatus] = useState<"pending"|"paid">("pending")
-  const [adminTelLink,  setAdminTelLink]  = useState("tel:0901999888")
-  const [adminPhone,    setAdminPhone]    = useState("0901 999 888")
+  const [paymentStatus,    setPaymentStatus]    = useState<"pending"|"paid">("pending")
+  const [deliveryPhotoUrl, setDeliveryPhotoUrl] = useState<string | null>(null)
+  const [adminTelLink,     setAdminTelLink]     = useState("tel:0901999888")
+  const [adminPhone,       setAdminPhone]       = useState("0901 999 888")
 
   const fireToast = useCallback((msg: string) => {
     setToast(msg); setTimeout(() => setToast(""), 2200)
@@ -130,7 +131,7 @@ export default function TrackingPage() {
         .from("orders")
         .select(`
           id, status, created_at, delivery_address, delivery_lat, delivery_lng,
-          total_amount, pay_method, driver_id,
+          total_amount, pay_method, driver_id, delivery_photo_url,
           shops(name, lat, lng, location),
           order_items(name, qty)
         `)
@@ -173,6 +174,7 @@ export default function TrackingPage() {
       const st = rawSt as OrderStatus
       setStatus(st)
       if (order.pay_method !== "cash" && st === "delivered") setPaymentStatus("paid")
+      if (order.delivery_photo_url) setDeliveryPhotoUrl(order.delivery_photo_url)
 
       // Fetch driver
       if (order.driver_id) {
@@ -211,9 +213,9 @@ export default function TrackingPage() {
     if (searchParams.get("chat") === "1") setShowChat(true)
   }, [searchParams])
 
-  // ── Realtime: order status + driver location ──────────────
+  // ── Realtime: order status + driver location (chỉ khi chưa delivered) ──
   useEffect(() => {
-    if (!orderId) return
+    if (!orderId || status === "delivered") return
 
     const orderCh = supabase
       .channel(`order-status:${orderId}`)
@@ -245,14 +247,14 @@ export default function TrackingPage() {
       supabase.removeChannel(locationCh)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderId])
+  }, [orderId, status === "delivered"])
 
   const currentIdx   = STATUS_ORDER.indexOf(status)
   const isDelivered  = status === "delivered"
 
   // ── Tính ETA thực theo khoảng cách tài xế/quán ↔ khách ────
   useEffect(() => {
-    if (!orderData) return
+    if (!orderData || isDelivered) return
     let etaMin: number
     if (status === "delivering" && hasDriverGps) {
       // Đã lấy hàng, đang trên đường đến khách → tính từ vị trí tài xế hiện tại
@@ -477,24 +479,24 @@ export default function TrackingPage() {
         {/* Scrollable */}
         <div style={{ flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch" } as React.CSSProperties}>
 
-          {/* Map */}
-          <div style={{ position:"relative",flexShrink:0 }}>
-            <LiveTrackMap
-              driverLat={driverPos.lat}
-              driverLng={driverPos.lng}
-              destLat={orderData.destLat}
-              destLng={orderData.destLng}
-              height={mapExpanded ? 380 : MAP_H} />
+          {/* Map — chỉ hiển thị khi đơn chưa delivered */}
+          {!isDelivered && (
+            <div style={{ position:"relative",flexShrink:0 }}>
+              <LiveTrackMap
+                driverLat={driverPos.lat}
+                driverLng={driverPos.lng}
+                destLat={orderData.destLat}
+                destLng={orderData.destLng}
+                height={mapExpanded ? 380 : MAP_H} />
 
-            <button onClick={() => setMapExpanded(e => !e)}
-              style={{ position:"absolute",bottom:10,right:10,zIndex:20,
-                background:"rgba(8,8,6,0.88)",backdropFilter:"blur(8px)",
-                border:"1px solid rgba(255,255,255,0.12)",borderRadius:9,padding:"5px 9px",
-                color:"#b0956a",fontSize: 11,fontWeight:600,fontFamily:"Lexend",cursor:"pointer" }}>
-              {mapExpanded ? "⬆ Thu nhỏ" : "⬇ Mở rộng"}
-            </button>
+              <button onClick={() => setMapExpanded(e => !e)}
+                style={{ position:"absolute",bottom:10,right:10,zIndex:20,
+                  background:"rgba(8,8,6,0.88)",backdropFilter:"blur(8px)",
+                  border:"1px solid rgba(255,255,255,0.12)",borderRadius:9,padding:"5px 9px",
+                  color:"#b0956a",fontSize: 11,fontWeight:600,fontFamily:"Lexend",cursor:"pointer" }}>
+                {mapExpanded ? "⬆ Thu nhỏ" : "⬇ Mở rộng"}
+              </button>
 
-            {!isDelivered && (
               <div style={{ position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",zIndex:20,
                 background:"rgba(8,8,6,0.9)",backdropFilter:"blur(10px)",
                 border:"1px solid rgba(255,107,0,0.3)",borderRadius:20,padding:"5px 16px",
@@ -504,8 +506,8 @@ export default function TrackingPage() {
                 </span>
                 <span style={{ color:"#6a5a40",fontSize: 11 }}>còn lại</span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <div style={{ padding:"10px 14px 100px" }}>
 
@@ -662,17 +664,40 @@ export default function TrackingPage() {
             <AnimatePresence>
               {isDelivered && (
                 <motion.div initial={{opacity:0,scale:.95}} animate={{opacity:1,scale:1}}
-                  style={{ textAlign:"center",marginBottom:16 }}>
-                  <div style={{ color:"#3ecf6e",fontSize:20,fontWeight:800,marginBottom:8 }}>
-                    🎉 Đã giao thành công!
+                  style={{ marginBottom:16 }}>
+
+                  <div style={{ textAlign:"center",marginBottom:12 }}>
+                    <div style={{ color:"#3ecf6e",fontSize:20,fontWeight:800,marginBottom:8 }}>
+                      🎉 Đã giao thành công!
+                    </div>
+                    <a href={`/review/${orderData.id}`}
+                      style={{ display:"inline-block",textDecoration:"none",
+                        background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
+                        color:"#fff",borderRadius:12,padding:"11px 28px",
+                        fontSize:12,fontWeight:700,boxShadow:"0 4px 20px rgba(255,107,0,0.4)" }}>
+                      ⭐ Đánh giá đơn hàng
+                    </a>
                   </div>
-                  <a href={`/review/${orderData.id}`}
-                    style={{ display:"inline-block",textDecoration:"none",
-                      background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
-                      color:"#fff",borderRadius:12,padding:"11px 28px",
-                      fontSize:12,fontWeight:700,boxShadow:"0 4px 20px rgba(255,107,0,0.4)" }}>
-                    ⭐ Đánh giá đơn hàng
-                  </a>
+
+                  {/* Ảnh xác nhận giao hàng */}
+                  {deliveryPhotoUrl && (
+                    <div style={{ background:"rgba(62,207,110,0.06)",
+                      border:"1px solid rgba(62,207,110,0.2)",
+                      borderRadius:14,overflow:"hidden" }}>
+                      <div style={{ padding:"10px 12px 8px",display:"flex",alignItems:"center",gap:7 }}>
+                        <span style={{ fontSize:14 }}>📷</span>
+                        <span style={{ color:"#3ecf6e",fontSize:11,fontWeight:700 }}>
+                          Ảnh xác nhận giao hàng
+                        </span>
+                      </div>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={deliveryPhotoUrl} alt="Ảnh giao hàng"
+                        style={{ width:"100%",maxHeight:200,objectFit:"cover",display:"block" }} />
+                      <div style={{ padding:"8px 12px",color:"#6a5a40",fontSize:10 }}>
+                        Tài xế đã chụp ảnh xác nhận trao hàng tận tay
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
