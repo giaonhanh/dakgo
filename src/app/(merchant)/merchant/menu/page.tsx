@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
 import * as XLSX from "xlsx"
+import ImageCropper from "@/components/ui/ImageCropper"
 import {
   DndContext, DragEndEvent, closestCenter,
   KeyboardSensor, PointerSensor, useSensor, useSensors,
@@ -195,6 +196,7 @@ export default function MerchantMenuPage() {
   const [toast, setToast] = useState("")
   const [toastOk, setToastOk] = useState(true)
   const [imageFile, setImageFile] = useState<File | null>(null)
+  const [cropSrc,  setCropSrc]  = useState<string | null>(null)
   const fileRef  = useRef<HTMLInputElement>(null)
   const csvRef   = useRef<HTMLInputElement>(null)
 
@@ -785,9 +787,16 @@ export default function MerchantMenuPage() {
   }
 
   const onImageFile = (file: File) => {
+    // Mở crop modal thay vì dùng ảnh trực tiếp
     const url = URL.createObjectURL(file)
-    setImageFile(file)
-    setPModal(m => m ? {...m, imagePreview:url} : m)
+    setCropSrc(url)
+  }
+
+  const onCropDone = (croppedFile: File) => {
+    const url = URL.createObjectURL(croppedFile)
+    setImageFile(croppedFile)
+    setPModal(m => m ? {...m, imagePreview: url} : m)
+    setCropSrc(null)
   }
 
   // ── Derived ────────────────────────────────────────────────────────────
@@ -829,6 +838,15 @@ export default function MerchantMenuPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Image crop modal */}
+      {cropSrc && (
+        <ImageCropper
+          src={cropSrc}
+          onDone={onCropDone}
+          onCancel={() => setCropSrc(null)}
+        />
+      )}
 
       {/* Hidden file inputs */}
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}}
