@@ -662,41 +662,6 @@ function LoginContent() {
                 </AnimatePresence>
               </div>
 
-              {/* Social — chỉ ở tab login */}
-              {tab === "login" && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: .2 }}
-                  style={{ width: "100%", paddingBottom: 24 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.07)" }} />
-                    <span style={{ color: "rgba(106,90,64,.5)", fontSize: 11 }}>hoặc đăng nhập với</span>
-                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.07)" }} />
-                  </div>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    {/* Zalo */}
-                    <button
-                      onClick={() => { window.location.href = "/api/auth/zalo" }}
-                      style={{
-                        flex: 1, height: 42, borderRadius: 11, border: "1px solid rgba(0,120,240,.3)",
-                        background: "rgba(0,120,240,.15)", backdropFilter: "blur(8px)", cursor: "pointer",
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                        color: "#f8f0e0", fontSize: 11, fontWeight: 500, fontFamily: "Lexend",
-                      }}>
-                      <span style={{ fontSize: 15 }}>💬</span>Zalo
-                    </button>
-                    {/* Facebook — dev mode, chỉ test được với tài khoản admin app */}
-                    <button
-                      onClick={() => setError("Tính năng đăng nhập Facebook đang phát triển.")}
-                      style={{
-                        flex: 1, height: 42, borderRadius: 11, border: "1px solid rgba(24,119,242,.3)",
-                        background: "rgba(24,119,242,.15)", backdropFilter: "blur(8px)", cursor: "pointer",
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                        color: "#f8f0e0", fontSize: 11, fontWeight: 500, fontFamily: "Lexend",
-                      }}>
-                      <span style={{ fontSize: 15 }}>📘</span>Facebook
-                    </button>
-                  </div>
-                </motion.div>
-              )}
 
 
               <p style={{ color: "rgba(255,255,255,.14)", fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: 20 }}>
