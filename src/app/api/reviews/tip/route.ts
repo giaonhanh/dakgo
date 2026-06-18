@@ -119,18 +119,19 @@ export async function POST(req: NextRequest) {
       },
     ])
 
-    // Push notification cho tài xế (fire-and-forget)
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/notify/send`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json", Cookie: req.headers.get("cookie") ?? "" },
-      body: JSON.stringify({
-        user_id: order.driver_id,
-        title:   "🎉 Bạn nhận được tip!",
-        body:    `Khách vừa gửi ${tip.toLocaleString("vi-VN")}đ tip. Cảm ơn bạn đã giao hàng tốt!`,
-        url:     "/driver/earnings",
-        tag:     "tip",
-      }),
-    }).catch(() => { /* non-critical */ })
+    // Lưu vào chuông (in-app) + push notification cho tài xế
+    const tipTitle = "🎉 Bạn nhận được tip!"
+    const tipBody  = `Khách vừa gửi ${tip.toLocaleString("vi-VN")}đ tip. Cảm ơn bạn đã giao hàng tốt!`
+    await db.from("notifications").insert({
+      user_id: order.driver_id,
+      type:    "order",
+      title:   tipTitle,
+      body:    tipBody,
+      data:    { order_id, url: "/driver/earnings" },
+    })
+    const { sendPushToUser } = await import("@/lib/webpush")
+    sendPushToUser(order.driver_id, { title: tipTitle, body: tipBody, url: "/driver/earnings", tag: "tip" })
+      .catch(() => { /* non-critical */ })
 
     return NextResponse.json({ ok: true, new_balance: newCustBal })
   } catch {
