@@ -64,11 +64,27 @@
       "PowerShell(git add \"supabase/migrations/20260622_commission_functions.sql\")",
       "PowerShell(git commit -m \"fix\\(db\\): them commission functions con thieu trong production DB\")",
       "PowerShell(git add \"supabase/schema.sql\")",
-      "PowerShell(git commit -m \"refactor\\(db\\): gop tat ca migrations vao 1 schema.sql duy nhat \\(1975 lines\\)\")"
+      "PowerShell(git commit -m \"refactor\\(db\\): gop tat ca migrations vao 1 schema.sql duy nhat \\(1975 lines\\)\")",
+      "PowerShell(git add \"src/lib/mapConfig.ts\")",
+      "PowerShell(git commit -m \"fix\\(map\\): fallback CartoDB dark khi thieu VietMap key - ban do hien thi ngay\")",
+      "Bash(xargs grep -l \"cover_image\")",
+      "Bash(node -e \"const pkg = require\\('./node_modules/@supabase/ssr/package.json'\\); console.log\\(pkg.version\\)\")",
+      "Bash(xargs grep -l \"push\\\\|PushPermission\\\\|usePush\")",
+      "Bash(xargs grep -l \"Push\\\\|push\")",
+      "Bash(xargs grep -l \"push\\\\|notify\")",
+      "Bash(xargs grep -l \"review\")",
+      "Bash(cp \"C:/Users/Admin/Desktop/anh app/zalo_verifierGItaCuIOJ2XMfi9magn8KKw2tWQYz0jHEJ4t.html\" \"d:/Projects/giaonhanh-ai/public/zalo_verifierGItaCuIOJ2XMfi9magn8KKw2tWQYz0jHEJ4t.html\")",
+      "Bash(ls \"C:/Users/Admin/Desktop/\" | grep -i zalo)",
+      "Read(//c/Users/Admin/Desktop/**)",
+      "Bash(find \"C:/Users/Admin/\" -name \"zalo_verifier*.html\" 2>/dev/null | head -5)",
+      "Read(//c/Users/Admin/**)",
+      "Bash(xargs grep -l \"push_subscriptions\\\\|web-push\\\\|webpush\\\\|sendNotification\\\\|notify/send\")",
+      "Bash(node -e \"require\\('sharp'\\); console.log\\('sharp ok'\\)\")"
     ],
     "additionalDirectories": [
       "d:\\Projects\\giaonhanh-ai\\src\\app\\(merchant)\\merchant\\print",
-      "d:\\Projects\\giaonhanh-ai\\supabase\\migrations"
+      "d:\\Projects\\giaonhanh-ai\\supabase\\migrations",
+      "C:\\Users\\Admin\\Desktop\\anh app"
     ]
   }
 }

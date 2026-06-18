@@ -1,5 +1,5 @@
-const CACHE_NAME = 'giaonhanh-v4'
-const MAP_CACHE  = 'giaonhanh-maps-v2'
+﻿const CACHE_NAME = 'goi-v4'
+const MAP_CACHE  = 'goi-maps-v2'
 const OFFLINE_URL = '/offline'
 
 const PRECACHE_URLS = [
@@ -120,7 +120,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     Promise.all([
       // 1. Hiện notification
-      self.registration.showNotification(data.title ?? 'Giao Nhanh', {
+      self.registration.showNotification(data.title ?? 'Goi', {
         body:     data.body ?? '',
         icon:     '/icon-192.png',
         badge:    '/icon-192.png',

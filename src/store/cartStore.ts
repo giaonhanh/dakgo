@@ -73,4 +73,4 @@ export const useCartStore = create<CartStore>()(persist((set, get) => ({
   totalPrice: () => get().items.reduce((sum, i) => sum + i.price * i.qty, 0),
 
   totalQty: () => get().items.reduce((sum, i) => sum + i.qty, 0),
-}), { name: "giaonhanh-cart" }));
+}), { name: "Goi-cart" }));

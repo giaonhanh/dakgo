@@ -83,7 +83,7 @@ function isRideType(t: ServiceType) { return t === "ride_motorbike" || t === "ri
 function fmtPayMethod(pm: string): string {
   const map: Record<string, string> = {
     cash: "Tiền mặt", vietqr: "VietQR",
-    momo: "MoMo", zalopay: "ZaloPay", wallet: "Ví GiaoNhanh",
+    momo: "MoMo", zalopay: "ZaloPay", wallet: "Ví Goi",
   }
   return map[pm] ?? pm
 }
@@ -464,7 +464,7 @@ export default function OrdersPage() {
   }, [userId])
 
   const cancelOrder      = orders.find(o => o.id === showCancel)
-  const willRefundWallet = cancelOrder?.payMethod === "Ví GiaoNhanh"
+  const willRefundWallet = cancelOrder?.payMethod === "Ví Goi"
 
   // Reset review inputs khi chuyển sang đơn khác
   useEffect(() => {
@@ -515,7 +515,7 @@ export default function OrdersPage() {
       fireToast("⚠️ Tài khoản bị khóa do hủy đơn quá nhiều lần · Liên hệ admin để mở khóa")
     } else {
       setOrders(prev => prev.map(o => o.id === showCancel ? { ...o, status: "cancelled" as Status, cancelReason: cancelRsn } : o))
-      const msg = willRefundWallet ? "Đã hủy đơn · Hoàn tiền về ví GiaoNhanh!" : "Đã hủy đơn hàng!"
+      const msg = willRefundWallet ? "Đã hủy đơn · Hoàn tiền về ví Goi!" : "Đã hủy đơn hàng!"
       if (count === 2) fireToast(`${msg} · ⚠️ Đây là lần hủy thứ 2, hủy thêm 1 lần nữa sẽ bị khóa tài khoản!`)
       else fireToast(msg)
     }
@@ -631,7 +631,7 @@ export default function OrdersPage() {
                     <span style={{ fontSize: 16 }}>{willRefundWallet ? "💚" : "ℹ️"}</span>
                     <div>
                       <div style={{ color: willRefundWallet ? "#3ecf6e" : "#b0956a", fontSize: 10, fontWeight: 600 }}>
-                        {willRefundWallet ? "Sẽ hoàn tiền về ví GiaoNhanh" : "Thanh toán tiền mặt — không hoàn tiền"}
+                        {willRefundWallet ? "Sẽ hoàn tiền về ví Goi" : "Thanh toán tiền mặt — không hoàn tiền"}
                       </div>
                       <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 2 }}>
                         {willRefundWallet
@@ -686,7 +686,7 @@ export default function OrdersPage() {
                     <span style={{ fontSize: 14 }}>ℹ️</span>
                     <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.6 }}>
                       {willRefundWallet
-                        ? "Nếu admin chấp thuận huỷ, tiền sẽ được hoàn về ví GiaoNhanh."
+                        ? "Nếu admin chấp thuận huỷ, tiền sẽ được hoàn về ví Goi."
                         : "Đơn tiền mặt: nếu admin chấp thuận huỷ, chưa có giao dịch phát sinh."}
                     </div>
                   </div>
@@ -1002,7 +1002,7 @@ export default function OrdersPage() {
                                       { label: isRideType(order.serviceType) ? "Cước phí xe" : "Tiền hàng", val: order.subtotal,    c: "#b0956a" },
                                       order.deliveryFee > 0 ? { label: "Phí giao hàng",  val: order.deliveryFee,  c: "#b0956a" } : null,
                                       order.discount > 0    ? { label: "Voucher giảm",   val: -order.discount,    c: "#3ecf6e" } : null,
-                                      xuUsed > 0            ? { label: "🪙 Xu Giao Nhanh", val: -xuUsed,          c: "#FFB347" } : null,
+                                      xuUsed > 0            ? { label: "🪙 Xu Goi", val: -xuUsed,          c: "#FFB347" } : null,
                                       xuBonusUsed > 0       ? { label: "🎁 Xu thưởng",   val: -xuBonusUsed,       c: "#FFB347" } : null,
                                     ].filter((r): r is { label: string; val: number; c: string } => r !== null)
                                      .map((r, ri) => (
@@ -1077,7 +1077,7 @@ export default function OrdersPage() {
                                       ))}
                                     </div>
                                     <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 7 }}>
-                                      {["Giao nhanh","Thân thiện","Đúng giờ","Cẩn thận","Biết đường"].map(chip => (
+                                      {["Goi","Thân thiện","Đúng giờ","Cẩn thận","Biết đường"].map(chip => (
                                         <div key={chip} onClick={() => setDriverReviewTxt(p => p.includes(chip) ? p.replace(`, ${chip}`,"").replace(chip,"").trim() : p ? `${p}, ${chip}` : chip)}
                                           style={{ padding: "3px 9px", borderRadius: 8, cursor: "pointer", fontSize: 11,
                                             background: driverReviewTxt.includes(chip) ? "rgba(74,143,245,0.12)" : "rgba(255,255,255,0.04)",

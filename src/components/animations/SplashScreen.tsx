@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { motion } from 'framer-motion';
 import { useEffect } from 'react';
@@ -87,7 +87,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.35, duration: 0.5 }}
         >
-          Giao Nhanh
+          Goi
         </motion.h1>
 
         <motion.p

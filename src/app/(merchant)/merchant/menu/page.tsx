@@ -551,7 +551,7 @@ export default function MerchantMenuPage() {
 
     // ── Sheet hướng dẫn ──────────────────────────────────────────────
     const guide = XLSX.utils.aoa_to_sheet([
-      ["📖 HƯỚNG DẪN NHẬP MENU — GIAO NHANH KRÔNG PẮC"],
+      ["📖 HƯỚNG DẪN NHẬP MENU — Goi — Krông Pắc"],
       [""],
       ["🔶 BƯỚC 1: Điền thông tin vào sheet '📋 Danh sách món'"],
       ["🔶 BƯỚC 2: Lưu file → App → Thực đơn → Nhập từ Excel → chọn file này"],
@@ -616,7 +616,7 @@ export default function MerchantMenuPage() {
     }
 
     XLSX.utils.book_append_sheet(wb, guide, "📖 Hướng dẫn")
-    XLSX.writeFile(wb, "template_menu_giaonhanh.xlsx")
+    XLSX.writeFile(wb, "template_menu_Goi.xlsx")
   }
 
   // ── Group handlers ─────────────────────────────────────────────────────

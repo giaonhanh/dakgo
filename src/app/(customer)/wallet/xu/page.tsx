@@ -230,7 +230,7 @@ export default function XuPage() {
                 <div style={{ width:36, height:4, background:"rgba(255,255,255,0.12)",
                   borderRadius:2, margin:"0 auto 16px" }} />
                 <div style={{ color:"#f8f0e0", fontSize:14, fontWeight:700, marginBottom:14 }}>
-                  💳 Nạp xu Giao Nhanh
+                  💳 Nạp xu Goi
                 </div>
 
                 {!showQR ? (
@@ -337,7 +337,7 @@ export default function XuPage() {
                 borderRadius:11, padding:"10px 13px", marginBottom:14,
                 display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <div>
-                  <span style={{ color:"#6a5a40", fontSize:10 }}>Xu Giao Nhanh có thể rút</span>
+                  <span style={{ color:"#6a5a40", fontSize:10 }}>Xu Goi có thể rút</span>
                   {bonusBalance > 0 && (
                     <div style={{ color:"rgba(62,207,110,0.6)", fontSize: 11, marginTop:2 }}>
                       Xu thưởng {fmt(bonusBalance)}xu — không rút được
@@ -421,7 +421,7 @@ export default function XuPage() {
               background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)",
               animation:"shimmer 4s infinite" }} />
             <div style={{ color:"rgba(180,100,255,0.5)", fontSize:10, marginBottom:4, position:"relative", zIndex:1 }}>
-              Xu Giao Nhanh (có thể rút)
+              Xu Goi (có thể rút)
             </div>
             <div style={{ display:"flex", alignItems:"baseline", gap:8, marginBottom:4, position:"relative", zIndex:1 }}>
               <div style={{ fontSize:36, fontWeight:800, lineHeight:1,

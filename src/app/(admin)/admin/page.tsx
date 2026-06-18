@@ -210,7 +210,7 @@ export default function AdminDashboard() {
 
       <AdminShell
         pageTitle="🏠 Tổng quan hệ thống"
-        pageSubtitle="Giao Nhanh · Krông Pắc · Tự động làm mới mỗi 30s"
+        pageSubtitle="Goi · Krông Pắc · Tự động làm mới mỗi 30s"
         actions={
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <div style={{ padding:"5px 12px", borderRadius:8, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", color:"#6a5a40", fontSize:9 }}>

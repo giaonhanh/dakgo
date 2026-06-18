@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next"
+﻿import type { Metadata, Viewport } from "next"
 import { Lexend } from "next/font/google"
 import "./globals.css"
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar"
@@ -12,13 +12,13 @@ const lexend = Lexend({
 })
 
 export const metadata: Metadata = {
-  title: "Giao Nhanh Krông Pắc",
+  title: "Goi — Krông Pắc",
   description: "Giao hàng · Mua hộ · Xe ôm · Taxi tại Krông Pắc, Đắk Lắk",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Giao Nhanh",
+    title: "Goi",
   },
   icons: {
     apple: [

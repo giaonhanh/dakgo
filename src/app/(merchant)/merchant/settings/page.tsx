@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -346,7 +346,7 @@ export default function MerchantSettingsPage() {
   const [showHours,     setShowHours]     = useState(false)
   const [showPrepSheet, setShowPrepSheet] = useState(false)
   const [toast, setToast]           = useState("")
-  const [adminContactLink, setAdminContactLink] = useState("mailto:giaonhanh.phuocan@gmail.com")
+  const [adminContactLink, setAdminContactLink] = useState("mailto:Goi.phuocan@gmail.com")
   const [adminPhone,       setAdminPhone]       = useState("")
   const [shopId,           setShopId]           = useState<string | null>(null)
   const [shopName,         setShopName]         = useState("")
@@ -595,7 +595,7 @@ export default function MerchantSettingsPage() {
 
           {/* about + account merged */}
           <Section title="Về ứng dụng & Tài khoản">
-            <Row icon="🚀" label="Giao Nhanh Merchant" sub="Phiên bản 1.0.0" />
+            <Row icon="🚀" label="Goi Merchant" sub="Phiên bản 1.0.0" />
             <Row icon="🚪" label="Đăng xuất" sub="Đăng xuất khỏi thiết bị này" danger onClick={async () => { const sb = createClient(); await sb.auth.signOut(); window.location.href = "/login" }} arrow last />
           </Section>
         </div>

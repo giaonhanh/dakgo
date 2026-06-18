@@ -1,6 +1,6 @@
-{
-  "name": "Giao Nhanh Krông Pắc",
-  "short_name": "GiaoNhanh",
+﻿{
+  "name": "Goi — Krông Pắc",
+  "short_name": "Goi",
   "description": "Giao hàng · Mua hộ · Xe ôm · Taxi tại Krông Pắc, Đắk Lắk",
   "theme_color": "#FF6B1A",
   "background_color": "#FF6B1A",
@@ -23,7 +23,7 @@
       "sizes": "512x512",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Trang chủ Giao Nhanh"
+      "label": "Trang chủ Goi"
     }
   ],
   "shortcuts": [

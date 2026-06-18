@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -186,7 +186,7 @@ export default function MerchantRegisterPage() {
                     style={{ width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 14px",color:"#f8f0e0",fontSize:12,resize:"none",fontFamily:"Lexend" }} />
                 </div>
                 <div style={{ background:"rgba(74,143,245,0.07)",border:"1px solid rgba(74,143,245,0.2)",borderRadius:12,padding:"12px 14px" }}>
-                  <div style={{ color:"#4a8ff5",fontSize:10,fontWeight:700,marginBottom:4 }}>ℹ️ Hoa hồng Giao Nhanh</div>
+                  <div style={{ color:"#4a8ff5",fontSize:10,fontWeight:700,marginBottom:4 }}>ℹ️ Hoa hồng Goi</div>
                   <div style={{ color:"#6a5a40",fontSize:9,lineHeight:1.7 }}>Thu <strong style={{ color:"#b0956a" }}>15% hoa hồng</strong> trên mỗi đơn. Không phí đăng ký. Thanh toán cuối tháng.</div>
                 </div>
               </motion.div>
@@ -312,7 +312,7 @@ export default function MerchantRegisterPage() {
                 </div>
                 <div style={{ background:"rgba(255,107,0,0.05)",border:"1px solid rgba(255,107,0,0.15)",borderRadius:12,padding:12 }}>
                   <div style={{ color:"#6a5a40",fontSize:9,lineHeight:1.8 }}>
-                    Bằng cách gửi, bạn đồng ý với <span style={{ color:"#FF8C00" }}>Điều khoản dịch vụ</span> và <span style={{ color:"#FF8C00" }}>Chính sách hoa hồng 15%</span> của Giao Nhanh.
+                    Bằng cách gửi, bạn đồng ý với <span style={{ color:"#FF8C00" }}>Điều khoản dịch vụ</span> và <span style={{ color:"#FF8C00" }}>Chính sách hoa hồng 15%</span> của Goi.
                   </div>
                 </div>
               </motion.div>

@@ -86,7 +86,7 @@ export default function WalletPage() {
             <div style={{ position:"relative", zIndex:1 }}>
               <div style={{ color:"rgba(180,100,255,0.55)", fontSize: 11, fontWeight:700,
                 textTransform:"uppercase", letterSpacing:0.8, marginBottom:8 }}>
-                💳 Xu Giao Nhanh
+                💳 Xu Goi
               </div>
               <div style={{ display:"flex", alignItems:"baseline", gap:8, marginBottom:3 }}>
                 <span style={{ fontSize:36, fontWeight:800, lineHeight:1,

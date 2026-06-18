@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client"
+﻿import { createClient } from "@/lib/supabase/client"
 
 export interface AdminContact {
   name: string
@@ -10,10 +10,10 @@ export interface AdminContact {
 }
 
 const FALLBACK: AdminContact = {
-  name: "Admin Giao Nhanh",
+  name: "Admin Goi",
   phone: "",
-  email: "giaonhanh.phuocan@gmail.com",
-  contactLink: "mailto:giaonhanh.phuocan@gmail.com",
+  email: "Goi.phuocan@gmail.com",
+  contactLink: "mailto:Goi.phuocan@gmail.com",
   zaloLink: "",
   telLink: "",
 }

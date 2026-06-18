@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { usePushNotification } from "@/hooks/usePushNotification"
@@ -1425,7 +1425,7 @@ export default function DriverDashboard() {
             }}>🛵</div>
             <div>
               <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:800 }}>{driverName}</div>
-              <div style={{ color:"#6a5a40", fontSize:9 }}>Tài xế · Giao Nhanh</div>
+              <div style={{ color:"#6a5a40", fontSize:9 }}>Tài xế · Goi</div>
             </div>
           </div>
 

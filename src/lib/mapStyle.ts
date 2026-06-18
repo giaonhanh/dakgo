@@ -1,5 +1,5 @@
-/**
- * Áp màu brand Giao Nhanh lên bản đồ MapLibre sau khi style load xong.
+﻿/**
+ * Áp màu brand Goi lên bản đồ MapLibre sau khi style load xong.
  * Chỉ đổi nền + nước + label — giữ nguyên màu đường VietMap để roads hiện rõ.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

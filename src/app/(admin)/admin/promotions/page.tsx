@@ -409,7 +409,7 @@ export default function AdminPromotionsPage() {
 
                   {/* 2. Các trường nhập liệu */}
                   {([
-                    { label:"Mã voucher *",             key:"code",         ph:"VD: GIAONHANH10, FREESHIP...",                  t:"text"   },
+                    { label:"Mã voucher *",             key:"code",         ph:"VD: Goi10, FREESHIP...",                  t:"text"   },
                     { label:"Tên khuyến mãi *",          key:"title",        ph:"VD: Giảm 10% cho đơn đầu tiên",                t:"text"   },
                     form.type!=="freeship" ? { label: form.type==="percent"?"Tỉ lệ giảm (%) *":"Số tiền giảm (đ) *",
                       key:"value", ph: form.type==="percent"?"VD: 10 → giảm 10%":"VD: 20000 → giảm 20.000đ", t:"number" } : null,

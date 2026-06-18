@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { usePushNotification } from "@/hooks/usePushNotification"
@@ -93,7 +93,7 @@ export default function PushPermissionPrompt() {
         Bạn đã từ chối quyền thông báo trước đó.{"\n"}
         Để nhận thông báo đơn hàng, vào{" "}
         <span style={{ color: "#b0956a" }}>Cài đặt trình duyệt</span>{" "}
-        → tìm Giao Nhanh → bật Thông báo.
+        → tìm Goi → bật Thông báo.
       </div>
 
       <button
@@ -138,7 +138,7 @@ export default function PushPermissionPrompt() {
         color: "#6a5a40", fontSize: 12, textAlign: "center",
         lineHeight: 1.8, marginBottom: 32, maxWidth: 300,
       }}>
-        Giao Nhanh sẽ thông báo ngay khi{"\n"}
+        Goi sẽ thông báo ngay khi{"\n"}
         <span style={{ color: "#b0956a" }}>đơn hàng được xác nhận</span>,{" "}
         <span style={{ color: "#b0956a" }}>tài xế đến lấy</span> và{" "}
         <span style={{ color: "#b0956a" }}>giao hàng thành công</span> —
