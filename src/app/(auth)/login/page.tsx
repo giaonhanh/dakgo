@@ -498,18 +498,18 @@ function LoginContent() {
                           Facebook
                         </button>
                         {/* Zalo */}
-                        <a href="/api/auth/zalo"
+                        <button onClick={() => { window.location.href = "/api/auth/zalo" }}
                           style={{ flex:1, height:42, borderRadius:11, border:"1px solid rgba(0,136,255,0.3)",
                             background:"rgba(0,136,255,0.08)", cursor:"pointer",
                             display:"flex", alignItems:"center", justifyContent:"center", gap:7,
                             fontFamily:"Lexend", fontSize:11, fontWeight:600, color:"#0088ff",
-                            textDecoration:"none", transition:"all .2s" }}>
+                            transition:"all .2s" }}>
                           <svg width="16" height="16" viewBox="0 0 48 48" fill="none">
                             <rect width="48" height="48" rx="12" fill="#0068FF"/>
                             <text x="24" y="32" textAnchor="middle" fontSize="20" fontWeight="bold" fill="white">Z</text>
                           </svg>
                           Zalo
-                        </a>
+                        </button>
                       </div>
 
                       <FooterLink q="Chưa có tài khoản?" a="Đăng ký ngay →" onClick={() => switchTab("register")} />
