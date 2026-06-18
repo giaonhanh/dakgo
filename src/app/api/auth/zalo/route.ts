@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     `&code_challenge=${codeChallenge}` +
     `&state=${state}`
 
+  const isPopup = request.nextUrl.searchParams.get("mode") === "popup"
   const response = NextResponse.redirect(zaloUrl)
 
   const cookieOpts = {
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
   }
   response.cookies.set("zalo_code_verifier", codeVerifier, cookieOpts)
   response.cookies.set("zalo_state",         state,        cookieOpts)
+  if (isPopup) response.cookies.set("zalo_popup", "1", cookieOpts)
 
   return response
 }

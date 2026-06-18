@@ -498,7 +498,36 @@ function LoginContent() {
                           Facebook
                         </button>
                         {/* Zalo */}
-                        <button onClick={() => { window.location.href = "/api/auth/zalo" }}
+                        <button onClick={() => {
+                          const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+                          if (isMobile) {
+                            // Mobile: redirect toàn trang — Zalo Universal Links tự mở app
+                            window.location.href = "/api/auth/zalo"
+                          } else {
+                            // Desktop: popup cửa sổ nhỏ
+                            const w = 480, h = 620
+                            const left = Math.round(window.screenX + (window.outerWidth  - w) / 2)
+                            const top  = Math.round(window.screenY + (window.outerHeight - h) / 2)
+                            const popup = window.open(
+                              "/api/auth/zalo?mode=popup",
+                              "zalo_login",
+                              `width=${w},height=${h},left=${left},top=${top},scrollbars=yes`
+                            )
+                            // Nhận message từ popup sau khi đăng nhập xong
+                            const handler = (e: MessageEvent) => {
+                              if (e.data?.type !== "zalo_auth") return
+                              window.removeEventListener("message", handler)
+                              popup?.close()
+                              const dest = e.data.dest ?? "/"
+                              window.location.href = dest
+                            }
+                            window.addEventListener("message", handler)
+                            // Nếu user đóng popup thủ công → dọn listener
+                            const check = setInterval(() => {
+                              if (popup?.closed) { window.removeEventListener("message", handler); clearInterval(check) }
+                            }, 500)
+                          }
+                        }}
                           style={{ flex:1, height:42, borderRadius:11, border:"1px solid rgba(0,136,255,0.3)",
                             background:"rgba(0,136,255,0.08)", cursor:"pointer",
                             display:"flex", alignItems:"center", justifyContent:"center", gap:7,

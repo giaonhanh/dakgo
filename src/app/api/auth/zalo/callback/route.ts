@@ -187,6 +187,32 @@ export async function GET(request: NextRequest) {
     redirectResponse.cookies.delete("zalo_code_verifier")
     redirectResponse.cookies.delete("zalo_state")
 
+    // Nếu đăng nhập qua popup (desktop) → đóng popup, báo parent redirect
+    const isPopup = request.cookies.get("zalo_popup")?.value === "1"
+    if (isPopup) {
+      // Copy session cookies sang response HTML
+      const htmlRes = new Response(
+        `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><script>
+          try {
+            window.opener && window.opener.postMessage(
+              { type: "zalo_auth", dest: ${JSON.stringify(dest)} }, "*"
+            );
+          } catch(e) {}
+          window.close();
+        </script><p>Đang xử lý...</p></body></html>`,
+        { headers: { "Content-Type": "text/html; charset=utf-8" } }
+      )
+      // Copy session cookies từ redirectResponse
+      redirectResponse.cookies.getAll().forEach(c => {
+        if (c.name !== "zalo_popup") htmlRes.headers.append("Set-Cookie",
+          redirectResponse.cookies.get(c.name)?.toString() ?? ""
+        )
+      })
+      htmlRes.headers.delete("zalo_popup")
+      return htmlRes
+    }
+
+    redirectResponse.cookies.delete("zalo_popup")
     return redirectResponse
   } catch (err) {
     console.error("[zalo/callback] unexpected:", err)
