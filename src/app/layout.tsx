@@ -41,6 +41,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi" className={lexend.className} style={{ background: "#080806" }}>
+      <head>
+        <meta name="zalo-platform-site-verification" content="GItaCuIOJ2XMfi9magn8KKw2tWQYz0jHEJ4t" />
+      </head>
       <body style={{ background: "#080806", margin: 0 }}>
         <ContentProtection />
         <SessionProvider>{children}</SessionProvider>
