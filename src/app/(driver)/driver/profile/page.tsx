@@ -323,16 +323,21 @@ interface WalletTx {
 }
 
 const TX_CFG: Record<string, { label: string; color: string; sign: string }> = {
-  topup:      { label: "Nạp tiền",   color: "#3ecf6e", sign: "+" },
-  withdrawal: { label: "Rút tiền",   color: "#ff4040", sign: "−" },
-  payment:    { label: "Thanh toán", color: "#4a8ff5", sign: "−" },
-  commission: { label: "Phí nền tảng", color: "#ff4040", sign: "−" },
-  refund:     { label: "Hoàn tiền",  color: "#FFB347", sign: "+" },
+  topup:      { label: "Nạp ký quỹ",    color: "#3ecf6e", sign: "+" },
+  withdrawal: { label: "Rút tiền",       color: "#ff4040", sign: "−" },
+  payment:    { label: "Thanh toán",     color: "#4a8ff5", sign: "−" },
+  commission: { label: "Phí nền tảng",   color: "#ff4040", sign: "−" },
+  refund:     { label: "Hoàn tiền",      color: "#FFB347", sign: "+" },
 }
 
 function txCfg(tx: WalletTx) {
+  // Thu nhập từ giao đơn (commission dương = nền tảng trả cho tài xế)
   if (tx.type === "commission" && tx.amount > 0) {
-    return { label: "Thu nhập đơn hàng", color: "#3ecf6e", sign: "+" }
+    return { label: "Thu nhập giao đơn", color: "#3ecf6e", sign: "+" }
+  }
+  // Tip từ khách
+  if (tx.type === "topup" && tx.note?.toLowerCase().includes("tip")) {
+    return { label: "Nhận tip từ khách 🎉", color: "#b464ff", sign: "+" }
   }
   return TX_CFG[tx.type] ?? { label: tx.type, color: "#6a5a40", sign: "" }
 }
@@ -373,7 +378,7 @@ function WalletHistorySheet({ onClose, walletBalance }: { onClose: () => void; w
         {/* header */}
         <div style={{ padding: "20px 20px 16px", flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
-            <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🪙 Lịch sử Nạp / Rút</div>
+            <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🪙 Lịch sử giao dịch</div>
             <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
           </div>
           {/* balance card */}
