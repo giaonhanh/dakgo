@@ -114,7 +114,6 @@ export default function ProfilePage() {
   const [newPw,       setNewPw]       = useState("")
   const [confirmPw,   setConfirmPw]   = useState("")
   const [showLogout,  setShowLogout]  = useState(false)
-  const [showDelete,  setShowDelete]  = useState(false)
   const [toast,       setToast]       = useState("")
   const [editMode,    setEditMode]    = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -325,54 +324,6 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
 
-      {/* Xác nhận xóa tài khoản */}
-      <AnimatePresence>
-        {showDelete && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowDelete(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 190, backdropFilter: "blur(4px)" }} />
-            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 320 }} style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 191, background: "#0e0c09", border: "1px solid rgba(255,64,64,0.2)", borderRadius: "20px 20px 0 0", padding: "20px 18px 36px" }}>
-              <div style={{ width: 36, height: 4, background: "rgba(255,255,255,0.12)", borderRadius: 2, margin: "0 auto 18px" }} />
-              <div style={{ textAlign: "center", marginBottom: 14 }}>
-                <div style={{ fontSize: 36, marginBottom: 8 }}>⚠️</div>
-                <div style={{ color: "#ff6060", fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Xóa tài khoản?</div>
-                <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.6 }}>Toàn bộ lịch sử đơn hàng, điểm tích lũy và thông tin<br />của bạn sẽ bị xóa vĩnh viễn. Không thể khôi phục.</div>
-              </div>
-
-              {/* Cảnh báo đơn đang chạy */}
-              {activeOrderCount > 0 && (
-                <div style={{ background: "rgba(255,64,64,0.08)", border: "1px solid rgba(255,64,64,0.25)", borderRadius: 12, padding: "10px 14px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <span style={{ fontSize: 16, flexShrink: 0 }}>🚫</span>
-                  <div>
-                    <div style={{ color: "#ff6060", fontSize: 11, fontWeight: 700, marginBottom: 3 }}>Đang có {activeOrderCount} đơn hàng đang xử lý</div>
-                    <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.5 }}>Vui lòng chờ đơn hoàn thành hoặc hủy đơn trước khi xóa tài khoản.</div>
-                  </div>
-                </div>
-              )}
-
-              {/* Cảnh báo xu còn trong ví */}
-              {walletXu > 0 && (
-                <div style={{ background: "rgba(255,179,71,0.08)", border: "1px solid rgba(255,179,71,0.25)", borderRadius: 12, padding: "10px 14px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <span style={{ fontSize: 16, flexShrink: 0 }}>🪙</span>
-                  <div>
-                    <div style={{ color: "#FFB347", fontSize: 11, fontWeight: 700, marginBottom: 3 }}>Còn {walletXu.toLocaleString("vi-VN")}đ xu trong ví</div>
-                    <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.5 }}>Xu sẽ <strong style={{ color: "#ff6060" }}>không được hoàn trả</strong> khi xóa tài khoản. Vui lòng dùng hết xu trước khi thực hiện.</div>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => setShowDelete(false)} style={{ flex: 1, height: 44, borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "#b0956a", fontSize: 12, fontWeight: 600, fontFamily: "Lexend", cursor: "pointer" }}>Giữ lại</button>
-                <button
-                  disabled={activeOrderCount > 0}
-                  onClick={() => { fireToast("Đã gửi yêu cầu xóa tài khoản"); setShowDelete(false) }}
-                  style={{ flex: 1, height: 44, borderRadius: 12, border: "none", background: activeOrderCount > 0 ? "rgba(255,64,64,0.2)" : "linear-gradient(90deg,#ff4040,#ff6060)", color: activeOrderCount > 0 ? "#6a5a40" : "#fff", fontSize: 12, fontWeight: 700, fontFamily: "Lexend", cursor: activeOrderCount > 0 ? "not-allowed" : "pointer" }}>
-                  {activeOrderCount > 0 ? "Không thể xóa" : "Xóa tài khoản"}
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       <div style={{ position: "fixed", inset: 0, background: "#080806", zIndex: 60, display: "flex", flexDirection: "column", fontFamily: "'Lexend',sans-serif" }}>
 
@@ -548,7 +499,6 @@ export default function ProfilePage() {
           <SectionLabel>Tài khoản</SectionLabel>
           <div style={{ ...CARD_STYLE, marginBottom: 6 }}>
             <SettingRow icon="🚪" label="Đăng xuất" onClick={() => setShowLogout(true)} />
-            <SettingRow icon="🗑️" label="Xóa tài khoản" sub="Hành động này không thể khôi phục" danger onClick={() => setShowDelete(true)} />
           </div>
 
         </div>
