@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
         .toBuffer()
     }
 
-    return new NextResponse(resultPng, {
+    return new NextResponse(resultPng.buffer as ArrayBuffer, {
       status: 200,
       headers: {
         "Content-Type":  "image/png",
