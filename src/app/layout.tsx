@@ -25,6 +25,9 @@ export const metadata: Metadata = {
       { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
+  other: {
+    "zalo-platform-site-verification": "GItaCuIOJ2XMfi9magn8KKw2tWQYz0jHEJ4t",
+  },
 }
 
 export const viewport: Viewport = {
