@@ -147,8 +147,13 @@ export async function GET(request: NextRequest) {
     const tempPass = `zp_${crypto.randomBytes(20).toString("hex")}`
     await adminClient.auth.admin.updateUserById(userId, { password: tempPass })
 
-    // User Zalo mới → hỏi có muốn link với tài khoản SĐT cũ không
-    const dest = isNewUser ? "/link-account"
+    // Kiểm tra phone có phải fake không (user Zalo cũ chưa cập nhật SĐT)
+    const { data: profile } = await adminClient
+      .from("profiles").select("phone").eq("id", userId).single()
+    const needsPhone = profile?.phone?.startsWith("zalo_")
+
+    const dest = isNewUser          ? "/link-account"
+               : needsPhone         ? "/update-phone"
                : role === "driver"   ? "/driver"
                : role === "merchant" ? "/merchant"
                : role === "admin"    ? "/admin"

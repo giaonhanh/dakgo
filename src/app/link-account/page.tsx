@@ -36,7 +36,7 @@ export default function LinkAccountPage() {
   }
 
   async function handleSkip() {
-    router.replace("/")
+    router.replace("/update-phone")
   }
 
   return (
