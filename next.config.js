@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  webpack: (config) => {
+    // Cho phép load WASM từ @imgly/background-removal
+    config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true }
+    return config
+  },
   images: {
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
