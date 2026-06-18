@@ -143,11 +143,17 @@ export default function MerchantDashboard() {
     }
     load()
 
-    // Re-check khi quay lại tab (sau khi shop update profile)
+    // Re-check khi quay lại tab (sau khi shop update profile / đọc thông báo)
     const recheck = async () => {
       if (document.visibilityState !== "visible") return
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+      // Cập nhật lại số thông báo chưa đọc
+      const { count } = await supabase.from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id).eq("is_read", false)
+      setUnreadNotif(count ?? 0)
+      // Cập nhật trạng thái setup quán
       const { data: sh } = await supabase
         .from("shops").select("name, phone, lat, lng").eq("owner_id", user.id).single()
       if (!sh) return
