@@ -43,30 +43,49 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
 
   const onCropComplete = useCallback((_: Area, p: Area) => setPixels(p), [])
 
-  async function handleRemoveBg() {
+  async function handleRemoveBg(attempt = 1) {
     setRemoving(true)
     setRemoveErr("")
-    setProgress("Đang tải mô hình AI...")
+    setProgress(attempt > 1 ? `Đang thử lại (${attempt}/3)...` : "Đang gửi ảnh lên AI...")
     try {
-      // Dynamic import — tránh SSR và chỉ tải khi cần
-      const { removeBackground } = await import("@imgly/background-removal")
-      setProgress("Đang phân tích ảnh...")
-      const blob = await removeBackground(activeSrc, {
-        model:      "isnet_quint8",
-        output:     { format: "image/png", quality: 0.9 },
-        progress:   (key: string, cur: number, total: number) => {
-          if (key === "compute:inference") {
-            setProgress(`Đang xóa nền... ${Math.round((cur / total) * 100)}%`)
-          }
-        },
+      // Đọc ảnh hiện tại thành base64
+      const res0   = await fetch(activeSrc)
+      const blob0  = await res0.blob()
+      const b64    = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.readAsDataURL(blob0)
       })
-      const url = URL.createObjectURL(blob)
+
+      setProgress("AI đang phân tích và xóa nền...")
+
+      const res = await fetch("/api/merchant/remove-bg", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ image: b64 }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        // Model cold start — tự retry tối đa 3 lần
+        if (data.retry && attempt < 3) {
+          setRemoving(false)
+          setProgress(`Model đang khởi động... thử lại sau 12s (${attempt}/3)`)
+          await new Promise(r => setTimeout(r, 12000))
+          return handleRemoveBg(attempt + 1)
+        }
+        setRemoveErr(data.error ?? "Không xóa được nền. Thử lại sau.")
+        return
+      }
+
+      const resultBlob = await res.blob()
+      const url = URL.createObjectURL(resultBlob)
       setActiveSrc(url)
       setBgRemoved(true)
       setCrop({ x: 0, y: 0 })
       setZoom(1)
     } catch {
-      setRemoveErr("Không xóa được nền. Thử lại hoặc bỏ qua.")
+      setRemoveErr("Lỗi kết nối. Kiểm tra mạng và thử lại.")
     } finally {
       setRemoving(false)
       setProgress("")
@@ -169,7 +188,7 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
         </button>
 
         <div style={{ marginLeft:"auto", color:"#6a5a40", fontSize:9, textAlign:"right", lineHeight:1.4 }}>
-          Lần đầu tải ~40MB<br/>Lần sau dùng cache
+          HuggingFace RMBG-1.4<br/>~2–5 giây/ảnh
         </div>
       </div>
 
@@ -204,8 +223,8 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
             zIndex:10, gap:12 }}>
             <div style={{ fontSize:36 }}>🤖</div>
             <div style={{ color:"#b464ff", fontSize:13, fontWeight:700 }}>{progress || "Đang xử lý..."}</div>
-            <div style={{ color:"#6a5a40", fontSize:10, textAlign:"center", maxWidth:200 }}>
-              AI đang phân tích và xóa nền ảnh,<br/>vui lòng chờ...
+            <div style={{ color:"#6a5a40", fontSize:10, textAlign:"center", maxWidth:220 }}>
+              {progress.includes("thử lại") ? "Model AI đang khởi động, tự động thử lại..." : "AI đang phân tích và xóa nền, vui lòng chờ..."}
             </div>
           </div>
         )}
