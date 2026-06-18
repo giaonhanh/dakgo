@@ -16,7 +16,7 @@ interface OrderData {
   id: string; shopId: string; shopName: string; shopEmoji: string
   items: string[]; total: number; driverId: string | null
   driver: { name: string; plate: string; rating: number } | null
-  createdAt: string
+  createdAt: string; payMethod: string
 }
 
 
@@ -108,7 +108,7 @@ export default function ReviewPage() {
       const { data } = await supabase
         .from("orders")
         .select(`
-          id, total_amount, created_at, driver_id, shop_id,
+          id, total_amount, created_at, driver_id, shop_id, pay_method,
           shops(id, name),
           order_items(name),
           drivers(id, license_plate, rating_avg)
@@ -142,6 +142,7 @@ export default function ReviewPage() {
           rating: Number(driverRow.rating_avg ?? 5),
         } : null,
         createdAt: fmtDate(data.created_at),
+        payMethod: data.pay_method ?? "cash",
       })
       setLoading(false)
     }
@@ -424,8 +425,8 @@ export default function ReviewPage() {
             </div>
           </SCard>
 
-          {/* Tip */}
-          <SCard title="💝 Tip cho tài xế (tùy chọn)">
+          {/* Tip — chỉ hiện khi thanh toán ví/QR, ẩn với COD */}
+          {order && order.payMethod !== "cash" && <SCard title="💝 Tip cho tài xế (tùy chọn)">
             <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
               {TIP_OPTIONS.map(v => (
                 <div key={v} onClick={() => setTip(v)}
@@ -444,7 +445,7 @@ export default function ReviewPage() {
                 🎉 Tài xế sẽ nhận được {fmt(tip)} — cảm ơn bạn đã hào phóng!
               </div>
             )}
-          </SCard>
+          </SCard>}
 
         </div>
 
