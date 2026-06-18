@@ -188,15 +188,28 @@ function LoginContent() {
 
   useEffect(() => {
     document.cookie = "dev_role=; path=/; max-age=0"
-    if (params.get("error") === "suspended") {
-      setError("Tài khoản của bạn đã bị tạm khóa. Liên hệ hỗ trợ để biết thêm.")
-    }
+    const errParam = params.get("error")
+    if (errParam === "suspended")    setError("Tài khoản của bạn đã bị tạm khóa. Liên hệ hỗ trợ.")
+    if (errParam === "oauth_failed") setError("Đăng nhập mạng xã hội thất bại. Thử lại sau.")
+    if (errParam?.startsWith("zalo")) setError("Đăng nhập Zalo thất bại. Thử lại hoặc dùng số điện thoại.")
     const t = setTimeout(() => setPhase("auth"), 3000)
     return () => {
       clearTimeout(t)
       if (redirectTimer.current) clearTimeout(redirectTimer.current)
     }
   }, [params])
+
+  async function handleFacebookLogin() {
+    setLoading(true); setError("")
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider: "facebook",
+      options: {
+        redirectTo: `${window.location.origin}/api/auth/callback`,
+        scopes: "email,public_profile",
+      },
+    })
+    if (err) { setError("Không thể kết nối Facebook. Thử lại sau."); setLoading(false) }
+  }
 
   const selectedRole = ROLES.find(r => r.key === role)
   const isDriver     = role === "driver_moto" || role === "driver_taxi"
@@ -464,6 +477,41 @@ function LoginContent() {
                         }}>Quên mật khẩu?</button>
                       </div>
                       <CTABtn label="🚀 Đăng nhập" onClick={handleLogin} loading={loading} />
+
+                      {/* ── Social login ── */}
+                      <div style={{ display:"flex", alignItems:"center", gap:7, margin:"12px 0 10px" }}>
+                        <div style={{ flex:1, height:1, background:"rgba(255,255,255,.06)" }} />
+                        <span style={{ color:"rgba(106,90,64,.5)", fontSize:10, fontWeight:600, whiteSpace:"nowrap" }}>hoặc đăng nhập với</span>
+                        <div style={{ flex:1, height:1, background:"rgba(255,255,255,.06)" }} />
+                      </div>
+                      <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+                        {/* Facebook */}
+                        <button onClick={handleFacebookLogin}
+                          style={{ flex:1, height:42, borderRadius:11, border:"1px solid rgba(74,143,245,0.3)",
+                            background:"rgba(74,143,245,0.08)", cursor:"pointer",
+                            display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                            fontFamily:"Lexend", fontSize:11, fontWeight:600, color:"#4a8ff5",
+                            transition:"all .2s" }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="#4a8ff5">
+                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                          </svg>
+                          Facebook
+                        </button>
+                        {/* Zalo */}
+                        <a href="/api/auth/zalo"
+                          style={{ flex:1, height:42, borderRadius:11, border:"1px solid rgba(0,136,255,0.3)",
+                            background:"rgba(0,136,255,0.08)", cursor:"pointer",
+                            display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                            fontFamily:"Lexend", fontSize:11, fontWeight:600, color:"#0088ff",
+                            textDecoration:"none", transition:"all .2s" }}>
+                          <svg width="16" height="16" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#0068FF"/>
+                            <text x="24" y="32" textAnchor="middle" fontSize="20" fontWeight="bold" fill="white">Z</text>
+                          </svg>
+                          Zalo
+                        </a>
+                      </div>
+
                       <FooterLink q="Chưa có tài khoản?" a="Đăng ký ngay →" onClick={() => switchTab("register")} />
                     </motion.div>
                   )}
@@ -624,21 +672,28 @@ function LoginContent() {
                     <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.07)" }} />
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>
-                    {[
-                      { icon: "💬", name: "Zalo",     c: "rgba(0,120,240,.15)",  bd: "rgba(0,120,240,.3)"  },
-                      { icon: "📘", name: "Facebook", c: "rgba(24,119,242,.15)", bd: "rgba(24,119,242,.3)" },
-                    ].map(s => (
-                      <button key={s.name}
-                        onClick={() => setError(`Tính năng đăng nhập ${s.name} đang phát triển.`)}
-                        style={{
-                          flex: 1, height: 42, borderRadius: 11, border: `1px solid ${s.bd}`,
-                          background: s.c, backdropFilter: "blur(8px)", cursor: "pointer",
-                          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                          color: "#f8f0e0", fontSize: 11, fontWeight: 500, fontFamily: "Lexend",
-                        }}>
-                        <span style={{ fontSize: 15 }}>{s.icon}</span>{s.name}
-                      </button>
-                    ))}
+                    {/* Zalo */}
+                    <button
+                      onClick={() => { window.location.href = "/api/auth/zalo" }}
+                      style={{
+                        flex: 1, height: 42, borderRadius: 11, border: "1px solid rgba(0,120,240,.3)",
+                        background: "rgba(0,120,240,.15)", backdropFilter: "blur(8px)", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                        color: "#f8f0e0", fontSize: 11, fontWeight: 500, fontFamily: "Lexend",
+                      }}>
+                      <span style={{ fontSize: 15 }}>💬</span>Zalo
+                    </button>
+                    {/* Facebook — dev mode, chỉ test được với tài khoản admin app */}
+                    <button
+                      onClick={() => setError("Tính năng đăng nhập Facebook đang phát triển.")}
+                      style={{
+                        flex: 1, height: 42, borderRadius: 11, border: "1px solid rgba(24,119,242,.3)",
+                        background: "rgba(24,119,242,.15)", backdropFilter: "blur(8px)", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                        color: "#f8f0e0", fontSize: 11, fontWeight: 500, fontFamily: "Lexend",
+                      }}>
+                      <span style={{ fontSize: 15 }}>📘</span>Facebook
+                    </button>
                   </div>
                 </motion.div>
               )}
