@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { getAdminContact } from "@/lib/adminContact"
 import { createClient } from "@/lib/supabase/client"
@@ -307,6 +308,7 @@ function PrepTimeSheet({ value, onSelect, onClose }: { value: string; onSelect: 
 
 /* ── main ── */
 export default function MerchantSettingsPage() {
+  const router = useRouter()
   /* shop settings */
   const [shop, setShop] = useState(() => {
     try {
@@ -588,7 +590,7 @@ export default function MerchantSettingsPage() {
             <Row icon="❓" label="Câu hỏi thường gặp" sub="Hướng dẫn chủ cửa hàng" onClick={() => fire("Đang mở FAQ...")} arrow />
             <Row icon="📞" label="Liên hệ admin" sub="Hỗ trợ, xóa tài khoản / cửa hàng" onClick={() => { if (adminContactLink) window.open(adminContactLink, "_blank"); else fire("Đang kết nối...") }} arrow />
             <Row icon="⚠️" label="Báo cáo vấn đề" sub="Đơn hàng sai, tài xế vi phạm..." onClick={() => fire("Đang mở form...")} arrow />
-            <Row icon="⚖️" label="Quy tắc & Chính sách" sub="Điều khoản, chính sách đối tác" onClick={() => fire("Đang mở tài liệu...")} arrow last />
+            <Row icon="⚖️" label="Quy tắc & Chính sách" sub="Điều khoản, chính sách đối tác" onClick={() => router.push("/merchant/policies")} arrow last />
           </Section>
 
           {/* about + account merged */}
