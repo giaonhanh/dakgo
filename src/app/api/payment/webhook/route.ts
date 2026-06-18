@@ -51,26 +51,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ code: "00" })
     }
 
-    // Notify merchant: đơn đã được thanh toán
-    // (Không cộng xu driver ở đây — driver nhận xu khi xác nhận giao hàng xong qua complete_order_with_commission)
-    try {
-      const { data: shop } = await supabase
-        .from("shops").select("owner_id").eq("id", order.shop_id).single()
-
-      if (shop?.owner_id) {
-        await supabase.from("notifications").insert({
-          user_id: shop.owner_id, type: "order",
-          title: "💰 Đơn đã được thanh toán",
-          body:  `Đơn #${data.orderCode} · ${order.total_amount.toLocaleString("vi-VN")}đ đã thanh toán thành công`,
-          data:  { order_id: order.id, url: "/merchant" },
-        })
-        await sendPushToUser(shop.owner_id, {
-          title: "💰 Đơn đã được thanh toán",
-          body:  `Đơn #${data.orderCode} · ${order.total_amount.toLocaleString("vi-VN")}đ`,
-          url:   "/merchant", tag: `paid-${order.id}`,
-        })
-      }
-    } catch (e) { console.error("[Webhook] merchant notify error:", e) }
 
     // Notify khách thanh toán thành công
     try {
