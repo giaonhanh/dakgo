@@ -414,10 +414,14 @@ function WalletHistorySheet({ onClose, walletBalance }: { onClose: () => void; w
                 {/* info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: "#f8f0e0", fontSize: 12, fontWeight: 600 }}>{cfg.label}</div>
-                  <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 2 }}>
-                    {tx.note || fmtDate(tx.created_at)}
+                  {tx.note && (
+                    <div style={{ color: "#b0956a", fontSize: 10.5, fontWeight: 500, marginTop: 3, lineHeight: 1.4 }}>
+                      {tx.note}
+                    </div>
+                  )}
+                  <div style={{ color: "rgba(106,90,64,0.55)", fontSize: 9, marginTop: 2 }}>
+                    {fmtDate(tx.created_at)}
                   </div>
-                  {tx.note && <div style={{ color: "rgba(106,90,64,0.6)", fontSize: 8.5, marginTop: 1 }}>{fmtDate(tx.created_at)}</div>}
                 </div>
                 {/* amount + balance */}
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
