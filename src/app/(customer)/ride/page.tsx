@@ -45,16 +45,17 @@ function RideContent() {
   const [pricingRows,   setPricingRows]   = useState<string[]>(DEFAULT_MOTORBIKE_ROWS);
   const [pricingExtra,  setPricingExtra]  = useState(DEFAULT_MOTORBIKE_EXTRA);
 
-  // Load motorbike pricing from admin settings
+  // Load pricing theo loại xe từ admin settings
   useEffect(() => {
     createClient()
       .from("app_settings").select("value").eq("key", "pricing").maybeSingle()
       .then(({ data }) => {
         const p = data?.value as Record<string, { rows?: string[]; extra?: string }> | null
-        if (p?.motorbike?.rows)  setPricingRows(p.motorbike.rows)
-        if (p?.motorbike?.extra) setPricingExtra(p.motorbike.extra)
+        const key = service === "taxi" ? "taxi" : "motorbike"
+        if (p?.[key]?.rows)  setPricingRows(p[key].rows!)
+        if (p?.[key]?.extra) setPricingExtra(p[key].extra!)
       })
-  }, [])
+  }, [service])
 
   // Tính km cung đường thực khi có đủ 2 toạ độ (fallback haversine nếu API lỗi)
   useEffect(() => {
@@ -83,7 +84,7 @@ function RideContent() {
       const dLng = destCoord?.lng ?? 108.483
       const { error } = await supabase.from("rides").insert({
         customer_id:     user.id,
-        vehicle_type:    "motorbike",
+        vehicle_type:    service === "taxi" ? "car" : "motorbike",
         pickup_address:  pickup,
         pickup_lat:      pLat,
         pickup_lng:      pLng,
@@ -135,7 +136,7 @@ function RideContent() {
             background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}>
           <ArrowLeft size={20} style={{ color: "var(--acc)" }} />
         </button>
-        <h1 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Đặt xe ôm</h1>
+        <h1 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{service === "taxi" ? "Đặt Taxi" : "Đặt xe ôm"}</h1>
       </header>
 
       <main className="max-w-md mx-auto px-4 space-y-4"
@@ -279,7 +280,9 @@ function RideContent() {
             boxShadow: dest && !loading ? "0 4px 20px rgba(255,107,0,0.4)" : "none",
           }}
         >
-          {loading ? "Đang tìm xe..." : <>🏍️ Đặt xe ôm ngay <ChevronRight size={18} /></>}
+          {loading ? "Đang tìm xe..." : service === "taxi"
+            ? <>🚕 Đặt taxi ngay <ChevronRight size={18} /></>
+            : <>🏍️ Đặt xe ôm ngay <ChevronRight size={18} /></>}
         </motion.button>
       </main>
     </div>
