@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'dakgo-v4'
+﻿const CACHE_NAME = 'dakgo-v5'
 const MAP_CACHE  = 'dakgo-maps-v2'
 const OFFLINE_URL = '/offline'
 
