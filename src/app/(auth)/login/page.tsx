@@ -407,7 +407,7 @@ function LoginContent() {
                 position: "relative", overflow: "hidden",
                 boxShadow: "0 0 0 3px rgba(255,255,255,0.15), 0 8px 32px rgba(0,0,0,0.5)",
               }}>
-                <Image src="/icon-512.png" alt="DakGo" fill style={{ objectFit: "cover" }} priority />
+                <Image src="/logo.png" alt="DakGo" fill style={{ objectFit: "cover" }} priority />
                 <div style={{
                   position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
                   background: "linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent)",
@@ -448,7 +448,7 @@ function LoginContent() {
                   marginBottom: 12, position: "relative", overflow: "hidden",
                   boxShadow: "0 0 0 3px rgba(255,255,255,0.2), 0 8px 24px rgba(0,0,0,0.4)",
                 }}>
-                <Image src="/icon-512.png" alt="DakGo" fill style={{ objectFit: "cover" }} />
+                <Image src="/logo.png" alt="DakGo" fill style={{ objectFit: "cover" }} />
                 <div style={{
                   position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
                   background: "linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent)",
