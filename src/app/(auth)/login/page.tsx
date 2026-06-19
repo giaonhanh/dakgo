@@ -403,13 +403,11 @@ function LoginContent() {
               exit={{ opacity: 0, scale: .95 }} transition={{ duration: .4 }}
               style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
               <div style={{
-                width: 88, height: 88, borderRadius: 24,
-                background: "#FF681A",
-                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 110, height: 110, borderRadius: 28,
                 position: "relative", overflow: "hidden",
-                boxShadow: "0 0 0 4px rgba(255,255,255,0.25), 0 8px 32px rgba(0,0,0,0.4)",
+                boxShadow: "0 0 0 3px rgba(255,255,255,0.15), 0 8px 32px rgba(0,0,0,0.5)",
               }}>
-                <Image src="/icon-512.png" alt="DakGo" width={72} height={72} style={{ objectFit: "contain" }} priority />
+                <Image src="/icon-512.png" alt="DakGo" fill style={{ objectFit: "cover" }} priority />
                 <div style={{
                   position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
                   background: "linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent)",
@@ -451,12 +449,10 @@ function LoginContent() {
                 transition={{ delay: .1, type: "spring", damping: 12 }}
                 style={{
                   width: 68, height: 68, borderRadius: 20,
-                  background: "#FF681A",
-                  display: "flex", alignItems: "center", justifyContent: "center",
                   marginBottom: 12, position: "relative", overflow: "hidden",
-                  boxShadow: "0 0 0 4px rgba(255,255,255,0.25), 0 8px 24px rgba(0,0,0,0.4)",
+                  boxShadow: "0 0 0 3px rgba(255,255,255,0.2), 0 8px 24px rgba(0,0,0,0.4)",
                 }}>
-                <Image src="/icon-512.png" alt="DakGo" width={52} height={52} style={{ objectFit: "contain" }} />
+                <Image src="/icon-512.png" alt="DakGo" fill style={{ objectFit: "cover" }} />
                 <div style={{
                   position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
                   background: "linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent)",
