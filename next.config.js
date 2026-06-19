@@ -22,12 +22,7 @@ const nextConfig = {
     ],
   },
   async rewrites() {
-    return [
-      {
-        source: "/zalo_verifierGltaCulOJ2XMfi9magn8KKw2tWQYz0jHEJ4t.html",
-        destination: "/api/zalo-verify",
-      },
-    ]
+    return []
   },
   async headers() {
     return [
