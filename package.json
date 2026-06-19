@@ -22,8 +22,6 @@
     "@tabler/icons-react": "^3.44.0",
     "autoprefixer": "^10",
     "clsx": "^2.1.1",
-    "firebase": "^12.14.0",
-    "firebase-admin": "^13.10.0",
     "framer-motion": "^12.38.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.14.0",

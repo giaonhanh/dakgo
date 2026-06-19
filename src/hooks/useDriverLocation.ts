@@ -9,9 +9,15 @@ function distanceDeg(a: { lat: number; lng: number }, b: { lat: number; lng: num
   return Math.abs(a.lat - b.lat) + Math.abs(a.lng - b.lng)
 }
 
-export function useDriverLocation(driverId: string | null, isOnline: boolean) {
+export function useDriverLocation(
+  driverId: string | null,
+  isOnline: boolean,
+  onPosition?: (lat: number, lng: number) => void,
+) {
   const lastSavedPos   = useRef({ lat: 0, lng: 0 })
   const lastSavedTime  = useRef(0)
+  const onPositionRef  = useRef(onPosition)
+  onPositionRef.current = onPosition
 
   useEffect(() => {
     if (!isOnline || !driverId) return
@@ -21,6 +27,9 @@ export function useDriverLocation(driverId: string | null, isOnline: boolean) {
 
     const watchId = navigator.geolocation.watchPosition(
       async ({ coords: { latitude: lat, longitude: lng } }) => {
+        // Luôn thông báo vị trí mới nhất cho caller (vd: gpsRef của driver page)
+        onPositionRef.current?.(lat, lng)
+
         const now      = Date.now()
         const pos      = { lat, lng }
         const moved    = distanceDeg(pos, lastSavedPos.current) >= MIN_DISTANCE_DEG

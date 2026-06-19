@@ -288,46 +288,53 @@ export default function HomePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Profile (user name)
-      const { data: profile } = await supabase
-        .from("profiles").select("full_name").eq("id", user.id).single()
-      if (profile?.full_name) setUserName(profile.full_name.split(" ").pop() ?? profile.full_name)
-
       setUserId(user.id)
 
-      // Unread notification count
-      const { count } = await supabase
-        .from("notifications").select("*", { count: "exact", head: true })
-        .eq("user_id", user.id).eq("is_read", false)
-      setNotifCount(count ?? 0)
+      const now = new Date().toISOString()
+      const productSelectFields = "id,name,price,original_price,sold_count,shop_id,image_url,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),all_day,start_hour,end_hour"
 
-      // Live orders: don d? an dang x? lư
-      const { data: liveFood } = await supabase
-        .from("orders")
-        .select("id, status, shops(name)")
-        .eq("customer_id", user.id)
-        .in("status", ["pending","accepted","preparing","ready","delivering"])
-        .order("created_at", { ascending: false })
-        .limit(5)
+      // BATCH 1: 16 queries song song — giảm từ ~15 round trip xuống 1
+      const [
+        { data: profile },
+        { count: notifCount },
+        { data: liveFood },
+        { data: liveRides },
+        { data: liveErrands },
+        { data: voucherData },
+        { data: shopData },
+        { data: bsData },
+        { data: discountData },
+        { data: comboVoucherData },
+        { data: freeshopData },
+        { data: bannerData },
+        { data: appSettings },
+        { data: newMenuData },
+        { data: orderData },
+        { data: recoData },
+      ] = await Promise.all([
+        supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+        supabase.from("notifications").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("is_read", false),
+        supabase.from("orders").select("id, status, shops(name)").eq("customer_id", user.id).in("status", ["pending","accepted","preparing","ready","delivering"]).order("created_at", { ascending: false }).limit(5),
+        supabase.from("rides").select("id, status, vehicle_type").eq("customer_id", user.id).in("status", ["searching","accepted","delivering"]).order("created_at", { ascending: false }).limit(3),
+        supabase.from("errands").select("id, status, type").eq("customer_id", user.id).in("status", ["pending","accepted","delivering"]).order("created_at", { ascending: false }).limit(3),
+        supabase.from("vouchers").select("id,code,title,discount_type,discount_value,valid_to,shop_id,min_order").eq("is_active", true).gt("valid_to", now).order("valid_to", { ascending: true }).limit(10),
+        supabase.from("shops").select("id,name,is_open,rating_avg,address,logo_url,lat,lng,location,opening_hours,category,categories").eq("status", "approved").order("rating_avg", { ascending: false }).limit(30),
+        supabase.from("products").select("id,name,price,sold_count,shop_id,image_url,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),all_day,start_hour,end_hour").eq("is_available", true).eq("shops.status", "approved").order("sold_count", { ascending: false }).limit(20),
+        supabase.from("products").select(productSelectFields).eq("is_available", true).eq("shops.status", "approved").not("original_price", "is", null).order("sold_count", { ascending: false }).limit(16),
+        supabase.from("vouchers").select("combo_items(product_id)").eq("is_active", true).eq("is_combo", true).lte("valid_from", now).gte("valid_to", now),
+        supabase.from("vouchers").select("shop_id").eq("is_active", true).eq("discount_type", "freeship").not("shop_id", "is", null).lte("valid_from", now).gte("valid_to", now),
+        supabase.from("banners").select("id,title,subtitle,image_url,link_url,sort_order").eq("is_active", true).order("sort_order", { ascending: true }).limit(5),
+        supabase.from("app_settings").select("key,value").in("key", ["service_time_pricing", "service_toggles"]),
+        supabase.from("products").select("id,name,price,image_url,shop_id,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),created_at,all_day,start_hour,end_hour").eq("is_available", true).eq("shops.status", "approved").order("created_at", { ascending: false }).limit(30),
+        supabase.from("orders").select("id,shop_id,total_amount,shops(name),order_items(name)").eq("customer_id", user.id).eq("status", "delivered").order("created_at", { ascending: false }).limit(5),
+        supabase.rpc("get_recommendations", { uid: user.id, lim: 10 }),
+      ])
 
-      // Live rides (xe ôm / taxi dang t́m xe / dang di)
-      const { data: liveRides } = await supabase
-        .from("rides")
-        .select("id, status, vehicle_type")
-        .eq("customer_id", user.id)
-        .in("status", ["searching","accepted","delivering"])
-        .order("created_at", { ascending: false })
-        .limit(3)
+      // --- Xử lý kết quả batch 1 ---
+      if (profile?.full_name) setUserName(profile.full_name.split(" ").pop() ?? profile.full_name)
+      setNotifCount(notifCount ?? 0)
 
-      // Live errands (giao h? / mua h? dang x? lư)
-      const { data: liveErrands } = await supabase
-        .from("errands")
-        .select("id, status, type")
-        .eq("customer_id", user.id)
-        .in("status", ["pending","accepted","delivering"])
-        .order("created_at", { ascending: false })
-        .limit(3)
-
+      // Live orders
       const ridesMapped = (liveRides ?? []).map(r => ({
         id: r.id,
         status: r.status === "searching" ? "pending" : r.status,
@@ -342,172 +349,29 @@ export default function HomePage() {
         _href: "/orders",
         _type: "errand" as const,
       }))
-
       setLiveOrders([...(liveFood ?? []), ...ridesMapped, ...errandsMapped] as LiveOrderRow[])
 
-      // Vouchers + Nearby shops — fetch song song
-      const [{ data: voucherData }, { data: shopData }] = await Promise.all([
-        supabase
-          .from("vouchers")
-          .select("id,code,title,discount_type,discount_value,valid_to,shop_id,min_order")
-          .eq("is_active", true)
-          .gt("valid_to", new Date().toISOString())
-          .order("valid_to", { ascending: true })
-          .limit(10),
-        supabase
-          .from("shops")
-          .select("id,name,is_open,rating_avg,address,logo_url,lat,lng,location,opening_hours,category,categories")
-          .eq("status", "approved")
-          .order("rating_avg", { ascending: false })
-          .limit(30),
-      ])
-
-      // Sort shops: đang mở lên trước, đóng xuống dưới
+      // Shops
       const sorted = (shopData ?? [] as ShopRow[]).sort((a, b) => {
         const aOpen = isShopInHours(a as ShopRow) ? 1 : 0
         const bOpen = isShopInHours(b as ShopRow) ? 1 : 0
         return bOpen - aOpen
       })
       setNearbyShops(sorted as ShopRow[])
-
-      // Chỉ giữ voucher toàn hệ thống (không có shop_id)
-      // hoặc voucher của quán đang mở — ẩn voucher của quán đóng cửa
       const openShopIds = new Set(sorted.filter(s => isShopInHours(s as ShopRow)).map(s => s.id))
       const shopNameMap: Record<string, string> = Object.fromEntries((sorted as ShopRow[]).map(s => [s.id, s.name]))
-      const filteredVouchers = (voucherData ?? []).filter(v =>
-        !v.shop_id || openShopIds.has(v.shop_id)
-      ).slice(0, 6).map(v => ({ ...v, shopName: v.shop_id ? (shopNameMap[v.shop_id] ?? null) : null }))
-      setVouchers(filteredVouchers as VoucherRow[])
 
-      // Badge ưu tiên cho card quán: Free Ship > Giảm % > không hiện
-      if (shopData && shopData.length > 0) {
-        const shopIds = (shopData as ShopRow[]).map(s => s.id)
-        const now2 = new Date().toISOString()
-        const [{ data: fsData }, { data: pctData }] = await Promise.all([
-          supabase.from("vouchers").select("shop_id")
-            .eq("is_active", true).eq("discount_type", "freeship")
-            .not("shop_id", "is", null).gte("valid_to", now2).in("shop_id", shopIds),
-          supabase.from("vouchers").select("shop_id")
-            .eq("is_active", true).in("discount_type", ["percent", "fixed"])
-            .not("shop_id", "is", null).gte("valid_to", now2).in("shop_id", shopIds),
-        ])
-        if (fsData)  setFreeshipsShopIds(new Set(fsData.map((v: { shop_id: string }) => v.shop_id)))
-        if (pctData) setDiscountShopIds(new Set(pctData.map((v: { shop_id: string }) => v.shop_id)))
-      }
+      // Vouchers
+      setVouchers(
+        (voucherData ?? []).filter(v => !v.shop_id || openShopIds.has(v.shop_id))
+          .slice(0, 6).map(v => ({ ...v, shopName: v.shop_id ? (shopNameMap[v.shop_id] ?? null) : null })) as VoucherRow[]
+      )
 
-      // Best sellers — top bán chạy, không lọc theo giờ (sold_count >= 0)
-      const { data: bsData } = await supabase
-        .from("products")
-        .select("id,name,price,sold_count,shop_id,image_url,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),all_day,start_hour,end_hour")
-        .eq("is_available", true)
-        .eq("shops.status", "approved")
-        .order("sold_count", { ascending: false })
-        .limit(20)
+      // Best sellers
       setBestSellers(((bsData ?? []) as ProductRow[]).filter(p => isShopOpen(p) && isProductInTime(p) && isProductGroupInTime(p)).slice(0, 8))
 
-      // Promos — gộp 3 nguồn: giảm giá trực tiếp + combo voucher + quán có free ship
-      const now = new Date().toISOString()
-      const productSelectFields = "id,name,price,original_price,sold_count,shop_id,image_url,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),all_day,start_hour,end_hour"
-
-      const [{ data: discountData }, { data: comboVoucherData }, { data: freeshopData }] = await Promise.all([
-        // 1. Sản phẩm giảm giá trực tiếp (original_price > price)
-        supabase.from("products")
-          .select(productSelectFields)
-          .eq("is_available", true).eq("shops.status", "approved")
-          .not("original_price", "is", null)
-          .order("sold_count", { ascending: false }).limit(16),
-
-        // 2. Voucher combo đang active — lấy danh sách product_id
-        supabase.from("vouchers")
-          .select("combo_items(product_id)")
-          .eq("is_active", true).eq("is_combo", true)
-          .lte("valid_from", now).gte("valid_to", now),
-
-        // 3. Shop có voucher free ship đang active
-        supabase.from("vouchers")
-          .select("shop_id")
-          .eq("is_active", true).eq("discount_type", "freeship")
-          .not("shop_id", "is", null)
-          .lte("valid_from", now).gte("valid_to", now),
-      ])
-
-      // Gộp & dedup theo id — ưu tiên: discount > combo > freeship
-      const seen = new Set<string>()
-      const merged: PromoProductRow[] = []
-
-      const addProducts = (rows: ProductRow[], tag: PromoProductRow["promoTag"]) => {
-        for (const p of rows) {
-          if (!isShopOpen(p) || !isProductInTime(p) || !isProductGroupInTime(p) || seen.has(p.id)) continue
-          seen.add(p.id)
-          merged.push({ ...p, promoTag: tag })
-        }
-      }
-
-      // Discount
-      addProducts((discountData ?? []) as ProductRow[], "discount")
-
-      // Combo — lấy product_id rồi fetch sản phẩm
-      const comboProductIds = [
-        ...new Set(
-          ((comboVoucherData ?? []) as { combo_items: { product_id: string }[] | null }[])
-            .flatMap(v => (v.combo_items ?? []).map(ci => ci.product_id))
-        ),
-      ].filter(id => !seen.has(id))
-
-      if (comboProductIds.length > 0) {
-        const { data: comboProducts } = await supabase.from("products")
-          .select(productSelectFields)
-          .in("id", comboProductIds)
-          .eq("is_available", true).eq("shops.status", "approved")
-        addProducts((comboProducts ?? []) as ProductRow[], "combo")
-      }
-
-      // Freeship — lấy shop_id rồi fetch sản phẩm bán chạy
-      const freeshopIds = [
-        ...new Set(
-          ((freeshopData ?? []) as { shop_id: string }[]).map(v => v.shop_id)
-        ),
-      ].filter(Boolean)
-
-      if (freeshopIds.length > 0) {
-        const { data: freeshopProducts } = await supabase.from("products")
-          .select(productSelectFields)
-          .in("shop_id", freeshopIds)
-          .eq("is_available", true).eq("shops.status", "approved")
-          .order("sold_count", { ascending: false }).limit(12)
-        addProducts((freeshopProducts ?? []) as ProductRow[], "freeship")
-      }
-
-      if (merged.length > 0) {
-        setPromos(merged.slice(0, 12))
-      } else {
-        // fallback: top sản phẩm bán chạy từ quán đang mở
-        const { data: fallbackPromo } = await supabase.from("products")
-          .select(productSelectFields)
-          .eq("is_available", true).eq("shops.status", "approved")
-          .order("sold_count", { ascending: false }).limit(20)
-        setPromos(
-          ((fallbackPromo ?? []) as ProductRow[])
-            .filter(p => isShopOpen(p) && isProductInTime(p) && isProductGroupInTime(p))
-            .slice(0, 8)
-            .map(p => ({ ...p, promoTag: "discount" as const }))
-        )
-      }
-
-      // Admin banners
-      const { data: bannerData } = await supabase
-        .from("banners")
-        .select("id,title,subtitle,image_url,link_url,sort_order")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true })
-        .limit(5)
+      // Banners + app_settings
       setAdminBanners((bannerData ?? []) as BannerRow[])
-
-      // Service hours + toggles from app_settings
-      const { data: appSettings } = await supabase
-        .from("app_settings")
-        .select("key,value")
-        .in("key", ["service_time_pricing", "service_toggles"])
       if (appSettings) {
         for (const row of appSettings) {
           if (row.key === "service_time_pricing") {
@@ -523,73 +387,104 @@ export default function HomePage() {
         }
       }
 
-      // V?a lên menu — quán đang mở, trong khung giờ bán
-      const { data: newMenuData } = await supabase
-        .from("products")
-        .select("id,name,price,image_url,shop_id,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),created_at,all_day,start_hour,end_hour")
-        .eq("is_available", true)
-        .eq("shops.status", "approved")
-        .order("created_at", { ascending: false })
-        .limit(30)
+      // New menu items
       setNewMenuItems(((newMenuData ?? []) as unknown as NewMenuRow[]).filter(p => {
         const pr = p as unknown as ProductRow
         return isShopOpen(pr) && isProductInTime(pr) && isProductGroupInTime(pr)
       }).slice(0, 10))
 
-      // Reorders (last 5 delivered orders for this user)
-      const { data: orderData } = await supabase
-        .from("orders")
-        .select("id,shop_id,total_amount,shops(name),order_items(name)")
-        .eq("customer_id", user.id)
-        .eq("status", "delivered")
-        .order("created_at", { ascending: false })
-        .limit(5)
+      // Reorders
       setReorders((orderData ?? []) as OrderRow[])
 
-      // Smart recommendations via RPC (falls back gracefully if not deployed)
-      const { data: recoData } = await supabase.rpc("get_recommendations", { uid: user.id, lim: 10 })
+      // --- Chuẩn bị cho batch 2 ---
+      const shopIdsForBadge = (shopData ?? []).map(s => s.id)
+      const comboProductIds = [...new Set(
+        ((comboVoucherData ?? []) as { combo_items: { product_id: string }[] | null }[])
+          .flatMap(v => (v.combo_items ?? []).map(ci => ci.product_id))
+      )]
+      const freeshopIds = [...new Set(
+        ((freeshopData ?? []) as { shop_id: string }[]).map(v => v.shop_id)
+      )].filter(Boolean)
+      const recoShopIds = (recoData && Array.isArray(recoData) && recoData.length > 0)
+        ? [...new Set((recoData as RecoRow[]).map(r => r.shop_id))]
+        : []
+      const reorderShopIds = [...new Set((orderData ?? []).map(o => o.shop_id as string))].filter(Boolean)
+
+      // BATCH 2: 5 queries phụ thuộc kết quả batch 1 — chạy song song
+      const [
+        { data: fsData },
+        { data: pctData },
+        { data: comboProducts },
+        { data: freeshopProducts },
+        { data: recoShopStatus },
+        { data: recFallback },
+      ] = await Promise.all([
+        shopIdsForBadge.length > 0
+          ? supabase.from("vouchers").select("shop_id").eq("is_active", true).eq("discount_type", "freeship").not("shop_id", "is", null).gte("valid_to", now).in("shop_id", shopIdsForBadge)
+          : Promise.resolve({ data: [] }),
+        shopIdsForBadge.length > 0
+          ? supabase.from("vouchers").select("shop_id").eq("is_active", true).in("discount_type", ["percent", "fixed"]).not("shop_id", "is", null).gte("valid_to", now).in("shop_id", shopIdsForBadge)
+          : Promise.resolve({ data: [] }),
+        comboProductIds.length > 0
+          ? supabase.from("products").select(productSelectFields).in("id", comboProductIds).eq("is_available", true).eq("shops.status", "approved")
+          : Promise.resolve({ data: [] }),
+        freeshopIds.length > 0
+          ? supabase.from("products").select(productSelectFields).in("shop_id", freeshopIds).eq("is_available", true).eq("shops.status", "approved").order("sold_count", { ascending: false }).limit(12)
+          : Promise.resolve({ data: [] }),
+        recoShopIds.length > 0
+          ? supabase.from("shops").select("id,is_open,status,opening_hours").in("id", recoShopIds).eq("status", "approved").eq("is_open", true)
+          : Promise.resolve({ data: [] }),
+        recoShopIds.length === 0 && reorderShopIds.length > 0
+          ? supabase.from("products").select("id, name, price, original_price, image_url, sold_count, shop_id, category, shops!inner(name,is_open,status,opening_hours,menu_groups_data), all_day, start_hour, end_hour").in("shop_id", reorderShopIds).eq("is_available", true).eq("shops.is_open", true).eq("shops.status", "approved").order("sold_count", { ascending: false }).limit(25)
+          : Promise.resolve({ data: [] }),
+      ])
+
+      // Shop badges
+      if (fsData)  setFreeshipsShopIds(new Set(fsData.map((v: { shop_id: string }) => v.shop_id)))
+      if (pctData) setDiscountShopIds(new Set(pctData.map((v: { shop_id: string }) => v.shop_id)))
+
+      // Promos — gộp 3 nguồn, dedup
+      const seen = new Set<string>()
+      const merged: PromoProductRow[] = []
+      const addProducts = (rows: ProductRow[], tag: PromoProductRow["promoTag"]) => {
+        for (const p of rows) {
+          if (!isShopOpen(p) || !isProductInTime(p) || !isProductGroupInTime(p) || seen.has(p.id)) continue
+          seen.add(p.id)
+          merged.push({ ...p, promoTag: tag })
+        }
+      }
+      addProducts((discountData ?? []) as ProductRow[], "discount")
+      addProducts((comboProducts ?? []) as ProductRow[], "combo")
+      addProducts((freeshopProducts ?? []) as ProductRow[], "freeship")
+
+      if (merged.length > 0) {
+        setPromos(merged.slice(0, 12))
+      } else {
+        // Fallback: dùng bsData đã có từ batch 1 — không cần query thêm
+        setPromos(
+          ((bsData ?? []) as ProductRow[])
+            .filter(p => isShopOpen(p) && isProductInTime(p) && isProductGroupInTime(p))
+            .slice(0, 8).map(p => ({ ...p, promoTag: "discount" as const }))
+        )
+      }
+
+      // Recommendations
       if (recoData && Array.isArray(recoData) && recoData.length > 0) {
-        const recoShopIds = [...new Set((recoData as RecoRow[]).map(r => r.shop_id))]
-        const { data: recoShopStatus } = await supabase
-          .from("shops")
-          .select("id,is_open,status,opening_hours")
-          .in("id", recoShopIds)
-          .eq("status", "approved")
-          .eq("is_open", true)
-        const openShopIds = new Set(
+        const openRecoIds = new Set(
           (recoShopStatus ?? [])
             .filter(s => checkOpeningHours(s.opening_hours, true))
             .map(s => s.id as string)
         )
-        const filteredRecos = (recoData as RecoRow[]).filter(r => openShopIds.has(r.shop_id))
+        const filteredRecos = (recoData as RecoRow[]).filter(r => openRecoIds.has(r.shop_id))
         if (filteredRecos.length > 0) setRecos(filteredRecos)
-      } else {
-        // Fallback: top products from shops the user ordered from
-        const { data: histShops } = await supabase
-          .from("orders")
-          .select("shop_id")
-          .eq("customer_id", user.id)
-          .eq("status", "delivered")
-          .order("created_at", { ascending: false })
-          .limit(8)
-        const shopIds = [...new Set((histShops ?? []).map(o => o.shop_id as string))]
-        if (shopIds.length > 0) {
-          const { data: recFallback } = await supabase
-            .from("products")
-            .select("id, name, price, original_price, image_url, sold_count, shop_id, category, shops!inner(name,is_open,status,opening_hours,menu_groups_data), all_day, start_hour, end_hour")
-            .in("shop_id", shopIds)
-            .eq("is_available", true)
-            .eq("shops.is_open", true)
-            .eq("shops.status", "approved")
-            .order("sold_count", { ascending: false })
-            .limit(25)
-          setRecos((recFallback ?? []).filter(p => isShopOpen(p as ProductRow) && isProductInTime(p) && isProductGroupInTime(p as ProductRow)).slice(0, 10).map(p => {
-            const sn = Array.isArray(p.shops) ? (p.shops[0] as { name: string })?.name : (p.shops as { name: string } | null)?.name
-            return { id: p.id, name: p.name, price: p.price, original_price: p.original_price,
-              image_url: p.image_url, sold_count: p.sold_count, shop_id: p.shop_id,
-              shop_name: sn ?? "", order_count: 1 }
-          }))
-        }
+      } else if (recFallback && recFallback.length > 0) {
+        // Fallback từ batch 2 — không cần thêm round trip
+        setRecos((recFallback as ProductRow[]).filter(p => isShopOpen(p) && isProductInTime(p) && isProductGroupInTime(p)).slice(0, 10).map(p => {
+          const sn = Array.isArray(p.shops) ? (p.shops[0] as { name: string })?.name : (p.shops as { name: string } | null)?.name
+          return { id: p.id, name: p.name, price: p.price, original_price: p.original_price,
+            image_url: p.image_url, sold_count: p.sold_count, shop_id: p.shop_id,
+            shop_name: sn ?? "", order_count: 1 }
+        }))
       }
     }
     loadData()

@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import AdminShell from "@/components/admin/AdminShell"
-import * as XLSX from "xlsx"
 import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/lib/categories"
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -250,6 +249,7 @@ export default function AdminUsersPage() {
     const isXlsx = /\.(xlsx|xls)$/i.test(file.name)
     const parse = async (buf: ArrayBuffer | string) => {
       try {
+        const XLSX = await import("xlsx")
         const wb = isXlsx ? XLSX.read(new Uint8Array(buf as ArrayBuffer), { type: "array" }) : XLSX.read(buf as string, { type: "string" })
         const raw = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" }) as string[][]
 
@@ -1622,13 +1622,14 @@ export default function AdminUsersPage() {
                       style={{ flex: 1, height: 40, borderRadius: 10, border: "1px dashed rgba(74,143,245,0.4)", background: "rgba(74,143,245,0.06)", color: "#4a8ff5", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                       📎 Chọn file .xlsx / .csv
                     </button>
-                    <button onClick={() => {
+                    <button onClick={async () => {
                       const phoneRow = ["SĐT_QUAN:", "0901234567 (điền SĐT quán vào đây)"]
                       const headers = ["Danh mục (tối đa 3)","Nhóm menu","Tên món *","Mô tả / Nguyên liệu","Giá bán * (đ)","Giá KM (đ)","Badge","Đang bán","Giờ từ","Giờ đến","Sizes","Toppings"]
                       const samples = [
                         ["Cơm, Buổi trưa","Cơm","Cơm sườn bì chả","Cơm + sườn + bì + chả",40000,"","bestseller","CÓ","","","",""],
                         ["Đồ uống","Trà","Trà đá","Mát lạnh",5000,"","","CÓ","","","",""],
                       ]
+                      const XLSX = await import("xlsx")
                       const ws = XLSX.utils.aoa_to_sheet([phoneRow, headers, ...samples])
                       ws["!cols"] = [{wch:18},{wch:14},{wch:26},{wch:30},{wch:14},{wch:12},{wch:12},{wch:10},{wch:9},{wch:9},{wch:18},{wch:20}]
                       const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "📋 Danh sách món")

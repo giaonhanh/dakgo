@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
-import * as XLSX from "xlsx"
 import ImageCropper from "@/components/ui/ImageCropper"
 import {
   DndContext, DragEndEvent, closestCenter,
@@ -391,8 +390,9 @@ export default function MerchantMenuPage() {
     const isXLSX = /\.(xlsx|xls)$/i.test(file.name)
     if (isXLSX) {
       const reader = new FileReader()
-      reader.onload = e => {
+      reader.onload = async e => {
         try {
+          const XLSX = await import("xlsx")
           const data = new Uint8Array(e.target?.result as ArrayBuffer)
           const wb = XLSX.read(data, { type: "array" })
           const ws = wb.Sheets[wb.SheetNames[0]]
@@ -464,7 +464,8 @@ export default function MerchantMenuPage() {
     fire(`✅ Đã lưu ${saved.length}/${importRows.length} sản phẩm vào Supabase`)
   }
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    const XLSX = await import("xlsx")
     // ── 9 cột: Danh mục | Tên món | Mô tả | Giá bán | Giá KM | Badge | Đang bán | Sizes | Toppings ──
     const headers = [
       "Danh mục *",

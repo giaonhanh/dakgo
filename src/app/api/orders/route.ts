@@ -32,17 +32,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Địa chỉ giao hàng không hợp lệ" }, { status: 400 })
     }
 
-    // Kiểm tra dịch vụ đặt đồ ăn (toàn hệ thống) có đang mở không — admin có thể
-    // tắt thủ công kèm lý do, hoặc cấu hình giờ hoạt động tự khoá ngoài giờ
-    const { data: toggleRow } = await supabase
-      .from("app_settings").select("value").eq("key", "service_toggles").maybeSingle()
-    const foodToggle = (toggleRow?.value as Record<string, { enabled?: boolean; customerMsg?: string }> | null)?.food
+    // Đọc tất cả app_settings cần thiết trong 1 query thay vì 3 query tuần tự
+    const { data: settingsRows } = await supabase
+      .from("app_settings")
+      .select("key, value")
+      .in("key", ["service_toggles", "service_time_pricing", "pricing"])
+    const settings = Object.fromEntries((settingsRows ?? []).map(r => [r.key, r.value]))
+
+    const foodToggle = (settings["service_toggles"] as Record<string, { enabled?: boolean; customerMsg?: string }> | null)?.food
     if (foodToggle?.enabled === false) {
       return NextResponse.json({ error: foodToggle.customerMsg || "Dịch vụ đặt đồ ăn tạm ngừng phục vụ." }, { status: 400 })
     }
-    const { data: timeRow } = await supabase
-      .from("app_settings").select("value").eq("key", "service_time_pricing").maybeSingle()
-    const foodHours = (timeRow?.value as Record<string, { hours?: { open: string; close: string; allDay: boolean } }> | null)?.food?.hours
+    const foodHours = (settings["service_time_pricing"] as Record<string, { hours?: { open: string; close: string; allDay: boolean } }> | null)?.food?.hours
     if (foodHours && !foodHours.allDay) {
       const now = new Date()
       const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
@@ -130,11 +131,10 @@ export async function POST(req: NextRequest) {
     })
 
     const total    = orderItems.reduce((s: number, i: { subtotal: number }) => s + i.subtotal, 0)
-    // Fallback: đọc giá km đầu tiên từ app_settings nếu client không gửi fee
+    // Fallback: dùng pricing đã load sẵn ở trên — không cần query thêm
     let fallbackShipFee = 15000
     if (clientDeliveryFee == null) {
-      const { data: pRow } = await supabase.from("app_settings").select("value").eq("key","pricing").maybeSingle()
-      const rows = (pRow?.value as Record<string, { rows?: string[] }> | null)?.food?.rows
+      const rows = (settings["pricing"] as Record<string, { rows?: string[] }> | null)?.food?.rows
       const firstKm = parseInt(rows?.[0] ?? "0")
       if (firstKm > 0) fallbackShipFee = firstKm
     }

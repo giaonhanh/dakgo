@@ -939,10 +939,10 @@ export default function DriverDashboard() {
   const [showTopup,     setShowTopup]     = useState(false)
   const [isApproved,    setIsApproved]    = useState<boolean | null>(null)
   const [unreadNotif,   setUnreadNotif]   = useState(0)
-  useDriverLocation(driverId, online)  // lưu GPS realtime vào drivers.location trong DB
+  // Một watchPosition duy nhất: lưu DB + cập nhật gpsRef cho check-pending API
+  useDriverLocation(driverId, online, (lat, lng) => { gpsRef.current = { lat, lng } })
   const channelRef    = useRef<RealtimeChannel | null>(null)
   const channelsRef   = useRef<RealtimeChannel[]>([])
-  const gpsWatchRef   = useRef<number | null>(null)
   const gpsRef        = useRef({ lat: 0, lng: 0 })
   const showOrderRef  = useRef(false)
   const acceptedRef   = useRef<string | null>(null)
@@ -1017,25 +1017,6 @@ export default function DriverDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Bật GPS khi online, tắt khi offline ──
-  useEffect(() => {
-    if (online && navigator.geolocation) {
-      gpsWatchRef.current = navigator.geolocation.watchPosition(
-        pos => { gpsRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude } },
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 },
-      )
-    } else {
-      if (gpsWatchRef.current !== null) {
-        navigator.geolocation.clearWatch(gpsWatchRef.current)
-        gpsWatchRef.current = null
-      }
-    }
-    return () => {
-      if (gpsWatchRef.current !== null) navigator.geolocation.clearWatch(gpsWatchRef.current)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online])
 
   // ── Toggle online/offline ──
   const handleToggleOnline = async () => {

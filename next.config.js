@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production"
+      ? { exclude: ["error", "warn"] }
+      : false,
+  },
   webpack: (config) => {
     // Cho phép load WASM từ @imgly/background-removal
     config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true }

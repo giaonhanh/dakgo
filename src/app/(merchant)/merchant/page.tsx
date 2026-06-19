@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { usePushNotification } from "@/hooks/usePushNotification"
 import { useOrderSound } from "@/hooks/useOrderSound"
 import { motion, AnimatePresence } from "framer-motion"
@@ -93,6 +93,9 @@ export default function MerchantDashboard() {
   const [shopStatus, setShopStatus] = useState<"pending" | "approved" | "suspended" | null>(null)
   const [unreadNotif, setUnreadNotif] = useState(0)
   const [setupRequired, setSetupRequired] = useState(false)
+
+  const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { requestPermission } = usePushNotification()
   useOrderSound("merchant", shopId)
@@ -280,9 +283,12 @@ export default function MerchantDashboard() {
         event: "INSERT", schema: "public", table: "orders",
         filter: `shop_id=eq.${shopId}`
       }, () => {
-        fetchOrders(shopId)
-        // BUG-014: re-query count thực tế thay vì optimistic +1 (tránh không đồng bộ với DB trigger)
-        setTimeout(async () => {
+        // Debounce: gom nhiều event liên tiếp thành 1 lần fetch
+        if (debounceRef.current) clearTimeout(debounceRef.current)
+        debounceRef.current = setTimeout(() => fetchOrders(shopId), 400)
+        // Notif count: clear timer cũ trước khi set timer mới
+        if (notifTimerRef.current) clearTimeout(notifTimerRef.current)
+        notifTimerRef.current = setTimeout(async () => {
           const { data: { user } } = await supabase.auth.getUser()
           if (!user) return
           const { count } = await supabase.from("notifications")
@@ -296,7 +302,9 @@ export default function MerchantDashboard() {
         event: "UPDATE", schema: "public", table: "orders",
         filter: `shop_id=eq.${shopId}`
       }, () => {
-        fetchOrders(shopId)
+        // Debounce UPDATE cũng — tránh nhiều status change gây nhiều fetch
+        if (debounceRef.current) clearTimeout(debounceRef.current)
+        debounceRef.current = setTimeout(() => fetchOrders(shopId), 400)
       })
       .subscribe()
 
@@ -306,6 +314,8 @@ export default function MerchantDashboard() {
     return () => {
       supabase.removeChannel(ch)
       clearInterval(interval)
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      if (notifTimerRef.current) clearTimeout(notifTimerRef.current)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shopId])

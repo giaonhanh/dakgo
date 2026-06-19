@@ -26,7 +26,9 @@ export async function GET(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: "Không thể tải quán gần đây" }, { status: 500 })
 
-    return NextResponse.json(shops ?? [])
+    return NextResponse.json(shops ?? [], {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=300" },
+    })
   } catch {
     return NextResponse.json({ error: "Lỗi server" }, { status: 500 })
   }
