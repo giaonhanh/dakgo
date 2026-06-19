@@ -128,8 +128,8 @@ export default function ProfilePage() {
       { data: profile },
       { data: loyalty },
       { data: wallet },
-      { data: orderCount },
-      { data: activeCount },
+      { count: orderCount },
+      { count: activeCount },
     ] = await Promise.all([
       supabase.from("profiles").select("full_name, phone, avatar_url, created_at, notif_settings").eq("id", user.id).single(),
       supabase.from("loyalty_points").select("total_points, tier").eq("user_id", user.id).maybeSingle(),
@@ -146,8 +146,8 @@ export default function ProfilePage() {
     setTier(loyalty?.tier ?? "bronze")
     setPoints(loyalty?.total_points ?? 0)
     setWalletXu(wallet?.balance ?? 0)
-    setTotalOrders((orderCount as { count?: number } | null)?.count ?? 0)
-    setActiveOrderCount((activeCount as { count?: number } | null)?.count ?? 0)
+    setTotalOrders(orderCount ?? 0)
+    setActiveOrderCount(activeCount ?? 0)
     if (profile?.notif_settings) {
       const saved = profile.notif_settings as Partial<NotifSettings>
       setNotif(prev => ({ ...prev, ...saved }))
@@ -375,7 +375,7 @@ export default function ProfilePage() {
             <div style={{ display: "flex", gap: 20, marginTop: 12 }}>
               {[
                 { val: totalOrders.toString(), label: "Tổng đơn" },
-                { val: points.toLocaleString("vi-VN"), label: "Điểm GN" },
+                { val: points.toLocaleString("vi-VN"), label: "Điểm DakGo" },
                 { val: joinYear ? `Từ ${joinYear}` : "—", label: "Thành viên" },
               ].map((s, i) => (
                 <div key={i} style={{ textAlign: "center" }}>
