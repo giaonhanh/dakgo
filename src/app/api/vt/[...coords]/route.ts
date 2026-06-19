@@ -17,7 +17,7 @@ export async function GET(
     const res = await fetch(tileUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; MapLibreGL/5)",
-        "Referer":    "https://giaonhanh.vercel.app/",
+        "Referer":    "https://dakgo.com/",
         "Accept":     "application/x-protobuf,*/*",
       },
       next: { revalidate: 86400 },
