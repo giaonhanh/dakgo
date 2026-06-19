@@ -186,27 +186,6 @@ function LoginContent() {
   const submitting    = useRef(false)
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Load FB JS SDK — chỉ trên mobile để mở thẳng app Facebook
-  useEffect(() => {
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-    if (!isMobile) return
-    if (document.getElementById("fb-sdk")) return
-    const script = document.createElement("script")
-    script.id = "fb-sdk"
-    script.src = "https://connect.facebook.net/vi_VN/sdk.js"
-    script.async = true
-    script.defer = true
-    script.onload = () => {
-      ;(window as unknown as { FB: { init: (opts: object) => void } }).FB.init({
-        appId: "4403020226600531",
-        cookie: true,
-        xfbml: false,
-        version: "v21.0",
-      })
-    }
-    document.body.appendChild(script)
-  }, [])
-
   useEffect(() => {
     document.cookie = "dev_role=; path=/; max-age=0"
     const errParam = params.get("error")
@@ -222,28 +201,6 @@ function LoginContent() {
 
   async function handleFacebookLogin() {
     setLoading(true); setError("")
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-
-    // Mobile: dùng FB JS SDK → mở thẳng app Facebook
-    type FBType = { login: (cb: (r: { authResponse?: { accessToken: string } }) => void, opts: object) => void }
-    if (isMobile && typeof window !== "undefined" && (window as unknown as { FB?: FBType }).FB) {
-      const FB = (window as unknown as { FB: FBType }).FB
-      FB.login(async (response) => {
-        if (!response.authResponse?.accessToken) {
-          setError("Đăng nhập Facebook thất bại. Thử lại sau.")
-          setLoading(false)
-          return
-        }
-        const { error: err } = await supabase.auth.signInWithIdToken({
-          provider: "facebook",
-          token: response.authResponse.accessToken,
-        })
-        if (err) { setError("Không thể kết nối tài khoản. Thử lại sau."); setLoading(false) }
-      }, { scope: "email,public_profile" })
-      return
-    }
-
-    // Desktop hoặc FB SDK chưa load: dùng redirect
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: "facebook",
       options: { redirectTo: `${window.location.origin}/api/auth/callback`, scopes: "email,public_profile" },
@@ -455,7 +412,6 @@ function LoginContent() {
                   animation: "logoShine 3s ease-in-out infinite",
                 }} />
               </motion.div>
-
               <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, marginBottom: 18, textAlign: "center" }}>
                 Giao đồ ăn · Giao hàng · Xe ôm · Taxi tại Krông Pắc
               </div>
