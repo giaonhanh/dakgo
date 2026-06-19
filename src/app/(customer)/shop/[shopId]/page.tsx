@@ -852,7 +852,7 @@ export default function ShopPage() {
         {toast && (
           <motion.div initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}}
             exit={{opacity:0,y:-12}}
-            style={{ position:"fixed", top:50, left:"50%",
+            style={{ position:"fixed", top:"calc(env(safe-area-inset-top, 0px) + 56px)", left:"50%",
               transform:"translateX(-50%)", zIndex:999, whiteSpace:"nowrap",
               background:"rgba(255,107,0,0.15)",
               border:"1px solid rgba(255,107,0,0.35)",
