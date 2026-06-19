@@ -1020,8 +1020,13 @@ export default function ShopPage() {
               <div style={{ position:"absolute", right:24, top:"50%",
                 transform:"translateY(-50%)", fontSize:80, opacity:.15 }}>🏪</div>
             )}
+            {/* Gradient dưới */}
             <div style={{ position:"absolute", inset:0,
               background:"linear-gradient(to top,rgba(8,8,6,0.85) 0%,transparent 60%)" }} />
+            {/* Gradient trên — che vùng safe-area (notch/status bar) để icon giờ/WiFi/loa luôn hiện */}
+            <div style={{ position:"absolute", top:0, left:0, right:0,
+              height:"calc(env(safe-area-inset-top, 44px) + 24px)",
+              background:"linear-gradient(to bottom,rgba(8,8,6,0.75) 0%,transparent 100%)" }} />
             {shop && (
               <div style={{ position:"absolute", top:92, right:16, backdropFilter:"blur(8px)" }}>
                 <Badge layer={3} variant={shopIsOpen ? "open" : "closed"} size="md" />
