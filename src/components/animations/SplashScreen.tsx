@@ -87,7 +87,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.35, duration: 0.5 }}
         >
-          Goi
+          DakGo
         </motion.h1>
 
         <motion.p

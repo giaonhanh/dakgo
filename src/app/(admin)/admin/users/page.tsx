@@ -1259,7 +1259,7 @@ export default function AdminUsersPage() {
                 </div>
                 <div style={{ padding: "12px 18px 18px", borderTop: "1px solid rgba(255,255,255,0.07)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
                   {(selected.role === "customer" || selected.role === "driver") && (
-                    <button onClick={() => { setWalletModal({ id: selected.id, name: selected.fullName, role: selected.role === "driver" ? "driver" : "customer", balance: selected.walletBalance }); setWalletAmount(""); setWalletNote(""); setWalletMsg("") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.25)", color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>💰 Nạp / Rút xu Goi</button>
+                    <button onClick={() => { setWalletModal({ id: selected.id, name: selected.fullName, role: selected.role === "driver" ? "driver" : "customer", balance: selected.walletBalance }); setWalletAmount(""); setWalletNote(""); setWalletMsg("") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.25)", color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>💰 Nạp / Rút xu DakGo</button>
                   )}
                   {selected.role === "customer" && (
                     <button onClick={() => { setPointsModal(selected); setPointsAmount(""); setPointsMsg(""); setPointsCustom(""); setPointsReason("Sự kiện") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(180,100,255,0.08)", border: "1px solid rgba(180,100,255,0.25)", color: "#b464ff", fontSize: 11, fontWeight: 700 }}>⭐ Nạp / Rút điểm tích lũy</button>
@@ -1360,7 +1360,7 @@ export default function AdminUsersPage() {
                 <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
                   style={{ maxHeight: "calc(100svh - 48px)", overflowY: "auto", background: "#0d0b19", border: "1px solid rgba(62,207,110,0.25)", borderRadius: 18, padding: "22px 20px 18px" }}>
                 <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>💰</div>
-                <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>Nạp / Rút xu Goi</div>
+                <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>Nạp / Rút xu DakGo</div>
                 <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 10, textAlign: "center", marginBottom: 16 }}>
                   {walletModal.name} · {walletModal.role === "driver" ? "Tài xế" : "Khách hàng"} · Số dư: {walletModal.balance.toLocaleString("vi-VN")}đ
                 </div>

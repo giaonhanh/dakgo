@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
 
       const txRows = []
       if (xuBonusUsed > 0) txRows.push({ wallet_id: wallet.id, type: "payment", amount: xuBonusUsed, balance_after: newBonus, ref_type: "order", ref_id: order_id, note: "Thanh toán bằng xu thưởng" })
-      if (xuUsed > 0)      txRows.push({ wallet_id: wallet.id, type: "payment", amount: xuUsed,      balance_after: newBal,   ref_type: "order", ref_id: order_id, note: "Thanh toán bằng xu Goi" })
+      if (xuUsed > 0)      txRows.push({ wallet_id: wallet.id, type: "payment", amount: xuUsed,      balance_after: newBal,   ref_type: "order", ref_id: order_id, note: "Thanh toán bằng xu DakGo" })
       if (txRows.length > 0) await db.from("transactions").insert(txRows)
     }
 

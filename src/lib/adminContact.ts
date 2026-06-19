@@ -10,10 +10,10 @@ export interface AdminContact {
 }
 
 const FALLBACK: AdminContact = {
-  name: "Admin Goi",
+  name: "Admin DakGo",
   phone: "",
-  email: "Goi.phuocan@gmail.com",
-  contactLink: "mailto:Goi.phuocan@gmail.com",
+  email: "DakGo.phuocan@gmail.com",
+  contactLink: "mailto:DakGo.phuocan@gmail.com",
   zaloLink: "",
   telLink: "",
 }

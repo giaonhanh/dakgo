@@ -15,7 +15,7 @@ const SECTIONS = [
     items: [
       {
         q: "Tỷ lệ hoa hồng là bao nhiêu?",
-        a: "Goi thu hoa hồng từ 10%–20% trên doanh thu thực nhận tùy theo loại hình và thỏa thuận ban đầu. Tỷ lệ cụ thể được ghi rõ trong hợp đồng đối tác.",
+        a: "DakGo thu hoa hồng từ 10%–20% trên doanh thu thực nhận tùy theo loại hình và thỏa thuận ban đầu. Tỷ lệ cụ thể được ghi rõ trong hợp đồng đối tác.",
       },
       {
         q: "Hoa hồng được tính trên cơ sở nào?",
@@ -23,7 +23,7 @@ const SECTIONS = [
       },
       {
         q: "Có phí đăng ký hay phí tháng không?",
-        a: "Hiện tại KHÔNG có phí đăng ký và KHÔNG có phí tháng cố định. Goi chỉ thu hoa hồng khi có đơn hàng thành công.",
+        a: "Hiện tại KHÔNG có phí đăng ký và KHÔNG có phí tháng cố định. DakGo chỉ thu hoa hồng khi có đơn hàng thành công.",
       },
       {
         q: "Phí ship ai thu?",
@@ -122,7 +122,7 @@ const SECTIONS = [
         a: "Vi phạm an toàn thực phẩm, lừa dối khách (ảnh không đúng thực tế), từ chối xử lý khiếu nại chính đáng, hoặc tỷ lệ hủy đơn > 30% trong tuần.",
       },
       {
-        q: "Goi có cam kết gì với quán?",
+        q: "DakGo có cam kết gì với quán?",
         a: "Minh bạch doanh thu theo thời gian thực, không tăng hoa hồng đột ngột (báo trước 30 ngày), hỗ trợ kỹ thuật trong giờ hành chính và ưu tiên giải quyết khiếu nại trong 24h.",
       },
       {
@@ -225,7 +225,7 @@ export default function MerchantPoliciesPage() {
             }}>←</button>
             <div style={{ flex: 1 }}>
               <div style={{ color: "#f8f0e0", fontSize: 16, fontWeight: 700 }}>Quy tắc & Chính sách</div>
-              <div style={{ color: "#6a5a40", fontSize: 9.5, marginTop: 1 }}>Điều khoản hợp tác Goi</div>
+              <div style={{ color: "#6a5a40", fontSize: 9.5, marginTop: 1 }}>Điều khoản hợp tác DakGo</div>
             </div>
             <div style={{
               background: "rgba(62,207,110,0.1)", border: "1px solid rgba(62,207,110,0.25)",
@@ -252,7 +252,7 @@ export default function MerchantPoliciesPage() {
             }} />
             <div style={{ fontSize: 28, marginBottom: 8 }}>📜</div>
             <div style={{ color: "#FF8C00", fontSize: 13, fontWeight: 700, marginBottom: 5, position: "relative" }}>
-              Đối tác Goi
+              Đối tác DakGo
             </div>
             <div style={{ color: "#b0956a", fontSize: 10.5, lineHeight: 1.6, position: "relative" }}>
               Đọc kỹ các chính sách dưới đây để đảm bảo hợp tác suôn sẻ và minh bạch.
@@ -337,7 +337,7 @@ export default function MerchantPoliciesPage() {
           {/* Footer note */}
           <div style={{ textAlign: "center", marginTop: 20, color: "#6a5a40", fontSize: 9.5, lineHeight: 1.6 }}>
             Cập nhật lần cuối: tháng 6/2026<br />
-            Goi — Phước An, Krông Pắc, Đắk Lắk
+            DakGo — Phước An, Krông Pắc, Đắk Lắk
           </div>
 
         </div>

@@ -12,13 +12,13 @@ const lexend = Lexend({
 })
 
 export const metadata: Metadata = {
-  title: "Goi — Krông Pắc",
+  title: "DakGo — Krông Pắc",
   description: "Giao hàng · Mua hộ · Xe ôm · Taxi tại Krông Pắc, Đắk Lắk",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Goi",
+    title: "DakGo",
   },
   icons: {
     apple: [

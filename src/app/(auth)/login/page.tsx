@@ -366,7 +366,7 @@ function LoginContent() {
                 position: "relative", overflow: "hidden",
                 boxShadow: "0 0 0 4px rgba(255,255,255,0.25), 0 8px 32px rgba(0,0,0,0.4)",
               }}>
-                <Image src="/icon-512.png" alt="Goi" width={72} height={72} style={{ objectFit: "contain" }} priority />
+                <Image src="/icon-512.png" alt="DakGo" width={72} height={72} style={{ objectFit: "contain" }} priority />
                 <div style={{
                   position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
                   background: "linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent)",
@@ -376,7 +376,7 @@ function LoginContent() {
               <div style={{
                 fontSize: 32, fontWeight: 800, letterSpacing: 2, color: "#fff",
                 textShadow: "0 2px 12px rgba(0,0,0,0.3)",
-              }}>Goi</div>
+              }}>DakGo</div>
               <div style={{ color: "rgba(176,149,106,0.9)", fontSize: 12, textAlign: "center", lineHeight: 1.6 }}>
                 Giao hàng · Mua hộ · Xe ôm · Taxi<br />tại Krông Pắc, Đắk Lắk
               </div>
@@ -413,7 +413,7 @@ function LoginContent() {
                   marginBottom: 12, position: "relative", overflow: "hidden",
                   boxShadow: "0 0 0 4px rgba(255,255,255,0.25), 0 8px 24px rgba(0,0,0,0.4)",
                 }}>
-                <Image src="/icon-512.png" alt="Goi" width={52} height={52} style={{ objectFit: "contain" }} />
+                <Image src="/icon-512.png" alt="DakGo" width={52} height={52} style={{ objectFit: "contain" }} />
                 <div style={{
                   position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
                   background: "linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent)",
@@ -424,7 +424,7 @@ function LoginContent() {
               <div style={{
                 fontSize: 20, fontWeight: 800, letterSpacing: 2, marginBottom: 3,
                 color: "#fff", textShadow: "0 1px 8px rgba(0,0,0,0.25)",
-              }}>Goi</div>
+              }}>DakGo</div>
               <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, marginBottom: 18, textAlign: "center" }}>
                 Giao đồ ăn · Giao hàng · Xe ôm · Taxi tại Krông Pắc
               </div>
@@ -717,7 +717,7 @@ function LoginContent() {
 
 
               <p style={{ color: "rgba(255,255,255,.14)", fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: 20 }}>
-                Goi · Krông Pắc
+                DakGo · Krông Pắc
               </p>
 
             </motion.div>

@@ -393,7 +393,7 @@ export default function ProfilePage() {
             <div style={{ position: "absolute", top: 0, left: "-100%", width: "50%", height: "100%", background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)", animation: "shimmer 4s infinite" }} />
             <div style={{ position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <div style={{ color: "rgba(180,100,255,0.55)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 4 }}>💳 Xu Goi</div>
+                <div style={{ color: "rgba(180,100,255,0.55)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 4 }}>💳 Xu DakGo</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginBottom: 3 }}>
                   <span style={{ fontSize: 24, fontWeight: 800, lineHeight: 1, background: "linear-gradient(135deg,#b464ff,#d484ff,#e8a4ff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" } as React.CSSProperties}>
                     {walletXu.toLocaleString("vi-VN")}

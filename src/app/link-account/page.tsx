@@ -50,7 +50,7 @@ export default function LinkAccountPage() {
         Đăng nhập Zalo thành công!
       </div>
       <div style={{ color:"#6a5a40", fontSize:11, textAlign:"center", marginBottom:28, maxWidth:280 }}>
-        Bạn đã có tài khoản Goi trước đó?<br/>
+        Bạn đã có tài khoản DakGo trước đó?<br/>
         Nhập SĐT + mật khẩu để gộp xu và lịch sử đơn hàng
       </div>
 

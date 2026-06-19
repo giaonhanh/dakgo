@@ -131,7 +131,7 @@ export default function AdminShell({ pageTitle, pageSubtitle, actions, children 
                 <div style={{ display: "flex", alignItems: "center", padding: "16px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)", gap: 10 }}>
                   <div style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, background: "linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>🚀</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ color: "#f0eaff", fontSize: 13, fontWeight: 800 }}>Goi</div>
+                    <div style={{ color: "#f0eaff", fontSize: 13, fontWeight: 800 }}>DakGo</div>
                     <div style={{ color: "#6a5a40", fontSize: 9 }}>Admin Panel</div>
                   </div>
                   <button onClick={() => setDrawer(false)} style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "none", color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
@@ -178,7 +178,7 @@ export default function AdminShell({ pageTitle, pageSubtitle, actions, children 
         {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
           <div style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, background: "linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>🚀</div>
-          {!collapsed && <div><div style={{ color: "#f0eaff", fontSize: 13, fontWeight: 800, lineHeight: 1 }}>Goi</div><div style={{ color: "#6a5a40", fontSize: 9 }}>Admin Panel</div></div>}
+          {!collapsed && <div><div style={{ color: "#f0eaff", fontSize: 13, fontWeight: 800, lineHeight: 1 }}>DakGo</div><div style={{ color: "#6a5a40", fontSize: 9 }}>Admin Panel</div></div>}
         </div>
 
         {/* Nav */}

@@ -551,7 +551,7 @@ export default function MerchantMenuPage() {
 
     // ── Sheet hướng dẫn ──────────────────────────────────────────────
     const guide = XLSX.utils.aoa_to_sheet([
-      ["📖 HƯỚNG DẪN NHẬP MENU — Goi — Krông Pắc"],
+      ["📖 HƯỚNG DẪN NHẬP MENU — DakGo — Krông Pắc"],
       [""],
       ["🔶 BƯỚC 1: Điền thông tin vào sheet '📋 Danh sách món'"],
       ["🔶 BƯỚC 2: Lưu file → App → Thực đơn → Nhập từ Excel → chọn file này"],

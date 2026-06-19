@@ -47,7 +47,7 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
         Đang bảo trì
       </div>
       <div style={{ color: "#6a5a40", fontSize: 13, lineHeight: 1.7, maxWidth: 280, marginBottom: 32 }}>
-        Goi đang được nâng cấp để phục vụ bạn tốt hơn.
+        DakGo đang được nâng cấp để phục vụ bạn tốt hơn.
         Vui lòng quay lại sau ít phút.
       </div>
       <button
@@ -61,7 +61,7 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
         🔄 Kiểm tra lại
       </button>
       <div style={{ color: "rgba(106,90,64,0.4)", fontSize: 9.5, marginTop: 24 }}>
-        Goi · Krông Pắc, Đắk Lắk
+        DakGo · Krông Pắc, Đắk Lắk
       </div>
     </div>
   )

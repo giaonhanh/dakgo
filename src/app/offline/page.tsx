@@ -5,7 +5,7 @@ export default function OfflinePage() {
   const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
-    document.title = "Mất kết nối — Goi"
+    document.title = "Mất kết nối — DakGo"
   }, [])
 
   const retry = () => {
@@ -59,7 +59,7 @@ export default function OfflinePage() {
         {/* logo */}
         <div style={{ position:"absolute", bottom:24, display:"flex", alignItems:"center", gap:8, opacity:.35 }}>
           <span style={{ fontSize:16 }}>🛵</span>
-          <span style={{ color:"#f8f0e0", fontSize:11, fontWeight:700 }}>Goi · Krông Pắc</span>
+          <span style={{ color:"#f8f0e0", fontSize:11, fontWeight:700 }}>DakGo · Krông Pắc</span>
         </div>
       </div>
     </>

@@ -5,7 +5,7 @@ import { usePWAInstall, Platform } from "@/hooks/usePWAInstall"
 /* ── hướng dẫn từng nền tảng ── */
 const STEPS: Record<string, { title: string; steps: { icon: string; text: string }[]; note?: string }> = {
   "ios-safari": {
-    title: "📲 Cài Goi lên iPhone / iPad",
+    title: "📲 Cài DakGo lên iPhone / iPad",
     steps: [
       { icon: "⬆️", text: 'Nhấn nút Chia sẻ ở thanh dưới Safari (biểu tượng hình vuông có mũi tên)' },
       { icon: "➕", text: 'Cuộn xuống, chọn "Thêm vào Màn hình chính"' },
@@ -13,7 +13,7 @@ const STEPS: Record<string, { title: string; steps: { icon: string; text: string
     ],
   },
   "ios-other": {
-    title: "📲 Cài Goi lên iPhone / iPad",
+    title: "📲 Cài DakGo lên iPhone / iPad",
     steps: [
       { icon: "🌐", text: "Trình duyệt bạn đang dùng chưa hỗ trợ cài đặt PWA" },
       { icon: "🧭", text: 'Mở lại trang này bằng Safari rồi làm theo hướng dẫn' },
@@ -21,7 +21,7 @@ const STEPS: Record<string, { title: string; steps: { icon: string; text: string
     note: "Chỉ Safari mới hỗ trợ cài ứng dụng lên iPhone / iPad",
   },
   "android-chrome": {
-    title: "📲 Thêm Goi vào màn hình",
+    title: "📲 Thêm DakGo vào màn hình",
     steps: [
       { icon: "⚡", text: "Mở nhanh như app thật, không cần vào trình duyệt" },
       { icon: "📶", text: "Vẫn dùng được khi mạng yếu nhờ cache thông minh" },
@@ -29,7 +29,7 @@ const STEPS: Record<string, { title: string; steps: { icon: string; text: string
     ],
   },
   "desktop": {
-    title: "💻 Cài Goi trên máy tính",
+    title: "💻 Cài DakGo trên máy tính",
     steps: [
       { icon: "⚡", text: "Mở nhanh từ taskbar / dock, không cần trình duyệt" },
       { icon: "🔔", text: "Nhận thông báo đơn hàng trên desktop" },

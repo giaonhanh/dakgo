@@ -406,7 +406,7 @@ export default function MerchantRevenuePage() {
                   <div style={{ padding:"0 14px" }}>
                     {[
                       { label:"Tổng tiền hàng", value:totalSubtotal, color:"#f8f0e0", prefix:"" },
-                      { label:`Hoa hồng Goi (${Math.round(commRate*100)}%)`, value:totalCommission, color:"#ff4040", prefix:"−" },
+                      { label:`Hoa hồng DakGo (${Math.round(commRate*100)}%)`, value:totalCommission, color:"#ff4040", prefix:"−" },
                       { label:"Voucher giảm giá", value:totalVoucher, color:"#FFB347", prefix:"−" },
                     ].map(r => (
                       <div key={r.label} style={{ display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.05)" }}>

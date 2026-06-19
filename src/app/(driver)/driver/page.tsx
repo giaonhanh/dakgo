@@ -1425,7 +1425,7 @@ export default function DriverDashboard() {
             }}>🛵</div>
             <div>
               <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:800 }}>{driverName}</div>
-              <div style={{ color:"#6a5a40", fontSize:9 }}>Tài xế · Goi</div>
+              <div style={{ color:"#6a5a40", fontSize:9 }}>Tài xế · DakGo</div>
             </div>
           </div>
 

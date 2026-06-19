@@ -660,7 +660,7 @@ export default function DriverProfilePage() {
             <Row icon="🔑" label="Đổi mật khẩu" sub="Cập nhật mật khẩu đăng nhập" onClick={() => setShowPw(true)} arrow />
             <Row icon="💬" label="Chat với hỗ trợ" sub="Nhắn tin Zalo hỗ trợ" onClick={() => window.open(adminZaloLink, "_blank")} arrow />
             <Row icon="⚠️" label="Báo cáo vấn đề" sub="Khiếu nại, sự cố khi giao hàng" onClick={() => window.open(adminTelLink || adminZaloLink, "_blank")} arrow />
-            <Row icon="🚀" label="Goi v1.0" sub="© 2025 Goi · Krông Pắc" />
+            <Row icon="🚀" label="DakGo v1.0" sub="© 2025 DakGo · Krông Pắc" />
             <Row icon="🚪" label="Đăng xuất" danger last
               onClick={async () => { await createClient().auth.signOut(); window.location.href = "/login" }} arrow />
           </Section>

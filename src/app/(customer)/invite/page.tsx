@@ -62,8 +62,8 @@ export default function InvitePage() {
   // Link trỏ về trang chủ (đăng nhập) kèm mã ref
   const shareUrl  = typeof window !== "undefined"
     ? `${window.location.origin}/?ref=${code}`
-    : `https://Goi.app/?ref=${code}`
-  const shareText = `Dùng mã ${code} để nhận 5.000 XU khi đặt đơn đầu trên Goi (từ 50.000đ)! 🎁`
+    : `https://DakGo.app/?ref=${code}`
+  const shareText = `Dùng mã ${code} để nhận 5.000 XU khi đặt đơn đầu trên DakGo (từ 50.000đ)! 🎁`
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code)
@@ -74,7 +74,7 @@ export default function InvitePage() {
   const handleShare = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Goi — Mã giới thiệu", text: shareText, url: shareUrl })
+        await navigator.share({ title: "DakGo — Mã giới thiệu", text: shareText, url: shareUrl })
       } catch { /* user dismissed */ }
     } else {
       await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`)
@@ -196,7 +196,7 @@ export default function InvitePage() {
         <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.8, textAlign: "center" }}>
           • Mỗi tài khoản chỉ được nhận thưởng giới thiệu 1 lần<br />
           • XU không quy đổi thành tiền mặt<br />
-          • Goi có quyền thu hồi XU nếu phát hiện gian lận
+          • DakGo có quyền thu hồi XU nếu phát hiện gian lận
         </div>
 
       </div>

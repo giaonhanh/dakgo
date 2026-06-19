@@ -1,4 +1,4 @@
-﻿# Hướng dẫn tạo file Excel để import menu vào Goi — Krông Pắc
+﻿# Hướng dẫn tạo file Excel để import menu vào DakGo — Krông Pắc
 
 ## Định dạng file
 - **Loại file**: `.xlsx` (Excel) hoặc `.csv`

@@ -1,6 +1,6 @@
 ﻿{
-  "name": "Goi — Krông Pắc",
-  "short_name": "Goi",
+  "name": "DakGo — Krông Pắc",
+  "short_name": "DakGo",
   "description": "Giao hàng · Mua hộ · Xe ôm · Taxi tại Krông Pắc, Đắk Lắk",
   "theme_color": "#FF6B1A",
   "background_color": "#FF6B1A",
@@ -23,7 +23,7 @@
       "sizes": "512x512",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Trang chủ Goi"
+      "label": "Trang chủ DakGo"
     }
   ],
   "shortcuts": [

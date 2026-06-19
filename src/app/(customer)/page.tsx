@@ -1309,7 +1309,7 @@ export default function HomePage() {
                 </div>
                 <div style={{ color:"#6a5a40", fontSize:10, lineHeight:1.7 }}>
                   Đặt đơn đầu tiên để nhận ngay<br/>
-                  <span style={{ color:"#FFB347", fontWeight:600 }}>ưu đãi hấp dẫn từ Goi!</span>
+                  <span style={{ color:"#FFB347", fontWeight:600 }}>ưu đãi hấp dẫn từ DakGo!</span>
                 </div>
               </div>
               <a href="/nearby-shops" style={{ textDecoration:"none" }}>

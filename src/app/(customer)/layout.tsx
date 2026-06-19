@@ -71,7 +71,7 @@ function GpsPermissionModal({ onAllow, onDeny }: { onAllow: () => void; onDeny: 
         color: '#6a5a40', fontSize: 12, textAlign: 'center',
         lineHeight: 1.8, marginBottom: 32, maxWidth: 300,
       }}>
-        Goi cần vị trí GPS để{'\n'}
+        DakGo cần vị trí GPS để{'\n'}
         <span style={{ color: '#b0956a' }}>tìm quán gần bạn</span>,{' '}
         <span style={{ color: '#b0956a' }}>tính phí ship</span> và{' '}
         <span style={{ color: '#b0956a' }}>giao hàng chính xác</span> đến tận nơi.

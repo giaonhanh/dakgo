@@ -317,7 +317,7 @@ export default function AdminNotificationsPage() {
                   <div style={{ flex: 1 }}>
                     <div style={{ color: "#f0eaff", fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{title || "Tiêu đề..."}</div>
                     <div style={{ color: "#b0956a", fontSize: 10 }}>{body || "Nội dung thông báo..."}</div>
-                    <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 4 }}>Goi · vừa xong</div>
+                    <div style={{ color: "#6a5a40", fontSize: 9, marginTop: 4 }}>DakGo · vừa xong</div>
                   </div>
                 </div>
                 {imagePreview && <img src={imagePreview} alt="banner" style={{ width: "100%", marginTop: 8, borderRadius: 8, maxHeight: 80, objectFit: "cover" }} />}
