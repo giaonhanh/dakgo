@@ -197,7 +197,7 @@ function LoginContent() {
     script.async = true
     script.defer = true
     script.onload = () => {
-      ;(window as Window & { FB: { init: (opts: object) => void } }).FB.init({
+      ;(window as unknown as { FB: { init: (opts: object) => void } }).FB.init({
         appId: "4403020226600531",
         cookie: true,
         xfbml: false,
@@ -225,8 +225,9 @@ function LoginContent() {
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
     // Mobile: dùng FB JS SDK → mở thẳng app Facebook
-    if (isMobile && typeof window !== "undefined" && (window as Window & { FB?: { login: (cb: (r: { authResponse?: { accessToken: string } }) => void, opts: object) => void } }).FB) {
-      const FB = (window as Window & { FB: { login: (cb: (r: { authResponse?: { accessToken: string } }) => void, opts: object) => void } }).FB
+    type FBType = { login: (cb: (r: { authResponse?: { accessToken: string } }) => void, opts: object) => void }
+    if (isMobile && typeof window !== "undefined" && (window as unknown as { FB?: FBType }).FB) {
+      const FB = (window as unknown as { FB: FBType }).FB
       FB.login(async (response) => {
         if (!response.authResponse?.accessToken) {
           setError("Đăng nhập Facebook thất bại. Thử lại sau.")
