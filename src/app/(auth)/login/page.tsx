@@ -414,10 +414,6 @@ function LoginContent() {
                   animation: "logoShine 2s ease-in-out infinite",
                 }} />
               </div>
-              <div style={{
-                fontSize: 32, fontWeight: 800, letterSpacing: 2, color: "#fff",
-                textShadow: "0 2px 12px rgba(0,0,0,0.3)",
-              }}>DakGo</div>
               <div style={{ color: "rgba(176,149,106,0.9)", fontSize: 12, textAlign: "center", lineHeight: 1.6 }}>
                 Giao hàng · Mua hộ · Xe ôm · Taxi<br />tại Krông Pắc, Đắk Lắk
               </div>
@@ -460,10 +456,6 @@ function LoginContent() {
                 }} />
               </motion.div>
 
-              <div style={{
-                fontSize: 20, fontWeight: 800, letterSpacing: 2, marginBottom: 3,
-                color: "#fff", textShadow: "0 1px 8px rgba(0,0,0,0.25)",
-              }}>DakGo</div>
               <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, marginBottom: 18, textAlign: "center" }}>
                 Giao đồ ăn · Giao hàng · Xe ôm · Taxi tại Krông Pắc
               </div>
