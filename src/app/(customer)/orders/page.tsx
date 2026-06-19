@@ -541,7 +541,9 @@ export default function OrdersPage() {
   const filtered = orders.filter(o => {
     if (activeTab === "history")
       return !ACTIVE_ST.includes(o.status) && !o.createdAt.startsWith(TODAY_STR)
-    if (activeTab === "cancelled") return o.status === "cancelled"
+    // "Đã hủy" chỉ hiện đơn hủy trong ngày hôm nay — ngày mới tự reset
+    if (activeTab === "cancelled")
+      return o.status === "cancelled" && o.createdAt.startsWith(TODAY_STR)
     const visibleToday = ACTIVE_ST.includes(o.status) || o.createdAt.startsWith(TODAY_STR)
     if (!visibleToday) return false
     if (activeTab === "all")       return true
@@ -555,7 +557,7 @@ export default function OrdersPage() {
     if (k === "all")       return todayOrders.length
     if (k === "active")    return todayOrders.filter(o => ACTIVE_ST.includes(o.status)).length
     if (k === "completed") return todayOrders.filter(o => o.status === "completed").length
-    if (k === "cancelled") return orders.filter(o => o.status === "cancelled").length
+    if (k === "cancelled") return orders.filter(o => o.status === "cancelled" && o.createdAt.startsWith(TODAY_STR)).length
     return 0
   }
 
