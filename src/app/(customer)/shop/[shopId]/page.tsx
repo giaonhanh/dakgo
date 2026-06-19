@@ -667,26 +667,15 @@ export default function ShopPage() {
         setComboProductIds(cpIds)
       }
 
-      // TODO: XÓA HARDCODE — chỉ dùng để kiểm tra UI reviews
-      const MOCK_REVIEWS: ShopReview[] = [
-        { id:"m1", food_rating:5, comment:"Món ăn ngon lắm, giao nhanh, đóng gói cẩn thận. Lần sau sẽ đặt tiếp!", food_tags:["Món ngon","Giao nhanh","Đóng gói đẹp"], images:["https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400","https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400"], created_at: new Date(Date.now()-86400000*0).toISOString(), reviewer:{ full_name:"Nguyễn Thị Hương" } },
-        { id:"m2", food_rating:4, comment:"Phần ăn nhiều, giá hợp lý. Hơi muộn một chút nhưng chấp nhận được.", food_tags:["Phần nhiều","Giá hợp lý"], images:["https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400"], created_at: new Date(Date.now()-86400000*1).toISOString(), reviewer:{ full_name:"Trần Văn Minh" } },
-        { id:"m3", food_rating:5, comment:"Quán này ổn lắm, thức ăn đúng mô tả, lần đầu thử mà rất hài lòng.", food_tags:["Đúng mô tả","Món ngon"], images:null, created_at: new Date(Date.now()-86400000*3).toISOString(), reviewer:{ full_name:"Lê Thị Lan" } },
-        { id:"m4", food_rating:3, comment:"Bình thường, không có gì đặc biệt lắm.", food_tags:[], images:null, created_at: new Date(Date.now()-86400000*5).toISOString(), reviewer:{ full_name:"Phạm Quốc Bảo" } },
-        { id:"m5", food_rating:5, comment:null, food_tags:["Món ngon","Giao nhanh"], images:["https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400","https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400","https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400"], created_at: new Date(Date.now()-86400000*7).toISOString(), reviewer:{ full_name:"Võ Thị Mai" } },
-      ]
-      setReviews(MOCK_REVIEWS)
-      setReviewsTotal(12) // mock: giả lập còn 7 review nữa chưa load
-      // TODO: XÓA HARDCODE ↑ và bật lại đoạn dưới
-      // const { data: rvData, count: rvCount } = await supabase
-      //   .from("reviews")
-      //   .select("id,food_rating,comment,food_tags,created_at,reviewer:profiles(full_name)", { count: "exact" })
-      //   .eq("shop_id", shopId)
-      //   .not("food_rating", "is", null)
-      //   .order("created_at", { ascending: false })
-      //   .limit(5)
-      // if (rvData) setReviews(rvData as unknown as ShopReview[])
-      // setReviewsTotal(rvCount ?? 0)
+      const { data: rvData, count: rvCount } = await supabase
+          .from("reviews")
+          .select("id,food_rating,comment,food_tags,created_at,reviewer:profiles(full_name)", { count: "exact" })
+          .eq("shop_id", shopId)
+          .not("food_rating", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(5)
+      if (rvData) setReviews(rvData as unknown as ShopReview[])
+      setReviewsTotal(rvCount ?? 0)
 
       setLoading(false)
     }
@@ -698,7 +687,7 @@ export default function ShopPage() {
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const onScroll = () => setScrolled(el.scrollTop > 130)
+    const onScroll = () => setScrolled(el.scrollTop > 160)
     el.addEventListener("scroll", onScroll, { passive:true })
     return () => el.removeEventListener("scroll", onScroll)
   }, [])
@@ -886,12 +875,12 @@ export default function ShopPage() {
           padding:"calc(env(safe-area-inset-top) + 10px) 16px 10px",
           transition:"all .25s" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <a href="/" style={{ width:32, height:32, borderRadius:9,
+            <button onClick={() => router.back()} style={{ width:40, height:40, borderRadius:9,
               background:"rgba(0,0,0,0.35)",
               border:"1px solid rgba(255,255,255,0.12)",
               display:"flex", alignItems:"center", justifyContent:"center",
-              fontSize:14, textDecoration:"none", color:"#f8f0e0",
-              backdropFilter:"blur(8px)", flexShrink:0 }}>←</a>
+              fontSize:14, color:"#f8f0e0", cursor:"pointer",
+              backdropFilter:"blur(8px)", flexShrink:0 }}>←</button>
 
             <AnimatePresence>
               {scrolled && (
@@ -1008,7 +997,7 @@ export default function ShopPage() {
           )}
 
           {/* Hero */}
-          <div style={{ height:220, position:"relative", overflow:"hidden",
+          <div style={{ height:"min(220px, 40vh)", position:"relative", overflow:"hidden",
             background: shop?.cover_url
               ? `url(${shop.cover_url}) center/cover`
               : "linear-gradient(135deg,#1a0800 0%,#2d1500 50%,#0d0600 100%)" }}>
@@ -1023,12 +1012,12 @@ export default function ShopPage() {
             {/* Gradient dưới */}
             <div style={{ position:"absolute", inset:0,
               background:"linear-gradient(to top,rgba(8,8,6,0.85) 0%,transparent 60%)" }} />
-            {/* Gradient trên — che vùng safe-area (notch/status bar) để icon giờ/WiFi/loa luôn hiện */}
+            {/* Gradient trên — che vùng safe-area kể cả Dynamic Island (59px) */}
             <div style={{ position:"absolute", top:0, left:0, right:0,
-              height:"calc(env(safe-area-inset-top, 44px) + 24px)",
-              background:"linear-gradient(to bottom,rgba(8,8,6,0.75) 0%,transparent 100%)" }} />
+              height:"calc(env(safe-area-inset-top, 60px) + 28px)",
+              background:"linear-gradient(to bottom,rgba(8,8,6,0.88) 0%,transparent 100%)" }} />
             {shop && (
-              <div style={{ position:"absolute", top:92, right:16, backdropFilter:"blur(8px)" }}>
+              <div style={{ position:"absolute", bottom:16, right:16, backdropFilter:"blur(8px)" }}>
                 <Badge layer={3} variant={shopIsOpen ? "open" : "closed"} size="md" />
               </div>
             )}
@@ -1059,7 +1048,8 @@ export default function ShopPage() {
                 <div style={{ flex:1, minWidth:0, paddingBottom:2 }}>
                   {/* Tên — full width, không cắt */}
                   <div style={{ color:"#f8f0e0", fontSize:17, fontWeight:800, lineHeight:1.2,
-                    marginBottom: shop.shop_type ? 5 : 4 }}>
+                    marginBottom: shop.shop_type ? 5 : 4,
+                    wordBreak:"break-word", overflowWrap:"anywhere" }}>
                     {shop.name}
                   </div>
                   {/* Badge loại cửa hàng — dòng riêng */}
@@ -1249,7 +1239,7 @@ export default function ShopPage() {
 
           {/* ── Category tabs (sticky) ── */}
           {categories.length > 0 && (
-            <div ref={tabsRef} style={{ position:"sticky", top:"calc(env(safe-area-inset-top, 0px) + 52px)", zIndex:30,
+            <div ref={tabsRef} style={{ position:"sticky", top:"calc(env(safe-area-inset-top, 24px) + 54px)", zIndex:30,
               background:"rgba(8,8,6,0.95)", backdropFilter:"blur(12px)",
               borderBottom:"1px solid rgba(255,255,255,0.06)",
               padding:"10px 14px 10px", marginTop:12 }}>
@@ -1550,7 +1540,7 @@ export default function ShopPage() {
               animate={{ y:0,  opacity:1 }}
               exit={{   y:80,  opacity:0 }}
               transition={{ type:"spring", damping:18, stiffness:200 }}
-              style={{ position:"absolute", bottom:84, left:14, right:14,
+              style={{ position:"absolute", bottom:"calc(max(16px,env(safe-area-inset-bottom)) + 56px + 12px)", left:14, right:14,
                 zIndex:45 }}>
               <div onClick={() => router.push("/cart")} style={{ cursor:"pointer" }}>
                 <div style={{ background:"linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)",
