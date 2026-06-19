@@ -184,67 +184,75 @@ export default function OrdersPage() {
       if (!user) { setLoading(false); return }
       setUserId(user.id)
 
-      // Profile: tên + SĐT để hiện trong chi tiết rides
-      const { data: prof } = await supabase
-        .from("profiles").select("full_name, phone").eq("id", user.id).single()
-      if (await isBlacklisted(supabase, user.id)) setCancelLocked(true)
-      const myName  = prof?.full_name ?? ""
-      const myPhone = prof?.phone     ?? ""
+      // Batch 1: chạy 5 query song song — giảm từ 5 round trip xuống 1
+      const [
+        { data: prof },
+        blacklisted,
+        { data: rows, error: ordersErr },
+        { data: errandRows },
+        { data: rideRows },
+      ] = await Promise.all([
+        supabase.from("profiles").select("full_name, phone").eq("id", user.id).single(),
+        isBlacklisted(supabase, user.id),
+        supabase
+          .from("orders")
+          .select(`id, status, delivery_address, note, total, ship_fee, pay_method, cancel_reason, created_at, driver_id, shop_id, payment_status, xu_used, xu_bonus_used, discount_amount, shops(id, name)`)
+          .eq("customer_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(50),
+        supabase
+          .from("errands")
+          .select("id, type, status, pickup_address, delivery_address, package_description, items_description, service_fee, payment_method, note, created_at, driver_id, sender_name, sender_phone, recipient_name, recipient_phone, package_photo_url")
+          .eq("customer_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(30),
+        supabase
+          .from("rides")
+          .select("id, vehicle_type, status, pickup_address, dropoff_address, estimated_fare, distance_km, payment_method, note, created_at, driver_id")
+          .eq("customer_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(30),
+      ])
 
-      const { data: rows, error: ordersErr } = await supabase
-        .from("orders")
-        .select(`
-          id, status, delivery_address, note, total, ship_fee,
-          pay_method, cancel_reason, created_at, driver_id, shop_id,
-          payment_status, xu_used, xu_bonus_used, discount_amount,
-          shops(id, name)
-        `)
-        .eq("customer_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50)
-
+      if (blacklisted) setCancelLocked(true)
       if (ordersErr) console.error("[Orders] fetch error:", ordersErr.message)
 
+      const myName  = prof?.full_name ?? ""
+      const myPhone = prof?.phone     ?? ""
       const orderIds = (rows ?? []).map(o => o.id)
 
-      // Fetch order_items riêng (tránh nested join RLS)
-      const { data: allItems } = orderIds.length ? await supabase
-        .from("order_items")
-        .select("order_id, id, product_id, name, price, qty, note, options")
-        .in("order_id", orderIds) : { data: [] }
+      // Batch 2: chạy 3 query phụ thuộc song song
+      const driverIds = (rows ?? []).filter(o => o.driver_id).map(o => o.driver_id as string)
+      const completedIds = (rows ?? []).filter(o => o.status === "delivered" || o.status === "completed").map(o => o.id)
+
+      const [
+        { data: allItems },
+        { data: dpRows },
+        { data: rv },
+      ] = await Promise.all([
+        orderIds.length
+          ? supabase.from("order_items").select("order_id, id, product_id, name, price, qty, note, options").in("order_id", orderIds)
+          : Promise.resolve({ data: [] }),
+        driverIds.length
+          ? supabase.from("profiles").select("id, full_name, phone").in("id", driverIds)
+          : Promise.resolve({ data: [] }),
+        completedIds.length
+          ? supabase.from("reviews").select("order_id, food_rating").in("order_id", completedIds)
+          : Promise.resolve({ data: [] }),
+      ])
+
       const itemsByOrder: Record<string, { id: string; product_id: string | null; name: string; price: number; qty: number; note?: string; breakdown?: ItemBreakdown }[]> = {}
       ;(allItems ?? []).forEach((item: { order_id: string; id: string; product_id: string | null; name: string; price: number; qty: number; note?: string; options?: ItemBreakdown }) => {
         if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = []
         itemsByOrder[item.order_id].push({ id: item.id, product_id: item.product_id, name: item.name, price: item.price, qty: item.qty, note: item.note, breakdown: item.options })
       })
 
-      // Fetch driver profiles for orders that have a driver
-      const driverIds = (rows ?? [])
-        .filter(o => o.driver_id)
-        .map(o => o.driver_id as string)
-      let driverProfiles: { id: string; full_name: string | null; phone: string }[] = []
-      if (driverIds.length > 0) {
-        const { data: dp } = await supabase
-          .from("profiles")
-          .select("id, full_name, phone")
-          .in("id", driverIds)
-        driverProfiles = (dp ?? []) as typeof driverProfiles
-      }
+      const driverProfiles = (dpRows ?? []) as { id: string; full_name: string | null; phone: string }[]
 
-      // Fetch reviews for completed orders
-      const completedIds = (rows ?? [])
-        .filter(o => o.status === "delivered" || o.status === "completed")
-        .map(o => o.id)
-      let reviewMap: Record<string, number> = {}
-      if (completedIds.length > 0) {
-        const { data: rv } = await supabase
-          .from("reviews")
-          .select("order_id, food_rating")
-          .in("order_id", completedIds)
-        ;(rv ?? []).forEach((r: { order_id: string; food_rating: number | null }) => {
-          if (r.food_rating) reviewMap[r.order_id] = r.food_rating
-        })
-      }
+      const reviewMap: Record<string, number> = {}
+      ;(rv ?? []).forEach((r: { order_id: string; food_rating: number | null }) => {
+        if (r.food_rating) reviewMap[r.order_id] = r.food_rating
+      })
 
       const mapped: Order[] = (rows ?? []).map((o, idx) => {
         const shop = Array.isArray(o.shops) ? o.shops[0] : o.shops
@@ -301,14 +309,6 @@ export default function OrdersPage() {
         }
       })
 
-      // ── Fetch errands (giao hộ / mua hộ) ──────────────────
-      const { data: errandRows } = await supabase
-        .from("errands")
-        .select("id, type, status, pickup_address, delivery_address, package_description, items_description, service_fee, payment_method, note, created_at, driver_id, sender_name, sender_phone, recipient_name, recipient_phone, package_photo_url")
-        .eq("customer_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(30)
-
       const errandMapped: Order[] = (errandRows ?? []).map((e, idx) => ({
         id:          e.id,
         serviceType: (e.type === "buy_for_me" ? "errand_buy" : "errand_deliver") as ServiceType,
@@ -345,14 +345,6 @@ export default function OrdersPage() {
         recipientPhone:e.recipient_phone ?? undefined,
         packagePhotoUrl: e.package_photo_url ?? undefined,
       }))
-
-      // ── Fetch rides (xe ôm / taxi) ─────────────────────────
-      const { data: rideRows } = await supabase
-        .from("rides")
-        .select("id, vehicle_type, status, pickup_address, dropoff_address, estimated_fare, distance_km, payment_method, note, created_at, driver_id")
-        .eq("customer_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(30)
 
       const rideMapped: Order[] = (rideRows ?? []).map((r, idx) => {
         const isMoto = r.vehicle_type === "motorbike"
