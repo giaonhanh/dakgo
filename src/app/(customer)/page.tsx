@@ -1110,13 +1110,6 @@ export default function HomePage() {
               S5 — ServiceGrid (4 dịch vụ nhanh)
           -------------------------------------- */}
           <SectionHeader title="Dịch vụ nhanh" />
-          {lockedSvcMsg && (
-            <div style={{ margin:"0 16px 10px", padding:"9px 14px", borderRadius:10,
-              background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.3)",
-              color:"#FFB347", fontSize:11, lineHeight:1.5 }}>
-              🔒 {lockedSvcMsg}
-            </div>
-          )}
           <div style={{
             display:"grid", gridTemplateColumns:"repeat(4,1fr)",
             gap:7, padding:"0 16px", marginBottom:14,
@@ -2080,6 +2073,36 @@ export default function HomePage() {
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Fixed toast — thông báo dịch vụ ngoài giờ / bị khoá */}
+      <AnimatePresence>
+        {lockedSvcMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ type: "spring", damping: 28, stiffness: 340 }}
+            style={{
+              position: "fixed",
+              bottom: "calc(max(16px, env(safe-area-inset-bottom)) + 64px)",
+              left: 16, right: 16, zIndex: 200,
+              background: "rgba(14,12,9,0.96)",
+              backdropFilter: "blur(16px)",
+              WebkitBackdropFilter: "blur(16px)",
+              border: "1px solid rgba(255,107,0,0.35)",
+              borderRadius: 14,
+              padding: "11px 14px",
+              display: "flex", alignItems: "flex-start", gap: 9,
+              boxShadow: "0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,107,0,0.1)",
+            }}
+          >
+            <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>🔒</span>
+            <span style={{ color: "#FFB347", fontSize: 12, lineHeight: 1.5, fontWeight: 500 }}>
+              {lockedSvcMsg}
+            </span>
           </motion.div>
         )}
       </AnimatePresence>
