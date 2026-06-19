@@ -199,6 +199,23 @@ function LoginContent() {
     }
   }, [params])
 
+  // Reset loading khi user quay lại từ OAuth mà không hoàn thành
+  // (bfcache restore hoặc tab back về) — tránh nút bị disabled mãi
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setLoading(false)
+    }
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setLoading(false)
+    }
+    window.addEventListener("pageshow", onPageShow)
+    document.addEventListener("visibilitychange", onVisible)
+    return () => {
+      window.removeEventListener("pageshow", onPageShow)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
+  }, [])
+
   async function handleFacebookLogin() {
     setLoading(true); setError("")
     const { error: err } = await supabase.auth.signInWithOAuth({
@@ -206,6 +223,8 @@ function LoginContent() {
       options: { redirectTo: `${window.location.origin}/api/auth/callback`, scopes: "email,public_profile" },
     })
     if (err) { setError("Không thể kết nối Facebook. Thử lại sau."); setLoading(false) }
+    // Fallback: nếu không redirect sau 10s (popup bị block...) thì reset
+    else setTimeout(() => setLoading(false), 10000)
   }
 
   async function handleGoogleLogin() {
@@ -215,6 +234,7 @@ function LoginContent() {
       options: { redirectTo: `${window.location.origin}/api/auth/callback` },
     })
     if (err) { setError("Không thể kết nối Google. Thử lại sau."); setLoading(false) }
+    else setTimeout(() => setLoading(false), 10000)
   }
 
   const selectedRole = ROLES.find(r => r.key === role)
@@ -510,10 +530,12 @@ function LoginContent() {
                         <button onClick={() => {
                           const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
                           if (isMobile) {
-                            // Mobile: redirect toàn trang — Zalo Universal Links tự mở app
+                            // Mobile: redirect toàn trang — pageshow/visibilitychange sẽ reset loading khi back về
+                            setLoading(true)
                             window.location.href = "/api/auth/zalo"
                           } else {
                             // Desktop: popup cửa sổ nhỏ
+                            setLoading(true)
                             const w = 480, h = 620
                             const left = Math.round(window.screenX + (window.outerWidth  - w) / 2)
                             const top  = Math.round(window.screenY + (window.outerHeight - h) / 2)
@@ -531,9 +553,9 @@ function LoginContent() {
                               window.location.href = dest
                             }
                             window.addEventListener("message", handler)
-                            // Nếu user đóng popup thủ công → dọn listener
+                            // Nếu user đóng popup thủ công → reset loading + dọn listener
                             const check = setInterval(() => {
-                              if (popup?.closed) { window.removeEventListener("message", handler); clearInterval(check) }
+                              if (popup?.closed) { setLoading(false); window.removeEventListener("message", handler); clearInterval(check) }
                             }, 500)
                           }
                         }}
