@@ -111,12 +111,16 @@ function GpsPermissionModal({ onAllow, onDeny }: { onAllow: () => void; onDeny: 
   )
 }
 
-// ── Sound Player: nghe message từ Service Worker và phát âm thanh ──────────
+// ── Sound Player: nghe SW message, chỉ play âm thanh dành cho customer
+// BUG-009: guard để không play nhầm âm thanh driver/merchant
+const CUSTOMER_SOUNDS = new Set(["order_update", "promo"])
 function SoundPlayer() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
     const onMessage = (e: MessageEvent) => {
       if (e.data?.type !== 'PLAY_ORDER_SOUND' || !e.data.sound) return
+      // Chỉ play các sound của customer, bỏ qua driver/merchant sounds
+      if (!CUSTOMER_SOUNDS.has(e.data.sound)) return
       const audio = new Audio(`/sounds/${e.data.sound}.mp3`)
       audio.play().catch(() => {})
     }

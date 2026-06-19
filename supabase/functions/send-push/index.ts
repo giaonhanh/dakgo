@@ -42,10 +42,16 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ sent: 0 }), { status: 200 })
   }
 
+  // BUG-001: derive url từ tag nếu caller không truyền url
+  const resolvedUrl = url
+    ?? (tag?.startsWith("order-") ? `/tracking/${tag.replace(/^order-/, "")}` : null)
+    ?? (tag?.startsWith("ride-")  ? `/orders` : null)
+    ?? "/"
+
   const payload = JSON.stringify({
     title,
     body,
-    data: { url: url ?? "/" },
+    data: { url: resolvedUrl },
     tag:  tag ?? "default",
   })
 

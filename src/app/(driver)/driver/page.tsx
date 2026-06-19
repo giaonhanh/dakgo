@@ -128,13 +128,22 @@ function OrderPopup({
   }, [onReject])
 
   // Phát âm thanh lặp liên tục suốt countdown — dừng khi đóng popup
+  // BUG-003: iOS autoplay fallback — retry khi user chạm màn hình
   useEffect(() => {
     const audio = new Audio("/sounds/ban_oi_co_don.mp3")
     audio.loop = true
     audio.volume = 0.85
     audioRef.current = audio
-    audio.play().catch(() => null)
-    return () => { audio.pause(); audio.currentTime = 0 }
+    const tryPlay = () => audio.play().catch(() => null)
+    tryPlay()
+    document.addEventListener("touchstart", tryPlay, { once: true })
+    document.addEventListener("click",      tryPlay, { once: true })
+    return () => {
+      audio.pause()
+      audio.currentTime = 0
+      document.removeEventListener("touchstart", tryPlay)
+      document.removeEventListener("click",      tryPlay)
+    }
   }, [])
 
   const o = order
@@ -932,6 +941,7 @@ export default function DriverDashboard() {
   const [unreadNotif,   setUnreadNotif]   = useState(0)
   useDriverLocation(driverId, online)  // lưu GPS realtime vào drivers.location trong DB
   const channelRef    = useRef<RealtimeChannel | null>(null)
+  const channelsRef   = useRef<RealtimeChannel[]>([])
   const gpsWatchRef   = useRef<number | null>(null)
   const gpsRef        = useRef({ lat: 0, lng: 0 })
   const showOrderRef  = useRef(false)
@@ -1110,7 +1120,9 @@ export default function DriverDashboard() {
   // ── Subscribe to pending orders when online ──
   useEffect(() => {
     if (!online || !driverId) {
-      channelRef.current?.unsubscribe()
+      // BUG-004: cleanup tất cả channels, không chỉ channelRef
+      channelsRef.current.forEach(c => c.unsubscribe())
+      channelsRef.current = []
       channelRef.current = null
       return
     }
@@ -1227,7 +1239,12 @@ export default function DriverDashboard() {
       .subscribe()
 
     channelRef.current = ch
-    return () => { ch.unsubscribe(); chErrands.unsubscribe(); chAccepted.unsubscribe(); chAssigned.unsubscribe(); channelRef.current = null }
+    channelsRef.current = [ch, chErrands, chAccepted, chAssigned]
+    return () => {
+      channelsRef.current.forEach(c => c.unsubscribe())
+      channelsRef.current = []
+      channelRef.current = null
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, driverId])
 

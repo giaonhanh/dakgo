@@ -79,12 +79,14 @@
       "Bash(find \"C:/Users/Admin/\" -name \"zalo_verifier*.html\" 2>/dev/null | head -5)",
       "Read(//c/Users/Admin/**)",
       "Bash(xargs grep -l \"push_subscriptions\\\\|web-push\\\\|webpush\\\\|sendNotification\\\\|notify/send\")",
-      "Bash(node -e \"require\\('sharp'\\); console.log\\('sharp ok'\\)\")"
+      "Bash(node -e \"require\\('sharp'\\); console.log\\('sharp ok'\\)\")",
+      "PowerShell(ls \"d:\\\\Projects\\\\giaonhanh-ai\\\\public\\\\\" | Where-Object { $_.Name -match \"favicon|icon\" })"
     ],
     "additionalDirectories": [
       "d:\\Projects\\giaonhanh-ai\\src\\app\\(merchant)\\merchant\\print",
       "d:\\Projects\\giaonhanh-ai\\supabase\\migrations",
-      "C:\\Users\\Admin\\Desktop\\anh app"
+      "C:\\Users\\Admin\\Desktop\\anh app",
+      "C:\\Users\\Admin\\Desktop"
     ]
   }
 }

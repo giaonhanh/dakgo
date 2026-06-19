@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'dakgo-v5'
+﻿const CACHE_NAME = 'dakgo-v6'
 const MAP_CACHE  = 'dakgo-maps-v2'
 const OFFLINE_URL = '/offline'
 
@@ -90,18 +90,18 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Navigation (page loads): network-first, fallback offline page
+  // Navigation (page loads): network-first, cache all successful navigations for offline fallback
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          if (res.ok && (url.pathname === '/' || url.pathname === '/offline')) {
+          if (res.ok) {
             const clone = res.clone()
             caches.open(CACHE_NAME).then((c) => c.put(request, clone))
           }
           return res
         })
-        .catch(() => caches.match(OFFLINE_URL))
+        .catch(() => caches.match(request).then(r => r ?? caches.match(OFFLINE_URL)))
     )
     return
   }

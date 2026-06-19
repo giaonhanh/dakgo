@@ -281,7 +281,15 @@ export default function MerchantDashboard() {
         filter: `shop_id=eq.${shopId}`
       }, () => {
         fetchOrders(shopId)
-        setUnreadNotif(n => n + 1) // tăng badge chuông ngay, trigger DB đã tạo notification
+        // BUG-014: re-query count thực tế thay vì optimistic +1 (tránh không đồng bộ với DB trigger)
+        setTimeout(async () => {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return
+          const { count } = await supabase.from("notifications")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id).eq("is_read", false)
+          setUnreadNotif(count ?? 0)
+        }, 500)
         fireToast("🔔 Đơn mới vừa vào!")
       })
       .on("postgres_changes", {

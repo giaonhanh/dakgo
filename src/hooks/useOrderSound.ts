@@ -79,7 +79,7 @@ export function useOrderSound(
       // orders table = food orders only, no service_type column exists
       const chOrders = supabase
         .channel("order-sound-driver-orders")
-        .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, () => {
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders", filter: "status=eq.pending" }, () => {
           play("food")
         })
         .subscribe()

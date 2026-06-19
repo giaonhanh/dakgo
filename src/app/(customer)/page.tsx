@@ -261,6 +261,7 @@ export default function HomePage() {
   // --- Real data state ---------------------------------------
   const [userName,      setUserName]      = useState("bạn")
   const [notifCount,    setNotifCount]    = useState(0)
+  const [userId,        setUserId]        = useState<string | null>(null)
   const [liveOrders,    setLiveOrders]    = useState<LiveOrderRow[]>([])
   const [liveIdx,       setLiveIdx]       = useState(0)
   const [vouchers,      setVouchers]      = useState<VoucherRow[]>([])
@@ -291,6 +292,8 @@ export default function HomePage() {
       const { data: profile } = await supabase
         .from("profiles").select("full_name").eq("id", user.id).single()
       if (profile?.full_name) setUserName(profile.full_name.split(" ").pop() ?? profile.full_name)
+
+      setUserId(user.id)
 
       // Unread notification count
       const { count } = await supabase
@@ -592,6 +595,20 @@ export default function HomePage() {
     loadData()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // BUG-012: Realtime bell badge — tăng count khi nhận thông báo mới
+  useEffect(() => {
+    if (!userId) return
+    const ch = supabase
+      .channel(`notif-badge:${userId}`)
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "notifications",
+        filter: `user_id=eq.${userId}`,
+      }, () => setNotifCount(n => n + 1))
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
 
   // Load favorites from localStorage + fetch shop data
   useEffect(() => {

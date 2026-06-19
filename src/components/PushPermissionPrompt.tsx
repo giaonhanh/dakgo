@@ -3,8 +3,8 @@ import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { usePushNotification } from "@/hooks/usePushNotification"
 
-// Bump version để buộc re-subscribe với VAPID key mới (cặp key đúng)
-const PROMPT_KEY = "push_prompted_v3"
+// Key theo userId để multi-account trên 1 thiết bị không bị skip
+const promptKey = (uid: string) => `push_prompted_v3_${uid}`
 
 export default function PushPermissionPrompt() {
   const [show, setShow]     = useState(false)
@@ -29,12 +29,12 @@ export default function PushPermissionPrompt() {
       if (perm === "granted") {
         // Luôn re-subscribe khi đã granted (idempotent upsert, không hại)
         // Quan trọng: đảm bảo subscription dùng đúng VAPID key hiện tại
-        localStorage.setItem(PROMPT_KEY, "1")
+        localStorage.setItem(promptKey(user.id), "1")
         requestPermission(user.id).catch(() => {})
         return
       }
 
-      if (localStorage.getItem(PROMPT_KEY)) return
+      if (localStorage.getItem(promptKey(user.id))) return
 
       if (perm === "denied") {
         // Đã từ chối ở browser → chỉ nhắc nhở bật lại trong cài đặt
@@ -51,13 +51,13 @@ export default function PushPermissionPrompt() {
 
   const handleAllow = async () => {
     setShow(false)
-    localStorage.setItem(PROMPT_KEY, "1")
+    localStorage.setItem(promptKey(userId!), "1")
     if (userId) await requestPermission(userId)
   }
 
   const handleLater = () => {
     setShow(false)
-    localStorage.setItem(PROMPT_KEY, "1")
+    localStorage.setItem(promptKey(userId!), "1")
   }
 
   if (!show) return null
