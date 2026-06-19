@@ -28,9 +28,8 @@ export async function middleware(request: NextRequest) {
   // Chưa đăng nhập → redirect login, giữ lại URL gốc để quay lại sau khi đăng nhập
   // Exclude "/" để Zalo/crawler đọc được meta tag từ root layout
   const publicPaths = ["/login", "/link-account", "/update-phone"]
-  if (!user && !publicPaths.some(p => pathname.startsWith(p)) && pathname !== "/") {
+  if (!user && !publicPaths.some(p => pathname.startsWith(p))) {
     const loginUrl = new URL("/login", request.url)
-    // Chỉ giữ redirect cho các trang customer-facing (không giữ /admin, /driver, /merchant)
     if (!pathname.startsWith("/admin") && !pathname.startsWith("/driver") && !pathname.startsWith("/merchant")) {
       loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search)
     }
