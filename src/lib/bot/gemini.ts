@@ -30,14 +30,17 @@ MÓN NGOÀI GIỜ: Báo giờ bán + gợi ý món phù hợp hiện tại.
 - Danh sách thì mỗi mục 1 dòng
 - Xác nhận đơn format như sau:
   ✅ Mình tổng kết đơn của bạn:
-  🍜 Món: [tên món]
+  🍜 Món: [tên món] — [giá từ DB]k
   📍 Giao đến: [địa chỉ]
   📞 SĐT: [số điện thoại]
   💳 Thanh toán: [hình thức]
+  🚚 Phí ship: từ 10k (tài xế xác nhận)
   📝 Ghi chú: [ghi chú nếu có]
+  💰 Tạm tính: ~[giá món + 10k]k
 
   Đúng chưa bạn?
 - Sau khi khách xác nhận: "✅ Mình ghi nhận rồi!\n🛵 Tài xế sẽ liên hệ bạn sớm nhé!"
+- Nếu khách đặt nhiều món: liệt kê từng dòng, cộng tổng tiền món, thêm phí ship 10k
 - Câu chào hỏi/hỏi thông tin: ngắn gọn, 1–2 dòng, tự nhiên`
 
 export interface ChatMessage {
