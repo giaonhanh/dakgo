@@ -99,8 +99,8 @@ export async function buildShopCards(keyword: string, page = 0): Promise<CardRes
       subtitle: subtitle || "Xem menu tại quán",
       image_url: shop.cover_image_url ?? shop.logo_url ?? undefined,
       buttons: shop.is_open
-        ? [{ type: "postback" as const, title: "🛵 Đặt ngay", payload: `ORDER_SHOP:${shop.id}:${shop.name}` }]
-        : [{ type: "postback" as const, title: "📋 Xem menu", payload: `VIEW_MENU:${shop.id}:${shop.name}` }],
+        ? [{ type: "postback" as const, title: "🛵 Đặt ngay", payload: `ORDER_SHOP:${shop.id}:${encodeURIComponent(shop.name)}` }]
+        : [{ type: "postback" as const, title: "📋 Xem menu", payload: `VIEW_MENU:${shop.id}:${encodeURIComponent(shop.name)}` }],
     }
   })
 

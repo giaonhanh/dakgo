@@ -21,22 +21,104 @@ function isRateLimited(senderId: string): boolean {
   return timestamps.length > RATE_LIMIT_PER_MIN
 }
 
+// Lấy menu quán và build card carousel sản phẩm
+async function buildMenuCards(shopId: string, shopName: string): Promise<BotResponse> {
+  const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+  const supabase = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, description, image_url, price, original_price, category")
+    .eq("shop_id", shopId)
+    .eq("is_available", true)
+    .order("sort_order", { ascending: true })
+    .limit(10) // FB Generic Template tối đa 10
+
+  if (!products || products.length === 0) {
+    return {
+      type: "text",
+      content: `😔 Quán ${shopName} chưa cập nhật menu. Bạn nhắn tên món muốn đặt nhé!`,
+    }
+  }
+
+  const elements = products.map(p => {
+    const price = `${(p.price / 1000).toFixed(0)}k`
+    const original = p.original_price ? ` ~~${(p.original_price / 1000).toFixed(0)}k~~` : ""
+    const desc = p.description
+      ? `${p.description.slice(0, 60)}${p.description.length > 60 ? "..." : ""}`
+      : price + original
+
+    return {
+      title: p.name,
+      subtitle: desc,
+      image_url: p.image_url ?? undefined,
+      buttons: [
+        {
+          type: "postback" as const,
+          title: `🛒 Chọn — ${price}`,
+          payload: `CHOOSE_PRODUCT:${shopId}:${encodeURIComponent(shopName)}:${p.id}:${encodeURIComponent(p.name)}:${p.price}`,
+        },
+      ],
+    }
+  })
+
+  return {
+    type: "cards",
+    intro: `🍽️ Menu của **${shopName}** — chọn món bạn muốn đặt nhé!`,
+    elements,
+  }
+}
+
 // Xử lý khi khách click "Đặt ngay" hoặc "Xem menu"
 export async function processPostback(senderId: string, payload: string): Promise<BotResponse> {
   if (payload.startsWith("ORDER_SHOP:")) {
-    const [, , shopName] = payload.split(":")
+    const parts = payload.split(":")
+    const shopId   = parts[1]
+    const shopName = decodeURIComponent(parts.slice(2).join(":"))
+
     await setState(senderId, "ordering")
     await saveMessage(senderId, "user", `[Chọn quán: ${shopName}]`)
-    const reply = `🛵 Bạn chọn **${shopName}** rồi!\n\nBạn muốn đặt món gì ạ?`
+
+    // Lưu shopId để dùng sau
+    const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+    const supabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    )
+    await supabase.from("bot_conversations").insert({
+      sender_id: senderId, role: "model",
+      content: `__SHOP__:${shopId}:${shopName}`,
+    })
+
+    return buildMenuCards(shopId, shopName)
+  }
+
+  // Khách chọn 1 món cụ thể
+  if (payload.startsWith("CHOOSE_PRODUCT:")) {
+    const parts       = payload.split(":")
+    const shopId      = parts[1]
+    const shopName    = decodeURIComponent(parts[2])
+    const productId   = parts[3]
+    const productName = decodeURIComponent(parts[4])
+    const price       = parseInt(parts[5])
+
+    // Lưu lựa chọn vào history để Groq biết
+    const itemStr = `${productName} — ${(price / 1000).toFixed(0)}k`
+    await saveMessage(senderId, "user", `[Chọn món: ${itemStr} tại ${shopName}]`)
+
+    const reply = `✅ Bạn chọn: **${itemStr}**\n\n🔢 Bạn muốn đặt mấy phần ạ?`
     await saveMessage(senderId, "model", reply)
     return { type: "text", content: reply }
   }
 
   if (payload.startsWith("VIEW_MENU:")) {
-    const [, , shopName] = payload.split(":")
-    const reply = `📋 Quán **${shopName}** hiện đang đóng cửa.\n\nBạn có thể đặt trước — mình ghi nhận đơn và tài xế sẽ lấy hàng khi quán mở cửa nhé!\n\nBạn muốn đặt món gì?`
-    await saveMessage(senderId, "model", reply)
-    return { type: "text", content: reply }
+    const parts    = payload.split(":")
+    const shopId   = parts[1]
+    const shopName = decodeURIComponent(parts.slice(2).join(":"))
+    return buildMenuCards(shopId, shopName)
   }
 
   return { type: "text", content: "Bạn cần hỗ trợ gì không? 😊" }
