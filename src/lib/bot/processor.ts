@@ -5,7 +5,7 @@ import {
   getState, setState, saveLocation, getLocation,
 } from "./storage"
 import { getPricing, calcFee, haversineKm } from "./pricing"
-import { extractFoodKeyword } from "./intent"
+import { detectServiceType, checkServiceAvailable, SERVICE_LABEL, type ServiceKey } from "./service-check"
 import { buildShopCards, type BotResponse } from "./cards"
 
 const RATE_LIMIT_PER_MIN = 5
@@ -106,21 +106,70 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
 
   // State hiện tại
   const state = await getState(senderId)
+  const isOrdering = ["ordering","awaiting_location","awaiting_address","awaiting_shop_address"].includes(state)
 
-  // Detect intent tìm quán/đặt đồ → hiện card
-  // KHÔNG hiện card khi đang trong flow đặt hàng
-  const isOrdering = state === "ordering" || state === "awaiting_location" || state === "awaiting_address"
+  // Khách nhắn "xem thêm" quán
+  if (state === "ordering" && /(xem thêm|thêm quán|quán khác|có quán nào khác)/i.test(text)) {
+    const history = await getConversation(senderId, 10)
+    const lastCard = history.findLast(h => h.parts.includes("[Card gợi ý quán:"))
+    const keyword = lastCard?.parts.match(/\[Card gợi ý quán: (.+?)\]/)?.[1] ?? "đồ ăn"
+    const pageMatch = lastCard?.parts.match(/\[Page:(\d+)\]/)
+    const nextPage = pageMatch ? parseInt(pageMatch[1]) + 1 : 1
+    const cardResponse = await buildShopCards(keyword, nextPage)
+    if (cardResponse && cardResponse.elements.length > 0) {
+      await saveMessage(senderId, "user", text)
+      await saveMessage(senderId, "model", `[Card gợi ý quán: ${keyword}][Page:${nextPage}]`)
+      return cardResponse
+    }
+    const noMore = "Mình đã gợi ý hết các quán đang mở rồi bạn ơi 😊\nBạn muốn chọn quán nào ở trên không?"
+    await saveMessage(senderId, "model", noMore)
+    return { type: "text", content: noMore }
+  }
+
+  // Khách vừa cung cấp địa chỉ để tìm quán gần
+  if (state === "awaiting_shop_address") {
+    await saveMessage(senderId, "user", text)
+    // Lấy keyword từ conversation gần nhất
+    const history = await getConversation(senderId, 5)
+    const lastKeyword = history.findLast(h => h.role === "model" && h.parts.includes("[KEYWORD:"))
+    const keyword = lastKeyword?.parts.match(/\[KEYWORD:(.+?)\]/)?.[1] ?? "đồ ăn"
+    const cardResponse = await buildShopCards(keyword)
+    if (cardResponse && cardResponse.elements.length > 0) {
+      await setState(senderId, "ordering")
+      await saveMessage(senderId, "model", `[Card gợi ý quán: ${keyword}]`)
+      return cardResponse
+    }
+    await setState(senderId, "ordering")
+    const noShopMsg = `😔 Mình chưa tìm thấy quán nào đang mở gần "${text}" có món bạn cần.\nBạn muốn thử món/quán khác không?`
+    await saveMessage(senderId, "model", noShopMsg)
+    return { type: "text", content: noShopMsg }
+  }
+
+  // Detect dịch vụ và check availability — chỉ khi chưa vào flow
   if (!isOrdering) {
-    const keyword = extractFoodKeyword(text)
-    if (keyword) {
-      const cardResponse = await buildShopCards(keyword)
-      if (cardResponse) {
+    const service = detectServiceType(text)
+    if (service) {
+      const status = await checkServiceAvailable(service)
+      if (!status.available) {
         await saveMessage(senderId, "user", text)
-        await saveMessage(senderId, "model", `[Card gợi ý quán: ${keyword}]`)
-        // Chuyển sang ordering sau khi show card
-        await setState(senderId, "ordering")
-        return cardResponse
+        const msg = status.customerMsg ?? "Dịch vụ này tạm thời chưa hoạt động bạn ơi 😔"
+        await saveMessage(senderId, "model", msg)
+        return { type: "text", content: msg }
       }
+
+      // Dịch vụ OK — đồ ăn thì hỏi địa chỉ để tìm quán
+      if (service === "food") {
+        await saveMessage(senderId, "user", text)
+        // Tìm keyword từ message
+        const kw = text.toLowerCase().match(/(cơm|bún|phở|bánh|gà|bò|heo|cá|mì|xôi|pizza|cháo|lẩu|nướng|đồ ăn|ăn)/)?.[0] ?? "đồ ăn"
+        await setState(senderId, "awaiting_shop_address")
+        const askMsg = `✅ Dịch vụ ${SERVICE_LABEL[service]} đang hoạt động!\n\n📍 Bạn cho mình biết địa chỉ hoặc khu vực của bạn để mình tìm quán gần nhất nhé!`
+        await saveMessage(senderId, "model", `[KEYWORD:${kw}]${askMsg}`)
+        return { type: "text", content: askMsg }
+      }
+
+      // Xe ôm / Taxi / Mua hộ / Giao hộ → vào ordering flow luôn
+      await setState(senderId, "ordering")
     }
   }
   if (state === "awaiting_address") {

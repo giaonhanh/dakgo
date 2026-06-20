@@ -25,6 +25,8 @@ export interface CardResponse {
   type: "cards"
   intro: string
   elements: FBCard[]
+  totalOpen?: number
+  page?: number
 }
 
 export interface TextResponse {
@@ -34,8 +36,9 @@ export interface TextResponse {
 
 export type BotResponse = CardResponse | TextResponse
 
-export async function buildShopCards(keyword: string): Promise<CardResponse | null> {
+export async function buildShopCards(keyword: string, page = 0): Promise<CardResponse | null> {
   const supabase = createClient()
+  const PAGE_SIZE = 2  // mỗi lần show 2 quán
 
   // Tìm quán đang mở có sản phẩm khớp keyword
   const { data: products } = await supabase
@@ -44,7 +47,7 @@ export async function buildShopCards(keyword: string): Promise<CardResponse | nu
     .ilike("name", `%${keyword}%`)
     .eq("is_available", true)
     .order("sold_count", { ascending: false })
-    .limit(30)
+    .limit(50)
 
   if (!products || products.length === 0) return null
 
@@ -55,8 +58,8 @@ export async function buildShopCards(keyword: string): Promise<CardResponse | nu
     .select("id, name, cover_image_url, logo_url, is_open, category")
     .in("id", shopIds)
     .eq("status", "approved")
-    .order("is_open", { ascending: false }) // mở trước, đóng sau
-    .limit(5)
+    .eq("is_open", true)  // chỉ lấy quán đang mở
+    .limit(20)
 
   if (!shops || shops.length === 0) return null
 
@@ -88,9 +91,31 @@ export async function buildShopCards(keyword: string): Promise<CardResponse | nu
   })
 
   const openCount = shops.filter(s => s.is_open).length
-  const intro = openCount > 0
-    ? `🍽️ Mình tìm được ${openCount} quán đang mở có "${keyword}" bạn nhé!`
-    : `😔 Hiện các quán có "${keyword}" đang đóng cửa. Bạn xem thử menu để đặt trước nhé!`
+  if (elements.length === 0) {
+    return {
+      type: "cards",
+      intro: `😔 Hiện tất cả quán có "${keyword}" đang đóng cửa rồi bạn ơi.\nBạn muốn đặt trước cho lần sau không?`,
+      elements: [],
+    }
+  }
 
-  return { type: "cards", intro, elements }
+  // Phân trang: mỗi lần show PAGE_SIZE quán
+  const paged = elements.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const totalOpen = elements.length
+  const hasMore = (page + 1) * PAGE_SIZE < totalOpen
+
+  let intro = ""
+  if (page === 0) {
+    intro = totalOpen === 1
+      ? `🍽️ Mình tìm được 1 quán đang mở có "${keyword}" bạn nhé!`
+      : `🍽️ Mình tìm được ${totalOpen} quán đang mở có "${keyword}"!\nĐây là ${paged.length} quán gần nhất:`
+  } else {
+    intro = `📋 Thêm ${paged.length} quán nữa bạn nhé:`
+  }
+
+  if (hasMore) {
+    intro += `\n\n💬 Nhắn "xem thêm" để mình gợi ý thêm quán khác!`
+  }
+
+  return { type: "cards", intro, elements: paged, totalOpen, page }
 }
