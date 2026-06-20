@@ -3,7 +3,7 @@
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
 
 export function ShareButtons({ shopName, slug }: { shopName: string; slug: string }) {
-  const shareUrl  = `${APP_URL}/s/${slug}?v=1`
+  const shareUrl  = `${APP_URL}/s/${slug}`
   const shareText = `Đặt hàng từ ${shopName} trên DakGo 🛵`
 
   const copyLink = async () => {

@@ -382,7 +382,7 @@ export default function MerchantProfilePage() {
                 <span style={{ color:"#b0956a" }}>www.dakgo.com/s/</span>
                 <span style={{ color:"#FF8C00",fontWeight:600 }}>{slug || toSlug(name) || "tencuahang"}</span>
               </div>
-              <button onClick={async () => { await navigator.clipboard.writeText(`https://www.dakgo.com/s/${slug||toSlug(name)}?v=1`); setSlugCopied(true); setTimeout(()=>setSlugCopied(false),2000) }}
+              <button onClick={async () => { await navigator.clipboard.writeText(`https://www.dakgo.com/s/${slug||toSlug(name)}`); setSlugCopied(true); setTimeout(()=>setSlugCopied(false),2000) }}
                 style={{ padding:"4px 10px",borderRadius:7,border:"none",background:slugCopied?"rgba(62,207,110,0.12)":"rgba(255,255,255,0.06)",color:slugCopied?"#3ecf6e":"#6a5a40",fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:"Lexend" }}>
                 {slugCopied?"✓ Đã copy":"📋 Copy"}
               </button>
