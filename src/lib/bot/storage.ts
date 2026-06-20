@@ -38,8 +38,7 @@ export async function getShopContext(): Promise<string> {
     .from("shops")
     .select("id, name, category, is_open, address")
     .eq("status", "approved")
-    .eq("is_open", true)
-    .limit(20)
+    .limit(30)
 
   if (!shops || shops.length === 0) return ""
 
@@ -50,17 +49,32 @@ export async function getShopContext(): Promise<string> {
     .in("shop_id", shopIds)
     .eq("is_available", true)
     .order("sold_count", { ascending: false })
-    .limit(60)
+    .limit(80)
 
-  const lines: string[] = ["QUÁN ĐANG MỞ:"]
-  for (const shop of shops) {
-    const items = (products ?? [])
-      .filter(p => p.shop_id === shop.id)
-      .slice(0, 5)
-      .map(p => `${p.name} ${(p.price / 1000).toFixed(0)}k`)
-      .join(", ")
-    lines.push(`- ${shop.name} (${shop.category}): ${items || "xem menu tại quán"}`)
+  const open = shops.filter(s => s.is_open)
+  const closed = shops.filter(s => !s.is_open)
+
+  const lines: string[] = []
+
+  if (open.length > 0) {
+    lines.push("QUÁN ĐANG MỞ:")
+    for (const shop of open) {
+      const items = (products ?? [])
+        .filter(p => p.shop_id === shop.id)
+        .slice(0, 5)
+        .map(p => `${p.name} ${(p.price / 1000).toFixed(0)}k`)
+        .join(", ")
+      lines.push(`- ${shop.name} (${shop.category}): ${items || "xem menu tại quán"}`)
+    }
   }
+
+  if (closed.length > 0) {
+    lines.push("QUÁN ĐANG ĐÓNG CỬA (thông báo cho khách biết, không nhận đơn):")
+    for (const shop of closed) {
+      lines.push(`- ${shop.name} (${shop.category})`)
+    }
+  }
+
   return lines.join("\n")
 }
 
