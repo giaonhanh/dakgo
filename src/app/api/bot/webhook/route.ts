@@ -1,9 +1,9 @@
-import { processMessage } from "@/lib/bot/processor"
+import { processMessage, processLocation, handleLocationRefused } from "@/lib/bot/processor"
+import { getState } from "@/lib/bot/storage"
 
-const FB_PAGE_TOKEN  = process.env.FB_PAGE_ACCESS_TOKEN!
+const FB_PAGE_TOKEN   = process.env.FB_PAGE_ACCESS_TOKEN!
 const FB_VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN!
 
-// Gửi tin nhắn về Facebook Messenger
 async function sendFbMessage(recipientId: string, text: string) {
   await fetch("https://graph.facebook.com/v21.0/me/messages", {
     method: "POST",
@@ -19,7 +19,6 @@ async function sendFbMessage(recipientId: string, text: string) {
   })
 }
 
-// Facebook verify webhook
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const mode      = searchParams.get("hub.mode")
@@ -32,17 +31,10 @@ export async function GET(req: Request) {
   return new Response("Forbidden", { status: 403 })
 }
 
-// Nhận tin nhắn từ Facebook
 export async function POST(req: Request) {
   const body = await req.json()
-
-  if (body.object !== "page") {
-    return Response.json({ ok: false }, { status: 404 })
-  }
-
-  // Await trước khi trả response — Vercel kill function ngay khi return
+  if (body.object !== "page") return Response.json({ ok: false }, { status: 404 })
   await handleEvents(body)
-
   return Response.json({ ok: true })
 }
 
@@ -54,14 +46,43 @@ async function handleEvents(body: Record<string, unknown>) {
 
     for (const event of messaging) {
       const senderId = (event.sender as { id: string })?.id
-      const message  = event.message as { text?: string; is_echo?: boolean } | undefined
+      if (!senderId) continue
 
-      // Bỏ qua echo (tin do page tự gửi) và tin không có text
-      if (!senderId || !message?.text || message.is_echo) continue
+      const message = event.message as {
+        text?: string
+        is_echo?: boolean
+        attachments?: Array<{
+          type: string
+          payload: { coordinates?: { lat: number; long: number } }
+        }>
+      } | undefined
+
+      if (!message || message.is_echo) continue
 
       try {
-        const reply = await processMessage(senderId, message.text.trim())
+        // Khách share vị trí
+        const locationAttachment = message.attachments?.find(a => a.type === "location")
+        if (locationAttachment?.payload?.coordinates) {
+          const { lat, long: lng } = locationAttachment.payload.coordinates
+          const reply = await processLocation(senderId, lat, lng)
+          await sendFbMessage(senderId, reply)
+          continue
+        }
+
+        // Khách gửi text
+        if (!message.text) continue
+        const text = message.text.trim()
+
+        // Nếu đang chờ share vị trí mà khách gửi text → bước B
+        const state = await getState(senderId)
+        if (state === "awaiting_location") {
+          const reply = await handleLocationRefused(senderId)
+          if (reply) { await sendFbMessage(senderId, reply); continue }
+        }
+
+        const reply = await processMessage(senderId, text)
         await sendFbMessage(senderId, reply)
+
       } catch (err) {
         console.error("[bot/webhook] error:", err)
         await sendFbMessage(
