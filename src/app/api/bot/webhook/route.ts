@@ -88,6 +88,10 @@ async function sendBotResponse(recipientId: string, response: BotResponse | stri
     await sendCards(recipientId, response.elements, response.intro)
   } else if (response.type === "webview_button") {
     await sendWebviewButton(recipientId, response.text, response.buttonTitle, response.url)
+  } else if (response.type === "text_with_webview") {
+    // Gửi text trước, rồi gửi nút webview ngay sau
+    await sendText(recipientId, response.content)
+    await sendWebviewButton(recipientId, "", response.buttonTitle, response.url)
   } else {
     await sendText(recipientId, response.content)
   }

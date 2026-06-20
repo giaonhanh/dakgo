@@ -7,7 +7,7 @@ import {
 } from "./storage"
 import { getPricing, calcFee, haversineKm } from "./pricing"
 import { detectServiceType, checkServiceAvailable, SERVICE_LABEL, type ServiceKey } from "./service-check"
-import { buildShopCards, type BotResponse } from "./cards"
+import { buildShopCards, type BotResponse, type TextWithWebviewResponse } from "./cards"
 
 const RATE_LIMIT_PER_MIN = 5
 const rateLimitMap = new Map<string, number[]>()
@@ -216,17 +216,20 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
   await saveMessage(senderId, "user", text)
   await saveMessage(senderId, "model", reply)
 
-  // Sau khi xác nhận đơn → yêu cầu share vị trí (bước A)
+  // Khi Groq hỏi địa chỉ giao hàng → tự động gửi thêm nút webview xác định vị trí
+  const asksForAddress = /địa chỉ giao|giao (đến|tới|hàng)|nhận hàng ở|giao đến đâu|địa chỉ (nhận|của bạn)/i.test(reply)
   const hasLocation = await getLocation(senderId)
-  const isConfirmStep = reply.includes("Đúng chưa bạn") || reply.includes("tổng kết đơn")
-  if (!hasLocation && isConfirmStep && state === "idle") {
-    await setState(senderId, "awaiting_location")
-    const locationMsg =
-      `\n\n📍 Để tính phí ship chính xác, bạn chia sẻ vị trí nhé!\n` +
-      `👉 Nhấn **(+)** → chọn **Vị trí** → **Gửi vị trí hiện tại**`
-    const fullReply = reply + locationMsg
-    await saveMessage(senderId, "model", locationMsg)
-    return { type: "text", content: fullReply }
+
+  if (asksForAddress && !hasLocation) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
+    const webviewUrl = `${appUrl}/bot-location?sid=${senderId}&kw=đồ ăn`
+    const response: TextWithWebviewResponse = {
+      type: "text_with_webview",
+      content: reply,
+      buttonTitle: "📍 Xác định vị trí để tính phí ship",
+      url: webviewUrl,
+    }
+    return response
   }
 
   return { type: "text", content: reply }
