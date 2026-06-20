@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import Image from "next/image"
 import type { Metadata } from "next"
 import { ShareButtons } from "./ShareButtons"
+import { ClientRedirect } from "./ClientRedirect"
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
 
@@ -86,11 +87,9 @@ export default async function ShopSlugPage({ params }: Props) {
 
   if (!shop) redirect("/")
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user) redirect(`/shop/${shop.id}`)
-
   return (
     <div style={{ minHeight: "100vh", background: "#080806", color: "#f8f0e0", fontFamily: "sans-serif" }}>
+      <ClientRedirect shopId={shop.id} />
       {/* Hero ảnh bìa */}
       <div style={{ position: "relative", height: 220, background: "#151210" }}>
         {shop.cover_image_url
