@@ -8,14 +8,15 @@ function createClient() {
   )
 }
 
-// Lọc bỏ các dòng metadata (__STATE__, __LOC__) trước khi gửi cho Groq
-export async function getConversation(senderId: string, limit = 10): Promise<ChatMessage[]> {
+// Lọc bỏ metadata (__STATE__, __LOC__, [KEYWORD:...], [Card...]) trước khi gửi cho Groq
+export async function getConversation(senderId: string, limit = 20): Promise<ChatMessage[]> {
   const supabase = createClient()
   const { data } = await supabase
     .from("bot_conversations")
     .select("role, content")
     .eq("sender_id", senderId)
     .not("content", "like", "__%")
+    .not("content", "like", "[%")
     .order("created_at", { ascending: false })
     .limit(limit)
 
@@ -35,6 +36,28 @@ export async function saveMessage(
 // ─── State machine (A→B→C location flow) ────────────────────────────────────
 
 export type LocationState = "idle" | "ordering" | "awaiting_shop_address" | "awaiting_location" | "awaiting_address" | "done"
+
+export async function saveKeyword(senderId: string, keyword: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from("bot_conversations").insert({
+    sender_id: senderId, role: "model", content: `__KEYWORD__:${keyword}`,
+  })
+}
+
+export async function getKeyword(senderId: string): Promise<string> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from("bot_conversations")
+    .select("content")
+    .eq("sender_id", senderId)
+    .like("content", "__KEYWORD__%")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single()
+
+  if (!data) return "đồ ăn"
+  return data.content.replace("__KEYWORD__:", "").trim() || "đồ ăn"
+}
 
 export async function getState(senderId: string): Promise<LocationState> {
   const supabase = createClient()

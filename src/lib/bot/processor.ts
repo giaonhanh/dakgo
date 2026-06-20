@@ -3,6 +3,7 @@ import { askGemini } from "./gemini"
 import {
   getConversation, saveMessage, logBlocked, getShopContext,
   getState, setState, saveLocation, getLocation,
+  saveKeyword, getKeyword,
 } from "./storage"
 import { getPricing, calcFee, haversineKm } from "./pricing"
 import { detectServiceType, checkServiceAvailable, SERVICE_LABEL, type ServiceKey } from "./service-check"
@@ -98,27 +99,41 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
     return { type: "text", content: "Bạn nhắn nhanh quá mình theo không kịp rồi 😄 Cho mình xíu nhé!" }
   }
 
-  const guardResult = guard(text)
-  if (guardResult.pass === false) {
-    await logBlocked(senderId, text, guardResult.reason)
-    return { type: "text", content: guardResult.reply }
-  }
-
-  // State hiện tại
+  // State phải lấy TRƯỚC guard để không chặn địa chỉ/SĐT khi đang đặt đơn
   const state = await getState(senderId)
   const isOrdering = ["ordering","awaiting_location","awaiting_address","awaiting_shop_address"].includes(state)
 
+  const guardResult = guard(text)
+  if (guardResult.pass === false) {
+    // Trong flow đặt hàng → chỉ chặn competitor, bỏ qua off_topic/unrelated
+    if (isOrdering && guardResult.reason !== "competitor") {
+      // Cho qua để Groq xử lý tự nhiên (địa chỉ, SĐT, ghi chú...)
+    } else {
+      await logBlocked(senderId, text, guardResult.reason)
+      return { type: "text", content: guardResult.reply }
+    }
+  }
+
   // Khách nhắn "xem thêm" quán
   if (state === "ordering" && /(xem thêm|thêm quán|quán khác|có quán nào khác)/i.test(text)) {
-    const history = await getConversation(senderId, 10)
-    const lastCard = history.findLast(h => h.parts.includes("[Card gợi ý quán:"))
-    const keyword = lastCard?.parts.match(/\[Card gợi ý quán: (.+?)\]/)?.[1] ?? "đồ ăn"
-    const pageMatch = lastCard?.parts.match(/\[Page:(\d+)\]/)
-    const nextPage = pageMatch ? parseInt(pageMatch[1]) + 1 : 1
+    const keyword = await getKeyword(senderId)
+    // Lấy page hiện tại từ __PAGE__ metadata
+    const supabase = (await import("@supabase/supabase-js")).createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    const { data: pageData } = await supabase
+      .from("bot_conversations").select("content")
+      .eq("sender_id", senderId).like("content", "__PAGE__%")
+      .order("created_at", { ascending: false }).limit(1).single()
+    const currentPage = pageData ? parseInt(pageData.content.replace("__PAGE__:", "")) : 0
+    const nextPage = currentPage + 1
+
     const cardResponse = await buildShopCards(keyword, nextPage)
     if (cardResponse && cardResponse.elements.length > 0) {
       await saveMessage(senderId, "user", text)
-      await saveMessage(senderId, "model", `[Card gợi ý quán: ${keyword}][Page:${nextPage}]`)
+      await supabase.from("bot_conversations").insert({
+        sender_id: senderId, role: "model", content: `__PAGE__:${nextPage}`
+      })
       return cardResponse
     }
     const noMore = "Mình đã gợi ý hết các quán đang mở rồi bạn ơi 😊\nBạn muốn chọn quán nào ở trên không?"
@@ -129,18 +144,14 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
   // Khách vừa cung cấp địa chỉ để tìm quán gần
   if (state === "awaiting_shop_address") {
     await saveMessage(senderId, "user", text)
-    // Lấy keyword từ conversation gần nhất
-    const history = await getConversation(senderId, 5)
-    const lastKeyword = history.findLast(h => h.role === "model" && h.parts.includes("[KEYWORD:"))
-    const keyword = lastKeyword?.parts.match(/\[KEYWORD:(.+?)\]/)?.[1] ?? "đồ ăn"
-    const cardResponse = await buildShopCards(keyword)
+    const keyword = await getKeyword(senderId)
+    const cardResponse = await buildShopCards(keyword, 0)
     if (cardResponse && cardResponse.elements.length > 0) {
       await setState(senderId, "ordering")
-      await saveMessage(senderId, "model", `[Card gợi ý quán: ${keyword}]`)
       return cardResponse
     }
     await setState(senderId, "ordering")
-    const noShopMsg = `😔 Mình chưa tìm thấy quán nào đang mở gần "${text}" có món bạn cần.\nBạn muốn thử món/quán khác không?`
+    const noShopMsg = `😔 Mình chưa tìm thấy quán nào đang mở có "${keyword}" bạn ơi.\nBạn muốn thử món/quán khác không?`
     await saveMessage(senderId, "model", noShopMsg)
     return { type: "text", content: noShopMsg }
   }
@@ -160,11 +171,12 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
       // Dịch vụ OK — đồ ăn thì gửi nút webview xác định vị trí
       if (service === "food") {
         await saveMessage(senderId, "user", text)
-        const kw = text.toLowerCase().match(/(cơm|bún|phở|bánh|gà|bò|heo|cá|mì|xôi|pizza|cháo|lẩu|nướng|đồ ăn|ăn)/)?.[0] ?? "đồ ăn"
+        const kw = text.toLowerCase().match(/(cơm|bún|phở|bánh|gà|bò|heo|cá|mì|xôi|pizza|cháo|lẩu|nướng|đồ ăn|ăn|trà sữa|nước|đồ uống)/)?.[0] ?? "đồ ăn"
         await setState(senderId, "awaiting_shop_address")
-        const webviewUrl = `https://www.dakgo.com/bot-location?sid=${senderId}&kw=${encodeURIComponent(kw)}`
+        await saveKeyword(senderId, kw)
+        const webviewUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"}/bot-location?sid=${senderId}&kw=${encodeURIComponent(kw)}`
         const introMsg = `✅ Dịch vụ ${SERVICE_LABEL[service]} đang hoạt động!\n\n📍 Bấm nút bên dưới để mình xác định vị trí và tìm quán gần bạn nhất nhé!`
-        await saveMessage(senderId, "model", `[KEYWORD:${kw}]${introMsg}`)
+        await saveMessage(senderId, "model", introMsg)
         return {
           type: "webview_button",
           text: introMsg,
