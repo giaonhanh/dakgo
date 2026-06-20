@@ -1,6 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import Groq from "groq-sdk"
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 const SYSTEM_PROMPT = `Bạn là Nhân viên CSKH DakGo. Xưng "mình", gọi khách "bạn". KHÔNG nhận là AI/robot. Nếu hỏi "bạn là AI?" → "Mình là nhân viên CSKH DakGo bạn nhé 😊"
 
@@ -31,26 +31,31 @@ export async function askGemini(
   history: ChatMessage[],
   userMessage: string,
 ): Promise<string> {
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash-lite",
-    systemInstruction: SYSTEM_PROMPT,
-  })
-
-  const chat = model.startChat({
-    history: history.map(h => ({
-      role: h.role,
-      parts: [{ text: h.parts }],
-    })),
-  })
-
   try {
-    const result = await chat.sendMessage(userMessage)
-    return result.response.text()
+    const messages: Groq.Chat.ChatCompletionMessageParam[] = [
+      ...history.map(h => ({
+        role: (h.role === "model" ? "assistant" : "user") as "user" | "assistant",
+        content: h.parts,
+      })),
+      { role: "user", content: userMessage },
+    ]
+
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...messages,
+      ],
+      max_tokens: 512,
+      temperature: 0.7,
+    })
+
+    return completion.choices[0]?.message?.content ?? "Bạn nhắn lại giúp mình nhé! 🙏"
   } catch (err) {
     const status = (err as { status?: number }).status
-    console.error(`[gemini] error:`, status)
+    console.error("[groq] error:", status)
     if (status === 429) {
-      return "Mình đang xử lý nhiều đơn quá 😅 Bạn nhắn lại sau 1 phút nhé!"
+      return "Mình đang bận xíu 😅 Bạn nhắn lại sau 1 phút nhé!"
     }
     return "Xin lỗi bạn, mình gặp chút sự cố 🙏 Bạn thử lại sau nhé!"
   }
