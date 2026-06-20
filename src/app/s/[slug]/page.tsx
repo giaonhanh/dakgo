@@ -24,11 +24,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const image = shop.cover_image_url ?? shop.logo_url ?? `${APP_URL}/icon-512.png`
 
   // Title ngắn gọn — không lặp lại trong description
-  const ogTitle = `${shop.name} — DakGo Phước An`
+  const ogTitle = `${shop.name} — DakGo Krông Pắc`
 
   // Description: dùng mô tả của quán nếu có, không thì dùng thông tin hữu ích
   const desc = shop.description?.trim()
-    || `${shop.category ? `${shop.category} · ` : ""}Giao hàng nhanh tại Phước An, Krông Pắc. Đặt hàng online, nhận tại nhà!`
+    || `${shop.category ? `${shop.category} · ` : ""}Giao hàng nhanh tại xã Krông Pắc, tỉnh Đắk Lắk. Đặt hàng online, nhận tại nhà!`
 
   return {
     title: ogTitle,
@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: ogTitle,
       description: desc,
       url: `${APP_URL}/s/${slug}`,
-      siteName: "DakGo — Giao Nhanh Phước An",
+      siteName: "DakGo — Giao Nhanh Krông Pắc",
       images: [{ url: image, width: 1200, height: 630, alt: shop.name }],
       type: "website",
       locale: "vi_VN",
