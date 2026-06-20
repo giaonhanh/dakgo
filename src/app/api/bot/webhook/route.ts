@@ -55,6 +55,30 @@ async function fbPost(body: unknown) {
   }
 }
 
+async function sendWebviewButton(recipientId: string, text: string, buttonTitle: string, url: string) {
+  if (text) await sendText(recipientId, text)
+  await fbPost({
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "button",
+          text: "👇 Nhấn nút bên dưới để xác định vị trí:",
+          buttons: [{
+            type: "web_url",
+            url,
+            title: buttonTitle,
+            webview_height_ratio: "compact",
+            messenger_extensions: false,
+          }],
+        },
+      },
+    },
+    messaging_type: "RESPONSE",
+  })
+}
+
 async function sendBotResponse(recipientId: string, response: BotResponse | string) {
   if (typeof response === "string") {
     await sendText(recipientId, response)
@@ -62,6 +86,8 @@ async function sendBotResponse(recipientId: string, response: BotResponse | stri
   }
   if (response.type === "cards") {
     await sendCards(recipientId, response.elements, response.intro)
+  } else if (response.type === "webview_button") {
+    await sendWebviewButton(recipientId, response.text, response.buttonTitle, response.url)
   } else {
     await sendText(recipientId, response.content)
   }

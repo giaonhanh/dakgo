@@ -157,15 +157,20 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
         return { type: "text", content: msg }
       }
 
-      // Dịch vụ OK — đồ ăn thì hỏi địa chỉ để tìm quán
+      // Dịch vụ OK — đồ ăn thì gửi nút webview xác định vị trí
       if (service === "food") {
         await saveMessage(senderId, "user", text)
-        // Tìm keyword từ message
         const kw = text.toLowerCase().match(/(cơm|bún|phở|bánh|gà|bò|heo|cá|mì|xôi|pizza|cháo|lẩu|nướng|đồ ăn|ăn)/)?.[0] ?? "đồ ăn"
         await setState(senderId, "awaiting_shop_address")
-        const askMsg = `✅ Dịch vụ ${SERVICE_LABEL[service]} đang hoạt động!\n\n📍 Bạn cho mình biết địa chỉ hoặc khu vực của bạn để mình tìm quán gần nhất nhé!`
-        await saveMessage(senderId, "model", `[KEYWORD:${kw}]${askMsg}`)
-        return { type: "text", content: askMsg }
+        const webviewUrl = `https://www.dakgo.com/bot-location?sid=${senderId}&kw=${encodeURIComponent(kw)}`
+        const introMsg = `✅ Dịch vụ ${SERVICE_LABEL[service]} đang hoạt động!\n\n📍 Bấm nút bên dưới để mình xác định vị trí và tìm quán gần bạn nhất nhé!`
+        await saveMessage(senderId, "model", `[KEYWORD:${kw}]${introMsg}`)
+        return {
+          type: "webview_button",
+          text: introMsg,
+          buttonTitle: "📍 Xác định vị trí",
+          url: webviewUrl,
+        } as unknown as BotResponse
       }
 
       // Xe ôm / Taxi / Mua hộ / Giao hộ → vào ordering flow luôn

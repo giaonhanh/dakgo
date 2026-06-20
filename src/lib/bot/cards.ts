@@ -34,7 +34,14 @@ export interface TextResponse {
   content: string
 }
 
-export type BotResponse = CardResponse | TextResponse
+export interface WebviewButtonResponse {
+  type: "webview_button"
+  text: string
+  buttonTitle: string
+  url: string
+}
+
+export type BotResponse = CardResponse | TextResponse | WebviewButtonResponse
 
 export async function buildShopCards(keyword: string, page = 0): Promise<CardResponse | null> {
   const supabase = createClient()
