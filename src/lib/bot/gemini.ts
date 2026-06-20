@@ -43,19 +43,15 @@ export async function askGemini(
     })),
   })
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const result = await chat.sendMessage(userMessage)
-      return result.response.text()
-    } catch (err) {
-      const status = (err as { status?: number }).status
-      console.error(`[gemini] attempt ${attempt} error:`, status)
-      if (status === 429 && attempt < 3) {
-        await new Promise(r => setTimeout(r, attempt * 2000))
-        continue
-      }
-      break
+  try {
+    const result = await chat.sendMessage(userMessage)
+    return result.response.text()
+  } catch (err) {
+    const status = (err as { status?: number }).status
+    console.error(`[gemini] error:`, status)
+    if (status === 429) {
+      return "Mình đang xử lý nhiều đơn quá 😅 Bạn nhắn lại sau 1 phút nhé!"
     }
+    return "Xin lỗi bạn, mình gặp chút sự cố 🙏 Bạn thử lại sau nhé!"
   }
-  return "Xin lỗi bạn, mình đang bận xử lý đơn 😅 Bạn nhắn lại sau vài giây nhé!"
 }
