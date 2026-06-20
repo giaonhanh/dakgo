@@ -192,6 +192,7 @@ function LoginContent() {
     if (errParam === "suspended")    setError("Tài khoản của bạn đã bị tạm khóa. Liên hệ hỗ trợ.")
     if (errParam === "oauth_failed") setError("Đăng nhập mạng xã hội thất bại. Thử lại sau.")
     if (errParam?.startsWith("zalo")) setError("Đăng nhập Zalo thất bại. Thử lại hoặc dùng số điện thoại.")
+    if (params.get("mode") === "register") setTab("register")
     const t = setTimeout(() => setPhase("auth"), 3000)
     return () => {
       clearTimeout(t)
