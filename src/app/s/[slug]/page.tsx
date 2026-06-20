@@ -8,47 +8,28 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
 
 interface Props { params: Promise<{ slug: string }> }
 
-// OG meta tags — hiển thị đẹp khi share lên Zalo/FB/Messenger
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const supabase  = await createClient()
-  // Không filter status — quán pending/suspended vẫn cần hiện OG khi share
   const { data: shop } = await supabase
     .from("shops")
     .select("name, description, cover_image_url, logo_url, category")
     .eq("slug", slug)
+    .eq("status", "approved")
     .single()
 
-  const fallbackOG: Metadata = {
-    title: "DakGo Krông Pắc",
-    description: "Đặt đồ ăn/xe ôm/taxi online tại xã Krông Pắc, tỉnh Đắk Lắk!",
-    openGraph: {
-      title: "DakGo Krông Pắc",
-      description: "Đặt đồ ăn/xe ôm/taxi online tại xã Krông Pắc, tỉnh Đắk Lắk!",
-      url: APP_URL,
-      siteName: "DakGo — Giao Nhanh Krông Pắc",
-      images: [{ url: `${APP_URL}/icon-512.png`, width: 512, height: 512, alt: "DakGo" }],
-      type: "website",
-      locale: "vi_VN",
-    },
-  }
-
-  if (!shop) return fallbackOG
+  if (!shop) return { title: "DakGo" }
 
   const image = shop.cover_image_url ?? shop.logo_url ?? `${APP_URL}/icon-512.png`
-
-  // Title ngắn gọn — không lặp lại trong description
-  const ogTitle = `${shop.name} — DakGo Krông Pắc`
-
-  // Description: dùng mô tả của quán nếu có, không thì dùng thông tin hữu ích
-  const desc = shop.description?.trim()
+  const title = `${shop.name} 🛵 Đặt hàng trên DakGo`
+  const desc  = shop.description?.trim()
     || "Đặt đồ ăn/xe ôm/taxi online tại xã Krông Pắc, tỉnh Đắk Lắk!"
 
   return {
-    title: ogTitle,
+    title,
     description: desc,
     openGraph: {
-      title: ogTitle,
+      title,
       description: desc,
       url: `${APP_URL}/s/${slug}`,
       siteName: "DakGo — Giao Nhanh Krông Pắc",
@@ -58,7 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: ogTitle,
+      title,
       description: desc,
       images: [image],
     },
@@ -69,7 +50,6 @@ export default async function ShopSlugPage({ params }: Props) {
   const { slug } = await params
   const supabase  = await createClient()
 
-  // Tìm quán theo slug
   const { data: shop } = await supabase
     .from("shops")
     .select("id, name, description, cover_image_url, logo_url, category, is_open, rating_avg, address")
@@ -79,31 +59,18 @@ export default async function ShopSlugPage({ params }: Props) {
 
   if (!shop) redirect("/")
 
-  // Kiểm tra đã đăng nhập chưa
   const { data: { user } } = await supabase.auth.getUser()
-
-  // Đã login → vào thẳng shop
   if (user) redirect(`/shop/${shop.id}`)
 
-  // Chưa login → hiển thị preview + nút đăng nhập/đăng ký
   return (
-    <div style={{
-      minHeight: "100vh", background: "#080806", color: "#f8f0e0",
-      fontFamily: "sans-serif",
-    }}>
+    <div style={{ minHeight: "100vh", background: "#080806", color: "#f8f0e0", fontFamily: "sans-serif" }}>
       {/* Hero ảnh bìa */}
       <div style={{ position: "relative", height: 220, background: "#151210" }}>
         {shop.cover_image_url
           ? <Image src={shop.cover_image_url} alt={shop.name} fill style={{ objectFit: "cover", opacity: 0.7 }} />
           : <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg,#1a0d00,#2d1500)" }} />
         }
-        {/* Gradient overlay */}
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "linear-gradient(to bottom, transparent 40%, #080806 100%)",
-        }} />
-
-        {/* Logo */}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 40%, #080806 100%)" }} />
         <div style={{
           position: "absolute", bottom: -28, left: 20,
           width: 56, height: 56, borderRadius: 14,
@@ -117,7 +84,6 @@ export default async function ShopSlugPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Info */}
       <div style={{ padding: "40px 20px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: "#f8f0e0" }}>{shop.name}</h1>
@@ -135,41 +101,30 @@ export default async function ShopSlugPage({ params }: Props) {
           <span>📍 {shop.address}</span>
         </div>
 
-        {/* CTA */}
-        <div style={{
-          background: "rgba(255,107,0,0.07)", border: "1px solid rgba(255,107,0,0.2)",
-          borderRadius: 16, padding: 20, textAlign: "center",
-        }}>
+        <div style={{ background: "rgba(255,107,0,0.07)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 16, padding: 20, textAlign: "center" }}>
           <p style={{ color: "#b0956a", fontSize: 14, margin: "0 0 16px", lineHeight: 1.5 }}>
             Đăng nhập để xem menu và đặt hàng từ <b style={{ color: "#FF8C00" }}>{shop.name}</b>
           </p>
-          <a
-            href={`/login?redirect=/shop/${shop.id}`}
-            style={{
-              display: "block", width: "100%", boxSizing: "border-box",
-              padding: "14px 0", borderRadius: 14, textDecoration: "none",
-              background: "linear-gradient(to right, #FF6B00, #FF8C00)",
-              color: "#fff", fontWeight: 700, fontSize: 15,
-              boxShadow: "0 4px 20px rgba(255,107,0,0.4)",
-            }}
-          >
+          <a href={`/login?redirect=/shop/${shop.id}`} style={{
+            display: "block", width: "100%", boxSizing: "border-box",
+            padding: "14px 0", borderRadius: 14, textDecoration: "none",
+            background: "linear-gradient(to right, #FF6B00, #FF8C00)",
+            color: "#fff", fontWeight: 700, fontSize: 15,
+            boxShadow: "0 4px 20px rgba(255,107,0,0.4)",
+          }}>
             🛵 Đặt hàng ngay
           </a>
-          <a
-            href={`/login?mode=register&redirect=/shop/${shop.id}`}
-            style={{
-              display: "block", marginTop: 10, padding: "12px 0",
-              borderRadius: 14, textDecoration: "none",
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              color: "#b0956a", fontWeight: 600, fontSize: 14,
-            }}
-          >
+          <a href={`/login?mode=register&redirect=/shop/${shop.id}`} style={{
+            display: "block", marginTop: 10, padding: "12px 0",
+            borderRadius: 14, textDecoration: "none",
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            color: "#b0956a", fontWeight: 600, fontSize: 14,
+          }}>
             Chưa có tài khoản? Đăng ký miễn phí
           </a>
         </div>
 
-        {/* Nút chia sẻ */}
         <ShareButtons shopName={shop.name} slug={slug} />
       </div>
     </div>
