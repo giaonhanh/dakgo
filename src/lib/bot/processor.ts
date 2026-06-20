@@ -298,18 +298,17 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
   await saveMessage(senderId, "user", text)
   await saveMessage(senderId, "model", reply)
 
-  // Khi Groq hỏi địa chỉ giao hàng → tự động gửi thêm nút webview xác định vị trí
+  // Khi Groq hỏi địa chỉ giao hàng → gửi thêm nút mở trang chọn địa chỉ
   const asksForAddress = /địa chỉ giao|giao (đến|tới|hàng)|nhận hàng ở|giao đến đâu|địa chỉ (nhận|của bạn)/i.test(reply)
-  const hasLocation = await getLocation(senderId)
 
-  if (asksForAddress && !hasLocation) {
+  if (asksForAddress) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
-    const webviewUrl = `${appUrl}/bot-location?sid=${senderId}&kw=đồ ăn`
+    const addressUrl = `${appUrl}/bot-address?sid=${senderId}`
     const response: TextWithWebviewResponse = {
       type: "text_with_webview",
       content: reply,
-      buttonTitle: "📍 Xác định vị trí để tính phí ship",
-      url: webviewUrl,
+      buttonTitle: "📍 Chọn địa chỉ giao hàng",
+      url: addressUrl,
     }
     return response
   }
