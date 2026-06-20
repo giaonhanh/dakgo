@@ -12,14 +12,28 @@ interface Props { params: Promise<{ slug: string }> }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const supabase  = await createClient()
+  // Không filter status — quán pending/suspended vẫn cần hiện OG khi share
   const { data: shop } = await supabase
     .from("shops")
     .select("name, description, cover_image_url, logo_url, category")
     .eq("slug", slug)
-    .eq("status", "approved")
     .single()
 
-  if (!shop) return { title: "DakGo" }
+  const fallbackOG: Metadata = {
+    title: "DakGo Krông Pắc",
+    description: "Đặt đồ ăn/xe ôm/taxi online tại xã Krông Pắc, tỉnh Đắk Lắk!",
+    openGraph: {
+      title: "DakGo Krông Pắc",
+      description: "Đặt đồ ăn/xe ôm/taxi online tại xã Krông Pắc, tỉnh Đắk Lắk!",
+      url: APP_URL,
+      siteName: "DakGo — Giao Nhanh Krông Pắc",
+      images: [{ url: `${APP_URL}/icon-512.png`, width: 512, height: 512, alt: "DakGo" }],
+      type: "website",
+      locale: "vi_VN",
+    },
+  }
+
+  if (!shop) return fallbackOG
 
   const image = shop.cover_image_url ?? shop.logo_url ?? `${APP_URL}/icon-512.png`
 

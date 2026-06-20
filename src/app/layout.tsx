@@ -12,6 +12,7 @@ const lexend = Lexend({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"),
   title: "DakGo — Krông Pắc",
   description: "Giao hàng · Mua hộ · Xe ôm · Taxi tại Krông Pắc, Đắk Lắk",
   manifest: "/manifest.json",
