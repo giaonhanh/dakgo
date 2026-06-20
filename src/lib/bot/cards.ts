@@ -54,14 +54,20 @@ export async function buildShopCards(keyword: string, page = 0): Promise<CardRes
   const supabase = createClient()
   const PAGE_SIZE = 2  // mỗi lần show 2 quán
 
-  // Tìm quán đang mở có sản phẩm khớp keyword
-  const { data: products } = await supabase
-    .from("products")
-    .select("shop_id, name, price")
-    .ilike("name", `%${keyword}%`)
-    .eq("is_available", true)
-    .order("sold_count", { ascending: false })
-    .limit(50)
+  // Thử tìm với full keyword trước, sau đó fallback từng từ
+  let products = null
+  const tries = [keyword, ...keyword.split(/\s+/).filter(w => w.length >= 2)]
+
+  for (const kw of tries) {
+    const { data } = await supabase
+      .from("products")
+      .select("shop_id, name, price")
+      .ilike("name", `%${kw}%`)
+      .eq("is_available", true)
+      .order("sold_count", { ascending: false })
+      .limit(50)
+    if (data && data.length > 0) { products = data; break }
+  }
 
   if (!products || products.length === 0) return null
 

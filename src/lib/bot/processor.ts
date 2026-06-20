@@ -223,19 +223,13 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
     return { type: "text", content: noMore }
   }
 
-  // Khách vừa cung cấp địa chỉ để tìm quán gần
+  // Legacy state awaiting_shop_address → reset về ordering, show cards nếu có
   if (state === "awaiting_shop_address") {
+    await setState(senderId, "ordering")
     await saveMessage(senderId, "user", text)
     const keyword = await getKeyword(senderId)
     const cardResponse = await buildShopCards(keyword, 0)
-    if (cardResponse && cardResponse.elements.length > 0) {
-      await setState(senderId, "ordering")
-      return cardResponse
-    }
-    await setState(senderId, "ordering")
-    const noShopMsg = `😔 Mình chưa tìm thấy quán nào đang mở có "${keyword}" bạn ơi.\nBạn muốn thử món/quán khác không?`
-    await saveMessage(senderId, "model", noShopMsg)
-    return { type: "text", content: noShopMsg }
+    if (cardResponse && cardResponse.elements.length > 0) return cardResponse
   }
 
   // Detect dịch vụ và check availability — chỉ khi chưa vào flow
@@ -250,21 +244,27 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
         return { type: "text", content: msg }
       }
 
-      // Dịch vụ OK — đồ ăn thì gửi nút webview xác định vị trí
+      // Dịch vụ OK — đồ ăn: trích keyword rồi show card quán ngay
       if (service === "food") {
         await saveMessage(senderId, "user", text)
-        const kw = text.toLowerCase().match(/(cơm|bún|phở|bánh|gà|bò|heo|cá|mì|xôi|pizza|cháo|lẩu|nướng|đồ ăn|ăn|trà sữa|nước|đồ uống)/)?.[0] ?? "đồ ăn"
-        await setState(senderId, "awaiting_shop_address")
+        // Trích keyword từ message (bỏ stop words)
+        const cleaned = text
+          .replace(/cho\s*(tôi|mình|t)\s*/gi, "")
+          .replace(/\b(đặt|muốn|ăn|nha|nhé|đi|ơi|order|lấy|mua|thử)\b/gi, "")
+          .trim()
+        const kw = cleaned.length >= 3 ? cleaned : "đồ ăn"
         await saveKeyword(senderId, kw)
-        const webviewUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"}/bot-location?sid=${senderId}&kw=${encodeURIComponent(kw)}`
-        const introMsg = `✅ Dịch vụ ${SERVICE_LABEL[service]} đang hoạt động!\n\n📍 Bấm nút bên dưới để mình xác định vị trí và tìm quán gần bạn nhất nhé!`
-        await saveMessage(senderId, "model", introMsg)
-        return {
-          type: "webview_button",
-          text: introMsg,
-          buttonTitle: "📍 Xác định vị trí",
-          url: webviewUrl,
-        } as unknown as BotResponse
+        await setState(senderId, "ordering")
+
+        const cardResponse = await buildShopCards(kw, 0)
+        if (cardResponse && cardResponse.elements.length > 0) {
+          return cardResponse
+        }
+
+        // Không tìm thấy quán → Groq xử lý
+        const noShop = `😔 Mình chưa tìm thấy quán nào đang mở có "${kw}" bạn ơi.\nBạn muốn thử món khác không?`
+        await saveMessage(senderId, "model", noShop)
+        return { type: "text", content: noShop }
       }
 
       // Xe ôm / Taxi / Mua hộ / Giao hộ → vào ordering flow luôn
