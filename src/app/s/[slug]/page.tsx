@@ -22,14 +22,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!shop) return { title: "DakGo" }
 
   const image = shop.cover_image_url ?? shop.logo_url ?? `${APP_URL}/icon-512.png`
-  const desc  = shop.description
-    ?? `Đặt hàng từ ${shop.name} trên DakGo — Giao nhanh tại Phước An, Krông Pắc`
+
+  // Title ngắn gọn — không lặp lại trong description
+  const ogTitle = `${shop.name} — DakGo Phước An`
+
+  // Description: dùng mô tả của quán nếu có, không thì dùng thông tin hữu ích
+  const desc = shop.description?.trim()
+    || `${shop.category ? `${shop.category} · ` : ""}Giao hàng nhanh tại Phước An, Krông Pắc. Đặt hàng online, nhận tại nhà!`
 
   return {
-    title: `${shop.name} — DakGo`,
+    title: ogTitle,
     description: desc,
     openGraph: {
-      title: `${shop.name} 🛵 Đặt hàng trên DakGo`,
+      title: ogTitle,
       description: desc,
       url: `${APP_URL}/s/${slug}`,
       siteName: "DakGo — Giao Nhanh Phước An",
@@ -39,7 +44,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: `${shop.name} — DakGo`,
+      title: ogTitle,
       description: desc,
       images: [image],
     },
