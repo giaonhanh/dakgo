@@ -270,109 +270,6 @@ function HoursSheet({ onClose, shopId, initialHours, onSaved }: {
   )
 }
 
-/* ── slug utils ── */
-function toSlug(name: string): string {
-  return name.toLowerCase()
-    .normalize("NFD").replace(/[̀-ͯ]/g, "")
-    .replace(/đ/g, "d").replace(/Đ/g, "d")
-    .replace(/[^a-z0-9\s]/g, "")
-    .trim().replace(/\s+/g, "")
-}
-
-/* ── slug sheet ── */
-function SlugSheet({ onClose, shopId, shopName, currentSlug, onSaved }: {
-  onClose: () => void; shopId: string | null; shopName: string
-  currentSlug: string; onSaved: (slug: string) => void
-}) {
-  const [slug, setSlug]       = useState(currentSlug || toSlug(shopName))
-  const [saving, setSaving]   = useState(false)
-  const [err, setErr]         = useState("")
-  const [copied, setCopied]   = useState(false)
-  const APP_URL = "www.dakgo.com"
-  const preview = `${APP_URL}/s/${slug}`
-
-  const handleChange = (v: string) => {
-    setErr("")
-    // Chỉ cho phép a-z0-9 và dấu gạch ngang
-    const clean = v.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-")
-    setSlug(clean)
-  }
-
-  const handleSave = async () => {
-    if (!shopId) return
-    if (slug.length < 3) return setErr("Link tối thiểu 3 ký tự")
-    if (!/^[a-z0-9]/.test(slug)) return setErr("Link phải bắt đầu bằng chữ hoặc số")
-    setSaving(true)
-    const sb = createClient()
-    const { error } = await sb.from("shops").update({ slug }).eq("id", shopId)
-    setSaving(false)
-    if (error) {
-      if (error.code === "23505") return setErr("Link này đã có người dùng, thử link khác nhé!")
-      return setErr("Lỗi lưu: " + error.message)
-    }
-    onSaved(slug)
-    onClose()
-  }
-
-  const copy = async () => {
-    await navigator.clipboard.writeText(`https://${preview}`)
-    setCopied(true); setTimeout(() => setCopied(false), 2000)
-  }
-
-  return (
-    <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-      transition={{ type: "spring", damping: 26, stiffness: 280 }}
-      style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-      <div style={{ background: "#0e0b07", borderTop: "1px solid rgba(255,107,0,0.3)", borderRadius: "22px 22px 0 0", padding: "20px 20px calc(env(safe-area-inset-bottom) + 20px)" }}>
-
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🔗 Link cửa hàng</div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
-        </div>
-
-        {/* Preview link */}
-        <div style={{ background: "rgba(255,107,0,0.07)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 12, padding: "12px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ color: "#6a5a40", fontSize: 9, marginBottom: 3, textTransform: "uppercase", letterSpacing: ".5px" }}>Link của bạn</div>
-            <div style={{ color: "#FF8C00", fontSize: 13, fontWeight: 700, wordBreak: "break-all" }}>
-              <span style={{ color: "#6a5a40" }}>www.dakgo.com/s/</span>{slug || "…"}
-            </div>
-          </div>
-          <button onClick={copy} style={{ flexShrink: 0, padding: "7px 12px", borderRadius: 9, border: "none", background: copied ? "rgba(62,207,110,0.15)" : "rgba(255,255,255,0.06)", color: copied ? "#3ecf6e" : "#b0956a", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>
-            {copied ? "✓ Đã copy" : "📋 Copy"}
-          </button>
-        </div>
-
-        {/* Input slug */}
-        <div style={{ color: "#6a5a40", fontSize: 10, marginBottom: 6 }}>Tùy chỉnh link (chỉ dùng chữ thường, số, dấu -)</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 0, background: "rgba(255,255,255,0.05)", border: `1px solid ${err ? "rgba(255,64,64,0.4)" : "rgba(255,107,0,0.25)"}`, borderRadius: 12, overflow: "hidden", marginBottom: 6 }}>
-          <div style={{ padding: "0 10px", color: "#6a5a40", fontSize: 11, whiteSpace: "nowrap", borderRight: "1px solid rgba(255,255,255,0.07)" }}>/s/</div>
-          <input
-            value={slug} onChange={e => handleChange(e.target.value)}
-            placeholder={toSlug(shopName) || "tencuahang"}
-            autoFocus
-            style={{ flex: 1, height: 46, padding: "0 12px", background: "none", border: "none", color: "#f8f0e0", fontSize: 14, fontFamily: "Lexend", outline: "none" }}
-          />
-          {slug && (
-            <button onClick={() => setSlug(toSlug(shopName))} style={{ padding: "0 10px", background: "none", border: "none", color: "#6a5a40", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>↺</button>
-          )}
-        </div>
-        {err && <div style={{ color: "#ff4040", fontSize: 11, marginBottom: 8 }}>⚠ {err}</div>}
-        <div style={{ color: "#6a5a40", fontSize: 10, lineHeight: 1.5, marginBottom: 20 }}>
-          💡 Mặc định là tên cửa hàng không dấu viết liền. Chia sẻ link này cho khách — khi bấm vào sẽ thấy trang quán và nút đặt hàng.
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10 }}>
-          <button onClick={onClose} style={{ height: 46, borderRadius: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#b0956a", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "Lexend" }}>Hủy</button>
-          <button onClick={handleSave} disabled={saving || !slug} style={{ height: 46, borderRadius: 12, border: "none", background: (saving || !slug) ? "rgba(255,255,255,0.08)" : "linear-gradient(90deg,#FF6B00,#FF8C00)", color: (saving || !slug) ? "#6a5a40" : "#fff", fontSize: 13, fontWeight: 800, cursor: (saving || !slug) ? "not-allowed" : "pointer", fontFamily: "Lexend" }}>
-            {saving ? "Đang lưu..." : "✓ Lưu link"}
-          </button>
-        </div>
-      </div>
-    </motion.div>
-  )
-}
-
 /* ── prep time sheet ── */
 function PrepTimeSheet({ value, onSelect, onClose }: { value: string; onSelect: (v: string) => void; onClose: () => void }) {
   const OPTIONS = ["5–10", "10–15", "15–20", "20–30", "30–45"]
@@ -445,11 +342,9 @@ export default function MerchantSettingsPage() {
   const [prepTime,      setPrepTime]      = useState(() => {
     try { return localStorage.getItem("merchant_prep_time") ?? "10–15" } catch { return "10–15" }
   })
-  const [shopSlug,      setShopSlug]      = useState("")
   const [showPw,        setShowPw]        = useState(false)
   const [showHours,     setShowHours]     = useState(false)
   const [showPrepSheet, setShowPrepSheet] = useState(false)
-  const [showSlugSheet, setShowSlugSheet] = useState(false)
   const [toast, setToast]           = useState("")
   const [adminContactLink, setAdminContactLink] = useState("mailto:DakGo.phuocan@gmail.com")
   const [adminPhone,       setAdminPhone]       = useState("")
@@ -473,7 +368,7 @@ export default function MerchantSettingsPage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       supabase.from("shops")
-        .select("id,name,address,location,is_open,rating_avg,commission_rate,is_negotiated_commission,prep_time,auto_accept,busy_mode,preorder_allow,show_rating,show_sold_count,opening_hours,notif_settings,privacy_settings,slug")
+        .select("id,name,address,location,is_open,rating_avg,commission_rate,is_negotiated_commission,prep_time,auto_accept,busy_mode,preorder_allow,show_rating,show_sold_count,opening_hours,notif_settings,privacy_settings")
         .eq("owner_id", user.id).maybeSingle()
         .then(({ data }) => {
           if (!data) return
@@ -496,7 +391,6 @@ export default function MerchantSettingsPage() {
             })
           }
           if (d.prep_time) setPrepTime(d.prep_time as string)
-          setShopSlug((d.slug as string) ?? "")
           // Giờ hoạt động từ DB
           setHours(normalizeHours(d.opening_hours))
           // Thông báo từ DB
@@ -586,10 +480,7 @@ export default function MerchantSettingsPage() {
                 {shopRating && <span style={{ background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 5, padding: "1px 8px", color: "#FF8C00", fontSize: 8, fontWeight: 700 }}>⭐ {shopRating.toFixed(1)}</span>}
               </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <a href="/merchant/profile" style={{ padding: "5px 10px", borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#b0956a", fontSize: 9, fontWeight: 700, textDecoration: "none", textAlign: "center" }}>Sửa hồ sơ</a>
-              <a href="/merchant/shop-preview" style={{ padding: "5px 10px", borderRadius: 8, background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.2)", color: "#FF8C00", fontSize: 9, fontWeight: 700, textDecoration: "none", textAlign: "center" }}>👁 Xem trước</a>
-            </div>
+            <a href="/merchant/profile" style={{ padding: "8px 12px", borderRadius: 10, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#b0956a", fontSize: 10, fontWeight: 700, textDecoration: "none", textAlign: "center", flexShrink: 0 }}>Sửa hồ sơ</a>
           </div>
 
           {/* commission info */}
@@ -640,18 +531,6 @@ export default function MerchantSettingsPage() {
             <Row icon="📍" label="Vị trí quán trên bản đồ"
               sub={shopHasLocation ? "Đã xác định — bấm để cập nhật lại" : "⚠️ Chưa xác định — tài xế/khách sẽ thấy sai vị trí trên bản đồ"}
               onClick={() => setShowLocationPicker(true)} arrow last />
-          </Section>
-
-          {/* shop link */}
-          <Section title="Link cửa hàng">
-            <Row
-              icon="🔗"
-              label="Link chia sẻ quán"
-              sub={shopSlug ? `www.dakgo.com/s/${shopSlug}` : `Mặc định: www.dakgo.com/s/${toSlug(shopName) || "tencuahang"}`}
-              onClick={() => setShowSlugSheet(true)}
-              arrow
-              last
-            />
           </Section>
 
           {/* quick links */}
@@ -721,7 +600,6 @@ export default function MerchantSettingsPage() {
 
       {/* sheets */}
       <AnimatePresence>
-        {showSlugSheet && <SlugSheet onClose={() => setShowSlugSheet(false)} shopId={shopId} shopName={shopName} currentSlug={shopSlug} onSaved={s => { setShopSlug(s); fire("✅ Đã lưu link cửa hàng") }} />}
         {showPw        && <PwSheet      onClose={() => setShowPw(false)}        />}
         {showHours     && <HoursSheet   onClose={() => setShowHours(false)} shopId={shopId} initialHours={hours} onSaved={h => { setHours(h); fire("✅ Đã lưu giờ hoạt động") }} />}
         {showPrepSheet && <PrepTimeSheet value={prepTime} onSelect={v => {

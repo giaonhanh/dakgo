@@ -16,6 +16,13 @@ const MapPicker = dynamic(() => import("@/components/merchant/MapPicker"), {
   ),
 })
 
+function toSlug(text: string): string {
+  return text.toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]/g, "")
+}
+
 const AVATAR_LIST = ["🍜","🍗","🍕","🥗","🍱","🥤","🧁","🍛","🥩","🦐","🍔","🌮"]
 
 type ToastType = "success" | "error" | "info"
@@ -39,6 +46,14 @@ export default function MerchantProfilePage() {
   const [joined,      setJoined]      = useState("")
   const [lat,         setLat]         = useState<number | null>(null)
   const [lng,         setLng]         = useState<number | null>(null)
+  const [logoUrl,     setLogoUrl]     = useState<string | null>(null)
+  const [coverUrl,    setCoverUrl]    = useState<string | null>(null)
+  const [slug,        setSlug]        = useState("")
+  const [slugErr,     setSlugErr]     = useState("")
+  const [slugSaving,  setSlugSaving]  = useState(false)
+  const [slugCopied,  setSlugCopied]  = useState(false)
+  const coverInputRef = useRef<HTMLInputElement>(null)
+  const logoInputRef  = useRef<HTMLInputElement>(null)
 
   // Track original values to detect changes
   const origRef = useRef({ name: "", phone: "", address: "" })
@@ -57,7 +72,7 @@ export default function MerchantProfilePage() {
         const [{ data: profile }, { data: shop }] = await Promise.all([
           supabase.from("profiles").select("created_at").eq("id", user.id).single(),
           supabase.from("shops")
-            .select("id,name,phone,address,category,categories,is_open,rating_avg,total_reviews,commission_rate,lat,lng")
+            .select("id,name,phone,address,category,categories,is_open,rating_avg,total_reviews,commission_rate,lat,lng,logo_url,cover_image_url,slug")
             .eq("owner_id", user.id)
             .single(),
         ])
@@ -83,6 +98,9 @@ export default function MerchantProfilePage() {
             setLat(shop.lat as number)
             setLng(shop.lng as number)
           }
+          setLogoUrl((shop as Record<string,unknown>).logo_url as string ?? null)
+          setCoverUrl((shop as Record<string,unknown>).cover_image_url as string ?? null)
+          setSlug((shop as Record<string,unknown>).slug as string ?? "")
         }
       } catch { /* ignore */ }
       setLoading(false)
@@ -136,6 +154,34 @@ export default function MerchantProfilePage() {
         checkDirty(name, phone, geocodedAddr || address)
       }
     }
+  }
+
+  const handleImageUpload = async (file: File, type: "logo" | "cover") => {
+    if (!shopId) return
+    const ext    = file.name.split(".").pop() ?? "jpg"
+    const path   = `${shopId}/${type}.${ext}`
+    const { error: upErr } = await supabase.storage.from("shops").upload(path, file, { upsert: true, contentType: file.type })
+    if (upErr) { addToast("❌ Lỗi upload: " + upErr.message, "error"); return }
+    const { data: { publicUrl } } = supabase.storage.from("shops").getPublicUrl(path)
+    const col = type === "logo" ? "logo_url" : "cover_image_url"
+    const { error } = await supabase.from("shops").update({ [col]: publicUrl }).eq("id", shopId)
+    if (error) { addToast("❌ Lỗi lưu ảnh: " + error.message, "error"); return }
+    if (type === "logo") setLogoUrl(publicUrl)
+    else setCoverUrl(publicUrl)
+    addToast(type === "logo" ? "✅ Đã cập nhật ảnh đại diện" : "✅ Đã cập nhật ảnh bìa")
+  }
+
+  const handleSlugSave = async () => {
+    if (!shopId || !slug) return
+    if (slug.length < 3) { setSlugErr("Tối thiểu 3 ký tự"); return }
+    setSlugSaving(true); setSlugErr("")
+    const { error } = await supabase.from("shops").update({ slug }).eq("id", shopId)
+    setSlugSaving(false)
+    if (error) {
+      if (error.code === "23505") { setSlugErr("Link đã có người dùng, thử link khác nhé!"); return }
+      setSlugErr("Lỗi: " + error.message); return
+    }
+    addToast("✅ Đã lưu link cửa hàng")
   }
 
   const handleSave = async () => {
@@ -217,43 +263,117 @@ export default function MerchantProfilePage() {
 
         <div style={{ flex:1,overflowY:"auto",padding:"16px 16px 100px" }}>
 
-          {/* Avatar + stats */}
-          <div style={{ textAlign:"center",marginBottom:20 }}>
-            <div style={{ position:"relative",display:"inline-block",marginBottom:14 }}>
-              <div onClick={() => setShowAvatarPicker(true)}
-                style={{ width:88,height:88,borderRadius:24, background:"linear-gradient(135deg,rgba(255,107,0,0.2),rgba(255,107,0,0.05))", border:"2px solid rgba(255,107,0,0.3)", display:"flex",alignItems:"center",justifyContent:"center",fontSize:42, cursor:"pointer",position:"relative",overflow:"hidden" }}>
-                {avatar}
-                <div style={{ position:"absolute",bottom:0,left:0,right:0,background:"rgba(0,0,0,0.55)",fontSize:9,color:"#fff",padding:"3px 0",fontWeight:600,textAlign:"center" }}>Đổi</div>
-              </div>
-              <div style={{ position:"absolute",bottom:-4,right:-4,width:22,height:22,borderRadius:7,background:isOpen?"#3ecf6e":"#6a5a40",border:"3px solid #080806" }} />
-            </div>
-
-            <div style={{ color:"#f8f0e0",fontSize:17,fontWeight:800,marginBottom:4 }}>{name || "Chưa đặt tên"}</div>
-            <div style={{ color:"#6a5a40",fontSize:10,marginBottom:10 }}>
-              {categories.length > 0 ? categories.map(v => getCategoryByValue(v).emoji).join(" ") + " " + categories.map(v => getCategoryByValue(v).label).join(", ") : "Chưa chọn loại hình"}
-            </div>
-
-            <div style={{ display:"flex",justifyContent:"center",gap:16,marginBottom:14 }}>
-              <div style={{ textAlign:"center" }}>
-                <div style={{ color:"#FF8C00",fontSize:14,fontWeight:700 }}>⭐ {rating?.toFixed(1) ?? "—"}</div>
-                <div style={{ color:"#6a5a40",fontSize:10 }}>Điểm sao</div>
-              </div>
-              <div style={{ width:1,background:"rgba(255,255,255,0.07)" }} />
-              <div style={{ textAlign:"center" }}>
-                <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>{totalReview}</div>
-                <div style={{ color:"#6a5a40",fontSize:10 }}>Lượt đánh giá</div>
-              </div>
-              <div style={{ width:1,background:"rgba(255,255,255,0.07)" }} />
-              <div style={{ textAlign:"center" }}>
-                <div style={{ color:"#f8f0e0",fontSize:14,fontWeight:700 }}>{commission}%</div>
-                <div style={{ color:"#6a5a40",fontSize:10 }}>Hoa hồng</div>
+          {/* Ảnh bìa + logo */}
+          <div style={{ marginBottom:16 }}>
+            {/* Cover image */}
+            <div style={{ position:"relative", height:130, borderRadius:14, overflow:"hidden", background:"linear-gradient(135deg,#1a0d00,#2d1500)", marginBottom:10, cursor:"pointer" }}
+              onClick={() => coverInputRef.current?.click()}>
+              {coverUrl
+                ? <img src={coverUrl} alt="cover" style={{ width:"100%",height:"100%",objectFit:"cover",opacity:0.85 }} />
+                : <div style={{ width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:6 }}>
+                    <div style={{ fontSize:26 }}>🖼️</div>
+                    <div style={{ color:"#6a5a40",fontSize:10,fontWeight:600 }}>Nhấn để thêm ảnh bìa</div>
+                  </div>
+              }
+              <div style={{ position:"absolute",bottom:0,left:0,right:0,background:"rgba(0,0,0,0.55)",padding:"6px 0",textAlign:"center",fontSize:9,color:"#fff",fontWeight:600 }}>
+                📷 Đổi ảnh bìa
               </div>
             </div>
+            <input ref={coverInputRef} type="file" accept="image/*" style={{ display:"none" }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "cover"); e.target.value="" }} />
 
-            <button onClick={handleToggleOpen}
-              style={{ background:isOpen?"rgba(62,207,110,0.1)":"rgba(255,255,255,0.06)", border:isOpen?"1px solid rgba(62,207,110,0.3)":"1px solid rgba(255,255,255,0.1)", borderRadius:10, padding:"8px 20px", color:isOpen?"#3ecf6e":"#6a5a40", fontSize:11, fontWeight:700, cursor:"pointer" }}>
-              {isOpen ? "🟢 Đang mở cửa" : "🔴 Đang đóng cửa"}
-            </button>
+            {/* Logo + stats row */}
+            <div style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
+              {/* Logo */}
+              <div style={{ position:"relative", flexShrink:0 }}>
+                <div onClick={() => logoInputRef.current?.click()}
+                  style={{ width:72,height:72,borderRadius:18,background:logoUrl?"transparent":"linear-gradient(135deg,rgba(255,107,0,0.2),rgba(255,107,0,0.05))",border:"2px solid rgba(255,107,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",position:"relative" }}>
+                  {logoUrl
+                    ? <img src={logoUrl} alt="logo" style={{ width:"100%",height:"100%",objectFit:"cover" }} />
+                    : <span style={{ fontSize:32 }}>{avatar}</span>
+                  }
+                  <div style={{ position:"absolute",bottom:0,left:0,right:0,background:"rgba(0,0,0,0.6)",fontSize:8,color:"#fff",padding:"2px 0",textAlign:"center",fontWeight:600 }}>Đổi</div>
+                </div>
+                <div style={{ position:"absolute",bottom:-3,right:-3,width:18,height:18,borderRadius:6,background:isOpen?"#3ecf6e":"#6a5a40",border:"2px solid #080806" }} />
+              </div>
+              <input ref={logoInputRef} type="file" accept="image/*" style={{ display:"none" }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "logo"); e.target.value="" }} />
+
+              {/* Info */}
+              <div style={{ flex:1 }}>
+                <div style={{ color:"#f8f0e0",fontSize:15,fontWeight:800,marginBottom:2 }}>{name || "Chưa đặt tên"}</div>
+                <div style={{ color:"#6a5a40",fontSize:10,marginBottom:8 }}>
+                  {categories.length > 0 ? categories.map(v => `${getCategoryByValue(v).emoji} ${getCategoryByValue(v).label}`).join(", ") : "Chưa chọn loại hình"}
+                </div>
+                <div style={{ display:"flex", gap:12 }}>
+                  <div style={{ textAlign:"center" }}>
+                    <div style={{ color:"#FF8C00",fontSize:12,fontWeight:700 }}>⭐ {rating?.toFixed(1) ?? "—"}</div>
+                    <div style={{ color:"#6a5a40",fontSize:9 }}>Sao</div>
+                  </div>
+                  <div style={{ width:1,background:"rgba(255,255,255,0.06)" }} />
+                  <div style={{ textAlign:"center" }}>
+                    <div style={{ color:"#f8f0e0",fontSize:12,fontWeight:700 }}>{totalReview}</div>
+                    <div style={{ color:"#6a5a40",fontSize:9 }}>Đánh giá</div>
+                  </div>
+                  <div style={{ width:1,background:"rgba(255,255,255,0.06)" }} />
+                  <div style={{ textAlign:"center" }}>
+                    <div style={{ color:"#f8f0e0",fontSize:12,fontWeight:700 }}>{commission}%</div>
+                    <div style={{ color:"#6a5a40",fontSize:9 }}>Hoa hồng</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Open toggle + emoji picker */}
+            <div style={{ display:"flex",gap:8,marginTop:10 }}>
+              <button onClick={handleToggleOpen}
+                style={{ flex:1,background:isOpen?"rgba(62,207,110,0.1)":"rgba(255,255,255,0.06)",border:isOpen?"1px solid rgba(62,207,110,0.3)":"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 0",color:isOpen?"#3ecf6e":"#6a5a40",fontSize:11,fontWeight:700,cursor:"pointer" }}>
+                {isOpen ? "🟢 Đang mở cửa" : "🔴 Đang đóng cửa"}
+              </button>
+              {!logoUrl && (
+                <button onClick={() => setShowAvatarPicker(true)}
+                  style={{ padding:"8px 14px",borderRadius:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",color:"#b0956a",fontSize:11,fontWeight:600,cursor:"pointer" }}>
+                  {avatar} Đổi icon
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Link cửa hàng */}
+          <div style={{ background:"rgba(255,107,0,0.06)",border:"1px solid rgba(255,107,0,0.18)",borderRadius:14,padding:14,marginBottom:14 }}>
+            <div style={{ color:"#FF8C00",fontSize:11,fontWeight:700,marginBottom:10 }}>🔗 Link cửa hàng</div>
+            <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:8 }}>
+              <div style={{ flex:1,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,107,0,0.25)",borderRadius:10,overflow:"hidden",display:"flex",alignItems:"center" }}>
+                <span style={{ padding:"0 8px",color:"#6a5a40",fontSize:10,whiteSpace:"nowrap",borderRight:"1px solid rgba(255,255,255,0.06)" }}>/s/</span>
+                <input
+                  value={slug}
+                  onChange={e => { setSlugErr(""); setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"").replace(/-+/g,"-")) }}
+                  placeholder={toSlug(name) || "tencuahang"}
+                  style={{ flex:1,height:38,padding:"0 10px",background:"none",border:"none",color:"#f8f0e0",fontSize:12,fontFamily:"Lexend",outline:"none" }}
+                />
+                {slug && name && slug !== toSlug(name) && (
+                  <button onClick={() => setSlug(toSlug(name))} style={{ padding:"0 8px",background:"none",border:"none",color:"#6a5a40",fontSize:11,cursor:"pointer" }}>↺</button>
+                )}
+              </div>
+              <button onClick={handleSlugSave} disabled={slugSaving||!slug}
+                style={{ padding:"0 14px",height:38,borderRadius:10,border:"none",background:slugSaving||!slug?"rgba(255,255,255,0.06)":"linear-gradient(90deg,#FF6B00,#FF8C00)",color:slugSaving||!slug?"#6a5a40":"#fff",fontSize:11,fontWeight:700,cursor:slugSaving||!slug?"not-allowed":"pointer",flexShrink:0,fontFamily:"Lexend" }}>
+                {slugSaving?"...":"Lưu"}
+              </button>
+            </div>
+            {slugErr && <div style={{ color:"#ff4040",fontSize:10,marginBottom:6 }}>⚠ {slugErr}</div>}
+            <div style={{ display:"flex",alignItems:"center",gap:6 }}>
+              <div style={{ flex:1,color:"#6a5a40",fontSize:10 }}>
+                <span style={{ color:"#b0956a" }}>www.dakgo.com/s/</span>
+                <span style={{ color:"#FF8C00",fontWeight:600 }}>{slug || toSlug(name) || "tencuahang"}</span>
+              </div>
+              <button onClick={async () => { await navigator.clipboard.writeText(`https://www.dakgo.com/s/${slug||toSlug(name)}`); setSlugCopied(true); setTimeout(()=>setSlugCopied(false),2000) }}
+                style={{ padding:"4px 10px",borderRadius:7,border:"none",background:slugCopied?"rgba(62,207,110,0.12)":"rgba(255,255,255,0.06)",color:slugCopied?"#3ecf6e":"#6a5a40",fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:"Lexend" }}>
+                {slugCopied?"✓ Đã copy":"📋 Copy"}
+              </button>
+            </div>
+            <div style={{ color:"#6a5a40",fontSize:9,marginTop:6,lineHeight:1.5 }}>
+              💡 Chia sẻ link này lên Zalo/FB — khách bấm vào sẽ thấy trang quán và đặt hàng ngay.
+            </div>
           </div>
 
           {/* Shop info — always editable */}
@@ -307,16 +427,6 @@ export default function MerchantProfilePage() {
             </div>
           </div>
 
-          {/* Quick links */}
-          <Link href="/merchant/shop-preview"
-            style={{ display:"flex",alignItems:"center",gap:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,marginBottom:8,textDecoration:"none" }}>
-            <div style={{ width:40,height:40,borderRadius:11,background:"rgba(255,107,0,0.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>👁</div>
-            <div style={{ flex:1 }}>
-              <div style={{ color:"#f8f0e0",fontSize:11,fontWeight:600 }}>Xem trước cửa hàng</div>
-              <div style={{ color:"#6a5a40",fontSize:10,marginTop:2 }}>Khách nhìn thấy thế này</div>
-            </div>
-            <span style={{ color:"#6a5a40",fontSize:16 }}>›</span>
-          </Link>
 
         </div>
 
