@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   // Description: dùng mô tả của quán nếu có, không thì dùng thông tin hữu ích
   const desc = shop.description?.trim()
-    || `${shop.category ? `${shop.category} · ` : ""}Giao hàng nhanh tại xã Krông Pắc, tỉnh Đắk Lắk. Đặt hàng online, nhận tại nhà!`
+    || `${shop.category ? `${shop.category} · ` : ""}Đặt đồ ăn/xe ôm/taxi online tại xã Krông Pắc, tỉnh Đắk Lắk!`
 
   return {
     title: ogTitle,
