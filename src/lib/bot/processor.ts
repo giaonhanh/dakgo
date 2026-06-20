@@ -36,8 +36,12 @@ export async function processMessage(senderId: string, text: string): Promise<st
     getShopContext(),
   ])
 
+  // Thêm giờ hiện tại vào context
+  const now = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", hour12: false })
+  const fullContext = shopContext ? `GIỜ HIỆN TẠI: ${now}\n\n${shopContext}` : `GIỜ HIỆN TẠI: ${now}`
+
   // Gọi Groq với context quán đang mở
-  const rawReply = await askGemini(history, text, shopContext)
+  const rawReply = await askGemini(history, text, fullContext)
 
   // Sanitize output — phòng AI tự ý nhắc đối thủ
   const reply = sanitizeReply(rawReply)

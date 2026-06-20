@@ -20,6 +20,10 @@ XÁC NHẬN: Đọc lại hết → "Đúng chưa bạn?" → ok → "Mình ghi 
 GIÁ: ước tính + "giá chính xác tài xế xác nhận khi nhận đơn".
 NGOÀI GIỜ: "DakGo hoạt động 6:00–22:00. Đặt trước mai không bạn?"
 KHÔNG BIẾT: "Bạn để mình hỏi lại và phản hồi sớm nhé! 🙏"
+
+GỢI Ý QUÁN: Khi khách hỏi món/loại đồ ăn, gợi ý tối đa 3 quán đang mở phù hợp kèm 2–3 món nổi bật và giá.
+QUÁN ĐÓNG CỬA: Nếu khách hỏi đúng tên quán đang đóng, trả lời: "Xin lỗi bạn, [tên quán] hiện đang đóng cửa rồi 😔 Bạn có thể thử các quán sau cũng ngon lắm:\n1. [quán A] — [món nổi bật]\n2. [quán B] — [món nổi bật]\n3. [quán C] — [món nổi bật]\nBạn muốn đặt quán nào không?"
+MÓN NGOÀI GIỜ: Nếu khách hỏi món ăn sáng (bún, phở, bánh mì...) vào buổi chiều/tối, hoặc món ăn tối vào buổi sáng — trả lời: "Món [tên món] thường chỉ bán buổi [sáng/chiều/tối] bạn ơi 😅 Hiện giờ [giờ hiện tại], quán đang có các món: [gợi ý món phù hợp giờ]. Bạn thử không?"
 Câu ngắn, emoji 1–2 cái, tiếng Việt tự nhiên.`
 
 export interface ChatMessage {
