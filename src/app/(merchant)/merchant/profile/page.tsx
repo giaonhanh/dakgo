@@ -51,6 +51,7 @@ export default function MerchantProfilePage() {
   const [slug,        setSlug]        = useState("")
   const [slugErr,     setSlugErr]     = useState("")
   const [slugSaving,  setSlugSaving]  = useState(false)
+  const [slugSaved,   setSlugSaved]   = useState(false)
   const [slugCopied,  setSlugCopied]  = useState(false)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef  = useRef<HTMLInputElement>(null)
@@ -100,7 +101,9 @@ export default function MerchantProfilePage() {
           }
           setLogoUrl((shop as Record<string,unknown>).logo_url as string ?? null)
           setCoverUrl((shop as Record<string,unknown>).cover_image_url as string ?? null)
-          setSlug((shop as Record<string,unknown>).slug as string ?? "")
+          const loadedSlug = (shop as Record<string,unknown>).slug as string ?? ""
+          setSlug(loadedSlug)
+          if (loadedSlug) setSlugSaved(true)
         }
       } catch { /* ignore */ }
       setLoading(false)
@@ -181,6 +184,7 @@ export default function MerchantProfilePage() {
       if (error.code === "23505") { setSlugErr("Link đã có người dùng, thử link khác nhé!"); return }
       setSlugErr("Lỗi: " + error.message); return
     }
+    setSlugSaved(true)
     addToast("✅ Đã lưu link cửa hàng")
   }
 
@@ -346,7 +350,7 @@ export default function MerchantProfilePage() {
                 <span style={{ padding:"0 8px",color:"#6a5a40",fontSize:10,whiteSpace:"nowrap",borderRight:"1px solid rgba(255,255,255,0.06)" }}>/s/</span>
                 <input
                   value={slug}
-                  onChange={e => { setSlugErr(""); setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"").replace(/-+/g,"-")) }}
+                  onChange={e => { setSlugErr(""); setSlugSaved(false); setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"").replace(/-+/g,"-")) }}
                   placeholder={toSlug(name) || "tencuahang"}
                   style={{ flex:1,height:38,padding:"0 10px",background:"none",border:"none",color:"#f8f0e0",fontSize:12,fontFamily:"Lexend",outline:"none" }}
                 />
@@ -354,9 +358,14 @@ export default function MerchantProfilePage() {
                   <button onClick={() => setSlug(toSlug(name))} style={{ padding:"0 8px",background:"none",border:"none",color:"#6a5a40",fontSize:11,cursor:"pointer" }}>↺</button>
                 )}
               </div>
-              <button onClick={handleSlugSave} disabled={slugSaving||!slug}
-                style={{ padding:"0 14px",height:38,borderRadius:10,border:"none",background:slugSaving||!slug?"rgba(255,255,255,0.06)":"linear-gradient(90deg,#FF6B00,#FF8C00)",color:slugSaving||!slug?"#6a5a40":"#fff",fontSize:11,fontWeight:700,cursor:slugSaving||!slug?"not-allowed":"pointer",flexShrink:0,fontFamily:"Lexend" }}>
-                {slugSaving?"...":"Lưu"}
+              <button onClick={slugSaved ? () => setSlugSaved(false) : handleSlugSave}
+                disabled={slugSaving}
+                style={{ padding:"0 14px",height:38,borderRadius:10,
+                  background: slugSaving||(!slug&&!slugSaved) ? "rgba(255,255,255,0.06)" : slugSaved ? "rgba(62,207,110,0.12)" : "linear-gradient(90deg,#FF6B00,#FF8C00)",
+                  border: slugSaved ? "1px solid rgba(62,207,110,0.3)" : "1px solid transparent",
+                  color: slugSaving||(!slug&&!slugSaved) ? "#6a5a40" : slugSaved ? "#3ecf6e" : "#fff",
+                  fontSize:11,fontWeight:700,cursor:slugSaving?"not-allowed":"pointer",flexShrink:0,fontFamily:"Lexend" }}>
+                {slugSaving ? "..." : slugSaved ? "✓ Thay đổi" : "Lưu"}
               </button>
             </div>
             {slugErr && <div style={{ color:"#ff4040",fontSize:10,marginBottom:6 }}>⚠ {slugErr}</div>}
