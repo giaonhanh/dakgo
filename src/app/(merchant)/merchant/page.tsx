@@ -114,7 +114,7 @@ export default function MerchantDashboard() {
       // Get merchant's shop
       const { data: shop } = await supabase
         .from("shops")
-        .select("id, name, is_open, rating_avg, total_reviews, status, commission_rate, phone, lat, lng")
+        .select("id, name, is_open, rating_avg, total_reviews, status, commission_rate, phone, lat, lng, slug")
         .eq("owner_id", user.id)
         .single()
 
@@ -132,7 +132,8 @@ export default function MerchantDashboard() {
       const hasLng   = !!(shop as { lng?: number }).lng
       const hasPhone = !!(shop as { phone?: string }).phone?.trim()
       const hasName  = !!shop.name?.trim()
-      setSetupRequired(!hasName || !hasPhone || !hasLat || !hasLng)
+      const hasSlug  = !!(shop as { slug?: string }).slug?.trim()
+      setSetupRequired(!hasName || !hasPhone || !hasLat || !hasLng || !hasSlug)
 
       await fetchOrders(shop.id)
 
@@ -158,10 +159,11 @@ export default function MerchantDashboard() {
       setUnreadNotif(count ?? 0)
       // Cập nhật trạng thái setup quán
       const { data: sh } = await supabase
-        .from("shops").select("name, phone, lat, lng").eq("owner_id", user.id).single()
+        .from("shops").select("name, phone, lat, lng, slug").eq("owner_id", user.id).single()
       if (!sh) return
       const ok = !!(sh as { lat?: number }).lat && !!(sh as { lng?: number }).lng
         && !!(sh as { phone?: string }).phone?.trim() && !!sh.name?.trim()
+        && !!(sh as { slug?: string }).slug?.trim()
       if (ok) setSetupRequired(false)
     }
     document.addEventListener("visibilitychange", recheck)
@@ -522,6 +524,7 @@ export default function MerchantDashboard() {
                 { icon:"🏪", label:"Tên cửa hàng",        desc:"Hiển thị cho khách đặt đơn" },
                 { icon:"📞", label:"Số điện thoại quán",   desc:"Liên hệ khi cần xác nhận đơn" },
                 { icon:"📍", label:"Vị trí trên bản đồ",  desc:"Tài xế dùng để điều hướng đến quán" },
+                { icon:"🔗", label:"Link cửa hàng",        desc:"Chia sẻ lên Zalo/FB để nhận đơn" },
               ].map((item, i, arr) => (
                 <div key={item.label} style={{ display:"flex", alignItems:"center", gap:12,
                   padding:"13px 0",
