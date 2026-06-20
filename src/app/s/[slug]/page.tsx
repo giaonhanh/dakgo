@@ -1,8 +1,50 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Image from "next/image"
+import type { Metadata } from "next"
+import { ShareButtons } from "./ShareButtons"
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
 
 interface Props { params: Promise<{ slug: string }> }
+
+// OG meta tags — hiển thị đẹp khi share lên Zalo/FB/Messenger
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params
+  const supabase  = await createClient()
+  const { data: shop } = await supabase
+    .from("shops")
+    .select("name, description, cover_image_url, logo_url, category")
+    .eq("slug", slug)
+    .eq("status", "approved")
+    .single()
+
+  if (!shop) return { title: "DakGo" }
+
+  const image = shop.cover_image_url ?? shop.logo_url ?? `${APP_URL}/icon-512.png`
+  const desc  = shop.description
+    ?? `Đặt hàng từ ${shop.name} trên DakGo — Giao nhanh tại Phước An, Krông Pắc`
+
+  return {
+    title: `${shop.name} — DakGo`,
+    description: desc,
+    openGraph: {
+      title: `${shop.name} 🛵 Đặt hàng trên DakGo`,
+      description: desc,
+      url: `${APP_URL}/s/${slug}`,
+      siteName: "DakGo — Giao Nhanh Phước An",
+      images: [{ url: image, width: 1200, height: 630, alt: shop.name }],
+      type: "website",
+      locale: "vi_VN",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${shop.name} — DakGo`,
+      description: desc,
+      images: [image],
+    },
+  }
+}
 
 export default async function ShopSlugPage({ params }: Props) {
   const { slug } = await params
@@ -107,6 +149,9 @@ export default async function ShopSlugPage({ params }: Props) {
             Chưa có tài khoản? Đăng ký miễn phí
           </a>
         </div>
+
+        {/* Nút chia sẻ */}
+        <ShareButtons shopName={shop.name} slug={slug} />
       </div>
     </div>
   )
