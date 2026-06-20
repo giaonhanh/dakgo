@@ -1,6 +1,6 @@
 import { guard, sanitizeReply } from "./guard"
 import { askGemini } from "./gemini"
-import { getConversation, saveMessage, logBlocked } from "./storage"
+import { getConversation, saveMessage, logBlocked, getShopContext } from "./storage"
 
 const RATE_LIMIT_PER_MIN = 5
 
@@ -30,11 +30,14 @@ export async function processMessage(senderId: string, text: string): Promise<st
     return guardResult.reply
   }
 
-  // Lấy lịch sử hội thoại gần nhất
-  const history = await getConversation(senderId, 10)
+  // Lấy lịch sử + shop context song song
+  const [history, shopContext] = await Promise.all([
+    getConversation(senderId, 10),
+    getShopContext(),
+  ])
 
-  // Gọi Gemini
-  const rawReply = await askGemini(history, text)
+  // Gọi Groq với context quán đang mở
+  const rawReply = await askGemini(history, text, shopContext)
 
   // Sanitize output — phòng AI tự ý nhắc đối thủ
   const reply = sanitizeReply(rawReply)

@@ -31,6 +31,39 @@ export async function saveMessage(
   await supabase.from("bot_conversations").insert({ sender_id: senderId, role, content })
 }
 
+export async function getShopContext(): Promise<string> {
+  const supabase = createClient()
+
+  const { data: shops } = await supabase
+    .from("shops")
+    .select("id, name, category, is_open, address")
+    .eq("status", "approved")
+    .eq("is_open", true)
+    .limit(20)
+
+  if (!shops || shops.length === 0) return ""
+
+  const shopIds = shops.map(s => s.id)
+  const { data: products } = await supabase
+    .from("products")
+    .select("shop_id, name, price, category")
+    .in("shop_id", shopIds)
+    .eq("is_available", true)
+    .order("sold_count", { ascending: false })
+    .limit(60)
+
+  const lines: string[] = ["QUÁN ĐANG MỞ:"]
+  for (const shop of shops) {
+    const items = (products ?? [])
+      .filter(p => p.shop_id === shop.id)
+      .slice(0, 5)
+      .map(p => `${p.name} ${(p.price / 1000).toFixed(0)}k`)
+      .join(", ")
+    lines.push(`- ${shop.name} (${shop.category}): ${items || "xem menu tại quán"}`)
+  }
+  return lines.join("\n")
+}
+
 export async function logBlocked(
   senderId: string,
   message: string,

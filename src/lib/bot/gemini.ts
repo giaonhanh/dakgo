@@ -30,6 +30,7 @@ export interface ChatMessage {
 export async function askGemini(
   history: ChatMessage[],
   userMessage: string,
+  shopContext?: string,
 ): Promise<string> {
   try {
     const messages: Groq.Chat.ChatCompletionMessageParam[] = [
@@ -40,10 +41,14 @@ export async function askGemini(
       { role: "user", content: userMessage },
     ]
 
+    const systemContent = shopContext
+      ? `${SYSTEM_PROMPT}\n\n${shopContext}`
+      : SYSTEM_PROMPT
+
     const completion = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: systemContent },
         ...messages,
       ],
       max_tokens: 512,
