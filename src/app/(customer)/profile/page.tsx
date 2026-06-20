@@ -157,12 +157,11 @@ export default function ProfilePage() {
   }, [])
 
   useEffect(() => {
-    router.refresh()
     void load()
     const onVisible = () => { if (document.visibilityState === "visible") void load() }
     document.addEventListener("visibilitychange", onVisible)
     return () => document.removeEventListener("visibilitychange", onVisible)
-  }, [load, router])
+  }, [load])
 
   const tierCfg  = TIER_CFG[tier as keyof typeof TIER_CFG] ?? TIER_CFG.bronze
   const nextTier = NEXT_TIER[tier] ?? "Gold"
@@ -239,10 +238,68 @@ export default function ProfilePage() {
 
   const CARD_STYLE: React.CSSProperties = { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "2px 13px" }
 
+  const SHELL_STYLE: React.CSSProperties = {
+    position: "fixed", inset: 0, background: "#080806",
+    zIndex: 60, display: "flex", flexDirection: "column", fontFamily: "'Lexend',sans-serif",
+  }
+  const HEADER_STYLE: React.CSSProperties = {
+    background: "rgba(8,8,6,0.96)", backdropFilter: "blur(16px)",
+    borderBottom: "1px solid rgba(255,255,255,0.07)",
+    padding: "calc(env(safe-area-inset-top) + 12px) 16px 12px", flexShrink: 0,
+    display: "flex", alignItems: "center", gap: 10,
+  }
+
   if (loading) {
     return (
-      <div style={{ position: "fixed", inset: 0, background: "#080806", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Lexend" }}>
-        <div style={{ color: "#6a5a40", fontSize: 12 }}>Đang tải hồ sơ...</div>
+      <div style={SHELL_STYLE}>
+        <style>{`@keyframes skshimmer{0%{left:-80%}100%{left:120%}}`}</style>
+        {/* Header skeleton — giống hệt header thật */}
+        <div style={HEADER_STYLE}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }} />
+          <div style={{ flex: 1, height: 14, borderRadius: 7, background: "rgba(255,255,255,0.06)", maxWidth: 120, position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: 0, left: "-80%", width: "60%", height: "100%", background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent)", animation: "skshimmer 1.4s infinite" }} />
+          </div>
+          <div style={{ width: 56, height: 28, borderRadius: 9, background: "rgba(255,107,0,0.06)", border: "1px solid rgba(255,107,0,0.1)" }} />
+        </div>
+        {/* Body skeleton */}
+        <div style={{ flex: 1, overflowY: "hidden", padding: "0 16px" }}>
+          {/* Avatar area */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "24px 0 16px", gap: 10 }}>
+            <div style={{ width: 80, height: 80, borderRadius: 24, background: "rgba(255,107,0,0.08)", border: "2px solid rgba(255,107,0,0.15)", position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: 0, left: "-80%", width: "60%", height: "100%", background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)", animation: "skshimmer 1.4s 0.1s infinite" }} />
+            </div>
+            <div style={{ width: 120, height: 14, borderRadius: 7, background: "rgba(255,255,255,0.05)", position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: 0, left: "-80%", width: "60%", height: "100%", background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)", animation: "skshimmer 1.4s 0.15s infinite" }} />
+            </div>
+            <div style={{ width: 80, height: 22, borderRadius: 9, background: "rgba(255,107,0,0.05)", border: "1px solid rgba(255,107,0,0.08)" }} />
+          </div>
+          {/* Stats skeleton */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            {[0,1,2].map(i => (
+              <div key={i} style={{ flex: 1, height: 60, borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: 0, left: "-80%", width: "60%", height: "100%", background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)", animation: `skshimmer 1.4s ${0.1*i}s infinite` }} />
+              </div>
+            ))}
+          </div>
+          {/* Rows skeleton */}
+          {[0,1,2,3,4].map(i => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              <div style={{ width: 20, height: 20, borderRadius: 6, background: "rgba(255,255,255,0.05)" }} />
+              <div style={{ flex: 1, height: 12, borderRadius: 6, background: "rgba(255,255,255,0.04)", maxWidth: `${60 + i*8}%`, position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: 0, left: "-80%", width: "60%", height: "100%", background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)", animation: `skshimmer 1.4s ${0.08*i}s infinite` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Bottom Nav skeleton — giữ layout ổn định, tránh jump khi loaded */}
+        <div style={{ position: "fixed", bottom: "max(16px,env(safe-area-inset-bottom))", left: 14, right: 14, height: 56, background: "rgba(8,8,6,0.92)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 9999, display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 6px", zIndex: 70 }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "5px 11px" }}>
+              <div style={{ width: 22, height: 22, borderRadius: 6, background: "rgba(255,255,255,0.05)" }} />
+              <div style={{ width: 28, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.04)" }} />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -251,6 +308,7 @@ export default function ProfilePage() {
     <>
       <style>{`
         @keyframes shimmer     { 0% { left: -60%; } 100% { left: 120%; } }
+        @keyframes skshimmer   { 0% { left: -80%; } 100% { left: 120%; } }
         @keyframes purplePulse { 0%,100% { box-shadow: 0 0 16px rgba(180,100,255,0.2) } 50% { box-shadow: 0 0 28px rgba(180,100,255,0.38) } }
         @keyframes goldPulse   { 0%,100% { box-shadow: 0 0 16px rgba(245,197,66,0.15) } 50% { box-shadow: 0 0 28px rgba(245,197,66,0.3)  } }
       `}</style>
@@ -325,11 +383,11 @@ export default function ProfilePage() {
       </AnimatePresence>
 
 
-      <div style={{ position: "fixed", inset: 0, background: "#080806", zIndex: 60, display: "flex", flexDirection: "column", fontFamily: "'Lexend',sans-serif" }}>
+      <div style={SHELL_STYLE}>
 
         {/* Header */}
-        <div style={{ background: "rgba(8,8,6,0.96)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "calc(env(safe-area-inset-top) + 12px) 16px 12px", flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={HEADER_STYLE}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
             <button onClick={() => router.back()} style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, cursor: "pointer", color: "#FF8C00" }}>←</button>
             <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 700 }}>Hồ sơ cá nhân</div>
             <button onClick={() => editMode ? handleSave() : setEditMode(true)} style={{ padding: "6px 14px", borderRadius: 9, cursor: "pointer", background: editMode ? "linear-gradient(90deg,#FF6B00,#FF8C00)" : "rgba(255,107,0,0.1)", border: editMode ? "none" : "1px solid rgba(255,107,0,0.25)", color: editMode ? "#fff" : "#FF8C00", fontSize: 10, fontWeight: 700, fontFamily: "Lexend", transition: "all .2s" }}>
