@@ -40,8 +40,8 @@ export async function POST(req: Request) {
     return Response.json({ ok: false }, { status: 404 })
   }
 
-  // Xử lý bất đồng bộ — trả 200 ngay để FB không retry
-  void handleEvents(body)
+  // Await trước khi trả response — Vercel kill function ngay khi return
+  await handleEvents(body)
 
   return Response.json({ ok: true })
 }
