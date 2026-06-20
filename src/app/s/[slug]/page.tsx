@@ -11,12 +11,22 @@ interface Props { params: Promise<{ slug: string }> }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const supabase  = await createClient()
-  const { data: shop } = await supabase
+  let { data: shop } = await supabase
     .from("shops")
     .select("name, description, cover_image_url, logo_url, category")
     .eq("slug", slug)
     .eq("status", "approved")
     .single()
+
+  if (!shop) {
+    const { data: byPrev } = await supabase
+      .from("shops")
+      .select("name, description, cover_image_url, logo_url, category")
+      .eq("previous_slug", slug)
+      .eq("status", "approved")
+      .single()
+    shop = byPrev
+  }
 
   if (!shop) return { title: "DakGo" }
 
@@ -50,12 +60,24 @@ export default async function ShopSlugPage({ params }: Props) {
   const { slug } = await params
   const supabase  = await createClient()
 
-  const { data: shop } = await supabase
+  let { data: shop } = await supabase
     .from("shops")
-    .select("id, name, description, cover_image_url, logo_url, category, is_open, rating_avg, address")
+    .select("id, name, description, cover_image_url, logo_url, category, is_open, rating_avg, address, slug")
     .eq("slug", slug)
     .eq("status", "approved")
     .single()
+
+  // Slug cũ → redirect sang slug mới
+  if (!shop) {
+    const { data: byPrev } = await supabase
+      .from("shops")
+      .select("id, name, description, cover_image_url, logo_url, category, is_open, rating_avg, address, slug")
+      .eq("previous_slug", slug)
+      .eq("status", "approved")
+      .single()
+    if (byPrev?.slug) redirect(`/s/${byPrev.slug}`)
+    shop = byPrev
+  }
 
   if (!shop) redirect("/")
 

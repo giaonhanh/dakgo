@@ -54,6 +54,7 @@ export default function MerchantProfilePage() {
   const [slugSaving,  setSlugSaving]  = useState(false)
   const [slugSaved,   setSlugSaved]   = useState(false)
   const [slugCopied,  setSlugCopied]  = useState(false)
+  const savedSlugRef = useRef("")  // slug đang lưu trong DB
   const coverInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef  = useRef<HTMLInputElement>(null)
 
@@ -105,6 +106,7 @@ export default function MerchantProfilePage() {
           setCoverUrl((shop as Record<string,unknown>).cover_image_url as string ?? null)
           const loadedSlug = (shop as Record<string,unknown>).slug as string ?? ""
           setSlug(loadedSlug)
+          savedSlugRef.current = loadedSlug
           if (loadedSlug) setSlugSaved(true)
         }
       } catch { /* ignore */ }
@@ -180,12 +182,16 @@ export default function MerchantProfilePage() {
     if (!shopId || !slug) return
     if (slug.length < 3) { setSlugErr("Tối thiểu 3 ký tự"); return }
     setSlugSaving(true); setSlugErr("")
-    const { error } = await supabase.from("shops").update({ slug }).eq("id", shopId)
+    const oldSlug = savedSlugRef.current
+    const payload: Record<string, unknown> = { slug }
+    if (oldSlug && oldSlug !== slug) payload.previous_slug = oldSlug
+    const { error } = await supabase.from("shops").update(payload).eq("id", shopId)
     setSlugSaving(false)
     if (error) {
       if (error.code === "23505") { setSlugErr("Link đã có người dùng, thử link khác nhé!"); return }
       setSlugErr("Lỗi: " + error.message); return
     }
+    savedSlugRef.current = slug
     setSlugSaved(true)
     addToast("✅ Đã lưu link cửa hàng")
   }
