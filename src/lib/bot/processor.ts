@@ -196,10 +196,12 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
     }
   }
 
-  // Khách nhắn "xem thêm" quán
-  if (state === "ordering" && /(xem thêm|thêm quán|quán khác|có quán nào khác)/i.test(text)) {
+  // Khách hỏi thêm quán (nhiều dạng)
+  const askMoreShops = /(xem thêm|thêm quán|quán khác|có quán nào|còn quán|quán nào (khác|nữa|không)|cho.*xem.*quán|gợi ý.*quán)/i
+  if (askMoreShops.test(text)) {
+    await saveMessage(senderId, "user", text)
     const keyword = await getKeyword(senderId)
-    // Lấy page hiện tại từ __PAGE__ metadata
+
     const supabase = (await import("@supabase/supabase-js")).createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
@@ -212,13 +214,12 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
 
     const cardResponse = await buildShopCards(keyword, nextPage)
     if (cardResponse && cardResponse.elements.length > 0) {
-      await saveMessage(senderId, "user", text)
       await supabase.from("bot_conversations").insert({
         sender_id: senderId, role: "model", content: `__PAGE__:${nextPage}`
       })
       return cardResponse
     }
-    const noMore = "Mình đã gợi ý hết các quán đang mở rồi bạn ơi 😊\nBạn muốn chọn quán nào ở trên không?"
+    const noMore = `😊 Mình đã gợi ý hết quán đang mở có "${keyword}" rồi bạn ơi!\nBạn muốn thử món khác không?`
     await saveMessage(senderId, "model", noMore)
     return { type: "text", content: noMore }
   }
