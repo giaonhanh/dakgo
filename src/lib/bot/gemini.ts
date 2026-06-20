@@ -126,11 +126,20 @@ export async function askGemini(
     })),
   })
 
-  try {
-    const result = await chat.sendMessage(userMessage)
-    return result.response.text()
-  } catch (err) {
-    console.error("[gemini] error:", JSON.stringify(err))
-    return "Xin lỗi bạn, mình đang bận xử lý đơn 😅 Bạn nhắn lại sau vài giây nhé!"
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const result = await chat.sendMessage(userMessage)
+      return result.response.text()
+    } catch (err) {
+      const status = (err as { status?: number }).status
+      console.error(`[gemini] attempt ${attempt} error:`, status, JSON.stringify(err))
+      // 429 rate limit — chờ rồi retry
+      if (status === 429 && attempt < 3) {
+        await new Promise(r => setTimeout(r, attempt * 2000))
+        continue
+      }
+      break
+    }
   }
+  return "Xin lỗi bạn, mình đang bận xử lý đơn 😅 Bạn nhắn lại sau vài giây nhé!"
 }
