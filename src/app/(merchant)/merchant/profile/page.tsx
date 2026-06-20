@@ -382,13 +382,25 @@ export default function MerchantProfilePage() {
                 <span style={{ color:"#b0956a" }}>www.dakgo.com/s/</span>
                 <span style={{ color:"#FF8C00",fontWeight:600 }}>{slug || toSlug(name) || "tencuahang"}</span>
               </div>
-              <button onClick={async () => { await navigator.clipboard.writeText(`https://www.dakgo.com/s/${slug||toSlug(name)}`); setSlugCopied(true); setTimeout(()=>setSlugCopied(false),2000) }}
-                style={{ padding:"4px 10px",borderRadius:7,border:"none",background:slugCopied?"rgba(62,207,110,0.12)":"rgba(255,255,255,0.06)",color:slugCopied?"#3ecf6e":"#6a5a40",fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:"Lexend" }}>
-                {slugCopied?"✓ Đã copy":"📋 Copy"}
+              <button
+                onClick={async () => {
+                  if (!slugSaved) return
+                  await navigator.clipboard.writeText(`https://www.dakgo.com/s/${slug}`)
+                  setSlugCopied(true)
+                  setTimeout(() => setSlugCopied(false), 2000)
+                }}
+                disabled={!slugSaved}
+                style={{ padding:"4px 10px",borderRadius:7,border:"none",
+                  background: slugCopied ? "rgba(62,207,110,0.12)" : !slugSaved ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.06)",
+                  color: slugCopied ? "#3ecf6e" : !slugSaved ? "#3a2a1a" : "#6a5a40",
+                  fontSize:9,fontWeight:700,cursor:slugSaved?"pointer":"not-allowed",fontFamily:"Lexend" }}>
+                {slugCopied ? "✓ Đã copy" : "📋 Copy"}
               </button>
             </div>
             <div style={{ color:"#6a5a40",fontSize:9,marginTop:6,lineHeight:1.5 }}>
-              💡 Chia sẻ link này lên Zalo/FB — khách bấm vào sẽ thấy trang quán và đặt hàng ngay.
+              {slugSaved
+                ? "💡 Chia sẻ link này lên Zalo/FB — khách bấm vào sẽ thấy trang quán và đặt hàng ngay."
+                : "⚠️ Nhập link và bấm Lưu trước khi chia sẻ."}
             </div>
           </div>
 
