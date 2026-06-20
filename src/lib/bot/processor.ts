@@ -136,7 +136,7 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
 
   // Groq text flow
   const [history, shopContext] = await Promise.all([
-    getConversation(senderId, 10),
+    getConversation(senderId, 20),
     getShopContext(),
   ])
 
