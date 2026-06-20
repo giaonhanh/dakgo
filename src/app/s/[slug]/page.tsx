@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { createClient as createAnonClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 import Image from "next/image"
 import type { Metadata } from "next"
@@ -10,7 +11,11 @@ interface Props { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const supabase  = await createClient()
+  // Dùng anon client trực tiếp — crawler không có session, tránh phụ thuộc cookies
+  const supabase = createAnonClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
   let { data: shop } = await supabase
     .from("shops")
     .select("name, description, cover_image_url, logo_url, category")
