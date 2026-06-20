@@ -62,41 +62,54 @@ export interface ChatMessage {
   parts: string
 }
 
+// Danh sách model rotate khi bị rate limit — mỗi model có bucket riêng
+const MODELS = [
+  "llama-3.3-70b-versatile",
+  "llama3-70b-8192",
+  "llama-3.1-8b-instant",
+  "gemma2-9b-it",
+  "mixtral-8x7b-32768",
+]
+
 export async function askGemini(
   history: ChatMessage[],
   userMessage: string,
   shopContext?: string,
 ): Promise<string> {
-  try {
-    const messages: Groq.Chat.ChatCompletionMessageParam[] = [
-      ...history.map(h => ({
-        role: (h.role === "model" ? "assistant" : "user") as "user" | "assistant",
-        content: h.parts,
-      })),
-      { role: "user", content: userMessage },
-    ]
+  const messages: Groq.Chat.ChatCompletionMessageParam[] = [
+    ...history.map(h => ({
+      role: (h.role === "model" ? "assistant" : "user") as "user" | "assistant",
+      content: h.parts,
+    })),
+    { role: "user", content: userMessage },
+  ]
 
-    const systemContent = shopContext
-      ? `${SYSTEM_PROMPT}\n\n${shopContext}`
-      : SYSTEM_PROMPT
+  const systemContent = shopContext
+    ? `${SYSTEM_PROMPT}\n\n${shopContext}`
+    : SYSTEM_PROMPT
 
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: systemContent },
-        ...messages,
-      ],
-      max_tokens: 512,
-      temperature: 0.7,
-    })
-
-    return completion.choices[0]?.message?.content ?? "Bạn nhắn lại giúp mình nhé! 🙏"
-  } catch (err) {
-    const status = (err as { status?: number }).status
-    console.error("[groq] error:", status)
-    if (status === 429) {
-      return "Mình đang bận xíu 😅 Bạn nhắn lại sau 1 phút nhé!"
+  for (const model of MODELS) {
+    try {
+      const completion = await groq.chat.completions.create({
+        model,
+        messages: [
+          { role: "system", content: systemContent },
+          ...messages,
+        ],
+        max_tokens: 512,
+        temperature: 0.7,
+      })
+      return completion.choices[0]?.message?.content ?? "Bạn nhắn lại giúp mình nhé! 🙏"
+    } catch (err) {
+      const status = (err as { status?: number }).status
+      if (status === 429) {
+        console.warn(`[groq] 429 on ${model}, trying next...`)
+        continue
+      }
+      console.error(`[groq] error on ${model}:`, status)
+      break
     }
-    return "Xin lỗi bạn, mình gặp chút sự cố 🙏 Bạn thử lại sau nhé!"
   }
+
+  return "Mình đang hơi bận, bạn nhắn lại sau giây lát nhé! 🙏"
 }
