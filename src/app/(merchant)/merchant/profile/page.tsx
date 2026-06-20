@@ -37,6 +37,7 @@ export default function MerchantProfilePage() {
   const [isOpen,      setIsOpen]      = useState(false)
   const [name,        setName]        = useState("")
   const [phone,       setPhone]       = useState("")
+  const [description, setDescription] = useState("")
   const [address,     setAddress]     = useState("")
   const [categories,  setCategories]  = useState<string[]>([])
   const [avatar,      setAvatar]      = useState("🍜")
@@ -73,7 +74,7 @@ export default function MerchantProfilePage() {
         const [{ data: profile }, { data: shop }] = await Promise.all([
           supabase.from("profiles").select("created_at").eq("id", user.id).single(),
           supabase.from("shops")
-            .select("id,name,phone,address,category,categories,is_open,rating_avg,total_reviews,commission_rate,lat,lng,logo_url,cover_image_url,slug")
+            .select("id,name,phone,address,description,category,categories,is_open,rating_avg,total_reviews,commission_rate,lat,lng,logo_url,cover_image_url,slug")
             .eq("owner_id", user.id)
             .single(),
         ])
@@ -85,6 +86,7 @@ export default function MerchantProfilePage() {
           setShopId(shop.id)
           setName(shop.name ?? "")
           setPhone(shop.phone ?? "")
+          setDescription((shop as Record<string,unknown>).description as string ?? "")
           setAddress(shop.address ?? "")
           origRef.current = { name: shop.name ?? "", address: shop.address ?? "" }
           const rawCats: string[] = Array.isArray(shop.categories) && shop.categories.length > 0
@@ -195,7 +197,7 @@ export default function MerchantProfilePage() {
     setSaving(true)
     if (shopId) {
       const payload: Record<string, unknown> = {
-        name, address, categories,
+        name, description, address, categories,
         category: categories[0] ?? "khac",
         updated_at: new Date().toISOString(),
       }
@@ -394,6 +396,17 @@ export default function MerchantProfilePage() {
               <input value={name} onChange={e => { setName(e.target.value); checkDirty(e.target.value, address) }}
                 placeholder="Tên cửa hàng..."
                 style={{ width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,107,0,0.25)",borderRadius:8,padding:"8px 10px",color:"#f8f0e0",fontSize:12,fontWeight:600 }} />
+            </div>
+
+            {/* Mô tả */}
+            <div style={{ marginBottom:10 }}>
+              <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}>
+                <div style={{ color:"#6a5a40",fontSize:9 }}>Mô tả quán</div>
+                <div style={{ color:"#6a5a40",fontSize:9 }}>{description.length}/150</div>
+              </div>
+              <textarea value={description} onChange={e => { setDescription(e.target.value.slice(0,150)); checkDirty(name, address) }}
+                rows={3} placeholder="Giới thiệu ngắn về quán — hiển thị khi chia sẻ link lên Zalo/FB..."
+                style={{ width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,107,0,0.25)",borderRadius:8,padding:"8px 10px",color:"#f8f0e0",fontSize:11,lineHeight:1.6 }} />
             </div>
 
             {/* SĐT — read-only, chỉ admin thay đổi */}
