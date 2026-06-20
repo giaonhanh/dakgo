@@ -56,7 +56,7 @@ export default function MerchantProfilePage() {
   const logoInputRef  = useRef<HTMLInputElement>(null)
 
   // Track original values to detect changes
-  const origRef = useRef({ name: "", phone: "", address: "" })
+  const origRef = useRef({ name: "", address: "" })
   const [dirty, setDirty] = useState(false)
 
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
@@ -85,7 +85,7 @@ export default function MerchantProfilePage() {
           setName(shop.name ?? "")
           setPhone(shop.phone ?? "")
           setAddress(shop.address ?? "")
-          origRef.current = { name: shop.name ?? "", phone: shop.phone ?? "", address: shop.address ?? "" }
+          origRef.current = { name: shop.name ?? "", address: shop.address ?? "" }
           const rawCats: string[] = Array.isArray(shop.categories) && shop.categories.length > 0
             ? shop.categories
             : shop.category ? [shop.category] : []
@@ -109,9 +109,9 @@ export default function MerchantProfilePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const checkDirty = (n: string, p: string, a: string) => {
+  const checkDirty = (n: string, a: string) => {
     const o = origRef.current
-    setDirty(n !== o.name || p !== o.phone || a !== o.address)
+    setDirty(n !== o.name || a !== o.address)
   }
 
   const addToast = (msg: string, type: ToastType = "success") => {
@@ -135,7 +135,7 @@ export default function MerchantProfilePage() {
     setLng(pickedLng)
     if (geocodedAddr) {
       setAddress(geocodedAddr)
-      checkDirty(name, phone, geocodedAddr)
+      checkDirty(name, geocodedAddr)
     }
     setShowMapPicker(false)
 
@@ -151,7 +151,7 @@ export default function MerchantProfilePage() {
       else {
         addToast("📍 Đã lưu vị trí trên bản đồ")
         if (geocodedAddr) origRef.current.address = geocodedAddr
-        checkDirty(name, phone, geocodedAddr || address)
+        checkDirty(name, geocodedAddr || address)
       }
     }
   }
@@ -186,13 +186,12 @@ export default function MerchantProfilePage() {
 
   const handleSave = async () => {
     if (!name.trim())    { addToast("❌ Tên cửa hàng không được để trống", "error"); return }
-    if (!phone.trim())   { addToast("❌ Số điện thoại không được để trống", "error"); return }
     if (!address.trim()) { addToast("❌ Địa chỉ không được để trống", "error"); return }
 
     setSaving(true)
     if (shopId) {
       const payload: Record<string, unknown> = {
-        name, phone, address, categories,
+        name, address, categories,
         category: categories[0] ?? "khac",
         updated_at: new Date().toISOString(),
       }
@@ -204,7 +203,7 @@ export default function MerchantProfilePage() {
       const { error } = await supabase.from("shops").update(payload).eq("id", shopId)
       if (error) { addToast("❌ Lỗi lưu: " + error.message, "error"); setSaving(false); return }
     }
-    origRef.current = { name, phone, address }
+    origRef.current = { name, address }
     setDirty(false)
     setSaving(false)
     addToast("✅ Đã lưu thông tin cửa hàng")
@@ -383,23 +382,25 @@ export default function MerchantProfilePage() {
             {/* Tên */}
             <div style={{ marginBottom:10 }}>
               <div style={{ color:"#6a5a40",fontSize:9,marginBottom:4 }}>Tên cửa hàng</div>
-              <input value={name} onChange={e => { setName(e.target.value); checkDirty(e.target.value, phone, address) }}
+              <input value={name} onChange={e => { setName(e.target.value); checkDirty(e.target.value, address) }}
                 placeholder="Tên cửa hàng..."
                 style={{ width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,107,0,0.25)",borderRadius:8,padding:"8px 10px",color:"#f8f0e0",fontSize:12,fontWeight:600 }} />
             </div>
 
-            {/* SĐT */}
+            {/* SĐT — read-only, chỉ admin thay đổi */}
             <div style={{ marginBottom:10 }}>
               <div style={{ color:"#6a5a40",fontSize:9,marginBottom:4 }}>Số điện thoại</div>
-              <input value={phone} onChange={e => { setPhone(e.target.value); checkDirty(name, e.target.value, address) }}
-                placeholder="0xxx xxx xxx"
-                style={{ width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,107,0,0.25)",borderRadius:8,padding:"8px 10px",color:"#f8f0e0",fontSize:12 }} />
+              <div style={{ display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8,padding:"8px 10px" }}>
+                <span style={{ flex:1,color:"#b0956a",fontSize:12 }}>{phone || "Chưa có"}</span>
+                <span style={{ color:"#6a5a40",fontSize:9,background:"rgba(255,255,255,0.05)",borderRadius:5,padding:"2px 7px",flexShrink:0 }}>🔒 Chỉ Admin</span>
+              </div>
+              <div style={{ color:"#6a5a40",fontSize:9,marginTop:4 }}>Liên hệ Admin để thay đổi số điện thoại cửa hàng.</div>
             </div>
 
             {/* Địa chỉ */}
             <div style={{ marginBottom:10 }}>
               <div style={{ color:"#6a5a40",fontSize:9,marginBottom:4 }}>Địa chỉ</div>
-              <textarea value={address} onChange={e => { setAddress(e.target.value); checkDirty(name, phone, e.target.value) }}
+              <textarea value={address} onChange={e => { setAddress(e.target.value); checkDirty(name, e.target.value) }}
                 rows={2} placeholder="Số nhà, tên đường, phường/xã..."
                 style={{ width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,107,0,0.25)",borderRadius:8,padding:"8px 10px",color:"#f8f0e0",fontSize:11,lineHeight:1.5 }} />
               <button type="button" onClick={() => setShowMapPicker(true)}
