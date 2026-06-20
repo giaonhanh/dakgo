@@ -75,20 +75,21 @@ export async function buildShopCards(keyword: string, page = 0): Promise<CardRes
 
   const { data: shops } = await supabase
     .from("shops")
-    .select("id, name, cover_image_url, logo_url, is_open, category")
+    .select("id, name, cover_image_url, logo_url, is_open, category, slug")
     .in("id", shopIds)
     .eq("status", "approved")
-    .eq("is_open", true)  // chỉ lấy quán đang mở
+    .eq("is_open", true)
     .limit(20)
 
   if (!shops || shops.length === 0) return null
+
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
 
   const elements: FBCard[] = shops.map(shop => {
     const shopProducts = products
       .filter(p => p.shop_id === shop.id)
       .slice(0, 3)
 
-    // Subtitle tối đa ~200 ký tự
     const itemLines = shopProducts
       .map(p => `• ${p.name} — ${(p.price / 1000).toFixed(0)}k`)
       .join("\n")
@@ -98,15 +99,18 @@ export async function buildShopCards(keyword: string, page = 0): Promise<CardRes
       ? `${itemLines}\n• +${extraCount} món khác`
       : itemLines
 
-    const status = shop.is_open ? "" : " (Đang đóng cửa)"
+    const shopUrl = shop.slug
+      ? `${APP_URL}/s/${shop.slug}`
+      : `${APP_URL}/shop/${shop.id}`
 
     return {
-      title: `${shop.name}${status}`,
+      title: shop.name,
       subtitle: subtitle || "Xem menu tại quán",
       image_url: shop.cover_image_url ?? shop.logo_url ?? undefined,
-      buttons: shop.is_open
-        ? [{ type: "postback" as const, title: "🛵 Đặt ngay", payload: `ORDER_SHOP:${shop.id}:${encodeURIComponent(shop.name)}` }]
-        : [{ type: "postback" as const, title: "📋 Xem menu", payload: `VIEW_MENU:${shop.id}:${encodeURIComponent(shop.name)}` }],
+      buttons: [
+        { type: "postback" as const, title: "🛵 Đặt ngay", payload: `ORDER_SHOP:${shop.id}:${encodeURIComponent(shop.name)}` },
+        { type: "web_url" as const,  title: "🏪 Vào quán",  url: shopUrl },
+      ],
     }
   })
 
