@@ -34,7 +34,7 @@ export async function saveMessage(
 
 // ─── State machine (A→B→C location flow) ────────────────────────────────────
 
-export type LocationState = "idle" | "awaiting_location" | "awaiting_address" | "done"
+export type LocationState = "idle" | "ordering" | "awaiting_location" | "awaiting_address" | "done"
 
 export async function getState(senderId: string): Promise<LocationState> {
   const supabase = createClient()

@@ -24,9 +24,10 @@ function isRateLimited(senderId: string): boolean {
 export async function processPostback(senderId: string, payload: string): Promise<BotResponse> {
   if (payload.startsWith("ORDER_SHOP:")) {
     const [, , shopName] = payload.split(":")
-    const reply = `🛵 Bạn muốn đặt từ **${shopName}**!\n\nBạn muốn đặt món gì? Mình sẽ giúp bạn hoàn tất đơn nhé 😊`
-    await saveMessage(senderId, "model", reply)
+    await setState(senderId, "ordering")
     await saveMessage(senderId, "user", `[Chọn quán: ${shopName}]`)
+    const reply = `🛵 Bạn chọn **${shopName}** rồi!\n\nBạn muốn đặt món gì ạ?`
+    await saveMessage(senderId, "model", reply)
     return { type: "text", content: reply }
   }
 
@@ -103,19 +104,25 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
     return { type: "text", content: guardResult.reply }
   }
 
+  // State hiện tại
+  const state = await getState(senderId)
+
   // Detect intent tìm quán/đặt đồ → hiện card
-  const keyword = extractFoodKeyword(text)
-  if (keyword) {
-    const cardResponse = await buildShopCards(keyword)
-    if (cardResponse) {
-      await saveMessage(senderId, "user", text)
-      await saveMessage(senderId, "model", `[Card gợi ý quán: ${keyword}]`)
-      return cardResponse
+  // KHÔNG hiện card khi đang trong flow đặt hàng
+  const isOrdering = state === "ordering" || state === "awaiting_location" || state === "awaiting_address"
+  if (!isOrdering) {
+    const keyword = extractFoodKeyword(text)
+    if (keyword) {
+      const cardResponse = await buildShopCards(keyword)
+      if (cardResponse) {
+        await saveMessage(senderId, "user", text)
+        await saveMessage(senderId, "model", `[Card gợi ý quán: ${keyword}]`)
+        // Chuyển sang ordering sau khi show card
+        await setState(senderId, "ordering")
+        return cardResponse
+      }
     }
   }
-
-  // State: đang chờ địa chỉ text (bước B)
-  const state = await getState(senderId)
   if (state === "awaiting_address") {
     await setState(senderId, "done")
     await saveMessage(senderId, "user", text)
