@@ -30,7 +30,7 @@ import {
   type BotSession, type CollectedData,
 } from "./session"
 import { createOrder } from "./order-creator"
-import { geocodeAddress, distanceKm, reverseGeocode } from "./geo"
+import { geocodeAddress, tryGeocodeAddress, distanceKm, reverseGeocode } from "./geo"
 import { getPricing, calcFee, type ServiceType } from "./pricing"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
@@ -816,20 +816,33 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
       const isNew = extracted.data[f.addr] && !collected_data[f.addr]
       if (isNew) {
         const addrText = newData[f.addr]!
-        try {
-          const coords = await geocodeAddress(addrText)
-          newData = mergeData(newData, { [f.lat]: coords.lat, [f.lng]: coords.lng })
-          await saveSession(senderId, { collected_data: newData })
-          await saveMessage(senderId, "model", `📍 ${addrText}\n\nĐúng chưa bạn?`)
+        const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
+        const mapUrl   = `${appUrl}/bot-address?sid=${senderId}`
+
+        const coords = await tryGeocodeAddress(addrText)
+
+        if (!coords) {
+          // Không tìm được → xóa address vừa extract, xin lỗi + gửi link bản đồ
+          const cleaned = { ...newData }
+          delete (cleaned as Record<string, unknown>)[f.addr]
+          await saveSession(senderId, { collected_data: cleaned })
+          const sorry = `😔 Mình chưa xác định được vị trí "${addrText}" trên bản đồ.\n\nBạn dùng link bên dưới để chọn chính xác giúp mình nhé!`
+          await saveMessage(senderId, "model", sorry)
           return {
-            type: "text",
-            content: `📍 ${addrText}\n\nĐúng chưa bạn?`,
-            quick_replies: QR_CONFIRM_CANCEL,
-          }
-        } catch {
-          // Geocode fail → tiếp tục bình thường, order-creator sẽ geocode lại
+            type:        "text_with_webview",
+            content:     sorry,
+            buttonTitle: "🗺️ Chọn vị trí trên bản đồ",
+            url:         mapUrl,
+            quick_replies: [{ content_type: "location" }],
+          } as TextWithWebviewResponse
         }
-        break
+
+        // Tìm được → lưu coords + hỏi xác nhận
+        newData = mergeData(newData, { [f.lat]: coords.lat, [f.lng]: coords.lng })
+        await saveSession(senderId, { collected_data: newData })
+        const confirmMsg = `📍 ${addrText}\n\nĐúng chưa bạn?`
+        await saveMessage(senderId, "model", confirmMsg)
+        return { type: "text", content: confirmMsg, quick_replies: QR_CONFIRM_CANCEL }
       }
     }
 

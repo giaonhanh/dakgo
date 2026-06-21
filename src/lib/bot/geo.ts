@@ -9,7 +9,8 @@ export interface LatLng { lat: number; lng: number }
 const PHUOC_AN: LatLng = { lat: 12.4383, lng: 108.1476 }
 const VIETMAP_KEY = process.env.NEXT_PUBLIC_VIETMAP_SERVICES_KEY
 
-export async function geocodeAddress(address: string): Promise<LatLng> {
+/** Trả null nếu không tìm được — KHÔNG fallback Phước An */
+export async function tryGeocodeAddress(address: string): Promise<LatLng | null> {
   if (VIETMAP_KEY) {
     try {
       const r = await vietmapGeocode(address)
@@ -24,6 +25,13 @@ export async function geocodeAddress(address: string): Promise<LatLng> {
   } catch (e) {
     console.warn("[geo] Nominatim err:", (e as Error).message?.slice(0, 60))
   }
+  return null
+}
+
+/** Luôn trả tọa độ — fallback Phước An nếu không tìm được (dùng khi tạo đơn) */
+export async function geocodeAddress(address: string): Promise<LatLng> {
+  const r = await tryGeocodeAddress(address)
+  if (r) return r
   console.warn("[geo] fallback Phuoc An for:", address)
   return PHUOC_AN
 }
