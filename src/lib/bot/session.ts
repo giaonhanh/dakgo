@@ -288,19 +288,22 @@ export function buildConfirmationSummary(intent: string, data: CollectedData): s
 // ─── Intent helpers ────────────────────────────────────────────────────────────
 
 export function isConfirmation(text: string): boolean {
-  const lower = text.toLowerCase().trim()
-  return /^(đúng|ok|okay|oke|được|rồi|xác nhận|đặt đi|đặt luôn|ừ|vâng|dạ|yes|chính xác|đúng rồi|đặt|tiếp tục|chuẩn|đặt nha|chuẩn rồi|ừ nhé)/.test(lower)
-    || lower === "1" || lower === "✅"
+  const t = text.toLowerCase().trim()
+  // Xác nhận rõ ràng
+  if (/^(1|✅|👍)$/.test(t)) return true
+  // Từ xác nhận phổ biến + địa phương Tây Nguyên
+  return /^(đúng|ok|okay|oke|okie|dc|đc|được|rồi|xác nhận|đặt đi|đặt luôn|đặt ngay|ừ|vâng|dạ|yes|yep|chính xác|đúng rồi|đặt|tiếp tục|chuẩn|đặt nha|chuẩn rồi|ừ nhé|ừa|uhm|um|thôi đặt|đặt thôi|đặt đi nào|ok nha|ok nhé|được rồi|chuẩn luôn|y vậy thôi|tui đồng ý|mình đồng ý|ok luôn|thống nhất|nhất trí|đặt luôn nha|mình đồng ý|được đó|oke đó|ok đó|ok đi|làm đi|cho đặt|đặt cho tui|tiến hành|chốt|chốt đơn|xác nhận đơn|ok chốt|chốt luôn)/.test(t)
 }
 
 export function isCorrection(text: string): boolean {
-  return /(không|sai|đổi|thay|chỉnh|nhầm|lại|khác|sửa|chưa đúng|không phải|bỏ|xóa|thêm)/.test(text.toLowerCase())
+  const t = text.toLowerCase()
+  return /(không|sai|đổi|thay|chỉnh|nhầm|lại|khác|sửa|chưa đúng|không phải|bỏ|xóa|thêm|chỉnh lại|đặt lại|nhầm rồi|sai bét|sai rồi|không đúng|ý tui là|ý mình là|không phải vậy|chưa đúng đâu|cần sửa|muốn đổi|đổi lại|bớt|giảm|thay bằng|thay thành|đổi thành|sửa thành)/.test(t)
 }
 
 export function isEscalationRequest(text: string): boolean {
-  return /(người thật|nhân viên|quản lý|hỗ trợ trực tiếp|gặp người|liên hệ người|admin|số điện thoại công ty)/.test(text.toLowerCase())
+  return /(người thật|nhân viên|quản lý|hỗ trợ trực tiếp|gặp người|liên hệ người|admin|số điện thoại công ty|nói chuyện trực tiếp|gặp trực tiếp|gọi cho tui|hotline)/.test(text.toLowerCase())
 }
 
 export function isReorderRequest(text: string): boolean {
-  return /(đặt lại|order lại|như (hôm qua|hôm kia|lần trước|trước đó)|gọi lại|y chang|y như|lại như cũ|đặt như cũ)/.test(text.toLowerCase())
+  return /(đặt lại|order lại|như (hôm qua|hôm kia|lần trước|trước đó|hồi trước)|gọi lại|y chang|y như|lại như cũ|đặt như cũ|y chang lần trước|giống hôm qua|giống như cũ|lấy lại|bữa trước|hôm trước)/.test(text.toLowerCase())
 }
