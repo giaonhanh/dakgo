@@ -16,7 +16,7 @@ import { extractAndReply, INTENT_MAP, type ChatTurn } from "./extractor"
 import { detectServiceType, checkServiceAvailable } from "./service-check"
 import {
   buildShopCards,
-  type BotResponse, type TextWithWebviewResponse, type ButtonTemplateResponse,
+  type BotResponse, type TextWithWebviewResponse, type ButtonTemplateResponse, type ReceiptTemplateResponse,
   QR_SERVICE_MENU, QR_LOCATION, QR_CONFIRM_CANCEL, QR_PAYMENT,
   QR_ORDER_ACTION, QR_RESUME, makeConfirmButtons,
 } from "./cards"
@@ -320,26 +320,86 @@ async function transitionToConfirming(session: BotSession): Promise<BotResponse>
 
 // ─── Success message ───────────────────────────────────────────────────────────
 
-function buildSuccessMsg(intent: string, displayId: string): string {
-  const label: Record<string, string> = {
+function buildSuccessMsg(intent: string, displayId: string, data?: CollectedData): BotResponse {
+  // Đồ ăn → Receipt Template (hóa đơn đẹp)
+  if (intent === "food_order" && data?.items?.length) {
+    const elements = data.items.map(it => ({
+      title:    it.name,
+      quantity: it.qty,
+      price:    it.price * it.qty,
+    }))
+    const subtotal     = data.estimated_subtotal ?? data.items.reduce((s, i) => s + i.price * i.qty, 0)
+    const shipping     = data.estimated_ship_fee ?? 15000
+    const total        = data.estimated_total ?? (subtotal + shipping)
+    const payLabel: Record<string, string> = { cash: "Tiền mặt", bank_transfer: "Chuyển khoản", momo: "MoMo", wallet: "Ví DakGo" }
+
+    return {
+      type:            "receipt_template",
+      recipient_name:  data.customer_name ?? "Khách hàng",
+      order_number:    displayId,
+      payment_method:  payLabel[data.payment_method ?? "cash"] ?? "Tiền mặt",
+      elements,
+      subtotal,
+      shipping_cost:   shipping,
+      total_cost:      total,
+      delivery_address: data.delivery_address,
+      timestamp:       Math.floor(Date.now() / 1000),
+    } as ReceiptTemplateResponse
+  }
+
+  // Xe ôm / Taxi / Giao hộ → text đẹp
+  const ICON: Record<string, string> = {
+    food_order: "🍜", deliver_for_me: "📦", buy_for_me: "🛒",
+    motorbike: "🛵", taxi: "🚕", taxi7: "🚕",
+  }
+  const LABEL: Record<string, string> = {
     food_order: "Đặt đồ ăn", deliver_for_me: "Giao hộ",
     buy_for_me: "Mua hộ", motorbike: "Xe ôm", taxi: "Taxi 4 chỗ", taxi7: "Taxi 7 chỗ",
   }
-  return [
-    "✅ Đặt hàng thành công!",
-    "",
-    `🧾 Mã đơn: #${displayId}`,
-    `📋 Dịch vụ: ${label[intent] ?? "Dịch vụ"}`,
-    "🛵 Tài xế sẽ nhận đơn và liên hệ bạn sớm nhé!",
-    "",
-    "Cảm ơn bạn đã dùng DakGo! 🙏",
-  ].join("\n")
+  const icon = ICON[intent] ?? "✅"
+  const svc  = LABEL[intent] ?? "Dịch vụ"
+  const fmt  = (n: number) => new Intl.NumberFormat("vi-VN").format(n) + "đ"
+
+  const lines = [
+    `${icon} ĐẶT THÀNH CÔNG!`,
+    `━━━━━━━━━━━━━━━━━━━━━`,
+    `🧾 Mã đơn : #${displayId}`,
+    `📋 Dịch vụ: ${svc}`,
+  ]
+
+  if (data) {
+    if (data.pickup_address)  lines.push(`📍 Đón tại : ${data.pickup_address}`)
+    if (data.dropoff_address) lines.push(`🏁 Đến     : ${data.dropoff_address}`)
+    if (data.delivery_address && !data.pickup_address)
+      lines.push(`📍 Giao đến: ${data.delivery_address}`)
+    if (data.estimated_total) lines.push(`💰 Giá     : ~${fmt(data.estimated_total)}`)
+  }
+
+  lines.push(`━━━━━━━━━━━━━━━━━━━━━`)
+  lines.push(`🛵 Tài xế sẽ liên hệ bạn sớm!`)
+  lines.push(`🙏 Cảm ơn bạn đã dùng DakGo`)
+
+  return { type: "text", content: lines.join("\n"), quick_replies: QR_ORDER_ACTION }
 }
 
 // ─── processPostback ──────────────────────────────────────────────────────────
 
 export async function processPostback(senderId: string, payload: string): Promise<BotResponse> {
   const session = await getSession(senderId)
+
+  // ── Get Started (lần đầu mở chat) ─────────────────────────────────────────
+  if (payload === "GET_STARTED") {
+    await resetSession(senderId)
+    const welcome = "Chào mừng bạn đến DakGo! 🎉\nMình phục vụ tại Phước An, Krông Pắc 📍\n\nBạn cần dịch vụ gì ạ?"
+    await saveMessage(senderId, "model", welcome)
+    return { type: "text", content: welcome, quick_replies: QR_SERVICE_MENU }
+  }
+
+  // ── Đặt lại đơn cũ từ persistent menu ──────────────────────────────────────
+  if (payload === "REORDER") {
+    await saveMessage(senderId, "user", "[Đặt lại đơn cũ]")
+    return processMessage(senderId, "đặt lại như hôm qua")
+  }
 
   // ── Quick Reply service selection ──────────────────────────────────────────
   if (payload.startsWith("SERVICE:")) {
@@ -649,10 +709,16 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
 
       if (result.success) {
         await saveSession(senderId, { state: "order_created" })
-        const msg = buildSuccessMsg(intent, result.displayId!)
-        await saveMessage(senderId, "model", msg)
-        // Quick reply sau khi đặt xong
-        return { type: "text", content: msg, quick_replies: QR_ORDER_ACTION }
+        const successResp = buildSuccessMsg(intent, result.displayId!, collected_data)
+        // Lưu log text tóm tắt
+        const logText = `[Đặt thành công #${result.displayId}]`
+        await saveMessage(senderId, "model", logText)
+        // Quick reply cho non-receipt (receipt không có quick_replies)
+        if (successResp.type !== "receipt_template") {
+          return successResp
+        }
+        // Receipt: gửi receipt rồi gửi thêm text với quick reply
+        return successResp  // webhook sẽ xử lý, gửi thêm quick reply riêng bên dưới
       } else {
         await saveSession(senderId, { state: "confirming" })
         const msg = `😔 Có lỗi khi tạo đơn: ${result.error}\nBạn thử xác nhận lại nhé!`

@@ -213,75 +213,111 @@ export function mergeData(current: CollectedData, incoming: Partial<CollectedDat
 
 // ─── Confirmation summary (deterministic) ─────────────────────────────────────
 
+const DIV  = "─────────────────────"
+const fmt  = (n: number) => new Intl.NumberFormat("vi-VN").format(n) + "đ"
+const fmtk = (n: number) => (n / 1000).toFixed(0) + "k"
+const PAY_LABEL: Record<string, string> = {
+  cash: "Tiền mặt", bank_transfer: "Chuyển khoản",
+  momo: "💙 MoMo", zalopay: "ZaloPay", wallet: "Ví DakGo",
+}
+
 export function buildConfirmationSummary(intent: string, data: CollectedData): string {
-  const fmt    = (n: number) => (n / 1000).toFixed(0) + "k"
-  const L: string[] = ["✅ Mình tổng kết lại đơn của bạn nhé:", ""]
+  const L: string[] = []
 
   switch (intent) {
     case "food_order": {
-      if (data.shop_name) L.push(`🏪 Quán: ${data.shop_name}`)
+      L.push(`🍜 ĐỒ ĂN — KIỂM TRA ĐƠN`, DIV)
+      if (data.shop_name) L.push(`🏪 ${data.shop_name}`, "")
       if (data.items?.length) {
-        L.push("🍜 Món đặt:")
-        for (const item of data.items) {
-          const pStr = item.price > 0 ? ` — ${fmt(item.price)}` : ""
-          L.push(`   • ${item.name} × ${item.qty}${pStr}`)
+        for (const it of data.items) {
+          const price = it.price > 0 ? `  ${fmtk(it.price * it.qty)}` : ""
+          L.push(`  • ${it.name} ×${it.qty}${price}`)
         }
+        L.push("")
       }
-      if (data.estimated_subtotal) L.push(`💰 Tiền món: ${fmt(data.estimated_subtotal)}`)
-      if (data.estimated_ship_fee) L.push(`🚚 Phí ship: ~${fmt(data.estimated_ship_fee)}`)
-      if (data.estimated_total)    L.push(`📊 Tổng ước tính: ~${fmt(data.estimated_total)}`)
-      else                         L.push(`🚚 Phí ship: tài xế báo khi nhận đơn`)
-      L.push(`📍 Giao đến: ${data.delivery_address}`)
-      L.push(`📞 SĐT: ${data.phone}`)
-      L.push(`💳 Thanh toán: ${!data.payment_method || data.payment_method === "cash" ? "Tiền mặt" : "Chuyển khoản"}`)
-      if (data.note) L.push(`📝 Ghi chú: ${data.note}`)
+      L.push(DIV)
+      if (data.estimated_subtotal && data.estimated_subtotal > 0)
+        L.push(`💰 Tiền món  ${fmtk(data.estimated_subtotal).padStart(8)}`)
+      if (data.estimated_ship_fee)
+        L.push(`🚚 Phí ship  ~${fmtk(data.estimated_ship_fee).padStart(7)}`)
+      if (data.estimated_total && data.estimated_total > 0) {
+        L.push(DIV)
+        L.push(`💳 TỔNG     ~${fmtk(data.estimated_total).padStart(7)}`)
+      }
+      L.push(DIV, "")
+      L.push(`📍 ${data.delivery_address}`)
+      L.push(`📞 ${data.phone}`)
+      L.push(`💳 ${PAY_LABEL[data.payment_method ?? "cash"] ?? "Tiền mặt"}`)
+      if (data.note) L.push(`📝 ${data.note}`)
       break
     }
 
-    case "deliver_for_me":
-      L.push("📦 Dịch vụ: Giao hộ")
-      L.push(`📍 Lấy tại: ${data.pickup_address}`)
-      L.push(`👤 Người gửi: ${data.sender_name ?? ""} — ${data.sender_phone ?? ""}`)
-      L.push(`🏠 Giao đến: ${data.delivery_address}`)
-      L.push(`👤 Người nhận: ${data.receiver_name ?? ""} — ${data.receiver_phone ?? ""}`)
-      if (data.package_description) L.push(`📦 Hàng: ${data.package_description}`)
-      if (data.estimated_service_fee) L.push(`💰 Phí dịch vụ: ~${fmt(data.estimated_service_fee)}`)
-      L.push(`💳 Thanh toán: Tiền mặt`)
+    case "deliver_for_me": {
+      L.push(`📦 GIAO HỘ — KIỂM TRA`, DIV)
+      L.push(`📍 Lấy hàng tại:`)
+      L.push(`   ${data.pickup_address}`)
+      L.push(`👤 ${data.sender_name ?? "—"}  📞 ${data.sender_phone ?? "—"}`)
+      L.push("")
+      L.push(`🏠 Giao đến:`)
+      L.push(`   ${data.delivery_address}`)
+      L.push(`👤 ${data.receiver_name ?? "—"}  📞 ${data.receiver_phone ?? "—"}`)
+      if (data.package_description) L.push(``, `📦 ${data.package_description}`)
+      if (data.estimated_service_fee) {
+        L.push("", DIV)
+        L.push(`💰 Phí dịch vụ ~${fmtk(data.estimated_service_fee)}`)
+      }
       break
+    }
 
-    case "buy_for_me":
-      L.push("🛒 Dịch vụ: Mua hộ")
-      L.push(`🛍️ Mua tại: ${data.pickup_address}`)
-      L.push(`📋 Cần mua: ${data.items_description}`)
-      if (data.estimated_items_cost) L.push(`💰 Tiền hàng ước tính: ~${fmt(data.estimated_items_cost)}`)
+    case "buy_for_me": {
+      L.push(`🛒 MUA HỘ — KIỂM TRA`, DIV)
+      L.push(`🛍️  Mua tại: ${data.pickup_address}`)
+      L.push(`📋 Cần mua:`)
+      L.push(`   ${data.items_description}`)
+      if (data.estimated_items_cost)
+        L.push(`💰 Tiền hàng ước tính ~${fmtk(data.estimated_items_cost)}`)
+      L.push("")
       L.push(`🏠 Giao đến: ${data.delivery_address}`)
-      L.push(`📞 SĐT: ${data.phone}`)
-      if (data.estimated_total) L.push(`📊 Tổng ước tính: ~${fmt(data.estimated_total)}`)
-      L.push(`💳 Thanh toán: Tiền mặt`)
+      L.push(`📞 ${data.phone}`)
+      if (data.estimated_total) {
+        L.push(DIV)
+        L.push(`💳 TỔNG ước tính ~${fmtk(data.estimated_total)}`)
+      }
       break
+    }
 
-    case "motorbike":
-      L.push("🛵 Dịch vụ: Xe ôm")
-      L.push(`📍 Đón tại: ${data.pickup_address}`)
-      L.push(`🏁 Đến: ${data.dropoff_address}`)
-      L.push(`📞 SĐT: ${data.phone}`)
-      if (data.estimated_total) L.push(`💰 Giá ước tính: ~${fmt(data.estimated_total)}`)
+    case "motorbike": {
+      L.push(`🛵 XE ÔM — KIỂM TRA`, DIV)
+      L.push(`📍 Đón tại:`)
+      L.push(`   ${data.pickup_address}`)
+      L.push(`🏁 Đến:`)
+      L.push(`   ${data.dropoff_address}`)
+      L.push(`📞 ${data.phone}`)
+      if (data.estimated_total) {
+        L.push(DIV)
+        L.push(`💰 Giá ước tính ~${fmtk(data.estimated_total)}`)
+      }
       break
+    }
 
     case "taxi":
     case "taxi7": {
-      const seats = intent === "taxi7" ? "7 chỗ" : "4 chỗ"
-      L.push(`🚕 Dịch vụ: Taxi ${seats}`)
-      L.push(`📍 Đón tại: ${data.pickup_address}`)
-      L.push(`🏁 Đến: ${data.dropoff_address}`)
-      L.push(`📞 SĐT: ${data.phone}`)
-      if (data.estimated_total) L.push(`💰 Giá ước tính: ~${fmt(data.estimated_total)}`)
+      const seats = intent === "taxi7" ? "7 CHỖ" : "4 CHỖ"
+      L.push(`🚕 TAXI ${seats} — KIỂM TRA`, DIV)
+      L.push(`📍 Đón tại:`)
+      L.push(`   ${data.pickup_address}`)
+      L.push(`🏁 Đến:`)
+      L.push(`   ${data.dropoff_address}`)
+      L.push(`📞 ${data.phone}`)
+      if (data.estimated_total) {
+        L.push(DIV)
+        L.push(`💰 Giá ước tính ~${fmtk(data.estimated_total)}`)
+      }
       break
     }
   }
 
-  L.push("", "Đúng chưa bạn? 😊")
-  L.push("(Nhắn *đúng rồi* để đặt, hoặc cho mình biết cần sửa gì)")
+  L.push("", "Thông tin trên đúng chưa? 😊")
   return L.join("\n")
 }
 

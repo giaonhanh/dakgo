@@ -1,5 +1,5 @@
 import { processMessage, processLocation, handleLocationRefused, processPostback } from "@/lib/bot/processor"
-import type { BotResponse, FBCard, QuickReply } from "@/lib/bot/cards"
+import type { BotResponse, FBCard, QuickReply, ReceiptTemplateResponse } from "@/lib/bot/cards"
 
 const FB_PAGE_TOKEN   = process.env.FB_PAGE_ACCESS_TOKEN!
 const FB_VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN!
@@ -68,6 +68,53 @@ async function sendButtonTemplate(
   })
 }
 
+// Receipt Template — hóa đơn đẹp cho đơn đồ ăn
+async function sendReceiptTemplate(recipientId: string, r: ReceiptTemplateResponse) {
+  const fmt = (n: number) => new Intl.NumberFormat("vi-VN").format(n) + "đ"
+
+  const addressParts = r.delivery_address
+    ? r.delivery_address.split(",").map(s => s.trim())
+    : []
+
+  await fbPost({
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type:  "receipt",
+          recipient_name: r.recipient_name,
+          order_number:   r.order_number,
+          currency:       "VND",
+          payment_method: r.payment_method,
+          timestamp:      r.timestamp ?? Math.floor(Date.now() / 1000),
+          elements: r.elements.map(el => ({
+            title:     el.title,
+            quantity:  el.quantity,
+            price:     el.price / 1000,  // receipt template dùng đơn vị nhỏ hơn (k)
+            currency:  "VND",
+            subtitle:  el.subtitle,
+            image_url: el.image_url,
+          })),
+          address: addressParts.length >= 2 ? {
+            street_1: addressParts[0],
+            city:     addressParts[1] ?? "Phước An",
+            state:    "Đắk Lắk",
+            country:  "VN",
+            postal_code: "630000",
+          } : undefined,
+          summary: {
+            subtotal:      r.subtotal / 1000,
+            shipping_cost: r.shipping_cost / 1000,
+            total_cost:    r.total_cost / 1000,
+          },
+        },
+      },
+    },
+    messaging_type: "RESPONSE",
+  })
+}
+
 async function sendWebviewButton(recipientId: string, text: string, buttonTitle: string, url: string, quickReplies?: QuickReply[]) {
   if (text) await sendText(recipientId, text)
   await fbPost({
@@ -106,6 +153,19 @@ async function sendBotResponse(recipientId: string, response: BotResponse | stri
 
     case "button_template":
       await sendButtonTemplate(recipientId, response.text, response.buttons)
+      break
+
+    case "receipt_template":
+      await sendReceiptTemplate(recipientId, response as ReceiptTemplateResponse)
+      // Sau receipt gửi thêm text + quick reply để user dễ thao tác tiếp
+      await sendText(
+        recipientId,
+        "🛵 Tài xế sẽ nhận đơn và liên hệ bạn sớm!\n🙏 Cảm ơn đã dùng DakGo",
+        [
+          { content_type: "text", title: "🔄 Đặt thêm", payload: "NEW_ORDER" },
+          { content_type: "text", title: "📞 Hỗ trợ",   payload: "ESCALATE" },
+        ],
+      )
       break
 
     case "webview_button":

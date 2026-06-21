@@ -66,10 +66,33 @@ export interface TextWithWebviewResponse {
   quick_replies?: QuickReply[]
 }
 
+// Receipt Template — hóa đơn đẹp cho đơn đồ ăn thành công
+export interface ReceiptElement {
+  title:    string
+  quantity: number
+  price:    number    // VND
+  subtitle?: string
+  image_url?: string
+}
+
+export interface ReceiptTemplateResponse {
+  type:           "receipt_template"
+  recipient_name: string
+  order_number:   string
+  payment_method: string
+  elements:       ReceiptElement[]
+  subtotal:       number
+  shipping_cost:  number
+  total_cost:     number
+  delivery_address?: string
+  timestamp?:     number
+}
+
 export type BotResponse =
   | CardResponse
   | TextResponse
   | ButtonTemplateResponse
+  | ReceiptTemplateResponse
   | WebviewButtonResponse
   | TextWithWebviewResponse
 
