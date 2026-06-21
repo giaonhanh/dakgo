@@ -24,17 +24,7 @@ export async function setupMessengerProfile(pageToken: string) {
       locale:                  "default",
       composer_input_disabled: false,
       call_to_actions: [
-        {
-          type:  "nested",
-          title: "🛵 Đặt dịch vụ",
-          call_to_actions: [
-            { type: "postback", title: "🍜 Đặt đồ ăn", payload: "SERVICE:food" },
-            { type: "postback", title: "📦 Giao hộ",    payload: "SERVICE:deliver_for_me" },
-            { type: "postback", title: "🛒 Mua hộ",     payload: "SERVICE:buy_for_me" },
-            { type: "postback", title: "🛵 Xe ôm",      payload: "SERVICE:motorbike" },
-            { type: "postback", title: "🚕 Taxi",        payload: "SERVICE:taxi" },
-          ],
-        },
+        { type: "postback", title: "🛵 Đặt dịch vụ",    payload: "SHOW_MENU" },
         { type: "postback", title: "🔄 Đặt lại đơn cũ", payload: "REORDER" },
         { type: "postback", title: "📞 Liên hệ hỗ trợ", payload: "ESCALATE" },
       ],

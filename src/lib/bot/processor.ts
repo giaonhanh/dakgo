@@ -387,6 +387,13 @@ function buildSuccessMsg(intent: string, displayId: string, data?: CollectedData
 export async function processPostback(senderId: string, payload: string): Promise<BotResponse> {
   const session = await getSession(senderId)
 
+  // ── Show service menu (từ persistent menu) ────────────────────────────────
+  if (payload === "SHOW_MENU") {
+    const msg = "Bạn cần dịch vụ gì ạ? 😊"
+    await saveMessage(senderId, "model", msg)
+    return { type: "text", content: msg, quick_replies: QR_SERVICE_MENU }
+  }
+
   // ── Get Started (lần đầu mở chat) ─────────────────────────────────────────
   if (payload === "GET_STARTED") {
     await resetSession(senderId)
