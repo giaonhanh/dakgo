@@ -803,7 +803,36 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
     const nextField = getNextMissingField(intent, collected_data)
     const history   = await getConversation(senderId, 10)
     const extracted = await extractAndReply(text, intent, collected_data, nextField, history as ChatTurn[])
-    const newData   = mergeData(collected_data, extracted.data)
+    let newData     = mergeData(collected_data, extracted.data)
+
+    // Geocode ngay khi địa chỉ text vừa được extract — lưu lat/lng vào session
+    // và echo lại để user xác nhận bot hiểu đúng
+    const ADDR_FIELDS = [
+      { addr: "delivery_address" as const, lat: "delivery_lat" as const, lng: "delivery_lng" as const },
+      { addr: "pickup_address"  as const, lat: "pickup_lat"   as const, lng: "pickup_lng"   as const },
+      { addr: "dropoff_address" as const, lat: "dropoff_lat"  as const, lng: "dropoff_lng"  as const },
+    ]
+    for (const f of ADDR_FIELDS) {
+      const isNew = extracted.data[f.addr] && !collected_data[f.addr]
+      if (isNew) {
+        const addrText = newData[f.addr]!
+        try {
+          const coords = await geocodeAddress(addrText)
+          newData = mergeData(newData, { [f.lat]: coords.lat, [f.lng]: coords.lng })
+          await saveSession(senderId, { collected_data: newData })
+          await saveMessage(senderId, "model", `📍 ${addrText}\n\nĐúng chưa bạn?`)
+          return {
+            type: "text",
+            content: `📍 ${addrText}\n\nĐúng chưa bạn?`,
+            quick_replies: QR_CONFIRM_CANCEL,
+          }
+        } catch {
+          // Geocode fail → tiếp tục bình thường, order-creator sẽ geocode lại
+        }
+        break
+      }
+    }
+
     await saveSession(senderId, { collected_data: newData })
 
     // Phát hiện đổi intent giữa chừng

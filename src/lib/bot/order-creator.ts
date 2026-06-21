@@ -275,9 +275,9 @@ async function createRideOrder(d: CollectedData, intent: string): Promise<OrderR
 // ─── Errand Order (Giao hộ / Mua hộ) ──────────────────────────────────────────
 
 async function createErrandOrder(d: CollectedData, intent: string): Promise<OrderResult> {
-  const isDelivery = intent === "deliver_for_me"
-  const phone      = isDelivery ? d.sender_phone : d.phone
-  const name       = isDelivery ? d.sender_name  : d.customer_name
+  // Người đặt (sender) luôn là d.phone — dù deliver hay buy
+  const phone = d.phone
+  const name  = d.customer_name
 
   if (!d.pickup_address || !d.delivery_address || !phone) {
     return { success: false, error: "Thiếu thông tin yêu cầu" }
@@ -296,9 +296,10 @@ async function createErrandOrder(d: CollectedData, intent: string): Promise<Orde
       : geocodeAddress(d.delivery_address),
   ])
 
+  const isDeliverForMe = intent === "deliver_for_me"
   const pricing    = await getPricing()
   const km         = distanceKm(pickup, delivery)
-  const svcKey     = isDelivery ? "delivery_pkg" : "errand"
+  const svcKey     = isDeliverForMe ? "delivery_pkg" : "errand"
   const serviceFee = pricing
     ? calcFee(Math.max(km, 1), svcKey as "delivery_pkg", pricing)
     : 25000
@@ -307,7 +308,7 @@ async function createErrandOrder(d: CollectedData, intent: string): Promise<Orde
     .from("errands")
     .insert({
       customer_id:          customerId,
-      type:                 isDelivery ? "deliver_for_me" : "buy_for_me",
+      type:                 isDeliverForMe ? "deliver_for_me" : "buy_for_me",
       status:               "pending",
       pickup_address:       d.pickup_address,
       pickup_lat:           pickup.lat,
