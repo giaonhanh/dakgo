@@ -14,7 +14,12 @@
 import { guard, sanitizeReply } from "./guard"
 import { extractAndReply, INTENT_MAP, type ChatTurn } from "./extractor"
 import { detectServiceType, checkServiceAvailable } from "./service-check"
-import { buildShopCards, type BotResponse, type TextWithWebviewResponse } from "./cards"
+import {
+  buildShopCards,
+  type BotResponse, type TextWithWebviewResponse, type ButtonTemplateResponse,
+  QR_SERVICE_MENU, QR_LOCATION, QR_CONFIRM_CANCEL, QR_PAYMENT,
+  QR_ORDER_ACTION, QR_RESUME, makeConfirmButtons,
+} from "./cards"
 import { saveMessage, logBlocked, saveKeyword, getKeyword, getConversation } from "./storage"
 import {
   getSession, saveSession, resetSession, mergeData,
@@ -273,24 +278,31 @@ async function askNextField(session: BotSession, aiReply?: string): Promise<BotR
   // Ưu tiên: intent-specific > FIELD_QUESTION > aiReply > fallback
   const reply = sanitizeReply(intentQ || FIELD_QUESTION[nextField] || aiReply?.trim() || "Bạn cho mình biết thêm nhé 😊")
 
-  // Địa chỉ → kèm nút webview chọn trên bản đồ
+  // Địa chỉ → quick reply "Chia sẻ vị trí" + nút webview bản đồ
   if (nextField === "delivery_address" || nextField === "pickup_address" || nextField === "dropoff_address") {
     const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
     const addressUrl = `${appUrl}/bot-address?sid=${sender_id}`
     await saveMessage(sender_id, "model", reply)
     return {
-      type:        "text_with_webview",
-      content:     reply,
-      buttonTitle: "📍 Chọn địa chỉ trên bản đồ",
-      url:         addressUrl,
+      type:         "text_with_webview",
+      content:      reply,
+      buttonTitle:  "🗺️ Chọn trên bản đồ",
+      url:          addressUrl,
+      quick_replies: QR_LOCATION,  // chip "📍 Chia sẻ vị trí" + "✏️ Tôi tự nhập"
     } as TextWithWebviewResponse
+  }
+
+  // Phương thức thanh toán → quick reply chips
+  if (nextField === "payment_method") {
+    await saveMessage(sender_id, "model", reply)
+    return { type: "text", content: reply, quick_replies: QR_PAYMENT }
   }
 
   await saveMessage(sender_id, "model", reply)
   return { type: "text", content: reply }
 }
 
-// ─── Transition sang confirming (có tính giá) ─────────────────────────────────
+// ─── Transition sang confirming (có tính giá, có button template) ─────────────
 
 async function transitionToConfirming(session: BotSession): Promise<BotResponse> {
   const priceHints = await estimatePrice(session.intent!, session.collected_data)
@@ -298,7 +310,12 @@ async function transitionToConfirming(session: BotSession): Promise<BotResponse>
   await saveSession(session.sender_id, { state: "confirming", collected_data: enriched })
   const summary = buildConfirmationSummary(session.intent!, enriched)
   await saveMessage(session.sender_id, "model", summary)
-  return { type: "text", content: summary }
+  // Button Template — nút xác nhận + sửa to, rõ ràng hơn text
+  return {
+    type:    "button_template",
+    text:    summary.slice(0, 640), // Messenger giới hạn 640 chars
+    buttons: makeConfirmButtons(session.intent!),
+  } as ButtonTemplateResponse
 }
 
 // ─── Success message ───────────────────────────────────────────────────────────
@@ -324,6 +341,95 @@ function buildSuccessMsg(intent: string, displayId: string): string {
 export async function processPostback(senderId: string, payload: string): Promise<BotResponse> {
   const session = await getSession(senderId)
 
+  // ── Quick Reply service selection ──────────────────────────────────────────
+  if (payload.startsWith("SERVICE:")) {
+    const svc = payload.slice(8)  // food | deliver_for_me | buy_for_me | motorbike | taxi | taxi7
+    await saveMessage(senderId, "user", `[Chọn dịch vụ: ${svc}]`)
+    const serviceTextMap: Record<string, string> = {
+      food:           "đặt đồ ăn",
+      deliver_for_me: "giao hộ",
+      buy_for_me:     "mua hộ",
+      motorbike:      "xe ôm",
+      taxi:           "taxi",
+      taxi7:          "taxi 7 chỗ",
+    }
+    return processMessage(senderId, serviceTextMap[svc] ?? svc)
+  }
+
+  // ── Xác nhận / Sửa đơn hàng ───────────────────────────────────────────────
+  if (payload === "CONFIRM_ORDER") {
+    await saveMessage(senderId, "user", "[Xác nhận đơn]")
+    return processMessage(senderId, "đúng rồi")
+  }
+  if (payload === "EDIT_ORDER") {
+    await saveMessage(senderId, "user", "[Sửa đơn]")
+    await saveSession(senderId, { state: "collecting" })
+    const msg = "Bạn muốn sửa thông tin gì ạ? 😊"
+    await saveMessage(senderId, "model", msg)
+    return { type: "text", content: msg }
+  }
+
+  // ── Thanh toán ─────────────────────────────────────────────────────────────
+  if (payload.startsWith("PAYMENT:")) {
+    const method = payload.slice(8)  // cash | bank_transfer | momo
+    const label: Record<string, string> = {
+      cash:          "💵 Tiền mặt",
+      bank_transfer: "🏦 Chuyển khoản",
+      momo:          "💙 MoMo",
+    }
+    await saveMessage(senderId, "user", `[Chọn: ${label[method] ?? method}]`)
+    const newData = mergeData(session.collected_data, { payment_method: method })
+    await saveSession(senderId, { collected_data: newData })
+    const updatedSession = { ...session, collected_data: newData }
+    const missing = session.intent ? getMissingFields(session.intent, newData) : []
+    if (missing.length === 0 && session.intent) {
+      return transitionToConfirming(updatedSession)
+    }
+    return askNextField(updatedSession)
+  }
+
+  // ── Xác nhận vị trí ───────────────────────────────────────────────────────
+  if (payload === "LOC_CONFIRMED") {
+    await saveMessage(senderId, "user", "[Xác nhận vị trí]")
+    return processMessage(senderId, "đúng rồi")
+  }
+  if (payload === "LOC_RETRY") {
+    await saveMessage(senderId, "user", "[Thay đổi địa chỉ]")
+    // Xóa địa chỉ vừa nhận, hỏi lại
+    const target = resolveLocationTarget(session.intent, session.collected_data)
+    const cleaned = { ...session.collected_data }
+    delete (cleaned as Record<string, unknown>)[target.addr]
+    delete (cleaned as Record<string, unknown>)[target.lat]
+    delete (cleaned as Record<string, unknown>)[target.lng]
+    await saveSession(senderId, { collected_data: cleaned })
+    return askNextField({ ...session, collected_data: cleaned })
+  }
+
+  // ── Session resume ─────────────────────────────────────────────────────────
+  if (payload === "CONTINUE_SESSION") {
+    await saveMessage(senderId, "user", "[Tiếp tục đặt]")
+    return askNextField(session)
+  }
+  if (payload === "NEW_ORDER") {
+    await resetSession(senderId)
+    const msg = "Bạn cần dịch vụ gì ạ? 😊"
+    await saveMessage(senderId, "model", msg)
+    return { type: "text", content: msg, quick_replies: QR_SERVICE_MENU }
+  }
+  if (payload === "ESCALATE") {
+    await saveSession(senderId, { state: "escalated" })
+    const msg = "Mình đã ghi nhận! 🙏\nNhân viên DakGo sẽ liên hệ bạn sớm.\n📞 Hotline: 0900 000 000"
+    await saveMessage(senderId, "model", msg)
+    return { type: "text", content: msg }
+  }
+  if (payload === "TYPE_ADDRESS") {
+    // User chọn tự gõ địa chỉ thay vì share GPS
+    const msg = "Bạn gõ địa chỉ vào đây nhé! 📝\n(Ví dụ: 55 Nguyễn Chí Thanh, Phước An)"
+    await saveMessage(senderId, "model", msg)
+    return { type: "text", content: msg }
+  }
+
+  // ── Shop / Product selection ───────────────────────────────────────────────
   if (payload.startsWith("ORDER_SHOP:")) {
     const parts    = payload.split(":")
     const shopId   = parts[1]
@@ -353,7 +459,7 @@ export async function processPostback(senderId: string, payload: string): Promis
     await saveMessage(senderId, "user", `[Chọn: ${productName} × 1 — ${(price / 1000).toFixed(0)}k]`)
 
     const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
-    const text     = `✅ **${productName}** ×1 thêm vào giỏ!\n\n🛒 Tổng hiện tại: ${(subtotal / 1000).toFixed(0)}k\n\nMuốn thêm món nữa không? Hoặc nhắn *xong* để điền địa chỉ giao nhé! 😊`
+    const text     = `✅ ${productName} ×1 thêm vào giỏ!\n🛒 Tổng: ${(subtotal / 1000).toFixed(0)}k\n\nMuốn thêm món nữa? Hoặc nhắn "xong" nhé!`
     await saveMessage(senderId, "model", text)
     return { type: "text", content: text }
   }
@@ -365,7 +471,7 @@ export async function processPostback(senderId: string, payload: string): Promis
     return buildMenuCards(shopId, shopName)
   }
 
-  return { type: "text", content: "Bạn cần hỗ trợ gì không? 😊" }
+  return { type: "text", content: "Bạn cần hỗ trợ gì không? 😊", quick_replies: QR_SERVICE_MENU }
 }
 
 // ─── processLocation ──────────────────────────────────────────────────────────
@@ -412,9 +518,10 @@ export async function processLocation(
   await saveMessage(senderId, "user", `[Vị trí ${target.label}: ${addrText ?? `${lat.toFixed(4)},${lng.toFixed(4)}`}]`)
 
   if (addrText) {
-    const confirmMsg = `📍 Đã ghi nhận **${target.label}**:\n${addrText}\n\nĐúng chưa bạn? 😊`
+    const confirmMsg = `📍 Đã ghi nhận ${target.label}:\n${addrText}\n\nĐúng chưa bạn?`
     await saveMessage(senderId, "model", confirmMsg)
-    return { type: "text", content: confirmMsg }
+    // Quick reply: Đúng rồi | Sửa lại
+    return { type: "text", content: confirmMsg, quick_replies: QR_CONFIRM_CANCEL }
   }
 
   if (session.intent) {
@@ -487,19 +594,19 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
   const isGreeting = /^(alo|hello|hi|chào|ơi|hey|xin chào|này|ờ alo|alo ơi|cho hỏi|cho mình hỏi)$/i.test(text.trim())
   if (isGreeting) {
     if (state === "collecting" && intent) {
-      // Có flow đang dở → hỏi có muốn tiếp không
+      // Có flow đang dở → hỏi có muốn tiếp không (dùng quick reply)
       const label: Record<string, string> = {
         food_order: "đặt đồ ăn", deliver_for_me: "giao hộ",
         buy_for_me: "mua hộ", motorbike: "xe ôm", taxi: "taxi", taxi7: "taxi 7 chỗ",
       }
-      const msg = `Chào bạn! 👋\nBạn đang đặt ${label[intent] ?? "dịch vụ"} chưa xong.\nNhắn *tiếp tục* để làm tiếp, hoặc *đặt mới* để bắt đầu lại nhé!`
+      const msg = `Chào bạn! 👋\nBạn đang ${label[intent] ?? "đặt dịch vụ"} chưa xong.`
       await saveMessage(senderId, "model", msg)
-      return { type: "text", content: msg }
+      return { type: "text", content: msg, quick_replies: QR_RESUME }
     }
-    // Idle → chào và show menu
-    const greet = "Chào bạn! Mình là nhân viên DakGo 🛵\n\nMình hỗ trợ:\n🍜 Đặt đồ ăn  |  📦 Giao hộ\n🛒 Mua hộ  |  🛵 Xe ôm  |  🚕 Taxi\n\nBạn cần gì ạ?"
+    // Idle → chào và show menu với quick reply chips
+    const greet = "Chào bạn! Mình là DakGo 🛵\nBạn cần dịch vụ nào ạ?"
     await saveMessage(senderId, "model", greet)
-    return { type: "text", content: greet }
+    return { type: "text", content: greet, quick_replies: QR_SERVICE_MENU }
   }
 
   // ── Gợi ý tiếp tục đơn dang dở sau khi idle > 30 phút ────────────────────
@@ -525,10 +632,10 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
         return processMessage(senderId, text)
       }
 
-      // Hỏi có muốn tiếp tục không
-      const remind = `Chào bạn! 👋 Hồi nãy bạn đang ${svc} mà chưa xong.\nBạn muốn tiếp tục không? Nhắn *tiếp tục* hoặc *đặt mới* nhé!`
+      // Hỏi có muốn tiếp tục không → dùng quick reply
+      const remind = `Hồi nãy bạn đang ${svc} nhưng chưa xong.\nBạn muốn tiếp tục không?`
       await saveMessage(senderId, "model", remind)
-      return { type: "text", content: remind }
+      return { type: "text", content: remind, quick_replies: QR_RESUME }
     }
   }
 
@@ -544,7 +651,8 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
         await saveSession(senderId, { state: "order_created" })
         const msg = buildSuccessMsg(intent, result.displayId!)
         await saveMessage(senderId, "model", msg)
-        return { type: "text", content: msg }
+        // Quick reply sau khi đặt xong
+        return { type: "text", content: msg, quick_replies: QR_ORDER_ACTION }
       } else {
         await saveSession(senderId, { state: "confirming" })
         const msg = `😔 Có lỗi khi tạo đơn: ${result.error}\nBạn thử xác nhận lại nhé!`
@@ -758,11 +866,10 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
     }
   }
 
-  // Fallback greeting
+  // Fallback greeting + service menu quick replies
   const reply = sanitizeReply(
-    extracted.reply?.trim() ||
-    "Xin chào! Mình là nhân viên DakGo 🛵\nMình hỗ trợ:\n• 🍜 Đặt đồ ăn\n• 📦 Giao hộ\n• 🛒 Mua hộ\n• 🛵 Xe ôm\n• 🚕 Taxi\n\nBạn cần dịch vụ nào ạ?"
+    extracted.reply?.trim() || "Mình hỗ trợ gì cho bạn ạ? 😊"
   )
   await saveMessage(senderId, "model", reply)
-  return { type: "text", content: reply }
+  return { type: "text", content: reply, quick_replies: QR_SERVICE_MENU }
 }

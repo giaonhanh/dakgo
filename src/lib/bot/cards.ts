@@ -21,6 +21,14 @@ export interface FBCard {
   buttons: FBButton[]
 }
 
+// Quick reply chip — hiện dưới tin nhắn, user tap thay vì gõ
+export interface QuickReply {
+  content_type: "text" | "location"
+  title?: string    // chỉ dùng cho text (max 20 chars)
+  payload?: string  // chỉ dùng cho text
+  image_url?: string
+}
+
 export interface CardResponse {
   type: "cards"
   intro: string
@@ -29,9 +37,18 @@ export interface CardResponse {
   page?: number
 }
 
+// Text + quick reply chips bên dưới (tự biến mất sau khi tap)
 export interface TextResponse {
   type: "text"
   content: string
+  quick_replies?: QuickReply[]
+}
+
+// Button Template — 1-3 nút to dưới tin nhắn (không tự biến mất)
+export interface ButtonTemplateResponse {
+  type: "button_template"
+  text: string
+  buttons: FBButton[]
 }
 
 export interface WebviewButtonResponse {
@@ -46,9 +63,59 @@ export interface TextWithWebviewResponse {
   content: string
   buttonTitle: string
   url: string
+  quick_replies?: QuickReply[]
 }
 
-export type BotResponse = CardResponse | TextResponse | WebviewButtonResponse | TextWithWebviewResponse
+export type BotResponse =
+  | CardResponse
+  | TextResponse
+  | ButtonTemplateResponse
+  | WebviewButtonResponse
+  | TextWithWebviewResponse
+
+// ─── Quick reply presets ────────────────────────────────────────────────────────
+
+export const QR_SERVICE_MENU: QuickReply[] = [
+  { content_type: "text", title: "🍜 Đồ ăn",  payload: "SERVICE:food" },
+  { content_type: "text", title: "📦 Giao hộ", payload: "SERVICE:deliver_for_me" },
+  { content_type: "text", title: "🛒 Mua hộ",  payload: "SERVICE:buy_for_me" },
+  { content_type: "text", title: "🛵 Xe ôm",   payload: "SERVICE:motorbike" },
+  { content_type: "text", title: "🚕 Taxi",     payload: "SERVICE:taxi" },
+]
+
+export const QR_LOCATION: QuickReply[] = [
+  { content_type: "location" },
+  { content_type: "text", title: "✏️ Tôi tự nhập", payload: "TYPE_ADDRESS" },
+]
+
+export const QR_CONFIRM_CANCEL: QuickReply[] = [
+  { content_type: "text", title: "✅ Đúng rồi",  payload: "LOC_CONFIRMED" },
+  { content_type: "text", title: "📍 Sửa lại",   payload: "LOC_RETRY" },
+]
+
+export const QR_PAYMENT: QuickReply[] = [
+  { content_type: "text", title: "💵 Tiền mặt",     payload: "PAYMENT:cash" },
+  { content_type: "text", title: "🏦 Chuyển khoản", payload: "PAYMENT:bank_transfer" },
+  { content_type: "text", title: "💙 MoMo",          payload: "PAYMENT:momo" },
+]
+
+export const QR_ORDER_ACTION: QuickReply[] = [
+  { content_type: "text", title: "🔄 Đặt thêm", payload: "NEW_ORDER" },
+  { content_type: "text", title: "📞 Hỗ trợ",   payload: "ESCALATE" },
+]
+
+export const QR_RESUME: QuickReply[] = [
+  { content_type: "text", title: "▶️ Tiếp tục", payload: "CONTINUE_SESSION" },
+  { content_type: "text", title: "🆕 Đặt mới",  payload: "NEW_ORDER" },
+]
+
+// Nút confirm to hơn — dùng cho tóm tắt đơn hàng
+export function makeConfirmButtons(intent: string): FBButton[] {
+  return [
+    { type: "postback", title: "✅ Xác nhận đặt", payload: "CONFIRM_ORDER" },
+    { type: "postback", title: "✏️ Sửa lại",       payload: "EDIT_ORDER" },
+  ]
+}
 
 export async function buildShopCards(keyword: string, page = 0): Promise<CardResponse | null> {
   const supabase = createClient()

@@ -1,43 +1,8 @@
 import { processMessage, processLocation, handleLocationRefused, processPostback } from "@/lib/bot/processor"
-import type { BotResponse, FBCard } from "@/lib/bot/cards"
+import type { BotResponse, FBCard, QuickReply } from "@/lib/bot/cards"
 
 const FB_PAGE_TOKEN   = process.env.FB_PAGE_ACCESS_TOKEN!
 const FB_VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN!
-
-// Gửi tin nhắn text
-async function sendText(recipientId: string, text: string) {
-  await fbPost({
-    recipient: { id: recipientId },
-    message: { text },
-    messaging_type: "RESPONSE",
-  })
-}
-
-// Gửi card carousel (Generic Template)
-async function sendCards(recipientId: string, elements: FBCard[], intro?: string) {
-  // Gửi text intro trước
-  if (intro) await sendText(recipientId, intro)
-
-  // Gửi carousel
-  await fbPost({
-    recipient: { id: recipientId },
-    message: {
-      attachment: {
-        type: "template",
-        payload: {
-          template_type: "generic",
-          elements: elements.map(el => ({
-            title: el.title,
-            subtitle: el.subtitle,
-            image_url: el.image_url,
-            buttons: el.buttons,
-          })),
-        },
-      },
-    },
-    messaging_type: "RESPONSE",
-  })
-}
 
 async function fbPost(body: unknown) {
   const res = await fetch("https://graph.facebook.com/v21.0/me/messages", {
@@ -50,11 +15,60 @@ async function fbPost(body: unknown) {
   })
   if (!res.ok) {
     const err = await res.text()
-    console.error("[fb] send error:", err)
+    console.error("[fb] send error:", err.slice(0, 200))
   }
 }
 
-async function sendWebviewButton(recipientId: string, text: string, buttonTitle: string, url: string) {
+// Gửi text (có thể kèm quick reply chips)
+async function sendText(recipientId: string, text: string, quickReplies?: QuickReply[]) {
+  const message: Record<string, unknown> = { text }
+  if (quickReplies?.length) message.quick_replies = quickReplies
+  await fbPost({ recipient: { id: recipientId }, message, messaging_type: "RESPONSE" })
+}
+
+// Gửi card carousel (Generic Template)
+async function sendCards(recipientId: string, elements: FBCard[], intro?: string) {
+  if (intro) await sendText(recipientId, intro)
+  if (!elements.length) return
+  await fbPost({
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "generic",
+          elements: elements.map(el => ({
+            title:     el.title,
+            subtitle:  el.subtitle,
+            image_url: el.image_url,
+            buttons:   el.buttons,
+          })),
+        },
+      },
+    },
+    messaging_type: "RESPONSE",
+  })
+}
+
+// Button Template — nút to hơn quick replies, không tự mất
+async function sendButtonTemplate(
+  recipientId: string,
+  text: string,
+  buttons: Array<{ type: string; title: string; payload?: string; url?: string }>,
+) {
+  await fbPost({
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: "template",
+        payload: { template_type: "button", text, buttons },
+      },
+    },
+    messaging_type: "RESPONSE",
+  })
+}
+
+async function sendWebviewButton(recipientId: string, text: string, buttonTitle: string, url: string, quickReplies?: QuickReply[]) {
   if (text) await sendText(recipientId, text)
   await fbPost({
     recipient: { id: recipientId },
@@ -73,6 +87,7 @@ async function sendWebviewButton(recipientId: string, text: string, buttonTitle:
           }],
         },
       },
+      ...(quickReplies?.length ? { quick_replies: quickReplies } : {}),
     },
     messaging_type: "RESPONSE",
   })
@@ -83,16 +98,29 @@ async function sendBotResponse(recipientId: string, response: BotResponse | stri
     await sendText(recipientId, response)
     return
   }
-  if (response.type === "cards") {
-    await sendCards(recipientId, response.elements, response.intro)
-  } else if (response.type === "webview_button") {
-    await sendWebviewButton(recipientId, response.text, response.buttonTitle, response.url)
-  } else if (response.type === "text_with_webview") {
-    // Gửi text trước, rồi gửi nút webview ngay sau
-    await sendText(recipientId, response.content)
-    await sendWebviewButton(recipientId, "", response.buttonTitle, response.url)
-  } else {
-    await sendText(recipientId, response.content)
+
+  switch (response.type) {
+    case "cards":
+      await sendCards(recipientId, response.elements, response.intro)
+      break
+
+    case "button_template":
+      await sendButtonTemplate(recipientId, response.text, response.buttons)
+      break
+
+    case "webview_button":
+      await sendWebviewButton(recipientId, response.text, response.buttonTitle, response.url)
+      break
+
+    case "text_with_webview":
+      await sendText(recipientId, response.content)
+      await sendWebviewButton(recipientId, "", response.buttonTitle, response.url, response.quick_replies)
+      break
+
+    case "text":
+    default:
+      await sendText(recipientId, (response as { content: string }).content, (response as { quick_replies?: QuickReply[] }).quick_replies)
+      break
   }
 }
 
