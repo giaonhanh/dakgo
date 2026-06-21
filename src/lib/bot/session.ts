@@ -74,8 +74,10 @@ export interface BotSession {
 
 const REQUIRED: Record<string, (keyof CollectedData)[]> = {
   food_order:     ["shop_id", "items", "delivery_address", "phone"],
-  deliver_for_me: ["pickup_address", "sender_name", "sender_phone", "delivery_address", "receiver_name", "receiver_phone"],
-  buy_for_me:     ["items_description", "pickup_address", "delivery_address", "phone", "estimated_items_cost"],
+  // sender_name/sender_phone bỏ — khách đang chat là người gửi
+  deliver_for_me: ["pickup_address", "delivery_address", "receiver_name", "receiver_phone"],
+  // estimated_items_cost bỏ khỏi required — user không biết giá thì bị kẹt
+  buy_for_me:     ["pickup_address", "items_description", "delivery_address", "phone"],
   motorbike:      ["pickup_address", "dropoff_address", "phone"],
   taxi:           ["pickup_address", "dropoff_address", "phone"],
   taxi7:          ["pickup_address", "dropoff_address", "phone"],

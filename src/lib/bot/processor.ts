@@ -240,13 +240,8 @@ async function askNextField(session: BotSession, aiReply?: string): Promise<BotR
   const nextField = getNextMissingField(intent, collected_data)
 
   if (!nextField) {
-    // Tất cả field đủ → tính giá trước khi show confirmation
-    const priceHints = await estimatePrice(intent, collected_data)
-    const enriched   = { ...collected_data, ...priceHints }
-    await saveSession(sender_id, { state: "confirming", collected_data: enriched })
-    const summary = buildConfirmationSummary(intent, enriched)
-    await saveMessage(sender_id, "model", summary)
-    return { type: "text", content: summary }
+    // Tất cả field đủ → chuyển sang confirming với button template
+    return transitionToConfirming(session)
   }
 
   // Food + cần shop_id nhưng đã có shop_name → auto-search
@@ -410,17 +405,47 @@ export async function processPostback(senderId: string, payload: string): Promis
 
   // ── Quick Reply service selection ──────────────────────────────────────────
   if (payload.startsWith("SERVICE:")) {
-    const svc = payload.slice(8)  // food | deliver_for_me | buy_for_me | motorbike | taxi | taxi7
-    await saveMessage(senderId, "user", `[Chọn dịch vụ: ${svc}]`)
-    const serviceTextMap: Record<string, string> = {
-      food:           "đặt đồ ăn",
-      deliver_for_me: "giao hộ",
-      buy_for_me:     "mua hộ",
-      motorbike:      "xe ôm",
-      taxi:           "taxi",
-      taxi7:          "taxi 7 chỗ",
+    const svc = payload.slice(8)
+    type SvcKey = "food" | "motorbike" | "taxi" | "taxi7" | "mua_ho" | "giao_ho"
+    const intentMap: Record<string, string> = {
+      food: "food_order", deliver_for_me: "deliver_for_me",
+      buy_for_me: "buy_for_me", motorbike: "motorbike", taxi: "taxi", taxi7: "taxi7",
     }
-    return processMessage(senderId, serviceTextMap[svc] ?? svc)
+    const svcKeyMap: Record<string, SvcKey> = {
+      food: "food", deliver_for_me: "giao_ho", buy_for_me: "mua_ho",
+      motorbike: "motorbike", taxi: "taxi", taxi7: "taxi7",
+    }
+    const labelMap: Record<string, string> = {
+      food: "🍜 Đặt đồ ăn", deliver_for_me: "📦 Giao hộ", buy_for_me: "🛒 Mua hộ",
+      motorbike: "🛵 Xe ôm", taxi: "🚕 Taxi", taxi7: "🚕 Taxi 7 chỗ",
+    }
+    const intent = intentMap[svc]
+    if (!intent) return { type: "text", content: "Dịch vụ không hợp lệ 😅", quick_replies: QR_SERVICE_MENU }
+
+    const svcKey = svcKeyMap[svc]
+    if (svcKey) {
+      const status = await checkServiceAvailable(svcKey)
+      if (!status.available) {
+        const msg = status.customerMsg ?? "Dịch vụ tạm thời chưa hoạt động bạn ơi 😔"
+        await saveMessage(senderId, "model", msg)
+        return { type: "text", content: msg, quick_replies: QR_SERVICE_MENU }
+      }
+    }
+
+    await saveMessage(senderId, "user", `[${labelMap[svc] ?? svc}]`)
+    const initData = session.collected_data.phone ? { phone: session.collected_data.phone } : {}
+
+    if (svc === "food") {
+      await saveSession(senderId, { state: "collecting", intent: "food_order", collected_data: initData })
+      const cards = await buildShopCards("đồ ăn", 0)
+      if (cards?.elements && cards.elements.length > 0) return cards
+      const msg = "🍜 Bạn muốn ăn gì? Nhắn tên món hoặc tên quán nhé!"
+      await saveMessage(senderId, "model", msg)
+      return { type: "text", content: msg }
+    }
+
+    await saveSession(senderId, { state: "collecting", intent, collected_data: initData })
+    return askNextField({ ...session, state: "collecting" as const, intent, collected_data: initData })
   }
 
   // ── Xác nhận / Sửa đơn hàng ───────────────────────────────────────────────
@@ -473,6 +498,10 @@ export async function processPostback(senderId: string, payload: string): Promis
   }
 
   // ── Session resume ─────────────────────────────────────────────────────────
+  if (payload === "DONE_ORDERING") {
+    await saveMessage(senderId, "user", "[Xong, đặt]")
+    return askNextField(session)
+  }
   if (payload === "CONTINUE_SESSION") {
     await saveMessage(senderId, "user", "[Tiếp tục đặt]")
     return askNextField(session)
@@ -526,9 +555,15 @@ export async function processPostback(senderId: string, payload: string): Promis
     await saveMessage(senderId, "user", `[Chọn: ${productName} × 1 — ${(price / 1000).toFixed(0)}k]`)
 
     const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
-    const text     = `✅ ${productName} ×1 thêm vào giỏ!\n🛒 Tổng: ${(subtotal / 1000).toFixed(0)}k\n\nMuốn thêm món nữa? Hoặc nhắn "xong" nhé!`
+    const text     = `✅ ${productName} ×1 thêm vào giỏ!\n🛒 Tổng giỏ: ${(subtotal / 1000).toFixed(0)}k`
     await saveMessage(senderId, "model", text)
-    return { type: "text", content: text }
+    return {
+      type: "text", content: text,
+      quick_replies: [
+        { content_type: "text", title: "✅ Xong, đặt",    payload: "DONE_ORDERING" },
+        { content_type: "text", title: "🍽️ Thêm món",     payload: `VIEW_MENU:${shopId}:${encodeURIComponent(shopName)}` },
+      ],
+    }
   }
 
   if (payload.startsWith("VIEW_MENU:")) {
@@ -812,31 +847,21 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
   // ── STATE: idle — Chào user quay lại sau >6 giờ ──────────────────────────
   if (state === "idle") {
     const lastTime = await getLastUserMessageTime(senderId)
-    const idleHours = lastTime
-      ? (Date.now() - lastTime.getTime()) / 3_600_000
-      : null
-
-    // Lần đầu tiên nhắn (null) → đã xử lý bằng GET_STARTED postback
-    // Quay lại sau >6h → chào và show menu
+    const idleHours = lastTime ? (Date.now() - lastTime.getTime()) / 3_600_000 : null
     if (lastTime && idleHours !== null && idleHours > 6 && !isGreeting) {
-      await saveMessage(senderId, "user", text)
-
-      const hour   = new Date().getHours()
-      const hi     = hour < 11 ? "buổi sáng" : hour < 13 ? "buổi trưa" : hour < 18 ? "buổi chiều" : "buổi tối"
-      const dayAgo = idleHours > 20
-
-      const greeting = dayAgo
-        ? `Chào bạn quay lại! 👋\nDạo này có gì cần DakGo hỗ trợ không?`
-        : `Chào bạn ${hi}! 👋\nBạn cần dịch vụ gì ạ?`
-
-      // Nếu tin nhắn đã chứa intent → xử lý luôn, không chào thêm
       const hasIntent = detectServiceType(text) || isReorderRequest(text)
-      if (hasIntent) {
-        // fall through — xử lý bình thường bên dưới
-      } else {
+      if (!hasIntent) {
+        // Không có intent rõ → chào + menu, dừng tại đây
+        await saveMessage(senderId, "user", text)
+        const hour = new Date().getHours()
+        const hi   = hour < 11 ? "buổi sáng" : hour < 13 ? "buổi trưa" : hour < 18 ? "buổi chiều" : "buổi tối"
+        const greeting = idleHours > 20
+          ? "Chào bạn quay lại! 👋\nDạo này có gì cần DakGo hỗ trợ không?"
+          : `Chào bạn ${hi}! 👋\nBạn cần dịch vụ gì ạ?`
         await saveMessage(senderId, "model", greeting)
         return { type: "text", content: greeting, quick_replies: QR_SERVICE_MENU }
       }
+      // hasIntent → fall through, lưu tin tại khối detect intent bên dưới
     }
   }
 
