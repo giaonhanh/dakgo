@@ -54,6 +54,14 @@ CONTEXT REFERENCES (dùng lịch sử hội thoại để giải mã):
 - "thêm 1 nữa" → thêm 1 vào món vừa được nhắc đến
 - "món kia / cái đó" → món đang thảo luận trong context
 
+QUAN TRỌNG — KHÔNG GHI ĐÈ FIELD ĐÃ CÓ:
+- Nếu Data đã thu thập có delivery_address → KHÔNG set delivery_address trong data (dù tin nhắn có địa chỉ)
+  TRỪ KHI người dùng rõ ràng muốn đổi địa chỉ ("đổi địa chỉ thành", "sửa địa chỉ")
+- Nếu tin nhắn chỉ là số điện thoại → chỉ set phone, KHÔNG set bất kỳ field nào khác
+- KHÔNG đặt delivery_address = số điện thoại
+- KHÔNG đặt phone = địa chỉ
+- Khi không chắc field nào → bỏ qua, đừng đoán
+
 CORRECTION DETECTION:
 - "đổi địa chỉ thành X / sửa thành X" → cập nhật field delivery_address hoặc pickup_address
 - "đổi số thành X / sửa số thành X" → cập nhật phone
@@ -79,6 +87,46 @@ export interface ExtractResult {
 export type ChatTurn = { role: "user" | "model"; parts: string }
 
 const FALLBACK_REPLY = "Bạn cho mình biết thêm nhé! 😊"
+
+const PHONE_RE = /^(\+?84|0)\d{8,9}$/
+
+// Loại bỏ dữ liệu sai kiểu mà Groq đôi khi trả về
+function sanitizeExtracted(
+  data: Partial<CollectedData>,
+  existing: CollectedData,
+): Partial<CollectedData> {
+  const out = { ...data }
+
+  // Địa chỉ không được là số điện thoại
+  const addrFields = ["delivery_address", "pickup_address", "dropoff_address"] as const
+  for (const f of addrFields) {
+    const v = out[f]
+    if (typeof v === "string" && PHONE_RE.test(v.replace(/\s/g, ""))) {
+      delete out[f]
+    }
+  }
+
+  // Không ghi đè địa chỉ đã có trừ khi rõ ràng là sửa
+  for (const f of addrFields) {
+    if (existing[f] && out[f] && out[f] === data[f]) {
+      // Chỉ cho ghi đè nếu địa chỉ mới khác hẳn (>10 chars khác)
+      const cur = String(existing[f])
+      const nw  = String(out[f])
+      if (nw.length < 10 || nw === cur) delete out[f]
+    }
+  }
+
+  // SĐT không được là địa chỉ (> 20 chars)
+  const phoneFields = ["phone", "sender_phone", "receiver_phone"] as const
+  for (const f of phoneFields) {
+    const v = out[f]
+    if (typeof v === "string" && v.replace(/\s/g, "").length > 15) {
+      delete out[f]
+    }
+  }
+
+  return out
+}
 
 export async function extractAndReply(
   userMessage: string,
@@ -128,9 +176,13 @@ export async function extractAndReply(
     const raw    = res.choices[0]?.message?.content ?? "{}"
     const parsed = JSON.parse(raw) as Partial<ExtractResult>
 
+    const rawData = (parsed.data ?? {}) as Partial<CollectedData>
+    // Sanity check: loại bỏ field vô lý từ Groq
+    const sanitized = sanitizeExtracted(rawData, collectedData)
+
     return {
       intent: parsed.intent ?? null,
-      data:   (parsed.data ?? {}) as Partial<CollectedData>,
+      data:   sanitized,
       reply:  parsed.reply ?? FALLBACK_REPLY,
     }
   } catch (err) {

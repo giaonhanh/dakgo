@@ -68,6 +68,34 @@ async function nominatimGeocode(address: string): Promise<LatLng | null> {
   return null
 }
 
+export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  if (VIETMAP_KEY) {
+    try {
+      const res = await fetch(
+        `https://maps.vietmap.vn/api/reverse/v3?apikey=${VIETMAP_KEY}&lat=${lat}&lng=${lng}`,
+        { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(4000) },
+      )
+      if (res.ok) {
+        const data = await res.json() as Array<{ display?: string; name?: string }>
+        const addr = data[0]?.display ?? data[0]?.name
+        if (addr) return addr
+      }
+    } catch { /* fallback */ }
+  }
+  // Nominatim reverse fallback
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=vi`,
+      { headers: { "User-Agent": "DakGo-Bot/1.0 (dakgo.com)" }, signal: AbortSignal.timeout(4000) },
+    )
+    if (res.ok) {
+      const d = await res.json() as { display_name?: string }
+      if (d.display_name) return d.display_name
+    }
+  } catch { /* fallback */ }
+  return null
+}
+
 export function distanceKm(a: LatLng, b: LatLng): number {
   const R    = 6371
   const dLat = ((b.lat - a.lat) * Math.PI) / 180

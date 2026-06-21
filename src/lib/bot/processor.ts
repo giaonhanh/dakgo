@@ -25,7 +25,7 @@ import {
   type BotSession, type CollectedData,
 } from "./session"
 import { createOrder } from "./order-creator"
-import { geocodeAddress, distanceKm } from "./geo"
+import { geocodeAddress, distanceKm, reverseGeocode } from "./geo"
 import { getPricing, calcFee, type ServiceType } from "./pricing"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
@@ -47,6 +47,21 @@ function db() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
+}
+
+// ─── Shop search by name ──────────────────────────────────────────────────────
+
+async function searchShopByName(name: string): Promise<{ id: string; name: string } | null> {
+  try {
+    const { data } = await db()
+      .from("shops")
+      .select("id, name")
+      .eq("status", "approved")
+      .ilike("name", `%${name}%`)
+      .limit(1)
+      .maybeSingle()
+    return data ?? null
+  } catch { return null }
 }
 
 // ─── Price estimation ──────────────────────────────────────────────────────────
@@ -229,12 +244,34 @@ async function askNextField(session: BotSession, aiReply?: string): Promise<BotR
     return { type: "text", content: summary }
   }
 
+  // Food + cần shop_id nhưng đã có shop_name → auto-search
+  if (nextField === "shop_id" && intent === "food_order" && collected_data.shop_name) {
+    const found = await searchShopByName(collected_data.shop_name)
+    if (found) {
+      const newData = mergeData(collected_data, { shop_id: found.id, shop_name: found.name })
+      await saveSession(sender_id, { collected_data: newData })
+      return buildMenuCards(found.id, found.name)
+    }
+    // Không tìm thấy → search cards
+    return buildShopCards(collected_data.shop_name, 0)
+  }
+
   // Food + cần items + đã có shop → show menu cards
   if (nextField === "items" && intent === "food_order" && collected_data.shop_id) {
     return buildMenuCards(collected_data.shop_id, collected_data.shop_name ?? "quán")
   }
 
-  const reply = sanitizeReply(aiReply?.trim() || FIELD_QUESTION[nextField] || "Bạn cho mình biết thêm nhé 😊")
+  // Câu hỏi theo context intent (taxi khác food)
+  const INTENT_OVERRIDE: Partial<Record<string, Partial<Record<keyof CollectedData, string>>>> = {
+    motorbike: { pickup_address: "Bạn đang ở đâu? Mình đến đón nhé! 📍", dropoff_address: "Bạn muốn đến đâu ạ? 🏁" },
+    taxi:      { pickup_address: "Bạn đang ở đâu? Mình đón bạn nhé! 📍", dropoff_address: "Bạn muốn đến đâu ạ? 🏁" },
+    taxi7:     { pickup_address: "Bạn đang ở đâu? Mình đến đón nhé! 📍", dropoff_address: "Bạn muốn đến đâu ạ? 🏁" },
+    deliver_for_me: { pickup_address: "Lấy hàng ở đâu vậy bạn? 📍", delivery_address: "Giao đến địa chỉ nào? 🏠" },
+    buy_for_me:     { pickup_address: "Mua ở đâu vậy bạn? (chợ/siêu thị) 📍", delivery_address: "Giao về địa chỉ nào? 🏠" },
+  }
+  const intentQ = intent ? (INTENT_OVERRIDE[intent]?.[nextField]) : undefined
+  // Ưu tiên: intent-specific > FIELD_QUESTION > aiReply > fallback
+  const reply = sanitizeReply(intentQ || FIELD_QUESTION[nextField] || aiReply?.trim() || "Bạn cho mình biết thêm nhé 😊")
 
   // Địa chỉ → kèm nút webview chọn trên bản đồ
   if (nextField === "delivery_address" || nextField === "pickup_address" || nextField === "dropoff_address") {
@@ -333,24 +370,59 @@ export async function processPostback(senderId: string, payload: string): Promis
 
 // ─── processLocation ──────────────────────────────────────────────────────────
 
+// Map intent + trạng thái hiện tại → field nào cần lưu khi share vị trí
+function resolveLocationTarget(intent: string | null, data: CollectedData): {
+  lat: keyof CollectedData; lng: keyof CollectedData
+  addr: keyof CollectedData; label: string
+} {
+  switch (intent) {
+    case "motorbike": case "taxi": case "taxi7":
+      if (!data.pickup_lat && !data.pickup_address)
+        return { lat: "pickup_lat", lng: "pickup_lng", addr: "pickup_address", label: "điểm đón" }
+      return { lat: "dropoff_lat", lng: "dropoff_lng", addr: "dropoff_address", label: "điểm đến" }
+
+    case "deliver_for_me": case "buy_for_me":
+      if (!data.pickup_lat && !data.pickup_address)
+        return { lat: "pickup_lat", lng: "pickup_lng", addr: "pickup_address", label: "điểm lấy hàng" }
+      return { lat: "delivery_lat", lng: "delivery_lng", addr: "delivery_address", label: "địa chỉ giao" }
+
+    default:
+      return { lat: "delivery_lat", lng: "delivery_lng", addr: "delivery_address", label: "địa chỉ giao hàng" }
+  }
+}
+
 export async function processLocation(
   senderId: string,
   lat: number,
   lng: number,
 ): Promise<BotResponse> {
   const session = await getSession(senderId)
-  const newData = mergeData(session.collected_data, { delivery_lat: lat, delivery_lng: lng })
+  const target  = resolveLocationTarget(session.intent, session.collected_data)
+
+  // Reverse-geocode → địa chỉ text cho đúng field (taxi=pickup, food=delivery,...)
+  const addrText   = await reverseGeocode(lat, lng)
+  const coordsData: Partial<CollectedData> = {
+    [target.lat]: lat,
+    [target.lng]: lng,
+    ...(addrText ? { [target.addr]: addrText } : {}),
+  }
+
+  const newData = mergeData(session.collected_data, coordsData)
   await saveSession(senderId, { state: "collecting", collected_data: newData })
-  await saveMessage(senderId, "user", `[Chia sẻ vị trí: ${lat.toFixed(4)}, ${lng.toFixed(4)}]`)
+  await saveMessage(senderId, "user", `[Vị trí ${target.label}: ${addrText ?? `${lat.toFixed(4)},${lng.toFixed(4)}`}]`)
+
+  if (addrText) {
+    const confirmMsg = `📍 Đã ghi nhận **${target.label}**:\n${addrText}\n\nĐúng chưa bạn? 😊`
+    await saveMessage(senderId, "model", confirmMsg)
+    return { type: "text", content: confirmMsg }
+  }
 
   if (session.intent) {
     const missing = getMissingFields(session.intent, newData)
-    if (missing.length === 0) {
-      return transitionToConfirming({ ...session, collected_data: newData })
-    }
+    if (missing.length === 0) return transitionToConfirming({ ...session, collected_data: newData })
   }
 
-  return askNextField({ ...session, state: "collecting", collected_data: newData })
+  return askNextField({ ...session, state: "collecting" as const, collected_data: newData })
 }
 
 // ─── handleLocationRefused ────────────────────────────────────────────────────
@@ -397,10 +469,37 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
     return { type: "text", content: msg }
   }
 
-  // Reset sau khi đặt xong / bị escalate
+  // Reset sau khi đặt xong / bị escalate / khách muốn bắt đầu lại
   if (state === "order_created" || state === "escalated") {
     await resetSession(senderId)
     return processMessage(senderId, text)
+  }
+
+  // Khách nhắn "đặt mới" / "bắt đầu lại" → reset session
+  if (/^(đặt mới|bắt đầu lại|đặt lại từ đầu|hủy đơn cũ|xóa đi|làm lại)$/i.test(text.trim())) {
+    await resetSession(senderId)
+    const msg = "Mình đã xóa thông tin cũ rồi! 😊\nBạn cần dịch vụ gì?\n🍜 Đồ ăn · 📦 Giao hộ · 🛒 Mua hộ · 🛵 Xe ôm · 🚕 Taxi"
+    await saveMessage(senderId, "model", msg)
+    return { type: "text", content: msg }
+  }
+
+  // Phát hiện lời chào — không kéo vào flow cũ
+  const isGreeting = /^(alo|hello|hi|chào|ơi|hey|xin chào|này|ờ alo|alo ơi|cho hỏi|cho mình hỏi)$/i.test(text.trim())
+  if (isGreeting) {
+    if (state === "collecting" && intent) {
+      // Có flow đang dở → hỏi có muốn tiếp không
+      const label: Record<string, string> = {
+        food_order: "đặt đồ ăn", deliver_for_me: "giao hộ",
+        buy_for_me: "mua hộ", motorbike: "xe ôm", taxi: "taxi", taxi7: "taxi 7 chỗ",
+      }
+      const msg = `Chào bạn! 👋\nBạn đang đặt ${label[intent] ?? "dịch vụ"} chưa xong.\nNhắn *tiếp tục* để làm tiếp, hoặc *đặt mới* để bắt đầu lại nhé!`
+      await saveMessage(senderId, "model", msg)
+      return { type: "text", content: msg }
+    }
+    // Idle → chào và show menu
+    const greet = "Chào bạn! Mình là nhân viên DakGo 🛵\n\nMình hỗ trợ:\n🍜 Đặt đồ ăn  |  📦 Giao hộ\n🛒 Mua hộ  |  🛵 Xe ôm  |  🚕 Taxi\n\nBạn cần gì ạ?"
+    await saveMessage(senderId, "model", greet)
+    return { type: "text", content: greet }
   }
 
   // ── Gợi ý tiếp tục đơn dang dở sau khi idle > 30 phút ────────────────────
@@ -585,19 +684,36 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
     const sessionIntent = INTENT_MAP[serviceKey] ?? serviceKey
 
     if (serviceKey === "food") {
+      // Tách: "đặt đồ ăn ở quán ABC" → keyword="quán ABC", shopName="ABC"
+      const atShop   = text.match(/(?:ở|tại|quán|shop)\s+([\wÀ-ỹ\s]{2,40})/i)
+      const shopHint = atShop?.[1]?.trim()
+
       const cleaned = text
         .replace(/cho\s*(tôi|mình|t|tui)\s*/gi, "")
-        .replace(/\b(đặt|muốn|ăn|nha|nhé|đi|ơi|order|lấy|mua|thử|ship|giao|giúp|dùm)\b/gi, "")
+        .replace(/\b(đặt|muốn|ăn|nha|nhé|đi|ơi|order|lấy|mua|thử|ship|giao|giúp|dùm|ở|tại)\b/gi, "")
         .trim()
       const kw = cleaned.length >= 2 ? cleaned : "đồ ăn"
 
       await saveKeyword(senderId, kw)
-      await saveSession(senderId, {
-        state:          "collecting",
-        intent:         "food_order",
-        // Kế thừa phone nếu đã biết từ trước
-        collected_data: session.collected_data.phone ? { phone: session.collected_data.phone } : {},
-      })
+
+      const keepPhone  = session.collected_data.phone
+      const initData: CollectedData = keepPhone ? { phone: keepPhone } : {}
+
+      // Nếu user nói tên quán cụ thể → auto-tìm
+      if (shopHint) {
+        const found = await searchShopByName(shopHint)
+        if (found) {
+          initData.shop_id   = found.id
+          initData.shop_name = found.name
+          await saveSession(senderId, { state: "collecting", intent: "food_order", collected_data: initData })
+          const intro = `🏪 Tìm thấy **${found.name}**! Xem menu nhé:`
+          await saveMessage(senderId, "model", intro)
+          return buildMenuCards(found.id, found.name)
+        }
+        initData.shop_name = shopHint
+      }
+
+      await saveSession(senderId, { state: "collecting", intent: "food_order", collected_data: initData })
 
       const cardResp = await buildShopCards(kw, 0)
       if (cardResp?.elements.length > 0) return cardResp
