@@ -377,6 +377,24 @@ function buildSuccessMsg(intent: string, displayId: string, data?: CollectedData
   return { type: "text", content: lines.join("\n"), quick_replies: QR_ORDER_ACTION }
 }
 
+// ─── Kiểm tra địa chỉ có thể geocode không ────────────────────────────────────
+// Phước An (có số nhà + tên đường) → geocode được
+// Xã / buôn / thôn → không có địa chỉ số → yêu cầu chọn map
+function isGeocodable(addr: string): boolean {
+  const lower = addr.toLowerCase()
+
+  // Buôn / thôn / làng / ấp → địa chỉ dân tộc/nông thôn, không geocode được
+  if (/(buôn[\s,]|bon[\s,]|thôn[\s,]|làng[\s,]|ấp[\s,]|xóm[\s,])/.test(lower)) return false
+
+  // "xã [tên]" mà không phải Phước An → xã lân cận
+  if (/\bxã\b/.test(lower) && !/phước\s*an/i.test(lower)) return false
+
+  // Không có chữ số nào → thiếu số nhà / km cụ thể
+  if (!/\d/.test(addr)) return false
+
+  return true
+}
+
 // ─── processPostback ──────────────────────────────────────────────────────────
 
 export async function processPostback(senderId: string, payload: string): Promise<BotResponse> {
@@ -819,22 +837,34 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
         const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
         const mapUrl   = `${appUrl}/bot-address?sid=${senderId}`
 
-        const coords = await tryGeocodeAddress(addrText)
-
-        if (!coords) {
-          // Không tìm được → xóa address vừa extract, xin lỗi + gửi link bản đồ
+        const sendMapLink = async (reason: string): Promise<BotResponse> => {
+          // Xóa địa chỉ vừa extract — chưa có tọa độ
           const cleaned = { ...newData }
           delete (cleaned as Record<string, unknown>)[f.addr]
           await saveSession(senderId, { collected_data: cleaned })
-          const sorry = `😔 Mình chưa xác định được vị trí "${addrText}" trên bản đồ.\n\nBạn dùng link bên dưới để chọn chính xác giúp mình nhé!`
-          await saveMessage(senderId, "model", sorry)
+          await saveMessage(senderId, "model", reason)
           return {
-            type:        "text_with_webview",
-            content:     sorry,
-            buttonTitle: "🗺️ Chọn vị trí trên bản đồ",
-            url:         mapUrl,
+            type:          "text_with_webview",
+            content:       reason,
+            buttonTitle:   "🗺️ Chọn vị trí trên bản đồ",
+            url:           mapUrl,
             quick_replies: [{ content_type: "location" }],
           } as TextWithWebviewResponse
+        }
+
+        // Địa chỉ xã / buôn / thôn → không có số nhà → cần chọn map
+        if (!isGeocodable(addrText)) {
+          return sendMapLink(
+            `📍 Địa chỉ "${addrText}" ở khu vực ngoài thị trấn, mình cần bạn ghim vị trí chính xác nhé!\n\nDùng link bên dưới hoặc share GPS trực tiếp:`
+          )
+        }
+
+        // Phước An / có số nhà → thử geocode
+        const coords = await tryGeocodeAddress(addrText)
+        if (!coords) {
+          return sendMapLink(
+            `😔 Mình chưa tìm được "${addrText}" trên bản đồ.\n\nBạn chọn vị trí giúp mình nhé:`
+          )
         }
 
         // Tìm được → lưu coords + hỏi xác nhận
