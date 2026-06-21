@@ -1,5 +1,4 @@
 import { processMessage, processLocation, handleLocationRefused, processPostback } from "@/lib/bot/processor"
-import { getState } from "@/lib/bot/storage"
 import type { BotResponse, FBCard } from "@/lib/bot/cards"
 
 const FB_PAGE_TOKEN   = process.env.FB_PAGE_ACCESS_TOKEN!
@@ -157,13 +156,6 @@ async function handleEvents(body: Record<string, unknown>) {
 
         if (!message.text) continue
         const text = message.text.trim()
-
-        // Đang chờ share vị trí mà khách gửi text → bước B
-        const state = await getState(senderId)
-        if (state === "awaiting_location") {
-          const reply = await handleLocationRefused(senderId)
-          if (reply) { await sendBotResponse(senderId, reply); continue }
-        }
 
         const reply = await processMessage(senderId, text)
         await sendBotResponse(senderId, reply)
