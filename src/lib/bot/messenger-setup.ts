@@ -20,6 +20,12 @@ export async function setupMessengerProfile(pageToken: string) {
   // Gửi 1 request duy nhất — get_started + persistent_menu cùng lúc
   const result = await fbProfilePost({
     get_started: { payload: "GET_STARTED" },
+    ice_breakers: [
+      { question: "🍜 Tôi muốn đặt đồ ăn",      payload: "SERVICE:food" },
+      { question: "🛵 Đặt xe ôm hoặc taxi",       payload: "SERVICE:motorbike" },
+      { question: "📦 Giao hộ / Mua hộ",          payload: "SERVICE:deliver_for_me" },
+      { question: "📞 Liên hệ nhân viên hỗ trợ",  payload: "ESCALATE" },
+    ],
     persistent_menu: [{
       locale:                  "default",
       composer_input_disabled: false,
