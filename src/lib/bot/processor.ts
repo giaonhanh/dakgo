@@ -575,8 +575,12 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
   if (state === "collecting" && intent) {
     await saveMessage(senderId, "user", text)
 
-    // Khách nhắn "xong" khi đã chọn đủ món → chuyển sang hỏi field tiếp
-    if (/^(xong|done|ok xong|chọn xong|đủ rồi)$/i.test(text.trim())) {
+    // Khách nhắn "xong" hoặc xác nhận đơn giản → tiếp tục hỏi field tiếp theo
+    // (vd: "đúng rồi" sau khi bot xác nhận địa chỉ → không cần Groq)
+    if (
+      /^(xong|done|ok xong|chọn xong|đủ rồi)$/i.test(text.trim()) ||
+      isConfirmation(text)
+    ) {
       return askNextField(session)
     }
 

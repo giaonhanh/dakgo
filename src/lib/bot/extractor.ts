@@ -58,12 +58,32 @@ buy_for_me — Mua hộ:
 ═══ TRÍCH XUẤT DỮ LIỆU ═══
 
 SỐ ĐIỆN THOẠI (phone / sender_phone / receiver_phone):
-  - Chuẩn hóa về 10 số, bắt đầu bằng 0
-  - 84xxxxxxxx → 0xxxxxxxx; +84xxxxxxxx → 0xxxxxxxx
-  - 035.447.4474 → 0354474474 (bỏ dấu chấm/gạch)
-  - 035 447 4474 → 0354474474 (bỏ dấu cách)
-  - "số tui là 035..." → phone field
-  - KHÔNG nhầm địa chỉ thành phone, KHÔNG nhầm phone thành địa chỉ
+  Chuẩn hóa về 10 chữ số, bắt đầu bằng 0.
+
+  Đầu số VN hợp lệ (tính đến 2025):
+    Viettel:      032, 033, 034, 035, 036, 037, 038, 039 · 086, 096, 097, 098
+    Mobifone:     070, 076, 077, 078, 079 · 089, 090, 093
+    Vinaphone:    081, 082, 083, 084, 085 · 091, 094
+    Vietnamobile: 052, 056, 058 · 092
+    Gmobile:      059 · 099
+    Reddi:        055
+    ITelecom:     099
+
+  Chuyển đổi đầu số 11 chữ số cũ (pre-2018) → 10 số mới:
+    01200→070, 01201→079, 01202→077, 01205→076, 01206→078, 01208→078, 01209→089
+    0162→032, 0163→033, 0164→034, 0165→035, 0166→036, 0167→037, 0168→038, 0169→039
+    0186→056, 0188→058, 0199→059, 0120→070, 0121→079, 0122→077, 0126→076, 0128→078
+
+  Định dạng phổ biến:
+    0354474474 (liền)
+    035 447 4474 (cách nhau)
+    035.447.4474 (chấm)
+    035-447-4474 (gạch)
+    +84 35 447 4474 (+84 không có số 0)
+    84 354474474 (84 có số 0 hoặc không)
+    "số tui là 035..." → phone field
+
+  KHÔNG nhầm địa chỉ thành phone, KHÔNG nhầm phone thành địa chỉ
 
 ĐỊA CHỈ (delivery_address / pickup_address / dropoff_address):
   - Giữ nguyên text người dùng nhập, không chỉnh sửa
@@ -187,7 +207,52 @@ export type ChatTurn = { role: "user" | "model"; parts: string }
 
 const FALLBACK_REPLY = "Bạn cho mình biết thêm nhé! 😊"
 
-const PHONE_RE = /^(\+?84|0)\d{8,9}$/
+// Đầu số VN hợp lệ (cập nhật 2025)
+const VN_PREFIXES = new Set([
+  // Viettel 10 số
+  "032","033","034","035","036","037","038","039","086","096","097","098",
+  // Mobifone 10 số
+  "070","076","077","078","079","089","090","093",
+  // Vinaphone 10 số
+  "081","082","083","084","085","091","094",
+  // Vietnamobile / Reddi
+  "052","055","056","058","092",
+  // Gmobile / ITelecom
+  "059","099",
+])
+
+// Map đầu số cũ 11 chữ số → 10 chữ số
+const OLD_PREFIX_MAP: Record<string, string> = {
+  "01200":"070","01201":"079","01202":"077","01205":"076","01206":"078","01208":"078","01209":"089",
+  "0162":"032","0163":"033","0164":"034","0165":"035","0166":"036","0167":"037","0168":"038","0169":"039",
+  "0186":"056","0188":"058","0199":"059",
+}
+
+/** Chuẩn hóa số điện thoại VN → 10 chữ số hoặc null nếu không hợp lệ */
+export function normalizePhone(raw: string): string | null {
+  // Bỏ hết ký tự không phải số (dấu chấm, gạch, cách, ngoặc)
+  let digits = raw.replace(/[\s.\-()]/g, "")
+
+  // +84 / 84 → 0
+  if (digits.startsWith("+84")) digits = "0" + digits.slice(3)
+  else if (digits.startsWith("84") && digits.length === 11) digits = "0" + digits.slice(2)
+
+  // Đổi đầu số cũ 11 chữ số → 10 chữ số
+  for (const [old, nw] of Object.entries(OLD_PREFIX_MAP)) {
+    if (digits.startsWith(old) && digits.length === old.length + (11 - old.length)) {
+      digits = nw + digits.slice(old.length)
+      break
+    }
+  }
+
+  // Kết quả phải đúng 10 chữ số và đầu số hợp lệ
+  if (digits.length !== 10) return null
+  const prefix3 = digits.slice(0, 3)
+  if (!VN_PREFIXES.has(prefix3)) return null
+  return digits
+}
+
+const PHONE_RE = /^0(3[2-9]|5[2568-9]|7[06-9]|8[1-9]|9[0-9])\d{7}$/
 
 // Loại bỏ dữ liệu sai kiểu mà Groq đôi khi trả về
 function sanitizeExtracted(
@@ -196,11 +261,22 @@ function sanitizeExtracted(
 ): Partial<CollectedData> {
   const out = { ...data }
 
+  // Chuẩn hóa số điện thoại từ Groq (có thể trả về format lạ)
+  const phoneFields2 = ["phone", "sender_phone", "receiver_phone"] as const
+  for (const f of phoneFields2) {
+    const v = out[f]
+    if (typeof v === "string") {
+      const normalized = normalizePhone(v)
+      if (normalized) out[f] = normalized
+      else delete out[f]  // Không hợp lệ → bỏ qua
+    }
+  }
+
   // Địa chỉ không được là số điện thoại
   const addrFields = ["delivery_address", "pickup_address", "dropoff_address"] as const
   for (const f of addrFields) {
     const v = out[f]
-    if (typeof v === "string" && PHONE_RE.test(v.replace(/\s/g, ""))) {
+    if (typeof v === "string" && normalizePhone(v) !== null) {
       delete out[f]
     }
   }
@@ -292,18 +368,43 @@ export async function extractAndReply(
 
 function regexFallback(text: string): ExtractResult {
   const extracted: Partial<CollectedData> = {}
+  const t = text.trim()
 
-  const phoneMatch = text.match(/(?:^|[\s,;])(\+?84|0)([\d]{8,9})/)
-  if (phoneMatch) {
-    const digits = (phoneMatch[1].replace("+", "") + phoneMatch[2]).replace(/^84/, "0")
-    if (digits.length === 10) extracted.phone = digits
+  // Nhận diện số điện thoại — tất cả format phổ biến
+  const phonePatterns = [
+    // +84 hoặc 84 trước
+    /(?:\+84|84)\s*[-.]?\s*(\d[\d\s.\-]{8,11})/,
+    // 0 + 9 chữ số (thêm 0 ở đầu)
+    /(0[3-9]\d[\s.\-]?\d{3,4}[\s.\-]?\d{4})/,
+    // Đầu số 11 chữ số cũ
+    /(01[2-9]\d{9})/,
+  ]
+  for (const re of phonePatterns) {
+    const m = t.match(re)
+    if (m) {
+      const norm = normalizePhone(m[1] ?? m[0])
+      if (norm) { extracted.phone = norm; break }
+    }
   }
 
-  const itemMatch = text.match(/(\d+)\s+([\wÀ-ỹ\s]{2,30})/)
+  // Nhận diện giá tiền (khi hỏi estimated_items_cost)
+  const priceMatch = t.match(/(\d+(?:[.,]\d+)?)\s*(k|ngàn|nghìn|tr|triệu|đ|đồng)/i)
+  if (priceMatch && !extracted.phone) {
+    const num   = parseFloat(priceMatch[1].replace(",", "."))
+    const unit  = priceMatch[2].toLowerCase()
+    let   vnd   = 0
+    if (unit === "k" || unit === "ngàn" || unit === "nghìn") vnd = num * 1000
+    else if (unit === "tr" || unit === "triệu") vnd = num * 1_000_000
+    else vnd = num
+    if (vnd > 0 && vnd < 100_000_000) extracted.estimated_items_cost = Math.round(vnd)
+  }
+
+  // Nhận diện món ăn + số lượng
+  const itemMatch = t.match(/(\d+)\s+([\wÀ-ỹ][^\d,\n]{1,30})/)
   if (itemMatch) {
     const qty  = parseInt(itemMatch[1])
     const name = itemMatch[2].trim()
-    if (qty > 0 && qty <= 99 && name.length >= 2) {
+    if (qty > 0 && qty <= 99 && name.length >= 2 && !extracted.phone) {
       extracted.items = [{ name, qty, price: 0 }]
     }
   }
