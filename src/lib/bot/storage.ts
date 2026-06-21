@@ -176,6 +176,25 @@ export async function getShopLocation(shopName: string): Promise<{ lat: number; 
   return { lat, lng }
 }
 
+// ─── Returning user detection ────────────────────────────────────────────────
+
+/** Trả về thời điểm user nhắn tin gần nhất, null nếu chưa từng nhắn */
+export async function getLastUserMessageTime(senderId: string): Promise<Date | null> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from("bot_conversations")
+    .select("created_at")
+    .eq("sender_id", senderId)
+    .eq("role", "user")
+    .not("content", "like", "__%")   // bỏ metadata
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!data?.created_at) return null
+  return new Date(data.created_at)
+}
+
 // ─── Logs ────────────────────────────────────────────────────────────────────
 
 export async function logBlocked(

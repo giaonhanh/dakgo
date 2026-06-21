@@ -20,7 +20,7 @@ import {
   QR_SERVICE_MENU, QR_LOCATION, QR_CONFIRM_CANCEL, QR_PAYMENT,
   QR_ORDER_ACTION, QR_RESUME, makeConfirmButtons,
 } from "./cards"
-import { saveMessage, logBlocked, saveKeyword, getKeyword, getConversation } from "./storage"
+import { saveMessage, logBlocked, saveKeyword, getKeyword, getConversation, getLastUserMessageTime } from "./storage"
 import {
   getSession, saveSession, resetSession, mergeData,
   getMissingFields, getNextMissingField,
@@ -807,6 +807,37 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
     }
 
     return askNextField(updatedSession, extracted.reply)
+  }
+
+  // ── STATE: idle — Chào user quay lại sau >6 giờ ──────────────────────────
+  if (state === "idle") {
+    const lastTime = await getLastUserMessageTime(senderId)
+    const idleHours = lastTime
+      ? (Date.now() - lastTime.getTime()) / 3_600_000
+      : null
+
+    // Lần đầu tiên nhắn (null) → đã xử lý bằng GET_STARTED postback
+    // Quay lại sau >6h → chào và show menu
+    if (lastTime && idleHours !== null && idleHours > 6 && !isGreeting) {
+      await saveMessage(senderId, "user", text)
+
+      const hour   = new Date().getHours()
+      const hi     = hour < 11 ? "buổi sáng" : hour < 13 ? "buổi trưa" : hour < 18 ? "buổi chiều" : "buổi tối"
+      const dayAgo = idleHours > 20
+
+      const greeting = dayAgo
+        ? `Chào bạn quay lại! 👋\nDạo này có gì cần DakGo hỗ trợ không?`
+        : `Chào bạn ${hi}! 👋\nBạn cần dịch vụ gì ạ?`
+
+      // Nếu tin nhắn đã chứa intent → xử lý luôn, không chào thêm
+      const hasIntent = detectServiceType(text) || isReorderRequest(text)
+      if (hasIntent) {
+        // fall through — xử lý bình thường bên dưới
+      } else {
+        await saveMessage(senderId, "model", greeting)
+        return { type: "text", content: greeting, quick_replies: QR_SERVICE_MENU }
+      }
+    }
   }
 
   // ── STATE: idle — Detect intent ───────────────────────────────────────────
