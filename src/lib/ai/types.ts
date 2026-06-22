@@ -9,6 +9,7 @@ export type Intent =
   | 'TRACK_ORDER'
   | 'MODIFY_CART'
   | 'GENERAL_QUESTION'
+  | 'FAQ'
   | 'CANCEL'
   | 'GREET'
   | 'CONFIRM_ORDER'

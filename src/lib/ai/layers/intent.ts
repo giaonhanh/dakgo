@@ -1,6 +1,65 @@
 // Layer 3: Intent Classifier (rule-based, không dùng AI — phải nhanh < 1ms)
 import type { Intent, PipelineInput } from '../types'
 
+// Câu hỏi thông tin thường gặp → trả lời nhanh không cần DB
+const FAQ_PATTERNS: Array<{ key: string; regexes: RegExp[] }> = [
+  {
+    key: 'delivery_fee',
+    regexes: [/ship (phí|giá|bao nhiêu)|phí (giao|ship|vận chuyển)|giao hàng (bao nhiêu|mất phí|tính phí)/i],
+  },
+  {
+    key: 'delivery_time',
+    regexes: [/giao (bao lâu|lâu không|nhanh không|trong bao lâu|mất bao lâu)/i, /bao lâu (giao|tới|đến)/i],
+  },
+  {
+    key: 'price_query',
+    regexes: [/giá (bao nhiêu|là bao|như thế nào|cả|thế nào)\??/i, /bao nhiêu tiền|mất bao nhiêu tiền/i],
+  },
+  {
+    key: 'open_hours',
+    regexes: [/(còn|đang) (mở|bán|hoạt động) (không|chưa)\??/i, /giờ (này|mấy giờ|bây giờ).*(mở|bán)/i, /mấy giờ (mở|đóng|bán)/i],
+  },
+  {
+    key: 'service_area',
+    regexes: [/(giao|phục vụ|hoạt động).*(đâu|ở đâu|khu vực nào|xã nào|vùng nào)/i, /có giao (đến|tới|ở)\b/i],
+  },
+  {
+    key: 'payment',
+    regexes: [/thanh toán (bằng|qua|thế nào|cách nào)|trả (tiền|bằng) (gì|cách)/i, /có (nhận|chấp nhận) (chuyển khoản|tiền mặt|momo|zalo)/i],
+  },
+]
+
+export function detectFaq(message: string): string | null {
+  for (const { key, regexes } of FAQ_PATTERNS) {
+    if (regexes.some(r => r.test(message))) return key
+  }
+  return null
+}
+
+// Detect category từ câu hỏi để filter quán
+export function detectCategoryFromMessage(message: string): string | null {
+  const map: Array<[RegExp, string]> = [
+    [/\b(cơm|cơm gà|cơm tấm|cơm rang)\b/i, 'com'],
+    [/\b(bún|bún bò|bún thịt)\b/i,          'bun'],
+    [/\b(phở|pho)\b/i,                       'pho'],
+    [/\b(cà phê|cafe|coffee)\b/i,            'ca-phe'],
+    [/\b(lẩu)\b/i,                           'lau'],
+    [/\b(mỳ|mì|mỳ cay|mì cay)\b/i,          'mi'],
+    [/\b(bánh mì|banh mi)\b/i,               'banh-mi'],
+    [/\b(gà rán|gà chiên)\b/i,               'ga-ran'],
+    [/\b(trà sữa|tra sua|bubble tea)\b/i,    'tra-sua'],
+  ]
+  for (const [re, cat] of map) {
+    if (re.test(message)) return cat
+  }
+  return null
+}
+
+// Detect "gần tôi/đây" → cần GPS
+export function needsLocation(message: string): boolean {
+  return /gần (tôi|đây|chỗ (tôi|này|mình)|vị trí)|quanh đây|xung quanh/i.test(message)
+}
+
 const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
   // ── Confirm order (phải check TRƯỚC ORDER_FOOD) ──────────────────────────────
   {
@@ -95,6 +154,8 @@ const PHONE_PATTERN = /^(0|\+84)[0-9\s\-\.]{8,11}$/
 const ADDRESS_PATTERN = /\b(đường|phố|ngõ|hẻm|thôn|xóm|khu|số|ngách|tổ|kp\b|chợ|gần|cạnh|trước|sau|cổng)\b/i
 
 export function classifyIntent(input: PipelineInput): Intent {
+  // FAQ check trước — tránh bị override bởi các pattern khác
+  if (detectFaq(input.message)) return 'FAQ'
   const msg = input.message.trim()
   const ctx = input.session.context
 

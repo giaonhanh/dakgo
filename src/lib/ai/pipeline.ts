@@ -6,7 +6,7 @@
 import { normalizeInput }        from './layers/normalizer'
 import { checkAntiSpam }         from './layers/spam'
 import { checkGatekeeper }       from './layers/gatekeeper'
-import { classifyIntent }        from './layers/intent'
+import { classifyIntent, detectFaq, detectCategoryFromMessage, needsLocation } from './layers/intent'
 import { fuzzySearchProducts, fuzzySearchShops, getOpenShops, getShopProducts } from './layers/search'
 import { extractFromMessage }    from './layers/extractor'
 import { calculateConfidence }   from './layers/confidence'
@@ -61,13 +61,18 @@ export async function runPipeline(
     : ''
 
   // ── Layers 4 & 5: Fuzzy Search + AI Extract in parallel ──────────────────
+  const faqKey      = detectFaq(message)
+  const category    = detectCategoryFromMessage(message)
+  const wantsNearby = needsLocation(message)
+
   const needShopMenu  = ctx.shopId !== null && ctx.items.length === 0
-  const needOpenShops = !needShopMenu && (intent === 'FIND_SHOP' || ctx.items.length === 0)
+  const needOpenShops = !needShopMenu && (intent === 'FIND_SHOP' || intent === 'FAQ' || ctx.items.length === 0)
 
   const [extracted, openShops, shopMenu] = await Promise.all([
-    extractFromMessage(message, contextSummary),
-    needOpenShops ? getOpenShops()               : Promise.resolve([]),
-    needShopMenu  ? getShopProducts(ctx.shopId!) : Promise.resolve([]),
+    intent === 'FAQ' ? Promise.resolve({ items: [], shopName: null, phone: null, address: null, intent: null, confidence: 0 })
+                     : extractFromMessage(message, contextSummary),
+    needOpenShops ? getOpenShops(category ?? undefined) : Promise.resolve([]),
+    needShopMenu  ? getShopProducts(ctx.shopId!)        : Promise.resolve([]),
   ])
 
   // Layer 4: Fuzzy search products from extracted item names
@@ -166,6 +171,9 @@ export async function runPipeline(
     shopResults,
     offTopic:        gate.offTopic,
     isCompetitor:    gate.isCompetitor,
+    faqKey:          faqKey ?? undefined,
+    wantsNearby,
+    category:        category ?? undefined,
   })
 
   const output: PipelineOutput = {

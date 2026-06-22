@@ -23,10 +23,23 @@ export interface ActionInput {
   shopResults:    ShopSearchResult[]
   offTopic:       boolean
   isCompetitor?:  boolean
+  faqKey?:        string
+  wantsNearby?:   boolean
+  category?:      string
+}
+
+// Câu trả lời FAQ cố định
+const FAQ_REPLIES: Record<string, string> = {
+  delivery_fee:  'Phí giao hàng cố định 15.000đ trong xã Krông Pắc. Đơn trên 150k miễn phí ship!',
+  delivery_time: 'Thường giao trong 20–35 phút tùy khoảng cách và quán. Đơn đặt giờ cao điểm có thể lâu hơn chút.',
+  price_query:   'Giá tuỳ từng món và quán. Gõ tên món để mình tìm giá cụ thể cho bạn nhé!',
+  open_hours:    'Mình kiểm tra ngay cho bạn — các quán thường mở 6h–21h. Gõ tên quán muốn hỏi!',
+  service_area:  'Mình phục vụ xã Krông Pắc và các xã lân cận: Ea Kly, Ea Yông, Ea Uy, Ea Tiêu. Gõ địa chỉ để mình kiểm tra nhé!',
+  payment:       'Mình nhận: 💵 Tiền mặt · 📱 Chuyển khoản · 📲 MoMo · ZaloPay. Chọn khi thanh toán là được!',
 }
 
 export function decideAction(inp: ActionInput): ActionDecision {
-  const { intent, ctx, confidence, validation, missingField, productResults, shopResults, offTopic, isCompetitor } = inp
+  const { intent, ctx, confidence, validation, missingField, productResults, shopResults, offTopic, isCompetitor, faqKey, wantsNearby, category } = inp
 
   // ── Competitor mention ────────────────────────────────────────────────────────
   if (isCompetitor) {
@@ -45,6 +58,33 @@ export function decideAction(inp: ActionInput): ActionDecision {
       extraActions: [],
       reply:        'Mình chỉ hỗ trợ đặt đồ ăn và dịch vụ giao hàng tại Krông Pắc thôi nhé',
       quickReplies: [],
+    }
+  }
+
+  // ── FAQ — trả lời nhanh không cần DB ────────────────────────────────────────
+  if (intent === 'FAQ' && faqKey) {
+    const reply = FAQ_REPLIES[faqKey] ?? 'Mình chưa có thông tin đó, thử hỏi cụ thể hơn nhé!'
+    return {
+      action:       { type: 'SHOW_SHOP', payload: { shops: shopResults.slice(0, 3) } },
+      extraActions: [],
+      reply,
+      quickReplies: [],
+    }
+  }
+
+  // ── Cần vị trí GPS nhưng chưa có ────────────────────────────────────────────
+  if (wantsNearby && !ctx.address) {
+    const shops = shopResults.slice(0, 5)
+    const categoryLabel = category ? ` ${category}` : ''
+    return {
+      action:       { type: 'ASK_LOCATION' },
+      extraActions: shops.length > 0
+        ? [{ type: 'SHOW_SHOP', payload: { shops } }]
+        : [],
+      reply:        shops.length > 0
+        ? `Đang có ${shops.length} quán${categoryLabel} mở — chia sẻ vị trí để mình sắp xếp theo khoảng cách gần nhất:`
+        : `Chia sẻ vị trí để mình tìm quán${categoryLabel} gần bạn nhất nhé:`,
+      quickReplies: ['📍 Vị trí của tôi'],
     }
   }
 
@@ -113,14 +153,17 @@ export function decideAction(inp: ActionInput): ActionDecision {
         quickReplies: [],
       }
     }
-    // Chưa biết quán → show danh sách quán
+    // Chưa biết quán → show danh sách quán (đã lọc theo category nếu có)
     const shops = shopResults.slice(0, 5)
+    const catLabel = category ? ` ${category}` : ''
     return {
       action:       { type: 'SHOW_SHOP', payload: { shops } },
       extraActions: [],
       reply:        shops.length > 0
-        ? `${shops.length} quán đang mở — chọn quán để xem menu:`
-        : 'Chưa có quán nào mở, thử lại sau nhé!',
+        ? `${shops.length} quán${catLabel} đang mở — chọn quán để xem menu:`
+        : category
+          ? `Chưa tìm thấy quán ${category} nào đang mở. Thử món khác hoặc hỏi mình nhé!`
+          : 'Chưa có quán nào mở, thử lại sau nhé!',
       quickReplies: [],
     }
   }
