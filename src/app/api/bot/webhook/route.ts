@@ -26,28 +26,26 @@ async function sendText(recipientId: string, text: string, quickReplies?: QuickR
   await fbPost({ recipient: { id: recipientId }, message, messaging_type: "RESPONSE" })
 }
 
-// Gửi card carousel (Generic Template)
-async function sendCards(recipientId: string, elements: FBCard[], intro?: string) {
+// Gửi card carousel (Generic Template) — kèm quick_replies nếu có
+async function sendCards(recipientId: string, elements: FBCard[], intro?: string, quickReplies?: QuickReply[]) {
   if (intro) await sendText(recipientId, intro)
   if (!elements.length) return
-  await fbPost({
-    recipient: { id: recipientId },
-    message: {
-      attachment: {
-        type: "template",
-        payload: {
-          template_type: "generic",
-          elements: elements.map(el => ({
-            title:     el.title,
-            subtitle:  el.subtitle,
-            image_url: el.image_url,
-            buttons:   el.buttons,
-          })),
-        },
+  const message: Record<string, unknown> = {
+    attachment: {
+      type: "template",
+      payload: {
+        template_type: "generic",
+        elements: elements.map(el => ({
+          title:     el.title,
+          subtitle:  el.subtitle,
+          image_url: el.image_url,
+          buttons:   el.buttons,
+        })),
       },
     },
-    messaging_type: "RESPONSE",
-  })
+  }
+  if (quickReplies?.length) message.quick_replies = quickReplies
+  await fbPost({ recipient: { id: recipientId }, message, messaging_type: "RESPONSE" })
 }
 
 // Button Template — nút to hơn quick replies, không tự mất
@@ -148,7 +146,7 @@ async function sendBotResponse(recipientId: string, response: BotResponse | stri
 
   switch (response.type) {
     case "cards":
-      await sendCards(recipientId, response.elements, response.intro)
+      await sendCards(recipientId, response.elements, response.intro, response.quick_replies)
       break
 
     case "button_template":

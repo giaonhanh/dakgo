@@ -198,23 +198,30 @@ async function loadLastOrder(phone: string): Promise<CollectedData | null> {
 
 // ─── Menu cards helper ─────────────────────────────────────────────────────────
 
-async function buildMenuCards(shopId: string, shopName: string): Promise<BotResponse> {
-  const { data: products } = await db()
+const MENU_PAGE_SIZE = 5
+
+async function buildMenuCards(shopId: string, shopName: string, page = 0): Promise<BotResponse> {
+  const { data: allProducts } = await db()
     .from("products")
     .select("id, name, description, image_url, price, original_price")
     .eq("shop_id", shopId)
     .eq("is_available", true)
     .order("sort_order", { ascending: true })
-    .limit(10)
 
-  if (!products?.length) {
+  if (!allProducts?.length) {
     return { type: "text", content: `😔 Quán ${shopName} chưa cập nhật menu. Nhắn tên món muốn đặt nhé!` }
   }
 
+  const paged   = allProducts.slice(page * MENU_PAGE_SIZE, (page + 1) * MENU_PAGE_SIZE)
+  const hasMore = (page + 1) * MENU_PAGE_SIZE < allProducts.length
+  const intro   = page === 0
+    ? `🍽️ Menu **${shopName}** (${allProducts.length} món) — chọn món nhé!`
+    : `🍽️ Thêm món từ **${shopName}**:`
+
   return {
-    type:  "cards",
-    intro: `🍽️ Menu **${shopName}** — chọn món nhé!`,
-    elements: products.map(p => ({
+    type: "cards",
+    intro,
+    elements: paged.map(p => ({
       title:     p.name,
       subtitle:  p.description?.slice(0, 80) ?? `${(p.price / 1000).toFixed(0)}k`,
       image_url: p.image_url ?? undefined,
@@ -224,6 +231,9 @@ async function buildMenuCards(shopId: string, shopName: string): Promise<BotResp
         payload: `CHOOSE_PRODUCT:${shopId}:${encodeURIComponent(shopName)}:${p.id}:${encodeURIComponent(p.name)}:${p.price}`,
       }],
     })),
+    quick_replies: hasMore
+      ? [{ content_type: "text" as const, title: "🍽️ Xem thêm món", payload: `MORE_ITEMS:${shopId}:${encodeURIComponent(shopName)}:${page + 1}` }]
+      : undefined,
   }
 }
 
@@ -651,6 +661,24 @@ export async function processPostback(senderId: string, payload: string): Promis
     return buildMenuCards(shopId, shopName)
   }
 
+  if (payload.startsWith("MORE_ITEMS:")) {
+    const parts    = payload.split(":")
+    const shopId   = parts[1]
+    const shopName = decodeURIComponent(parts[2])
+    const page     = parseInt(parts[3]) || 1
+    return buildMenuCards(shopId, shopName, page)
+  }
+
+  if (payload.startsWith("MORE_SHOPS:")) {
+    const page     = parseInt(payload.split(":")[1]) || 1
+    const keyword  = await getKeyword(senderId)
+    const cardResp = await buildShopCards(keyword, page)
+    if (cardResp?.elements.length) return cardResp
+    const msg = `😊 Mình đã gợi ý hết quán rồi bạn ơi!`
+    await saveMessage(senderId, "model", msg)
+    return { type: "text", content: msg }
+  }
+
   return { type: "text", content: "Bạn cần hỗ trợ gì không? 😊", quick_replies: QR_SERVICE_MENU }
 }
 
@@ -1030,25 +1058,6 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
     const notFound = "😔 Mình không tìm được đơn cũ. Bạn đặt mới nhé!\n\nMuốn: 🍜 Đồ ăn · 📦 Giao hộ · 🛒 Mua hộ · 🛵 Xe ôm · 🚕 Taxi?"
     await saveMessage(senderId, "model", notFound)
     return { type: "text", content: notFound }
-  }
-
-  // Xem thêm quán
-  if (/(xem thêm|thêm quán|quán khác|còn quán|quán nào (khác|nữa)|cho.*xem.*quán|gợi ý.*quán)/i.test(text)) {
-    const keyword  = await getKeyword(senderId)
-    const { data: pageData } = await db()
-      .from("bot_conversations").select("content")
-      .eq("sender_id", senderId).like("content", "__PAGE__%")
-      .order("created_at", { ascending: false }).limit(1).single()
-    const currentPage = pageData ? parseInt(pageData.content.replace("__PAGE__:", "")) : 0
-    const nextPage    = currentPage + 1
-    const cardResp    = await buildShopCards(keyword, nextPage)
-    if (cardResp?.elements.length > 0) {
-      await db().from("bot_conversations").insert({ sender_id: senderId, role: "model", content: `__PAGE__:${nextPage}` })
-      return cardResp
-    }
-    const msg = `😊 Mình đã gợi ý hết quán có "${keyword}" rồi bạn ơi!`
-    await saveMessage(senderId, "model", msg)
-    return { type: "text", content: msg }
   }
 
   // L1: Detect intent

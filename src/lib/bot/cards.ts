@@ -35,6 +35,7 @@ export interface CardResponse {
   elements: FBCard[]
   totalOpen?: number
   page?: number
+  quick_replies?: QuickReply[]
 }
 
 // Text + quick reply chips bên dưới (tự biến mất sau khi tap)
@@ -176,12 +177,14 @@ export async function buildShopCards(keyword: string, page = 0): Promise<CardRes
       }
     })
 
-    let introAll = allShops.length === 1
+    const introAll = allShops.length === 1
       ? "🏪 Hiện có 1 quán đang mở bạn nhé!"
       : `🏪 Có ${allShops.length} quán đang mở!\nBạn chọn quán nhé:`
-    if (hasMoreAll) introAll += "\n\n💬 Nhắn 'xem thêm' để xem thêm quán!"
 
-    return { type: "cards", intro: introAll, elements: elemAll, totalOpen: allShops.length, page }
+    return {
+      type: "cards", intro: introAll, elements: elemAll, totalOpen: allShops.length, page,
+      quick_replies: hasMoreAll ? [{ content_type: "text" as const, title: "📋 Xem thêm quán", payload: `MORE_SHOPS:${page + 1}` }] : undefined,
+    }
   }
 
   // Thử tìm với full keyword trước, sau đó fallback từng từ
@@ -265,9 +268,10 @@ export async function buildShopCards(keyword: string, page = 0): Promise<CardRes
     intro = `📋 Thêm ${paged.length} quán nữa bạn nhé:`
   }
 
-  if (hasMore) {
-    intro += `\n\n💬 Nhắn "xem thêm" để mình gợi ý thêm quán khác!`
-  }
+  // không thêm text hướng dẫn, dùng quick_reply chip bên dưới
 
-  return { type: "cards", intro, elements: paged, totalOpen, page }
+  return {
+    type: "cards", intro, elements: paged, totalOpen, page,
+    quick_replies: hasMore ? [{ content_type: "text" as const, title: "📋 Xem thêm quán", payload: `MORE_SHOPS:${page + 1}` }] : undefined,
+  }
 }
