@@ -21,6 +21,7 @@ export type ActionType =
   | 'CHECKOUT'
   | 'SHOW_PRODUCTS'
   | 'SHOW_SHOP'
+  | 'SHOW_ORDER_CARD'
   | 'HUMAN_HANDOFF'
 
 // ─── Session & Memory ─────────────────────────────────────────────────────────
@@ -70,9 +71,10 @@ export interface ChatMessage {
 // ─── Items & Search ───────────────────────────────────────────────────────────
 
 export interface ExtractedItem {
-  rawName:  string
-  quantity: number
-  note:     string | null
+  rawName:   string
+  quantity:  number
+  note:      string | null
+  modifiers: string[]
 }
 
 export interface ResolvedItem {
@@ -84,6 +86,7 @@ export interface ResolvedItem {
   quantity:    number
   price:       number
   note:        string | null
+  modifiers:   string[]
   confidence:  number
 }
 
@@ -112,16 +115,19 @@ export interface ShopSearchResult {
 // ─── AI Provider (Adapter pattern) ───────────────────────────────────────────
 
 export interface AIExtraction {
-  items:   ExtractedItem[]
-  phone:   string | null
-  address: string | null
-  intent:  'ORDER' | 'FIND' | 'CANCEL' | 'TRACK' | 'OTHER' | null
+  items:      ExtractedItem[]
+  shopName:   string | null
+  phone:      string | null
+  address:    string | null
+  intent:     'ORDER' | 'FIND' | 'CANCEL' | 'TRACK' | 'OTHER' | null
+  confidence: number
 }
 
 // ─── Confidence ───────────────────────────────────────────────────────────────
 
 export interface ConfidenceScore {
   total:     number
+  aiScore:   number
   breakdown: {
     hasItems:      number
     itemsResolved: number
@@ -161,9 +167,10 @@ export interface PipelineOutput {
 export type RichContent =
   | { type: 'product_card';    data: ProductCardData }
   | { type: 'shop_card';       data: ShopCardData }
-  | { type: 'cart_preview';    data: CartPreviewData }
-  | { type: 'checkout_button'; url: string }
-  | { type: 'location_picker'; url: string }
+  | { type: 'order_card';      data: OrderCardData }
+  | { type: 'checkout_sheet';  data: CheckoutSheetData }
+  | { type: 'checkout_button'; url?: string }
+  | { type: 'location_picker'; url?: string }
 
 export interface ProductCardData {
   id:       string
@@ -181,6 +188,25 @@ export interface ShopCardData {
   isOpen:    boolean
   logoUrl:   string | null
   ratingAvg: number
+}
+
+export interface OrderCardData {
+  items:    Array<{ name: string; quantity: number; price: number; modifiers: string[] }>
+  shopName: string
+  address:  string | null
+  phone:    string | null
+  total:    number
+  mode:     'confirm' | 'auto'  // confirm = user xem lại, auto = đủ info tự động
+}
+
+export interface CheckoutSheetData {
+  items:      Array<{ name: string; quantity: number; price: number; modifiers: string[] }>
+  shopName:   string
+  address:    string
+  phone:      string | null
+  subtotal:   number
+  deliveryFee: number
+  total:      number
 }
 
 export interface CartPreviewData {

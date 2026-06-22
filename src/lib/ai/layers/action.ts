@@ -1,11 +1,9 @@
-// Layer 10: Action Layer — quyết định hành động tiếp theo
-import type {
-  Action, Intent, SessionContext, ConfidenceScore,
-  ProductSearchResult, ShopSearchResult,
-} from '../types'
+// Layer 10: Action Layer — chat-first, replies ngắn, confidence-based routing
+import type { Action, Intent, SessionContext, ConfidenceScore, ProductSearchResult, ShopSearchResult } from '../types'
 import type { ValidationResult } from './validator'
 import type { MissingField }     from './missing'
 import { formatPrice }           from '@/lib/utils'
+import { isAutoCheckout, isConfirmMode } from './confidence'
 
 export interface ActionDecision {
   action:       Action
@@ -15,52 +13,183 @@ export interface ActionDecision {
 }
 
 export interface ActionInput {
-  intent:          Intent
-  aiIntent:        string | null
-  ctx:             SessionContext
-  confidence:      ConfidenceScore
-  validation:      ValidationResult
-  missingField:    MissingField
-  productResults:  ProductSearchResult[]
-  shopResults:     ShopSearchResult[]
-  offTopic:        boolean
+  intent:         Intent
+  aiIntent:       string | null
+  ctx:            SessionContext
+  confidence:     ConfidenceScore
+  validation:     ValidationResult
+  missingField:   MissingField
+  productResults: ProductSearchResult[]
+  shopResults:    ShopSearchResult[]
+  offTopic:       boolean
 }
 
 export function decideAction(inp: ActionInput): ActionDecision {
-  const { intent, ctx, validation, missingField, productResults, shopResults, offTopic } = inp
+  const { intent, ctx, confidence, validation, missingField, productResults, shopResults, offTopic } = inp
 
-  // Off-topic redirect
+  // ── Off-topic ────────────────────────────────────────────────────────────────
   if (offTopic) {
     return {
-      action:       { type: 'SHOW_PRODUCTS', payload: { products: [] } },
+      action:       { type: 'HUMAN_HANDOFF' },
       extraActions: [],
-      reply:        'Câu đó ngoài tầm mình rồi 😅 Mình chỉ hỗ trợ đặt đồ ăn và giao hàng thôi nhé! Bạn muốn đặt gì không?',
-      quickReplies: ['🍜 Xem quán', '📦 Giao hộ', '🛵 Xe ôm'],
+      reply:        'Mình chỉ hỗ trợ đặt đồ ăn thôi nhé 🍜',
+      quickReplies: ['🍜 Xem quán', '📦 Giao hộ'],
     }
   }
 
-  // GREET
+  // ── GREET ────────────────────────────────────────────────────────────────────
   if (intent === 'GREET') {
     return {
       action:       { type: 'SHOW_PRODUCTS', payload: { products: [] } },
       extraActions: [],
-      reply:        'Chào bạn! Mình giúp giao đồ ăn tại Phước An nhanh nhất 🍜\nHôm nay bạn muốn ăn gì?',
-      quickReplies: ['🍜 Xem quán đang mở', '🍱 Cơm hộp', '☕ Cà phê', '📦 Giao hộ'],
+      reply:        'Chào! Gõ tên món muốn ăn là mình lo ngay 🍜',
+      quickReplies: ['🍜 Xem quán đang mở', '🍱 Cơm', '☕ Cà phê', '🍜 Bún phở'],
     }
   }
 
-  // CANCEL
+  // ── CANCEL ───────────────────────────────────────────────────────────────────
   if (intent === 'CANCEL') {
     return {
       action:       { type: 'HUMAN_HANDOFF' },
       extraActions: [],
-      reply:        'OK mình hủy rồi nhé! Lần sau cần gì cứ nhắn mình. 😊',
-      quickReplies: ['🍜 Đặt đồ ăn', '📦 Giao hộ'],
+      reply:        'Đã hủy 👍',
+      quickReplies: ['🍜 Đặt lại'],
     }
   }
 
-  // CONFIRM_ORDER — user bấm "✅ Đặt ngay" khi đủ thông tin
-  if (intent === 'CONFIRM_ORDER' && ctx.items.length > 0 && missingField === null) {
+  // ── CONFIRM_ORDER — user bấm xác nhận ────────────────────────────────────────
+  if (intent === 'CONFIRM_ORDER' && ctx.items.length > 0) {
+    if (ctx.address) {
+      const total = ctx.items.reduce((s, i) => s + i.price * i.quantity, 0)
+      return {
+        action: {
+          type: 'CHECKOUT',
+          payload: { items: ctx.items, address: ctx.address, phone: ctx.phone, total },
+        },
+        extraActions: [],
+        reply:        '',
+        quickReplies: [],
+      }
+    }
+    return {
+      action:       { type: 'ASK_LOCATION' },
+      extraActions: [],
+      reply:        'Giao đến đâu? 📍',
+      quickReplies: ['📍 Vị trí của tôi'],
+    }
+  }
+
+  // ── FIND_SHOP ────────────────────────────────────────────────────────────────
+  if (intent === 'FIND_SHOP' && ctx.items.length === 0) {
+    const shops = shopResults.slice(0, 5)
+    return {
+      action:       { type: 'SHOW_SHOP', payload: { shops } },
+      extraActions: [],
+      reply:        shops.length > 0 ? `${shops.length} quán đang mở:` : 'Chưa có quán nào mở. Thử lại sau nhé!',
+      quickReplies: [],
+    }
+  }
+
+  // ── Shop đóng cửa ─────────────────────────────────────────────────────────────
+  if (ctx.shopId && !validation.shopIsOpen) {
+    return {
+      action:       { type: 'SHOW_SHOP', payload: { shops: shopResults.slice(0, 3) } },
+      extraActions: [],
+      reply:        `${validation.shopName ?? 'Quán này'} đang đóng 😔 Chọn quán khác không?`,
+      quickReplies: [],
+    }
+  }
+
+  // ── Có items → AUTO CHECKOUT (confidence ≥ 0.88) ─────────────────────────────
+  if (ctx.items.length > 0 && isAutoCheckout(ctx, confidence)) {
+    const total = ctx.items.reduce((s, i) => s + i.price * i.quantity, 0)
+    return {
+      action: {
+        type: 'CHECKOUT',
+        payload: { items: ctx.items, address: ctx.address, phone: ctx.phone, total, mode: 'auto' },
+      },
+      extraActions: [],
+      reply:        '',
+      quickReplies: [],
+    }
+  }
+
+  // ── Có items → CONFIRM CARD (confidence 0.65–0.87) ────────────────────────────
+  if (ctx.items.length > 0 && isConfirmMode(ctx, confidence)) {
+    const total = ctx.items.reduce((s, i) => s + i.price * i.quantity, 0)
+    return {
+      action: {
+        type: 'SHOW_ORDER_CARD',
+        payload: { items: ctx.items, address: ctx.address, phone: ctx.phone, shopName: ctx.shopName, total, mode: 'confirm' },
+      },
+      extraActions: [],
+      reply:        'Kiểm tra lại đơn nhé:',
+      quickReplies: [],
+    }
+  }
+
+  // ── Chưa có món nhưng đã chọn quán → show menu ─────────────────────────────
+  if (ctx.items.length === 0 && ctx.shopId && productResults.length > 0) {
+    return {
+      action:       { type: 'SHOW_PRODUCTS', payload: { products: productResults.slice(0, 8) } },
+      extraActions: [],
+      reply:        `Menu ${ctx.shopName ?? 'quán'} — tap "+" để thêm:`,
+      quickReplies: [],
+    }
+  }
+
+  // ── Chưa có món + search result → show products ──────────────────────────────
+  if (ctx.items.length === 0 && productResults.length > 0) {
+    return {
+      action:       { type: 'SHOW_PRODUCTS', payload: { products: productResults.slice(0, 6) } },
+      extraActions: [],
+      reply:        'Tìm được mấy món này:',
+      quickReplies: [],
+    }
+  }
+
+  // ── Chưa có món + không tìm thấy ─────────────────────────────────────────────
+  if (ctx.items.length === 0) {
+    return {
+      action:       { type: 'SHOW_SHOP', payload: { shops: shopResults.slice(0, 5) } },
+      extraActions: [],
+      reply:        'Bạn muốn ăn gì? Gõ tên món hoặc chọn quán 👇',
+      quickReplies: ['🍜 Bún phở', '🍱 Cơm', '☕ Cà phê', '🔥 Lẩu'],
+    }
+  }
+
+  // ── Thiếu địa chỉ ─────────────────────────────────────────────────────────────
+  if (missingField === 'address') {
+    return {
+      action:       { type: 'ASK_LOCATION' },
+      extraActions: [],
+      reply:        `${buildItemSummary(ctx)} — giao đến đâu? 📍`,
+      quickReplies: ['📍 Vị trí của tôi'],
+    }
+  }
+
+  // ── Thiếu phone ──────────────────────────────────────────────────────────────
+  if (missingField === 'phone') {
+    return {
+      action:       { type: 'ASK_PHONE' },
+      extraActions: [],
+      reply:        'Số điện thoại? (VD: 0901 234 567)',
+      quickReplies: ['⏩ Bỏ qua'],
+    }
+  }
+
+  // ── Validation issue ──────────────────────────────────────────────────────────
+  if (!validation.valid && validation.issues.length > 0) {
+    return {
+      action:       { type: 'SHOW_PRODUCTS', payload: {} },
+      extraActions: [],
+      reply:        validation.issues[0],
+      quickReplies: ['🔄 Chọn quán khác'],
+    }
+  }
+
+  // ── Ready to checkout ─────────────────────────────────────────────────────────
+  if (missingField === null && ctx.items.length > 0) {
     const total = ctx.items.reduce((s, i) => s + i.price * i.quantity, 0)
     return {
       action: {
@@ -68,131 +197,21 @@ export function decideAction(inp: ActionInput): ActionDecision {
         payload: { items: ctx.items, address: ctx.address, phone: ctx.phone, total },
       },
       extraActions: [],
-      reply:        '✅ Xác nhận đặt hàng! Đang chuyển sang thanh toán...',
+      reply:        '',
       quickReplies: [],
     }
   }
 
-  // FIND_SHOP — không có items, chỉ tìm quán
-  if (intent === 'FIND_SHOP' && ctx.items.length === 0) {
-    const shops = shopResults.slice(0, 4)
-    return {
-      action:       { type: 'SHOW_SHOP', payload: { shops } },
-      extraActions: [],
-      reply:        shops.length > 0
-        ? shops.length === 1
-          ? `Tìm được 1 quán đang mở! Chọn bạn thích:`
-          : `Tìm được ${shops.length} quán đang mở! Chọn bạn thích:`
-        : 'Hiện chưa có quán nào đang mở. Bạn thử lại sau nhé!',
-      quickReplies: shops.length > 0
-        ? ['☕ Cà phê', '🍜 Bún phở', '🍱 Cơm hộp', '🔥 Lẩu nướng']
-        : ['🔄 Thử lại sau'],
-    }
-  }
-
-  // Shop đóng cửa
-  if (ctx.shopId && !validation.shopIsOpen) {
-    return {
-      action:       { type: 'SHOW_SHOP', payload: { shops: shopResults.slice(0, 3) } },
-      extraActions: [],
-      reply:        `${validation.shopName ?? 'Quán này'} đang đóng cửa rồi! 😔\nBạn muốn xem quán khác không?`,
-      quickReplies: shopResults.slice(0, 3).map(s => s.name),
-    }
-  }
-
-  // Chưa có món nhưng đã chọn quán → show menu của quán
-  if (ctx.items.length === 0 && ctx.shopId && productResults.length > 0) {
-    const shopName = ctx.shopName ?? 'quán'
-    return {
-      action:       { type: 'SHOW_PRODUCTS', payload: { products: productResults.slice(0, 8) } },
-      extraActions: [],
-      reply:        `Menu ${shopName} — tap "+" để thêm vào giỏ 👇`,
-      quickReplies: ['🔍 Tìm món khác', '🏪 Đổi quán'],
-    }
-  }
-
-  // Chưa có món + chưa chọn quán → gợi ý
-  if (ctx.items.length === 0) {
-    if (productResults.length > 0) {
-      return {
-        action:       { type: 'SHOW_PRODUCTS', payload: { products: productResults.slice(0, 4) } },
-        extraActions: [],
-        reply:        'Mình tìm được mấy món này, bạn xem có ưng không?',
-        quickReplies: ['🍜 Xem thêm quán', '🍱 Cơm hộp', '🧋 Trà sữa'],
-      }
-    }
-    return {
-      action:       { type: 'SHOW_PRODUCTS', payload: { products: [] } },
-      extraActions: [],
-      reply:        'Bạn muốn ăn gì? Nhắn tên món hoặc chọn danh mục nhé 😋',
-      quickReplies: ['🍜 Xem quán đang mở', '🍱 Cơm hộp', '🧋 Trà sữa', '🔥 Lẩu/Nướng'],
-    }
-  }
-
-  // Thiếu địa chỉ
-  if (missingField === 'address') {
-    return {
-      action:       { type: 'ASK_LOCATION' },
-      extraActions: [],
-      reply:        buildCartSummary(ctx) + '\n\nGiao đến đâu bạn? 📍\nNhắn địa chỉ (VD: "số 5 Lê Lợi") hoặc dùng vị trí hiện tại:',
-      quickReplies: ['📍 Vị trí của tôi', '✍️ Nhắn địa chỉ'],
-    }
-  }
-
-  // Thiếu phone
-  if (missingField === 'phone') {
-    return {
-      action:       { type: 'ASK_PHONE' },
-      extraActions: [],
-      reply:        'Gần xong rồi! 📞 Số điện thoại để tài xế liên hệ?\n(VD: 0901 234 567)',
-      quickReplies: ['⏩ Bỏ qua'],
-    }
-  }
-
-  // Validation issues
-  if (!validation.valid && validation.issues.length > 0) {
-    return {
-      action:       { type: 'SHOW_PRODUCTS', payload: {} },
-      extraActions: [],
-      reply:        `⚠️ ${validation.issues[0]}`,
-      quickReplies: ['🔄 Chọn quán khác', '❓ Liên hệ hỗ trợ'],
-    }
-  }
-
-  // Ready to checkout
-  if (missingField === null && ctx.items.length > 0) {
-    const total = ctx.items.reduce((s, i) => s + i.price * i.quantity, 0)
-    return {
-      action:       {
-        type: 'CHECKOUT',
-        payload: { items: ctx.items, address: ctx.address, phone: ctx.phone, total },
-      },
-      extraActions: [],
-      reply:        [
-        '🎊 Xác nhận đơn hàng:',
-        ...ctx.items.map(i => `• ${i.quantity}x ${i.productName} — ${formatPrice(i.price * i.quantity)}`),
-        `📍 ${ctx.address}`,
-        ctx.phone ? `📞 ${ctx.phone}` : '',
-        `\nTổng: ${formatPrice(total)} + phí ship 15.000đ`,
-        '\nXác nhận đặt không?',
-      ].filter(Boolean).join('\n'),
-      quickReplies: ['✅ Đặt ngay', '✏️ Sửa đơn', '❌ Hủy đơn'],
-    }
-  }
-
-  // ADD_TO_CART fallback
+  // ── Fallback: ADD_TO_CART ────────────────────────────────────────────────────
   return {
     action:       { type: 'ADD_TO_CART', payload: { items: ctx.items } },
     extraActions: [],
-    reply:        'Đã thêm vào giỏ! Bạn muốn đặt thêm gì nữa không?',
-    quickReplies: ['✅ Chốt đơn', '➕ Thêm món', '🛒 Xem giỏ hàng'],
+    reply:        'Thêm vào giỏ rồi! Giao đến đâu? 📍',
+    quickReplies: ['📍 Vị trí của tôi'],
   }
 }
 
-function buildCartSummary(ctx: SessionContext): string {
-  const lines = ctx.items
-    .slice(0, 3)
-    .map(i => `• ${i.quantity}x ${i.productName} — ${formatPrice(i.price * i.quantity)}`)
-  if (ctx.items.length > 3) lines.push(`• +${ctx.items.length - 3} món khác`)
-  return `🛒 Giỏ hàng:\n${lines.join('\n')}`
+function buildItemSummary(ctx: SessionContext): string {
+  const preview = ctx.items.slice(0, 2).map(i => `${i.quantity} ${i.productName}`).join(', ')
+  return ctx.items.length > 2 ? `${preview} +${ctx.items.length - 2} món` : preview
 }

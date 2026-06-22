@@ -4,26 +4,30 @@
 import type { AIExtraction } from '../types'
 
 export interface AIProvider {
-  /** Extract structured order data from natural language. Returns strict JSON. */
   extract(message: string, contextSummary: string): Promise<AIExtraction>
-  /** Provider name, for logging */
   readonly name: string
 }
 
 export const EXTRACTION_SCHEMA = `{
-  "items": [{ "rawName": "string", "quantity": number, "note": string|null }],
+  "items": [{ "name": "string", "quantity": number, "modifiers": string[] }],
+  "shopName": string|null,
   "phone": string|null,
   "address": string|null,
-  "intent": "ORDER"|"FIND"|"CANCEL"|"TRACK"|"OTHER"|null
+  "intent": "ORDER"|"FIND"|"CANCEL"|"TRACK"|"OTHER"|null,
+  "confidence": number
 }`
 
 export const EXTRACTION_RULES = `
-Quy tắc bắt buộc:
-- Trả về CHỈ JSON, không có text, không markdown, không giải thích
-- quantity mặc định 1 nếu không nói rõ, tối đa 20
-- rawName: giữ nguyên như user gõ kể cả lỗi chính tả
-- phone: chuỗi số, định dạng VN (0xxx...), 10-11 số
-- address: địa chỉ đầy đủ như user nói
-- note: ghi chú riêng cho món (ít đường, không cay...)
-- intent: ORDER=đặt hàng, FIND=tìm quán/món, CANCEL=hủy, TRACK=theo dõi đơn, OTHER=khác
-- Nếu không có gì: {"items":[],"phone":null,"address":null,"intent":"OTHER"}`
+QUY TẮC (bắt buộc, không ngoại lệ):
+- Chỉ trả về JSON, không có text, không markdown
+- Hiểu tiếng Việt không dấu, viết tắt, sai chính tả thoải mái
+- "mi cay" = "mỳ cay", "my" = "mỳ", "bo" = "bò", "com" = "cơm", "pho" = "phở", "bun" = "bún", "ga" = "gà"
+- "lam hoa" / "lam hoà" = tên quán Lâm Hoà
+- items[].name: tên món chuẩn hóa có dấu nếu đoán được, hoặc giữ nguyên
+- items[].modifiers: mảng ghi chú cho món — ít cay, không hành, ít đường, cấp 2...
+- quantity mặc định 1, tối đa 20
+- shopName: tên quán nếu user đề cập
+- phone: chuỗi số VN (0xxx, 10–11 số)
+- address: địa chỉ giao hàng đầy đủ như user nói
+- confidence: 0.0–1.0 — mức chắc chắn của extraction (cao nếu đủ thông tin, thấp nếu mơ hồ)
+- Không có gì: {"items":[],"shopName":null,"phone":null,"address":null,"intent":"OTHER","confidence":0}`

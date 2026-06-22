@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Send, ShoppingCart, RotateCcw, MapPin, Phone, Store, ChevronRight } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
 import { formatPrice }  from '@/lib/utils'
-import type { UIResponse, RichContent, Action } from '@/lib/ai/types'
+import type { UIResponse, RichContent, Action, OrderCardData, CheckoutSheetData } from '@/lib/ai/types'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -116,45 +116,212 @@ function ShopCard({ data, onSelect }: {
   )
 }
 
-function CartPreviewCard({ data }: { data: Extract<RichContent, { type: 'cart_preview' }>['data'] }) {
+
+function SmartOrderCard({ data, onConfirm, onEdit }: {
+  data:      OrderCardData
+  onConfirm: () => void
+  onEdit:    () => void
+}) {
+  const DELIVERY_FEE = 15000
   return (
     <div style={{
-      background: 'rgba(255,107,0,0.06)', border: '1px solid rgba(255,107,0,0.2)',
-      borderRadius: 12, padding: '10px 12px', minWidth: 220,
+      background: 'rgba(255,107,0,0.06)', border: '1px solid rgba(255,107,0,0.25)',
+      borderRadius: 16, overflow: 'hidden', width: '100%', maxWidth: 320,
     }}>
-      <p style={{ fontSize: 11, fontWeight: 700, color: '#FF8C00', marginBottom: 6 }}>
-        🛒 Giỏ hàng
-      </p>
-      {data.items.map((it, i) => (
-        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-          <span style={{ fontSize: 11, color: '#b0956a' }}>{it.quantity}x {it.name}</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#FF8C00' }}>
-            {formatPrice(it.price * it.quantity)}
+      {/* Header */}
+      <div style={{
+        padding: '10px 14px 8px',
+        borderBottom: '1px solid rgba(255,107,0,0.12)',
+        background: 'rgba(255,107,0,0.08)',
+      }}>
+        <p style={{ fontSize: 12, fontWeight: 700, color: '#FF8C00', margin: 0 }}>
+          🛒 {data.shopName || 'Đơn hàng'}
+        </p>
+      </div>
+
+      {/* Items */}
+      <div style={{ padding: '10px 14px' }}>
+        {data.items.map((it, i) => (
+          <div key={i} style={{ marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#f8f0e0' }}>
+                {it.quantity}× {it.name}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#FF8C00' }}>
+                {formatPrice(it.price * it.quantity)}
+              </span>
+            </div>
+            {it.modifiers.length > 0 && (
+              <p style={{ fontSize: 11, color: '#6a5a40', margin: '2px 0 0 12px' }}>
+                {it.modifiers.join(' · ')}
+              </p>
+            )}
+          </div>
+        ))}
+
+        {/* Divider */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '8px 0' }} />
+
+        {/* Address */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <MapPin size={12} color={data.address ? '#FF8C00' : '#6a5a40'} />
+          <span style={{ fontSize: 12, color: data.address ? '#b0956a' : '#6a5a40' }}>
+            {data.address || 'Chưa có địa chỉ giao'}
           </span>
         </div>
-      ))}
+
+        {/* Total */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+          <span style={{ fontSize: 12, color: '#6a5a40' }}>Tổng + ship</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#FF6B00' }}>
+            {formatPrice(data.total + DELIVERY_FEE)}
+          </span>
+        </div>
+      </div>
+
+      {/* Actions */}
       <div style={{
-        borderTop: '1px solid rgba(255,107,0,0.15)', marginTop: 6, paddingTop: 6,
-        display: 'flex', justifyContent: 'space-between',
+        display: 'flex', borderTop: '1px solid rgba(255,107,0,0.12)',
       }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#f8f0e0' }}>Tổng</span>
-        <span style={{ fontSize: 12, fontWeight: 800, color: '#FF6B00' }}>
-          {formatPrice(data.total)}
-        </span>
+        <button onClick={onEdit} style={{
+          flex: 1, padding: '11px 0', background: 'none', border: 'none',
+          color: '#b0956a', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          borderRight: '1px solid rgba(255,107,0,0.12)',
+        }}>
+          ✏️ Sửa
+        </button>
+        <button onClick={onConfirm} style={{
+          flex: 2, padding: '11px 0', background: 'none', border: 'none',
+          color: '#FF8C00', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+        }}>
+          ✅ Xác nhận đặt
+        </button>
       </div>
     </div>
   )
 }
 
+// ─── Checkout Bottom Sheet ────────────────────────────────────────────────────
+
+function CheckoutBottomSheet({ data, onClose, onComplete }: {
+  data:       CheckoutSheetData
+  onClose:    () => void
+  onComplete: () => void
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 100,
+        background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+      }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 400 }}
+        onClick={e => e.stopPropagation()}
+        style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          background: '#0e0c09',
+          borderRadius: '20px 20px 0 0',
+          border: '1px solid rgba(255,107,0,0.2)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          maxHeight: '80vh', overflowY: 'auto',
+        }}
+      >
+        {/* Drag handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)' }} />
+        </div>
+
+        <div style={{ padding: '4px 20px 20px' }}>
+          <p style={{ fontSize: 16, fontWeight: 700, color: '#f8f0e0', marginBottom: 16 }}>
+            📋 Xác nhận đơn hàng
+          </p>
+
+          {/* Shop */}
+          <p style={{ fontSize: 12, color: '#6a5a40', marginBottom: 8 }}>
+            🏪 {data.shopName}
+          </p>
+
+          {/* Items */}
+          {data.items.map((it, i) => (
+            <div key={i} style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 14, color: '#f8f0e0' }}>{it.quantity}× {it.name}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#FF8C00' }}>
+                  {formatPrice(it.price * it.quantity)}
+                </span>
+              </div>
+              {it.modifiers.length > 0 && (
+                <p style={{ fontSize: 11, color: '#6a5a40', margin: '2px 0 0 14px' }}>
+                  {it.modifiers.join(' · ')}
+                </p>
+              )}
+            </div>
+          ))}
+
+          {/* Divider */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '12px 0' }} />
+
+          {/* Fees */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 13, color: '#6a5a40' }}>Tạm tính</span>
+            <span style={{ fontSize: 13, color: '#b0956a' }}>{formatPrice(data.subtotal)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontSize: 13, color: '#6a5a40' }}>Phí giao hàng</span>
+            <span style={{ fontSize: 13, color: '#b0956a' }}>{formatPrice(data.deliveryFee)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#f8f0e0' }}>Tổng cộng</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: '#FF6B00' }}>
+              {formatPrice(data.total)}
+            </span>
+          </div>
+
+          {/* Address */}
+          {data.address && (
+            <div style={{
+              background: 'rgba(255,255,255,0.04)', borderRadius: 10,
+              padding: '10px 12px', marginBottom: 16,
+            }}>
+              <p style={{ fontSize: 11, color: '#6a5a40', margin: '0 0 2px' }}>Giao đến</p>
+              <p style={{ fontSize: 13, color: '#b0956a', margin: 0 }}>{data.address}</p>
+            </div>
+          )}
+
+          {/* CTA */}
+          <button onClick={onComplete} style={{
+            width: '100%', padding: '16px 0',
+            background: 'linear-gradient(to right, #FF6B00, #FF8C00)',
+            border: 'none', borderRadius: 14, cursor: 'pointer',
+            fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: 0.5,
+            boxShadow: '0 4px 20px rgba(255,107,0,0.5)',
+          }}>
+            HOÀN TẤT ĐẶT ĐƠN →
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 // ─── Message Bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({ msg, onQuickReply, onProductAdd, onShopSelect, onUseLocation, onCheckout }: {
-  msg:           Message
-  onQuickReply:  (text: string) => void
-  onProductAdd:  (data: Extract<RichContent, { type: 'product_card' }>['data']) => void
-  onShopSelect:  (data: Extract<RichContent, { type: 'shop_card' }>['data'])    => void
-  onUseLocation: () => void
-  onCheckout:    (url: string) => void
+function MessageBubble({ msg, onQuickReply, onProductAdd, onShopSelect, onUseLocation, onConfirmOrder, onEditOrder }: {
+  msg:             Message
+  onQuickReply:    (text: string) => void
+  onProductAdd:    (data: Extract<RichContent, { type: 'product_card' }>['data']) => void
+  onShopSelect:    (data: Extract<RichContent, { type: 'shop_card' }>['data'])    => void
+  onUseLocation:   () => void
+  onConfirmOrder:  () => void
+  onEditOrder:     () => void
 }) {
   const isUser = msg.role === 'user'
 
@@ -195,20 +362,14 @@ function MessageBubble({ msg, onQuickReply, onProductAdd, onShopSelect, onUseLoc
             if (rc.type === 'shop_card') {
               return <ShopCard key={i} data={rc.data} onSelect={() => onShopSelect(rc.data)} />
             }
-            if (rc.type === 'cart_preview') {
-              return <CartPreviewCard key={i} data={rc.data} />
-            }
-            if (rc.type === 'checkout_button') {
+            if (rc.type === 'order_card') {
               return (
-                <button key={i} onClick={() => onCheckout(rc.url ?? '')} style={{
-                  display: 'block', width: '100%', padding: '12px 0', borderRadius: 12, textAlign: 'center',
-                  background: 'linear-gradient(to right, #FF6B00, #FF8C00)',
-                  color: '#fff', fontWeight: 700, fontSize: 14, border: 'none',
-                  boxShadow: '0 4px 16px rgba(255,107,0,0.35)', cursor: 'pointer',
-                }}>
-                  ✅ Thanh toán ngay →
-                </button>
+                <SmartOrderCard key={i} data={rc.data} onConfirm={onConfirmOrder} onEdit={onEditOrder} />
               )
+            }
+            if (rc.type === 'checkout_sheet') {
+              // Bottom sheet is handled at page level — no inline render
+              return null
             }
             if (rc.type === 'location_picker') {
               return (
@@ -278,14 +439,15 @@ function TypingDots() {
 export default function ChatbotPage() {
   const router                      = useRouter()
   const { addItem, clearCart, totalQty } = useCartStore()
-  const [messages, setMessages]     = useState<Message[]>([])
-  const [input, setInput]           = useState('')
-  const [loading, setLoading]       = useState(false)
-  const [sessionKey, setSessionKey] = useState('')
-  const bottomRef                   = useRef<HTMLDivElement>(null)
-  const inputRef                    = useRef<HTMLInputElement>(null)
+  const [messages, setMessages]         = useState<Message[]>([])
+  const [input, setInput]               = useState('')
+  const [loading, setLoading]           = useState(false)
+  const [sessionKey, setSessionKey]     = useState('')
+  const [checkoutSheet, setCheckoutSheet] = useState<CheckoutSheetData | null>(null)
+  const bottomRef                       = useRef<HTMLDivElement>(null)
+  const inputRef                        = useRef<HTMLInputElement>(null)
   // Track synced productIds to avoid doubling cart from repeated ADD_TO_CART payloads (BUG-002)
-  const syncedProductIds            = useRef<Set<string>>(new Set())
+  const syncedProductIds                = useRef<Set<string>>(new Set())
 
   // Init session + welcome message
   useEffect(() => {
@@ -345,6 +507,12 @@ export default function ChatbotPage() {
       }
 
       setMessages(prev => [...prev, botMsg])
+
+      // Open checkout bottom sheet if checkout_sheet richContent is present
+      const sheetContent = data.richContent.find(rc => rc.type === 'checkout_sheet')
+      if (sheetContent && sheetContent.type === 'checkout_sheet') {
+        setCheckoutSheet(sheetContent.data)
+      }
 
       // Sync cart — only add NEW products (BUG-002: avoid re-adding on every message)
       type ItemLike = { productId: string; productName: string; price: number; quantity: number; shopId: string; shopName: string }
@@ -421,9 +589,17 @@ export default function ChatbotPage() {
     )
   }
 
-  function handleCheckout(url: string) {
-    // Cart đã được sync từ CHECKOUT action — navigate to checkout
-    router.push(url || '/checkout')
+  function handleConfirmOrder() {
+    sendMessage('✅ đặt ngay')
+  }
+
+  function handleEditOrder() {
+    sendMessage('Tôi muốn sửa đơn')
+  }
+
+  function handleCheckoutComplete() {
+    setCheckoutSheet(null)
+    router.push('/checkout')
   }
 
   function handleReset() {
@@ -504,13 +680,25 @@ export default function ChatbotPage() {
               onProductAdd={handleProductAdd}
               onShopSelect={handleShopSelect}
               onUseLocation={handleUseLocation}
-              onCheckout={handleCheckout}
+              onConfirmOrder={handleConfirmOrder}
+              onEditOrder={handleEditOrder}
             />
           ))}
           <AnimatePresence>{loading && <TypingDots />}</AnimatePresence>
           <div ref={bottomRef} />
         </div>
       </div>
+
+      {/* ── Checkout Bottom Sheet ── */}
+      <AnimatePresence>
+        {checkoutSheet && (
+          <CheckoutBottomSheet
+            data={checkoutSheet}
+            onClose={() => setCheckoutSheet(null)}
+            onComplete={handleCheckoutComplete}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Input ── */}
       <div style={{

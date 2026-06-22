@@ -3,24 +3,28 @@
 // 1-Spam → 2-Gatekeeper → 3-Intent → 4-Search → 5-Extract →
 // 6-Confidence → 7-Validate → 8-Missing → 9-Memory → 10-Action → 11-Controller
 
-import { checkAntiSpam }        from './layers/spam'
-import { checkGatekeeper }      from './layers/gatekeeper'
-import { classifyIntent }       from './layers/intent'
+import { normalizeInput }        from './layers/normalizer'
+import { checkAntiSpam }         from './layers/spam'
+import { checkGatekeeper }       from './layers/gatekeeper'
+import { classifyIntent }        from './layers/intent'
 import { fuzzySearchProducts, fuzzySearchShops, getOpenShops, getShopProducts } from './layers/search'
-import { extractFromMessage }   from './layers/extractor'
-import { calculateConfidence }  from './layers/confidence'
-import { validateOrder }        from './layers/validator'
-import { getNextMissingField }  from './layers/missing'
+import { extractFromMessage }    from './layers/extractor'
+import { calculateConfidence }   from './layers/confidence'
+import { validateOrder }         from './layers/validator'
+import { getNextMissingField }   from './layers/missing'
 import { loadOrCreateSession, loadHistory, persistTurn } from './layers/memory'
-import { decideAction }         from './layers/action'
-import { formatForWeb }         from './layers/controller'
+import { decideAction }          from './layers/action'
+import { formatForWeb }          from './layers/controller'
 import type { PipelineOutput, SessionContext, ResolvedItem, UIResponse } from './types'
-import { EMPTY_CONTEXT }        from './types'
+import { EMPTY_CONTEXT }         from './types'
 
 export async function runPipeline(
   message:    string,
   sessionKey: string,
 ): Promise<UIResponse> {
+  // ── Layer 0: Text Normalization ──────────────────────────────────────────
+  message = normalizeInput(message)
+
   // ── Layer 9: Load Context Memory ──────────────────────────────────────────
   const session = await loadOrCreateSession(sessionKey)
   const history = await loadHistory(session.id, 8)
@@ -104,6 +108,7 @@ export async function runPipeline(
         quantity:    ei.quantity,
         price:       match.price,
         note:        ei.note,
+        modifiers:   ei.modifiers ?? [],
         confidence:  match.similarity,
       })
     }
@@ -116,15 +121,19 @@ export async function runPipeline(
     items:     updatedItems,
     turnCount: ctx.turnCount + 1,
   }
-  if (extracted.phone   && !ctx.phone)   newCtx.phone   = extracted.phone
-  if (extracted.address && !ctx.address) newCtx.address = extracted.address
+  if (extracted.phone    && !ctx.phone)    newCtx.phone    = extracted.phone
+  if (extracted.address  && !ctx.address)  newCtx.address  = extracted.address
   if (updatedItems.length > 0 && !ctx.shopId) {
     newCtx.shopId   = updatedItems[0].shopId
     newCtx.shopName = updatedItems[0].shopName
   }
+  // Nếu AI trích xuất tên quán nhưng chưa có trong items, lưu vào context để search
+  if (extracted.shopName && !newCtx.shopName) {
+    newCtx.shopName = extracted.shopName
+  }
 
   // ── Layer 6: Confidence Layer ─────────────────────────────────────────────
-  const confidence = calculateConfidence(newCtx)
+  const confidence = calculateConfidence(newCtx, extracted.confidence)
 
   // ── Layer 7: Business Validator ───────────────────────────────────────────
   const validation = newCtx.shopId

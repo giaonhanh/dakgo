@@ -5,12 +5,23 @@ import { EXTRACTION_SCHEMA, EXTRACTION_RULES } from './base'
 const GROK_BASE  = 'https://api.x.ai/v1'
 const GROK_MODEL = process.env.GROK_MODEL ?? 'grok-3-mini'
 
-const SYSTEM_PROMPT = `Bạn là module trích xuất dữ liệu đơn hàng cho app giao đồ ăn DakGo Việt Nam.
-Phân tích tin nhắn tiếng Việt và trích xuất thông tin đặt hàng.
+const SYSTEM_PROMPT = `Bạn là module trích xuất dữ liệu đơn hàng cho app giao đồ ăn DakGo tại Phước An, Đắk Lắk.
+Phân tích tin nhắn đặt đồ ăn tiếng Việt (có thể không dấu, viết tắt, sai chính tả).
 
-Schema bắt buộc:
+SCHEMA bắt buộc:
 ${EXTRACTION_SCHEMA}
-${EXTRACTION_RULES}`
+
+${EXTRACTION_RULES}
+
+VÍ DỤ:
+Input: "2 my cay lam hoa cap 2 it bot ngot"
+Output: {"items":[{"name":"mỳ cay","quantity":2,"modifiers":["cấp 2","ít bột ngọt"]}],"shopName":"Lâm Hoà","phone":null,"address":null,"intent":"ORDER","confidence":0.85}
+
+Input: "cho mình 1 com ga khong hanh giao 123 le loi sdt 0901234567"
+Output: {"items":[{"name":"cơm gà","quantity":1,"modifiers":["không hành"]}],"shopName":null,"phone":"0901234567","address":"123 Lê Lợi","intent":"ORDER","confidence":0.95}
+
+Input: "2 mỳ cayy ko hanh"
+Output: {"items":[{"name":"mỳ cay","quantity":2,"modifiers":["không hành"]}],"shopName":null,"phone":null,"address":null,"intent":"ORDER","confidence":0.75}`
 
 export class GrokProvider implements AIProvider {
   readonly name = 'grok'
@@ -18,13 +29,13 @@ export class GrokProvider implements AIProvider {
   async extract(message: string, contextSummary: string): Promise<AIExtraction> {
     const apiKey = process.env.GROK_API_KEY
     if (!apiKey) {
-      console.warn('[grok] GROK_API_KEY not set, returning empty extraction')
-      return { items: [], phone: null, address: null, intent: null }
+      console.warn('[grok] GROK_API_KEY not set')
+      return { items: [], shopName: null, phone: null, address: null, intent: null, confidence: 0 }
     }
 
     const userContent = contextSummary
-      ? `[Ngữ cảnh hiện tại: ${contextSummary}]\n\nTin nhắn của khách: ${message}`
-      : message
+      ? `[Ngữ cảnh: ${contextSummary}]\n\nKhách nhắn: "${message}"`
+      : `Khách nhắn: "${message}"`
 
     try {
       const res = await fetch(`${GROK_BASE}/chat/completions`, {
@@ -40,16 +51,15 @@ export class GrokProvider implements AIProvider {
             { role: 'user',   content: userContent },
           ],
           temperature:     0,
-          max_tokens:      600,
+          max_tokens:      400,
           response_format: { type: 'json_object' },
         }),
         signal: AbortSignal.timeout(8000),
       })
 
       if (!res.ok) {
-        const err = await res.text()
-        console.error('[grok] API error:', res.status, err.slice(0, 200))
-        return { items: [], phone: null, address: null, intent: null }
+        console.error('[grok] API error:', res.status)
+        return { items: [], shopName: null, phone: null, address: null, intent: null, confidence: 0 }
       }
 
       const data    = await res.json()
@@ -57,7 +67,7 @@ export class GrokProvider implements AIProvider {
       return this.parse(content)
     } catch (err) {
       console.error('[grok] request error:', err)
-      return { items: [], phone: null, address: null, intent: null }
+      return { items: [], shopName: null, phone: null, address: null, intent: null, confidence: 0 }
     }
   }
 
@@ -66,22 +76,29 @@ export class GrokProvider implements AIProvider {
       const parsed = JSON.parse(raw)
       const items: ExtractedItem[] = Array.isArray(parsed.items)
         ? parsed.items.map((it: Record<string, unknown>) => ({
-            rawName:  String(it.rawName ?? it.name ?? '').slice(0, 100),
-            quantity: Math.max(1, Math.min(20, parseInt(String(it.quantity)) || 1)),
-            note:     it.note ? String(it.note).slice(0, 200) : null,
+            rawName:   String(it.name ?? it.rawName ?? '').slice(0, 100),
+            quantity:  Math.max(1, Math.min(20, parseInt(String(it.quantity)) || 1)),
+            note:      Array.isArray(it.modifiers) && it.modifiers.length > 0
+                         ? (it.modifiers as string[]).join(', ')
+                         : (it.note ? String(it.note).slice(0, 200) : null),
+            modifiers: Array.isArray(it.modifiers) ? (it.modifiers as string[]).map(String) : [],
           })).filter((it: ExtractedItem) => it.rawName.length > 0)
         : []
 
       return {
         items,
-        phone:   parsed.phone   ? String(parsed.phone).replace(/\D/g, '').slice(0, 11) : null,
-        address: parsed.address ? String(parsed.address).slice(0, 300) : null,
-        intent:  ['ORDER','FIND','CANCEL','TRACK','OTHER'].includes(parsed.intent)
-          ? parsed.intent as AIExtraction['intent']
-          : null,
+        shopName:   parsed.shopName   ? String(parsed.shopName).slice(0, 100) : null,
+        phone:      parsed.phone      ? String(parsed.phone).replace(/\D/g, '').slice(0, 11) : null,
+        address:    parsed.address    ? String(parsed.address).slice(0, 300) : null,
+        intent:     ['ORDER','FIND','CANCEL','TRACK','OTHER'].includes(parsed.intent)
+                      ? parsed.intent as AIExtraction['intent']
+                      : null,
+        confidence: typeof parsed.confidence === 'number'
+                      ? Math.min(1, Math.max(0, parsed.confidence))
+                      : 0.5,
       }
     } catch {
-      return { items: [], phone: null, address: null, intent: null }
+      return { items: [], shopName: null, phone: null, address: null, intent: null, confidence: 0 }
     }
   }
 }

@@ -1,46 +1,76 @@
-// Layer 11: UI Controller — format response cho từng channel
-// Web: trả về richContent (product cards, shop cards, cart preview...)
-// Zalo/Messenger: adapter riêng implement interface này sau
-
+// Layer 11: UI Controller — format response cho Web
+// Zalo/Messenger: implement adapter riêng sau
 import type { PipelineOutput, RichContent, UIResponse, ProductCardData, ShopCardData } from '../types'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.dakgo.com'
+const DELIVERY_FEE = 15000
 
 export function formatForWeb(output: PipelineOutput, sessionId: string): UIResponse {
   const richContent: RichContent[] = []
 
   for (const action of output.actions) {
     switch (action.type) {
+
       case 'SHOW_PRODUCTS': {
         const products = (action.payload?.products ?? []) as ProductCardData[]
         products.forEach(p => richContent.push({ type: 'product_card', data: p }))
         break
       }
+
       case 'SHOW_SHOP': {
         const shops = (action.payload?.shops ?? []) as ShopCardData[]
         shops.forEach(s => richContent.push({ type: 'shop_card', data: s }))
         break
       }
-      case 'ADD_TO_CART':
+
+      case 'SHOW_ORDER_CARD':
       case 'CHECKOUT': {
-        type ItemLike = { productName: string; quantity: number; price: number }
-        const items = (action.payload?.items ?? []) as ItemLike[]
-        if (items.length > 0) {
+        type ItemLike = { productName: string; quantity: number; price: number; modifiers?: string[] }
+        const items    = (action.payload?.items ?? []) as ItemLike[]
+        const total    = typeof action.payload?.total === 'number' ? action.payload.total : 0
+        const mode     = action.payload?.mode === 'auto' ? 'auto' : 'confirm'
+        const address  = action.payload?.address as string | null ?? null
+        const phone    = action.payload?.phone as string | null ?? null
+        const shopName = action.payload?.shopName as string ?? ''
+
+        if (action.type === 'SHOW_ORDER_CARD') {
           richContent.push({
-            type: 'cart_preview',
+            type: 'order_card',
             data: {
-              items: items.map(i => ({ name: i.productName, quantity: i.quantity, price: i.price })),
-              total: items.reduce((s, i) => s + i.price * i.quantity, 0),
+              items: items.map(i => ({
+                name: i.productName, quantity: i.quantity, price: i.price,
+                modifiers: i.modifiers ?? [],
+              })),
+              shopName, address, phone, total, mode,
+            },
+          })
+        } else {
+          // CHECKOUT → show checkout_sheet (bottom sheet)
+          richContent.push({
+            type: 'checkout_sheet',
+            data: {
+              items: items.map(i => ({
+                name: i.productName, quantity: i.quantity, price: i.price,
+                modifiers: i.modifiers ?? [],
+              })),
+              shopName,
+              address: address ?? '',
+              phone,
+              subtotal:    total,
+              deliveryFee: DELIVERY_FEE,
+              total:       total + DELIVERY_FEE,
             },
           })
         }
-        if (action.type === 'CHECKOUT') {
-          richContent.push({ type: 'checkout_button', url: `${APP_URL}/checkout` })
-        }
         break
       }
+
       case 'ASK_LOCATION': {
-        richContent.push({ type: 'location_picker', url: `${APP_URL}/addresses` })
+        richContent.push({ type: 'location_picker' })
+        break
+      }
+
+      case 'ADD_TO_CART': {
+        // No rich content — cart sync happens in page.tsx
         break
       }
     }
