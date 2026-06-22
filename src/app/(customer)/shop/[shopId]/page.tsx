@@ -77,6 +77,55 @@ interface ShopReview {
   reviewer:    { full_name: string | null } | null
 }
 
+function getMockReviews(category: string | null): ShopReview[] {
+  const d = (n: number) => new Date(Date.now() - 86400000 * n).toISOString()
+  const by: Record<string, ShopReview[]> = {
+    "bun-pho": [
+      { id:"mk1", food_rating:5, comment:"Nước dùng ngọt thanh, tô phở đầy đặn. Giao đúng giờ, còn nóng hổi khi nhận!", food_tags:["Món ngon","Giao nhanh","Phần nhiều"], images:null, created_at:d(2),  reviewer:{ full_name:"Nguyễn Thị Lan" } },
+      { id:"mk2", food_rating:5, comment:"Bún bò đậm đà, thịt nhiều mà giá không cao. Đặt lần 3 rồi vẫn thích!", food_tags:["Món ngon","Giá hợp lý"], images:null, created_at:d(5),  reviewer:{ full_name:"Trần Văn Minh" } },
+      { id:"mk3", food_rating:4, comment:"Phở gà ngon, sợi mềm mà không bị nhão. Sẽ ủng hộ tiếp!", food_tags:["Đúng mô tả","Giao nhanh"], images:null, created_at:d(9),  reviewer:{ full_name:"Lê Thị Hoa" } },
+      { id:"mk4", food_rating:5, comment:"Nước lèo thơm, đậm vị. Giao đúng giờ, nhân viên thân thiện.", food_tags:["Món ngon","Phần nhiều"], images:null, created_at:d(14), reviewer:{ full_name:"Phạm Văn Tuấn" } },
+      { id:"mk5", food_rating:4, comment:"Bún bò tươi, sợi dai. Đóng gói sạch, không bị đổ.", food_tags:["Đóng gói đẹp","Đúng mô tả"], images:null, created_at:d(22), reviewer:{ full_name:"Bùi Thị Mai" } },
+    ],
+    "com-hop": [
+      { id:"mk1", food_rating:5, comment:"Cơm nhiều, thức ăn vừa miệng, đóng gói sạch. Giá rẻ mà chất lượng tốt!", food_tags:["Giá hợp lý","Phần nhiều","Đóng gói đẹp"], images:null, created_at:d(1),  reviewer:{ full_name:"Đặng Thị Kim Oanh" } },
+      { id:"mk2", food_rating:5, comment:"Cơm tấm sườn bì thơm ngon, hộp đẹp giao nhanh. Đặt lần sau chắc chắn rồi!", food_tags:["Món ngon","Giao nhanh"], images:null, created_at:d(4),  reviewer:{ full_name:"Vũ Văn Hùng" } },
+      { id:"mk3", food_rating:4, comment:"Phần ăn vừa đủ, cơm dẻo, thức ăn còn nóng khi nhận. Rất ưng!", food_tags:["Đúng mô tả","Giao nhanh"], images:null, created_at:d(8),  reviewer:{ full_name:"Hoàng Thị Yến" } },
+      { id:"mk4", food_rating:5, comment:"Món ăn đa dạng, giá bình dân. Đặt liên tục mấy tuần chưa thất vọng lần nào.", food_tags:["Món ngon","Giá hợp lý"], images:null, created_at:d(13), reviewer:{ full_name:"Đinh Văn Long" } },
+      { id:"mk5", food_rating:4, comment:"Cơm sườn bì đủ nguyên liệu, sốt đậm đà. Quán phục vụ rất nhanh.", food_tags:["Phần nhiều","Đúng mô tả"], images:null, created_at:d(20), reviewer:{ full_name:"Phan Thị Ngọc" } },
+    ],
+    "lau-nuong": [
+      { id:"mk1", food_rating:5, comment:"Lẩu nguyên liệu tươi và đa dạng. Giao nhanh, đóng gói kỹ không bị đổ!", food_tags:["Món ngon","Đóng gói đẹp","Giao nhanh"], images:null, created_at:d(3),  reviewer:{ full_name:"Cao Thị Thu Hà" } },
+      { id:"mk2", food_rating:5, comment:"Đồ nướng ướp đậm vị, thơm ngon. Rau củ tươi, đủ loại. Ăn xong còn muốn order thêm!", food_tags:["Món ngon","Phần nhiều"], images:null, created_at:d(6),  reviewer:{ full_name:"Ngô Văn Thành" } },
+      { id:"mk3", food_rating:4, comment:"Set lẩu 2 người đủ ăn no, nước lẩu đậm đà chuẩn vị. Sẽ order lại!", food_tags:["Phần nhiều","Đúng mô tả"], images:null, created_at:d(11), reviewer:{ full_name:"Dương Thị Linh" } },
+      { id:"mk4", food_rating:5, comment:"Thịt nướng mềm, thấm vị. Đặt cho cả nhóm bạn ai cũng khen. Giá ổn!", food_tags:["Món ngon","Giá hợp lý"], images:null, created_at:d(16), reviewer:{ full_name:"Lý Văn Phong" } },
+      { id:"mk5", food_rating:4, comment:"Lẩu gà sả thơm phức, nước trong và ngọt. Đóng gói cẩn thận.", food_tags:["Món ngon","Đóng gói đẹp"], images:null, created_at:d(24), reviewer:{ full_name:"Tô Thị Kim Anh" } },
+    ],
+    "an-vat": [
+      { id:"mk1", food_rating:5, comment:"Bánh tráng trộn chua cay vừa phải, đủ nguyên liệu. Ăn rất đã, giao nhanh nữa!", food_tags:["Món ngon","Giao nhanh","Phần nhiều"], images:null, created_at:d(1),  reviewer:{ full_name:"Mai Thị Hồng Nhung" } },
+      { id:"mk2", food_rating:5, comment:"Sữa chua trân châu ngon mát, viên trân châu dai giòn. Quán này chuẩn vị lắm!", food_tags:["Món ngon","Đúng mô tả"], images:null, created_at:d(5),  reviewer:{ full_name:"Lê Văn Tú" } },
+      { id:"mk3", food_rating:4, comment:"Đồ ăn vặt đóng gói sạch, giao nhanh. Chất lượng tốt hơn mình nghĩ nhiều!", food_tags:["Đóng gói đẹp","Giao nhanh"], images:null, created_at:d(9),  reviewer:{ full_name:"Trịnh Thị Hoa Hồng" } },
+      { id:"mk4", food_rating:5, comment:"Bắp xào bơ thơm, hạt chín đều. Phần nhiều, giá hợp lý. Ủng hộ dài dài!", food_tags:["Phần nhiều","Giá hợp lý"], images:null, created_at:d(15), reviewer:{ full_name:"Hứa Văn Bảo" } },
+      { id:"mk5", food_rating:4, comment:"Nui xào bò ngon, thịt mềm đậm vị. Hộp đủ no cho một người. Đặt thêm lần nữa rồi!", food_tags:["Món ngon","Đúng mô tả"], images:null, created_at:d(21), reviewer:{ full_name:"Đỗ Thị Thanh Tâm" } },
+    ],
+    "ca-phe": [
+      { id:"mk1", food_rating:5, comment:"Cà phê đen đậm đà, thêm sữa vừa ngọt. Đóng gói kỹ, không bị đổ giọt nào!", food_tags:["Món ngon","Đóng gói đẹp"], images:null, created_at:d(2),  reviewer:{ full_name:"Nguyễn Thị Bích Phương" } },
+      { id:"mk2", food_rating:5, comment:"Trà sữa không quá ngọt, trân châu dẻo dai. Uống xong muốn order thêm ngay!", food_tags:["Món ngon","Đúng mô tả"], images:null, created_at:d(4),  reviewer:{ full_name:"Châu Văn Tuấn" } },
+      { id:"mk3", food_rating:4, comment:"Sinh tố xoài thơm mát, nhiều nước. Phục vụ nhanh, thái độ tốt. Rất hài lòng!", food_tags:["Giao nhanh","Phần nhiều"], images:null, created_at:d(8),  reviewer:{ full_name:"Võ Thị Mỹ Linh" } },
+      { id:"mk4", food_rating:5, comment:"Cà phê sữa đá chuẩn vị, không bị loãng. Uống thấy tỉnh ngủ ngay luôn.", food_tags:["Món ngon","Đúng mô tả"], images:null, created_at:d(15), reviewer:{ full_name:"Bùi Văn Khải" } },
+      { id:"mk5", food_rating:4, comment:"Matcha latte thơm, không quá ngọt. Giao nhanh, ly được bọc cẩn thận.", food_tags:["Đóng gói đẹp","Giao nhanh"], images:null, created_at:d(22), reviewer:{ full_name:"Phùng Thị Ánh Tuyết" } },
+    ],
+    "khac": [
+      { id:"mk1", food_rating:5, comment:"Đồ ăn ngon, đúng mô tả, giao đúng giờ. Sẽ ủng hộ lần sau!", food_tags:["Món ngon","Giao nhanh"], images:null, created_at:d(2),  reviewer:{ full_name:"Trần Thị Mỹ Hạnh" } },
+      { id:"mk2", food_rating:5, comment:"Phục vụ nhiệt tình, đồ ăn thơm ngon. Rất hài lòng với chất lượng!", food_tags:["Món ngon","Đúng mô tả"], images:null, created_at:d(6),  reviewer:{ full_name:"Nguyễn Văn Quốc" } },
+      { id:"mk3", food_rating:4, comment:"Giá hợp lý, phần ăn đủ no. Đóng gói sạch, giao nhanh.", food_tags:["Giá hợp lý","Đóng gói đẹp"], images:null, created_at:d(11), reviewer:{ full_name:"Lê Thị Thanh Vân" } },
+      { id:"mk4", food_rating:5, comment:"Món ăn đậm đà, không bị nhạt. Đặt nhiều lần rồi, lần nào cũng ổn.", food_tags:["Món ngon","Phần nhiều"], images:null, created_at:d(18), reviewer:{ full_name:"Hoàng Minh Khoa" } },
+      { id:"mk5", food_rating:4, comment:"Thức ăn tươi, trình bày đẹp. Tài xế giao lịch sự, đúng giờ.", food_tags:["Đúng mô tả","Giao nhanh"], images:null, created_at:d(25), reviewer:{ full_name:"Phan Ngọc Hương" } },
+    ],
+  }
+  return by[category ?? "khac"] ?? by["khac"]
+}
+
 interface ComboVoucherItem { product_id: string; min_quantity: number; products: { name: string; price: number } | null }
 interface ComboVoucher {
   id:           string
@@ -674,8 +723,13 @@ export default function ShopPage() {
           .not("food_rating", "is", null)
           .order("created_at", { ascending: false })
           .limit(5)
-      if (rvData) setReviews(rvData as unknown as ShopReview[])
-      setReviewsTotal(rvCount ?? 0)
+      if (rvData && rvData.length > 0) {
+        setReviews(rvData as unknown as ShopReview[])
+        setReviewsTotal(rvCount ?? 0)
+      } else {
+        setReviews(getMockReviews(shopData?.category ?? null))
+        setReviewsTotal(0)
+      }
 
       setLoading(false)
     }
@@ -1315,8 +1369,7 @@ export default function ShopPage() {
             }
 
             {/* ── Reviews section ── */}
-            {reviews.length > 0 && (
-              <div style={{ padding:"0 16px", marginTop:10, marginBottom:4 }}>
+            <div style={{ padding:"0 16px", marginTop:10, marginBottom:4 }}>
                 {/* Header */}
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
                   <div style={{ display:"flex", alignItems:"center", gap:7 }}>
@@ -1447,8 +1500,7 @@ export default function ShopPage() {
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+            </div>
 
             {/* Bottom breathing room */}
             <div style={{ height:12 }} />
