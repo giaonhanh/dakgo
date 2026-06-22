@@ -41,6 +41,11 @@ interface OrderData {
   senderPhone?:     string
   recipientName?:   string
   recipientPhone?:  string
+  codAmount?:       number
+  bankBin?:         string
+  bankName?:        string
+  bankAccount?:     string
+  bankHolder?:      string
 }
 
 /* ── sub-components ── */
@@ -303,6 +308,72 @@ function OrderPopup({
                       📞 {o.recipientPhone}
                     </a>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── COD — Thu hộ tiền hàng ── */}
+          {o.codAmount && o.codAmount > 0 && (
+            <div style={{
+              background:"rgba(62,207,110,0.07)", border:"1px solid rgba(62,207,110,0.3)",
+              borderRadius:14, padding:"12px 14px", marginBottom:12,
+            }}>
+              <div style={{ color:"#6a5a40", fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:.5, marginBottom:8 }}>
+                💵 Thu hộ tiền hàng
+              </div>
+              <div style={{ color:"#3ecf6e", fontSize:24, fontWeight:800, marginBottom:10 }}>
+                {fmt(o.codAmount)}
+              </div>
+
+              {/* Thông tin tài khoản */}
+              {o.bankAccount && (
+                <div style={{ background:"rgba(0,0,0,0.2)", borderRadius:10, padding:"10px 12px", marginBottom:10 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                    <span style={{ color:"#6a5a40", fontSize:10 }}>Ngân hàng</span>
+                    <span style={{ color:"#f8f0e0", fontSize:12, fontWeight:700 }}>{o.bankName ?? ""}</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                    <span style={{ color:"#6a5a40", fontSize:10 }}>Số tài khoản</span>
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      <span style={{ color:"#f8f0e0", fontSize:13, fontWeight:800, letterSpacing:1 }}>{o.bankAccount}</span>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(o.bankAccount!).then(() => alert("Đã copy!"))}
+                        style={{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:6, padding:"3px 8px", color:"#b0956a", fontSize:10, fontFamily:"Lexend", cursor:"pointer" }}>
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                  {o.bankHolder && (
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      <span style={{ color:"#6a5a40", fontSize:10 }}>Chủ tài khoản</span>
+                      <span style={{ color:"#f8f0e0", fontSize:12, fontWeight:600 }}>{o.bankHolder}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Nút chuyển khoản — VietQR deep link */}
+              {o.bankBin && o.bankAccount && (
+                <a
+                  href={`https://dl.vietqr.io/pay?bank=${o.bankBin}&account=${o.bankAccount}&amount=${o.codAmount}&memo=${encodeURIComponent("Thu ho don hang")}`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{
+                    display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+                    width:"100%", padding:"11px 0", borderRadius:10, textDecoration:"none",
+                    background:"linear-gradient(135deg,#3ecf6e,#2ab55a)",
+                    color:"#fff", fontFamily:"Lexend", fontWeight:700, fontSize:13,
+                    boxShadow:"0 4px 16px rgba(62,207,110,0.3)",
+                  }}>
+                  💸 Chuyển khoản ngay
+                </a>
+              )}
+
+              {/* QR image — show nếu chỉ có ảnh, không có bank info */}
+              {o.packagePhotoUrl && !o.bankAccount && (
+                <div style={{ textAlign:"center" }}>
+                  <div style={{ color:"#6a5a40", fontSize:10, marginBottom:8 }}>Quét QR để chuyển tiền cho quán</div>
+                  <img src={o.packagePhotoUrl} alt="QR" style={{ width:140, height:140, objectFit:"cover", borderRadius:10, border:"1px solid rgba(62,207,110,0.3)" }} />
                 </div>
               )}
             </div>
@@ -1139,10 +1210,23 @@ export default function DriverDashboard() {
           id: string; type: string; customer_id: string
           pickup_address: string; delivery_address: string
           package_description: string | null; items_description: string | null
+          estimated_items_cost: number | null
           service_fee: number; payment_method: string
+          note: string | null
           sender_name: string | null; sender_phone: string | null
           recipient_name: string | null; recipient_phone: string | null
           package_photo_url: string | null
+        }
+
+        // Parse bank info từ note (format: __BANK__:{json}\n...)
+        let bankBin = "", bankName = "", bankAccount = "", bankHolder = ""
+        if (e.note?.startsWith("__BANK__:")) {
+          try {
+            const jsonEnd = e.note.indexOf("\n")
+            const json = e.note.slice(9, jsonEnd > 0 ? jsonEnd : undefined)
+            const b = JSON.parse(json) as { bin?: string; name?: string; account?: string; holder?: string }
+            bankBin = b.bin ?? ""; bankName = b.name ?? ""; bankAccount = b.account ?? ""; bankHolder = b.holder ?? ""
+          } catch { /* ignore */ }
         }
 
         const { data: customer } = await supabase
@@ -1179,6 +1263,11 @@ export default function DriverDashboard() {
           senderPhone:     e.sender_phone   ?? undefined,
           recipientName:   e.recipient_name ?? undefined,
           recipientPhone:  e.recipient_phone ?? undefined,
+          codAmount:       e.estimated_items_cost ?? undefined,
+          bankBin:     bankBin     || undefined,
+          bankName:    bankName    || undefined,
+          bankAccount: bankAccount || undefined,
+          bankHolder:  bankHolder  || undefined,
         }
         if (showOrderRef.current) { orderQueueRef.current.push(orderData); return }
         setPendingOrder(orderData); setShowOrder(true); showOrderRef.current = true

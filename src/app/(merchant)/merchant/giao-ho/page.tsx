@@ -54,6 +54,10 @@ export default function MerchantGiaoHoPage() {
   // COD — tiền hàng thu hộ
   const [codEnabled,  setCodEnabled]  = useState(false)
   const [codAmount,   setCodAmount]   = useState("")
+  const [bankBin,     setBankBin]     = useState("")
+  const [bankName,    setBankName]    = useState("")
+  const [bankAccount, setBankAccount] = useState("")
+  const [bankHolder,  setBankHolder]  = useState("")
   const [qrUrl,       setQrUrl]       = useState<string | null>(null)
   const [qrUploading, setQrUploading] = useState(false)
   const qrInputRef = useRef<HTMLInputElement>(null)
@@ -186,10 +190,11 @@ export default function MerchantGiaoHoPage() {
         package_description:  pkgDesc,
         estimated_items_cost: codValue || null,
         package_photo_url:    qrUrl || null,
-        note:                 [
+        note: [
+          bankAccount ? `__BANK__:${JSON.stringify({ bin: bankBin, name: bankName, account: bankAccount, holder: bankHolder })}` : "",
           `Quán: ${shopName}`,
           note ? `Ghi chú: ${note}` : "",
-        ].filter(Boolean).join(" | ") || null,
+        ].filter(Boolean).join("\n") || null,
         service_fee:          serviceFee,
         payment_method:       "cash",
         sender_name:          shopName,
@@ -235,7 +240,7 @@ export default function MerchantGiaoHoPage() {
         </div>
         <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: 320 }}>
           <button
-            onClick={() => { setSuccess(false); setRecipientName(""); setRecipientPhone(""); setDelivery(""); setDeliveryCoord(null); setPkgDesc(""); setNote(""); setCodEnabled(false); setCodAmount(""); setQrUrl(null) }}
+            onClick={() => { setSuccess(false); setRecipientName(""); setRecipientPhone(""); setDelivery(""); setDeliveryCoord(null); setPkgDesc(""); setNote(""); setCodEnabled(false); setCodAmount(""); setBankAccount(""); setBankBin(""); setBankName(""); setBankHolder(""); setQrUrl(null) }}
             style={{ flex: 1, height: 44, borderRadius: 10, border: "1px solid rgba(255,107,0,0.3)", background: "rgba(255,107,0,0.07)", color: "#FF8C00", fontFamily: "Lexend", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
           >
             + Tạo đơn mới
@@ -403,9 +408,48 @@ export default function MerchantGiaoHoPage() {
                 </div>
               </div>
 
+              {/* Thông tin tài khoản ngân hàng */}
+              <div>
+                <label style={lbl}>Tài khoản nhận tiền (khuyến nghị)</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {/* Chọn ngân hàng */}
+                  <select
+                    value={bankBin}
+                    onChange={e => {
+                      const opt = e.target.options[e.target.selectedIndex]
+                      setBankBin(e.target.value)
+                      setBankName(opt.text)
+                    }}
+                    style={{ ...inp, appearance: "none", backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236a5a40' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center" }}>
+                    <option value="">-- Chọn ngân hàng --</option>
+                    {[
+                      ["970436","Vietcombank (VCB)"],["970415","VietinBank (CTG)"],["970418","BIDV"],
+                      ["970405","Agribank"],["970407","Techcombank (TCB)"],["970422","MB Bank"],
+                      ["970416","ACB"],["970403","Sacombank (STB)"],["970423","TPBank"],
+                      ["970432","VPBank"],["970443","SHB"],["970437","HDBank"],
+                      ["970448","OCB"],["970426","MSB"],["970449","LienVietPostBank"],
+                      ["970431","Eximbank"],["970428","Nam A Bank"],["970440","SeABank"],
+                    ].map(([bin, name]) => (
+                      <option key={bin} value={bin}>{name}</option>
+                    ))}
+                  </select>
+                  <input value={bankAccount} onChange={e => setBankAccount(e.target.value.replace(/\D/g, ""))}
+                    placeholder="Số tài khoản" inputMode="numeric"
+                    style={{ ...inp, borderColor: "rgba(62,207,110,0.2)" }} />
+                  <input value={bankHolder} onChange={e => setBankHolder(e.target.value.toUpperCase())}
+                    placeholder="TÊN CHỦ TÀI KHOẢN (IN HOA)"
+                    style={{ ...inp, borderColor: "rgba(62,207,110,0.2)" }} />
+                </div>
+                {bankBin && bankAccount && (
+                  <div style={{ marginTop: 8, padding: "8px 10px", background: "rgba(62,207,110,0.08)", borderRadius: 8, color: "#3ecf6e", fontSize: 11 }}>
+                    ✅ Tài xế sẽ bấm "Chuyển khoản ngay" → mở thẳng app ngân hàng, điền sẵn {fmt(codValue || 0)}
+                  </div>
+                )}
+              </div>
+
               {/* Upload QR chuyển khoản */}
               <div>
-                <label style={lbl}>Mã QR nhận tiền (tùy chọn)</label>
+                <label style={lbl}>Hoặc upload ảnh QR (tùy chọn)</label>
                 <input
                   ref={qrInputRef} type="file" accept="image/*"
                   style={{ display: "none" }}
