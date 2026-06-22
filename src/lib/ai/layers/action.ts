@@ -124,6 +124,44 @@ export function decideAction(inp: ActionInput): ActionDecision {
     }
   }
 
+  // ── SOCIAL — cảm ơn / khen / đói / không hiểu ───────────────────────────────
+  if (intent === 'SOCIAL') {
+    // Cảm ơn → thân thiện + mời tiếp tục
+    if (/cảm ơn|cam on|thank|thanks|ty/i.test(message)) {
+      return {
+        action:       { type: 'SHOW_SHOP', payload: { shops: [] } },
+        extraActions: [],
+        reply:        'Không có chi! Lần sau muốn đặt cứ nhắn mình nhé 😊',
+        quickReplies: [],
+      }
+    }
+    // Đói bụng → gợi ý món
+    if (/đói/i.test(message)) {
+      return {
+        action:       { type: 'SHOW_SHOP', payload: { shops: shopResults.slice(0, 4) } },
+        extraActions: [],
+        reply:        'Đói rồi à! Gõ tên món muốn ăn để mình tìm quán ngay 🍜',
+        quickReplies: [],
+      }
+    }
+    // Không hiểu / lỗi
+    if (/không hiểu|hả|hở|lỗi|sao vậy/i.test(message)) {
+      return {
+        action:       { type: 'SHOW_SHOP', payload: { shops: [] } },
+        extraActions: [],
+        reply:        'Mình chưa hiểu ý bạn 😅 Thử gõ lại theo kiểu: "2 tô bún bò giao 123 Lê Lợi" nhé!',
+        quickReplies: [],
+      }
+    }
+    // Khen / tích cực
+    return {
+      action:       { type: 'SHOW_SHOP', payload: { shops: [] } },
+      extraActions: [],
+      reply:        'Vui quá! Muốn đặt thêm gì không? Gõ tên món là mình lo ngay 🍜',
+      quickReplies: [],
+    }
+  }
+
   // ── CANCEL ───────────────────────────────────────────────────────────────────
   if (intent === 'CANCEL') {
     return {

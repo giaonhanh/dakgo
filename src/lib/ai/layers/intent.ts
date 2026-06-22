@@ -62,6 +62,23 @@ export function needsLocation(message: string): boolean {
 }
 
 const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
+  // ── Social / cảm ơn / phản hồi cảm xúc (check SỚM tránh bị ORDER bắt nhầm) ─
+  {
+    intent: 'SOCIAL',
+    regexes: [
+      // Cảm ơn
+      /^(cảm ơn|cam on|thank|thanks|ty|camon|cảm ơn bạn|cảm ơn nha|cảm ơn nhiều)[!.\s]*$/i,
+      // Khen / tích cực
+      /^(hay (vậy|đó|quá)|ngon (vậy|đó|quá|lắm)|tốt (vậy|đó|quá)|được (đó|vậy)|ok rồi|oki|oke rồi|good|tuyệt|great)[!.\s]*$/i,
+      // Bày tỏ cảm xúc đói (không có món kèm theo)
+      /^(đói (quá|bụng|rồi)|bụng đói|đói bụng (quá|rồi))[!.\s]*$/i,
+      // Không hiểu / nhầm
+      /^(sao vậy|không hiểu|hả|hở|ý bạn là|ý mình là|bạn nói gì)[!?\s]*$/i,
+      // Phàn nàn nhẹ / hỏi lại
+      /^(lỗi rồi|bị lỗi|app lỗi|không chạy được|sao không được)[!?\s]*$/i,
+    ],
+  },
+
   // ── Confirm order (phải check TRƯỚC ORDER_FOOD) ──────────────────────────────
   {
     intent: 'CONFIRM_ORDER',
@@ -79,6 +96,7 @@ const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
       /^(thôi|hủy|không (đặt|mua|cần|lấy)|cancel|stop)(\s|$|[!?])/i,
       /^hủy\s*(đơn|hết|tất|toàn bộ)?(\s|$)/i,
       /đặt lại từ đầu|làm lại từ đầu|bắt đầu lại/i,
+      /^(không cần nữa|thôi bỏ đi|bỏ qua đi)[!.\s]*$/i,
     ],
   },
 
@@ -88,7 +106,9 @@ const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
     regexes: [
       /(đơn|order)\s*(của|tôi|mình)\s*(đâu|rồi|chưa|sao)/i,
       /tài xế (đâu|ở đâu|bao giờ)/i,
-      /theo dõi|tracking|bao giờ tới|bao lâu/i,
+      /theo dõi|tracking|bao giờ tới/i,
+      /giao (rồi chưa|chưa vậy|đến chưa|tới chưa)/i,
+      /sao (lâu|chưa thấy|chưa tới|chưa giao)/i,
     ],
   },
 
@@ -132,9 +152,12 @@ const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
   {
     intent: 'ORDER_FOOD',
     regexes: [
-      // Động từ đặt hàng
-      /\b(đặt|order|mua|thêm|lấy|cho (tôi|mình|em|con))\b/i,
-      /\b(muốn (ăn|uống|order|đặt))\b/i,
+      // Động từ đặt hàng (mở rộng thêm cách xưng hô anh/chị/em/bạn)
+      /\b(đặt|order|mua|thêm|lấy|cho (tôi|mình|em|con|anh|chị|bạn|t))\b/i,
+      /\b(muốn (ăn|uống|order|đặt|thử))\b/i,
+      /\b(cần|gọi|order giùm|đặt giùm|giao giùm)\b/i,
+      // Đói bụng + muốn ăn gì đó cụ thể
+      /đói.*(ăn|muốn|cần|gọi)/i,
       // "đặt lại" theo sau bởi tên món = đặt mới
       /^đặt lại\s+\w/i,
       // Số lượng + đơn vị
@@ -152,6 +175,8 @@ const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
     regexes: [
       /^(xin chào|chào|hi|hello|hey|alo|hế lô)(\s|$|[!?])/i,
       /^(mình cần|giúp (mình|tôi)|hỗ trợ)(\s|$)/i,
+      // Cách gọi nhân viên phổ biến
+      /^(em ơi|bạn ơi|ơi|shop ơi|cho hỏi|hỏi chút|hỏi tí)[!,\s?]*$/i,
       // Gõ tên dịch vụ đứng một mình = muốn dùng dịch vụ đó
       /^(giao hàng|xe ôm|taxi|mua hộ|giao hộ)(\s|$|[!?])/i,
     ],
@@ -167,8 +192,16 @@ const ADDRESS_PATTERN = /\b(đường|phố|ngõ|hẻm|thôn|xóm|khu|số|ngác
 export function classifyIntent(input: PipelineInput): Intent {
   // FAQ check trước — tránh bị override bởi các pattern khác
   if (detectFaq(input.message)) return 'FAQ'
+
   const msg = input.message.trim()
   const ctx = input.session.context
+
+  // "ừ/dạ/vâng" chỉ là CONFIRM khi đang có items chờ xác nhận
+  if (/^(ừ|dạ|vâng|nhé|đúng rồi|chính xác|vậy đi|thì đặt đi)[!.\s]*$/i.test(msg)) {
+    if (ctx.items.length > 0 && ctx.address) return 'CONFIRM_ORDER'
+    if (ctx.items.length > 0 && !ctx.address) return 'ORDER_FOOD'
+    return 'SOCIAL'
+  }
 
   // ── Context-aware shortcuts (trả lời câu hỏi của bot) ────────────────────────
   if (ctx.lastAskField === 'address') {

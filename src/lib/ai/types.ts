@@ -10,6 +10,7 @@ export type Intent =
   | 'MODIFY_CART'
   | 'GENERAL_QUESTION'
   | 'FAQ'
+  | 'SOCIAL'
   | 'CANCEL'
   | 'GREET'
   | 'CONFIRM_ORDER'
