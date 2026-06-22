@@ -675,8 +675,10 @@ export async function processPostback(senderId: string, payload: string): Promis
   }
 
   if (payload.startsWith("MORE_SHOPS:")) {
-    const page     = parseInt(payload.split(":")[1]) || 1
-    const keyword  = await getKeyword(senderId)
+    const parts    = payload.split(":")
+    const page     = parseInt(parts[1]) || 1
+    // keyword nhúng trong payload (parts[2]+); fallback getKeyword cho payload cũ
+    const keyword  = parts.length > 2 ? decodeURIComponent(parts.slice(2).join(":")) : await getKeyword(senderId)
     const cardResp = await buildShopCards(keyword, page)
     if (cardResp?.elements.length) return cardResp
     const msg = `😊 Mình đã gợi ý hết quán rồi bạn ơi!`

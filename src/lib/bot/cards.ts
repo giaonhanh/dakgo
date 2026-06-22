@@ -183,7 +183,7 @@ export async function buildShopCards(keyword: string, page = 0): Promise<CardRes
 
     return {
       type: "cards", intro: introAll, elements: elemAll, totalOpen: allShops.length, page,
-      quick_replies: hasMoreAll ? [{ content_type: "text" as const, title: "📋 Xem thêm quán", payload: `MORE_SHOPS:${page + 1}` }] : undefined,
+      quick_replies: hasMoreAll ? [{ content_type: "text" as const, title: "📋 Xem thêm quán", payload: `MORE_SHOPS:${page + 1}:` }] : undefined,
     }
   }
 
@@ -272,6 +272,6 @@ export async function buildShopCards(keyword: string, page = 0): Promise<CardRes
 
   return {
     type: "cards", intro, elements: paged, totalOpen, page,
-    quick_replies: hasMore ? [{ content_type: "text" as const, title: "📋 Xem thêm quán", payload: `MORE_SHOPS:${page + 1}` }] : undefined,
+    quick_replies: hasMore ? [{ content_type: "text" as const, title: "📋 Xem thêm quán", payload: `MORE_SHOPS:${page + 1}:${encodeURIComponent(keyword)}` }] : undefined,
   }
 }
