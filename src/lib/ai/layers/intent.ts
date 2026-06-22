@@ -39,15 +39,16 @@ export function detectFaq(message: string): string | null {
 // Detect category từ câu hỏi để filter quán
 export function detectCategoryFromMessage(message: string): string | null {
   const map: Array<[RegExp, string]> = [
-    [/\b(cơm|cơm gà|cơm tấm|cơm rang)\b/i, 'com'],
-    [/\b(bún|bún bò|bún thịt)\b/i,          'bun'],
-    [/\b(phở|pho)\b/i,                       'pho'],
-    [/\b(cà phê|cafe|coffee)\b/i,            'ca-phe'],
-    [/\b(lẩu)\b/i,                           'lau'],
-    [/\b(mỳ|mì|mỳ cay|mì cay)\b/i,          'mi'],
-    [/\b(bánh mì|banh mi)\b/i,               'banh-mi'],
-    [/\b(gà rán|gà chiên)\b/i,               'ga-ran'],
-    [/\b(trà sữa|tra sua|bubble tea)\b/i,    'tra-sua'],
+    [/\b(cơm|cơm gà|cơm tấm|cơm rang)\b/i,                       'com'],
+    [/\b(bún|bún bò|bún thịt|bun)\b/i,                            'bun'],
+    [/\b(phở|pho)\b/i,                                             'pho'],
+    [/\b(cà phê|cafe|coffee|ca phe)\b/i,                           'ca-phe'],
+    [/\b(lẩu)\b/i,                                                 'lau'],
+    [/\b(mỳ|mì|mỳ cay|mì cay|my cay)\b/i,                        'mi'],
+    [/\b(bánh mì|banh mi)\b/i,                                     'banh-mi'],
+    [/\b(gà rán|gà chiên|ga ran)\b/i,                              'ga-ran'],
+    [/\b(trà sữa|tra sua|bubble tea|trà)\b/i,                      'tra-sua'],
+    [/\b(nước|đồ uống|nước uống|nước ngọt|nước mát|giải khát|do uong)\b/i, 'do-uong'],
   ]
   for (const [re, cat] of map) {
     if (re.test(message)) return cat
@@ -55,9 +56,9 @@ export function detectCategoryFromMessage(message: string): string | null {
   return null
 }
 
-// Detect "gần tôi/đây" → cần GPS
+// Detect "gần tôi/đây/ở đây" → cần GPS
 export function needsLocation(message: string): boolean {
-  return /gần (tôi|đây|chỗ (tôi|này|mình)|vị trí)|quanh đây|xung quanh/i.test(message)
+  return /gần (tôi|đây|chỗ (tôi|này|mình)|vị trí)|quanh đây|xung quanh|ở đây|chỗ này|tại đây/i.test(message)
 }
 
 const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
@@ -111,11 +112,19 @@ const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
       /gợi ý|recommend|ngon nhất|gần đây|đang mở/i,
       /có (quán|chỗ|nơi) nào/i,
       /xem quán|danh sách quán/i,
-      // Hỏi menu / có gì ngon
-      /có (gì|những gì|món gì|những món)/i,
+      // Dịch vụ giao đồ ăn (gõ tên dịch vụ = muốn dùng dịch vụ)
+      /giao (đồ ăn|do an|thức ăn|đồ)/i,
+      // Hỏi menu / có gì ngon — flex hơn: "có [bất kỳ] gì"
+      /có\s+\S*\s*(gì|không|ngon)/i,
       /menu|thực đơn|xem món|món gì|đồ gì/i,
       /hôm nay (có|bán) gì/i,
-      /ngon (không|gì|lắm)/i,
+      /ngon (không|gì|lắm|vậy)/i,
+      // Còn [loại món/đồ] không
+      /(còn|hết)\s+\w+\s*(không|chưa)/i,
+      // Đồ uống / nước
+      /(đồ uống|nước uống|nước ngọt|nước mát|giải khát)/i,
+      // Ở đây / chỗ này có gì
+      /(ở đây|chỗ này|tại đây)\s+(có|bán)/i,
     ],
   },
 
@@ -143,6 +152,8 @@ const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
     regexes: [
       /^(xin chào|chào|hi|hello|hey|alo|hế lô)(\s|$|[!?])/i,
       /^(mình cần|giúp (mình|tôi)|hỗ trợ)(\s|$)/i,
+      // Gõ tên dịch vụ đứng một mình = muốn dùng dịch vụ đó
+      /^(giao hàng|xe ôm|taxi|mua hộ|giao hộ)(\s|$|[!?])/i,
     ],
   },
 ]

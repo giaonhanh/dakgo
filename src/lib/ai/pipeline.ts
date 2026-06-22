@@ -161,6 +161,7 @@ export async function runPipeline(
 
   // ── Layer 10: Action Layer ────────────────────────────────────────────────
   const decision = decideAction({
+    message,
     intent,
     aiIntent:        extracted.intent,
     ctx:             newCtx,

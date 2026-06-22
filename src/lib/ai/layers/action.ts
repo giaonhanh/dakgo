@@ -13,6 +13,7 @@ export interface ActionDecision {
 }
 
 export interface ActionInput {
+  message:        string
   intent:         Intent
   aiIntent:       string | null
   ctx:            SessionContext
@@ -39,7 +40,7 @@ const FAQ_REPLIES: Record<string, string> = {
 }
 
 export function decideAction(inp: ActionInput): ActionDecision {
-  const { intent, ctx, confidence, validation, missingField, productResults, shopResults, offTopic, isCompetitor, faqKey, wantsNearby, category } = inp
+  const { message, intent, ctx, confidence, validation, missingField, productResults, shopResults, offTopic, isCompetitor, faqKey, wantsNearby, category } = inp
 
   // ── Competitor mention ────────────────────────────────────────────────────────
   if (isCompetitor) {
@@ -90,6 +91,31 @@ export function decideAction(inp: ActionInput): ActionDecision {
 
   // ── GREET ────────────────────────────────────────────────────────────────────
   if (intent === 'GREET') {
+    // User gõ tên dịch vụ cụ thể → hướng dẫn đúng dịch vụ đó
+    if (/xe ôm/i.test(message)) {
+      return { action: { type: 'SHOW_SHOP', payload: {} }, extraActions: [], quickReplies: [],
+        reply: 'Đặt xe ôm — gõ địa chỉ đón và điểm đến nhé! Ví dụ: "đón 123 Lê Lợi đến chợ Krông Pắc"' }
+    }
+    if (/\btaxi\b/i.test(message)) {
+      return { action: { type: 'SHOW_SHOP', payload: {} }, extraActions: [], quickReplies: [],
+        reply: 'Đặt taxi — gõ điểm đón và điểm đến, mình báo giá ngay! Ví dụ: "taxi từ nhà tôi đến bệnh viện huyện"' }
+    }
+    if (/mua hộ/i.test(message)) {
+      return { action: { type: 'SHOW_SHOP', payload: {} }, extraActions: [], quickReplies: [],
+        reply: 'Mua hộ — gõ danh sách đồ cần mua và địa chỉ nhận, mình lo hết!' }
+    }
+    if (/giao hộ/i.test(message)) {
+      return { action: { type: 'SHOW_SHOP', payload: {} }, extraActions: [], quickReplies: [],
+        reply: 'Giao hộ — gõ địa chỉ lấy hàng và địa chỉ giao là xong!' }
+    }
+    if (/giao (hàng|đồ ăn|do an|thức ăn)/i.test(message)) {
+      return {
+        action:       { type: 'SHOW_SHOP', payload: { shops: shopResults.slice(0, 4) } },
+        extraActions: [],
+        reply:        'Giao đồ ăn — gõ tên món muốn ăn, mình tìm quán và giao đến tay! 🍜',
+        quickReplies: [],
+      }
+    }
     return {
       action:       { type: 'SHOW_SHOP', payload: { shops: shopResults.slice(0, 3) } },
       extraActions: [],
