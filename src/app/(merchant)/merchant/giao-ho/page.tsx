@@ -1,13 +1,36 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, Package, MapPin, User, Phone, StickyNote, CheckCircle2, Loader2 } from "lucide-react"
+import Cropper from "react-easy-crop"
+import type { Area } from "react-easy-crop"
 import { createClient } from "@/lib/supabase/client"
 import { getRouteKm, calcDeliveryFeeFromPricing } from "@/lib/vietmapRoute"
 import AddressPicker from "@/components/map/AddressPicker"
 import type { AddressPickerResult } from "@/types"
+
+const BANKS = [
+  { bin: "970436", name: "Vietcombank (VCB)" },
+  { bin: "970415", name: "VietinBank (CTG)" },
+  { bin: "970418", name: "BIDV" },
+  { bin: "970405", name: "Agribank" },
+  { bin: "970407", name: "Techcombank (TCB)" },
+  { bin: "970422", name: "MB Bank" },
+  { bin: "970416", name: "ACB" },
+  { bin: "970403", name: "Sacombank (STB)" },
+  { bin: "970423", name: "TPBank" },
+  { bin: "970432", name: "VPBank" },
+  { bin: "970443", name: "SHB" },
+  { bin: "970437", name: "HDBank" },
+  { bin: "970448", name: "OCB" },
+  { bin: "970426", name: "MSB" },
+  { bin: "970449", name: "LienVietPostBank" },
+  { bin: "970431", name: "Eximbank" },
+  { bin: "970428", name: "Nam A Bank" },
+  { bin: "970440", name: "SeABank" },
+]
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 
@@ -60,6 +83,12 @@ export default function MerchantGiaoHoPage() {
   const [bankHolder,  setBankHolder]  = useState("")
   const [qrUrl,       setQrUrl]       = useState<string | null>(null)
   const [qrUploading, setQrUploading] = useState(false)
+  const [qrDecoding,  setQrDecoding]  = useState(false)
+  const [cropSrc,     setCropSrc]     = useState<string | null>(null)
+  const [showCropper, setShowCropper] = useState(false)
+  const [crop,        setCrop]        = useState({ x: 0, y: 0 })
+  const [zoom,        setZoom]        = useState(1)
+  const [croppedArea, setCroppedArea] = useState<Area | null>(null)
   const qrInputRef = useRef<HTMLInputElement>(null)
 
   // Pricing
@@ -126,35 +155,109 @@ export default function MerchantGiaoHoPage() {
   const serviceFee = baseFee + weightSurcharge
   const codValue   = codEnabled ? (parseInt(codAmount.replace(/\D/g, "")) || 0) : 0
 
-  // Crop ảnh về hình vuông (center crop) rồi nén
-  const cropSquare = (file: File, size: number): Promise<Blob> =>
+  // Crop ảnh từ croppedAreaPixels (react-easy-crop)
+  const getCroppedBlob = (imageSrc: string, pixels: Area): Promise<Blob> =>
     new Promise((resolve, reject) => {
       const img = new Image()
       img.onload = () => {
-        const s = Math.min(img.width, img.height)
-        const sx = (img.width  - s) / 2
-        const sy = (img.height - s) / 2
         const canvas = document.createElement("canvas")
-        canvas.width = size; canvas.height = size
-        canvas.getContext("2d")!.drawImage(img, sx, sy, s, s, 0, 0, size, size)
+        canvas.width = 400; canvas.height = 400
+        canvas.getContext("2d")!.drawImage(img, pixels.x, pixels.y, pixels.width, pixels.height, 0, 0, 400, 400)
         canvas.toBlob(b => b ? resolve(b) : reject(new Error("crop failed")), "image/webp", 0.92)
       }
       img.onerror = reject
-      img.src = URL.createObjectURL(file)
+      img.src = imageSrc
     })
 
-  const handleQrUpload = async (file: File) => {
-    if (!shopId) return
+  // Parse chuỗi VietQR/EMVCo → {bin, account, holder}
+  const parseVietQR = (data: string): { bin?: string; account?: string; holder?: string } => {
+    const result: { bin?: string; account?: string; holder?: string } = {}
+    let i = 0
+    while (i + 4 <= data.length) {
+      const tag = data.slice(i, i + 2)
+      const len = parseInt(data.slice(i + 2, i + 4), 10)
+      if (isNaN(len) || i + 4 + len > data.length) break
+      const val = data.slice(i + 4, i + 4 + len)
+      if (tag === "38") {
+        // NAPAS sub-fields: 01=BIN, 02=account
+        let j = 0
+        while (j + 4 <= val.length) {
+          const st = val.slice(j, j + 2)
+          const sl = parseInt(val.slice(j + 2, j + 4), 10)
+          if (isNaN(sl)) break
+          const sv = val.slice(j + 4, j + 4 + sl)
+          if (st === "01") result.bin = sv
+          if (st === "02") result.account = sv
+          j += 4 + sl
+        }
+      }
+      if (tag === "59") result.holder = val
+      i += 4 + len
+    }
+    return result
+  }
+
+  // Decode QR từ blob → parse VietQR
+  const decodeQRFromBlob = async (blob: Blob): Promise<{ bin?: string; account?: string; holder?: string } | null> => {
+    try {
+      const jsQR = (await import("jsqr")).default
+      const img  = new Image()
+      const url  = URL.createObjectURL(blob)
+      await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; img.src = url })
+      const canvas = document.createElement("canvas")
+      canvas.width = img.width; canvas.height = img.height
+      canvas.getContext("2d")!.drawImage(img, 0, 0)
+      const d = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      const qr = jsQR(d.data, d.width, d.height)
+      return qr ? parseVietQR(qr.data) : null
+    } catch { return null }
+  }
+
+  // Mở file → hiện cropper
+  const handleFileSelect = (file: File) => {
+    const url = URL.createObjectURL(file)
+    setCropSrc(url)
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setCroppedArea(null)
+    setShowCropper(true)
+  }
+
+  const onCropComplete = useCallback((_: Area, pixels: Area) => { setCroppedArea(pixels) }, [])
+
+  // Xác nhận crop → upload → decode QR → auto-fill
+  const handleCropConfirm = async () => {
+    if (!cropSrc || !croppedArea || !shopId) return
+    setShowCropper(false)
     setQrUploading(true)
     try {
-      const blob = await cropSquare(file, 400).catch(() => file)
+      const blob = await getCroppedBlob(cropSrc, croppedArea)
       const path = `${shopId}/payment-qr`
       const { error } = await supabase.storage.from("shops").upload(path, blob, { upsert: true, contentType: "image/webp" })
       if (error) { fireToast("❌ Lỗi upload QR: " + error.message); return }
       const { data: { publicUrl } } = supabase.storage.from("shops").getPublicUrl(path)
       setQrUrl(`${publicUrl}?t=${Date.now()}`)
+
+      // Decode QR → auto-fill bank fields
+      setQrDecoding(true)
+      const info = await decodeQRFromBlob(blob)
+      setQrDecoding(false)
+      if (info?.bin) {
+        const bank = BANKS.find(b => b.bin === info.bin)
+        setBankBin(info.bin)
+        setBankName(bank?.name ?? info.bin)
+      }
+      if (info?.account) setBankAccount(info.account)
+      if (info?.holder)  setBankHolder(info.holder)
+      if (info?.bin && info?.account) {
+        fireToast("✅ Đọc QR thành công — đã điền thông tin tài khoản")
+      }
     } finally {
       setQrUploading(false)
+      setQrDecoding(false)
+      URL.revokeObjectURL(cropSrc)
+      setCropSrc(null)
     }
   }
 
@@ -392,15 +495,12 @@ export default function MerchantGiaoHoPage() {
           </div>
           {codEnabled && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {/* Số tiền */}
+
+              {/* ── Số tiền ── */}
               <div>
                 <label style={lbl}>Số tiền thu hộ *</label>
-                <input
-                  value={codAmount}
-                  onChange={e => {
-                    const raw = e.target.value.replace(/\D/g, "")
-                    setCodAmount(raw ? Number(raw).toLocaleString("vi-VN") : "")
-                  }}
+                <input value={codAmount}
+                  onChange={e => { const r = e.target.value.replace(/\D/g, ""); setCodAmount(r ? Number(r).toLocaleString("vi-VN") : "") }}
                   placeholder="0đ" inputMode="numeric"
                   style={{ ...inp, borderColor: "rgba(62,207,110,0.3)" }} />
                 <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 5 }}>
@@ -408,37 +508,85 @@ export default function MerchantGiaoHoPage() {
                 </div>
               </div>
 
-              {/* Thông tin tài khoản ngân hàng */}
+              {/* ── QR Upload — ĐẦU TIÊN ── */}
               <div>
-                <label style={lbl}>Tài khoản nhận tiền (khuyến nghị)</label>
+                <label style={lbl}>Upload mã QR nhận tiền</label>
+                {/* Note tự điền */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "rgba(74,143,245,0.07)", border: "1px solid rgba(74,143,245,0.2)", borderRadius: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 14 }}>💡</span>
+                  <span style={{ color: "#4a8ff5", fontSize: 11, lineHeight: 1.5 }}>
+                    Upload QR ngân hàng — app sẽ <b>tự đọc và điền</b> số tài khoản, tên chủ tài khoản bên dưới, không cần nhập tay.
+                  </span>
+                </div>
+
+                <input ref={qrInputRef} type="file" accept="image/*" style={{ display: "none" }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); e.target.value = "" }} />
+
+                {qrUrl ? (
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <div style={{ position: "relative", width: 90, height: 90, borderRadius: 10, overflow: "hidden", border: "2px solid rgba(62,207,110,0.4)", flexShrink: 0 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={qrUrl} alt="QR" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      {["tl","tr","bl","br"].map(p => (
+                        <div key={p} style={{ position:"absolute", top:p[0]==="t"?4:"auto", bottom:p[0]==="b"?4:"auto", left:p[1]==="l"?4:"auto", right:p[1]==="r"?4:"auto", width:12, height:12,
+                          borderTop:p[0]==="t"?"2px solid #3ecf6e":"none", borderBottom:p[0]==="b"?"2px solid #3ecf6e":"none",
+                          borderLeft:p[1]==="l"?"2px solid #3ecf6e":"none", borderRight:p[1]==="r"?"2px solid #3ecf6e":"none" }} />
+                      ))}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      {qrDecoding
+                        ? <div style={{ color: "#4a8ff5", fontSize: 12 }}>🔍 Đang đọc QR...</div>
+                        : <div style={{ color: "#3ecf6e", fontSize: 12, fontWeight: 600 }}>✅ Đã upload QR</div>
+                      }
+                      <button onClick={() => qrInputRef.current?.click()}
+                        style={{ marginTop: 6, background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "4px 10px", color: "#b0956a", fontSize: 11, fontFamily: "Lexend", cursor: "pointer" }}>
+                        Đổi ảnh
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => qrInputRef.current?.click()} disabled={qrUploading}
+                    style={{ width: "100%", background: "rgba(62,207,110,0.06)", border: "1.5px dashed rgba(62,207,110,0.3)", borderRadius: 12, padding: "16px 12px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                    {qrUploading
+                      ? <div style={{ color: "#3ecf6e", fontSize: 12 }}>Đang xử lý...</div>
+                      : <>
+                          <div style={{ position: "relative", width: 72, height: 72, border: "2px dashed rgba(62,207,110,0.5)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {["tl","tr","bl","br"].map(p => (
+                              <div key={p} style={{ position:"absolute", top:p[0]==="t"?-2:"auto", bottom:p[0]==="b"?-2:"auto", left:p[1]==="l"?-2:"auto", right:p[1]==="r"?-2:"auto", width:14, height:14, borderRadius:2,
+                                borderTop:p[0]==="t"?"3px solid #3ecf6e":"none", borderBottom:p[0]==="b"?"3px solid #3ecf6e":"none",
+                                borderLeft:p[1]==="l"?"3px solid #3ecf6e":"none", borderRight:p[1]==="r"?"3px solid #3ecf6e":"none" }} />
+                            ))}
+                            <span style={{ fontSize: 28 }}>📷</span>
+                          </div>
+                          <div style={{ color: "#3ecf6e", fontSize: 12, fontWeight: 600 }}>Chụp / chọn ảnh QR ngân hàng</div>
+                          <div style={{ color: "#6a5a40", fontSize: 11, textAlign: "center" }}>Kéo, zoom để căn QR vào đúng khung · App tự đọc và điền thông tin</div>
+                        </>
+                    }
+                  </button>
+                )}
+              </div>
+
+              {/* ── Thông tin tài khoản — CÓ THỂ TỰ NHẬP — */}
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
+                <label style={lbl}>Thông tin tài khoản nhận tiền</label>
+                <div style={{ color: "#6a5a40", fontSize: 11, marginBottom: 8 }}>
+                  Tự động điền từ QR ở trên · Hoặc nhập tay nếu muốn
+                </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {/* Chọn ngân hàng */}
-                  <select
-                    value={bankBin}
-                    onChange={e => {
-                      const opt = e.target.options[e.target.selectedIndex]
-                      setBankBin(e.target.value)
-                      setBankName(opt.text)
-                    }}
-                    style={{ ...inp, appearance: "none", backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236a5a40' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center" }}>
+                  <select value={bankBin}
+                    onChange={e => { const o = e.target.options[e.target.selectedIndex]; setBankBin(e.target.value); setBankName(o.text) }}
+                    style={{ ...inp, borderColor: bankBin ? "rgba(62,207,110,0.3)" : "rgba(255,255,255,0.1)", appearance: "none",
+                      backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236a5a40' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E\")",
+                      backgroundRepeat:"no-repeat", backgroundPosition:"right 12px center" }}>
                     <option value="">-- Chọn ngân hàng --</option>
-                    {[
-                      ["970436","Vietcombank (VCB)"],["970415","VietinBank (CTG)"],["970418","BIDV"],
-                      ["970405","Agribank"],["970407","Techcombank (TCB)"],["970422","MB Bank"],
-                      ["970416","ACB"],["970403","Sacombank (STB)"],["970423","TPBank"],
-                      ["970432","VPBank"],["970443","SHB"],["970437","HDBank"],
-                      ["970448","OCB"],["970426","MSB"],["970449","LienVietPostBank"],
-                      ["970431","Eximbank"],["970428","Nam A Bank"],["970440","SeABank"],
-                    ].map(([bin, name]) => (
-                      <option key={bin} value={bin}>{name}</option>
-                    ))}
+                    {BANKS.map(b => <option key={b.bin} value={b.bin}>{b.name}</option>)}
                   </select>
                   <input value={bankAccount} onChange={e => setBankAccount(e.target.value.replace(/\D/g, ""))}
                     placeholder="Số tài khoản" inputMode="numeric"
-                    style={{ ...inp, borderColor: "rgba(62,207,110,0.2)" }} />
+                    style={{ ...inp, borderColor: bankAccount ? "rgba(62,207,110,0.3)" : "rgba(255,255,255,0.1)" }} />
                   <input value={bankHolder} onChange={e => setBankHolder(e.target.value.toUpperCase())}
                     placeholder="TÊN CHỦ TÀI KHOẢN (IN HOA)"
-                    style={{ ...inp, borderColor: "rgba(62,207,110,0.2)" }} />
+                    style={{ ...inp, borderColor: bankHolder ? "rgba(62,207,110,0.3)" : "rgba(255,255,255,0.1)" }} />
                 </div>
                 {bankBin && bankAccount && (
                   <div style={{ marginTop: 8, padding: "8px 10px", background: "rgba(62,207,110,0.08)", borderRadius: 8, color: "#3ecf6e", fontSize: 11 }}>
@@ -447,84 +595,6 @@ export default function MerchantGiaoHoPage() {
                 )}
               </div>
 
-              {/* Upload QR chuyển khoản */}
-              <div>
-                <label style={lbl}>Hoặc upload ảnh QR (tùy chọn)</label>
-                <input
-                  ref={qrInputRef} type="file" accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleQrUpload(f) }}
-                />
-
-                {qrUrl ? (
-                  /* Preview QR đã upload */
-                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                    <div style={{ position: "relative", width: 90, height: 90, borderRadius: 10, overflow: "hidden", border: "2px solid rgba(62,207,110,0.4)", flexShrink: 0 }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={qrUrl} alt="QR" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      {/* Khung canh góc */}
-                      {["topleft","topright","bottomleft","bottomright"].map(pos => (
-                        <div key={pos} style={{
-                          position: "absolute",
-                          top:    pos.includes("top")    ? 4 : "auto",
-                          bottom: pos.includes("bottom") ? 4 : "auto",
-                          left:   pos.includes("left")   ? 4 : "auto",
-                          right:  pos.includes("right")  ? 4 : "auto",
-                          width: 12, height: 12,
-                          borderTop:    pos.includes("top")    ? "2px solid #3ecf6e" : "none",
-                          borderBottom: pos.includes("bottom") ? "2px solid #3ecf6e" : "none",
-                          borderLeft:   pos.includes("left")   ? "2px solid #3ecf6e" : "none",
-                          borderRight:  pos.includes("right")  ? "2px solid #3ecf6e" : "none",
-                        }} />
-                      ))}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ color: "#3ecf6e", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>✅ Đã upload QR</div>
-                      <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.5 }}>Tài xế sẽ quét mã này để chuyển khoản hoặc trả tay</div>
-                      <button onClick={() => qrInputRef.current?.click()}
-                        style={{ marginTop: 6, background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "4px 10px", color: "#b0956a", fontSize: 11, fontFamily: "Lexend", cursor: "pointer" }}>
-                        Đổi ảnh
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* Nút upload + khung hướng dẫn */
-                  <button
-                    onClick={() => qrInputRef.current?.click()}
-                    disabled={qrUploading}
-                    style={{ width: "100%", background: "rgba(62,207,110,0.06)", border: "1.5px dashed rgba(62,207,110,0.3)", borderRadius: 12, padding: "16px 12px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                    {qrUploading ? (
-                      <div style={{ color: "#3ecf6e", fontSize: 12 }}>Đang xử lý...</div>
-                    ) : (
-                      <>
-                        {/* Khung vuông giả lập QR */}
-                        <div style={{ position: "relative", width: 72, height: 72, border: "2px dashed rgba(62,207,110,0.5)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          {["topleft","topright","bottomleft","bottomright"].map(pos => (
-                            <div key={pos} style={{
-                              position: "absolute",
-                              top:    pos.includes("top")    ? -2 : "auto",
-                              bottom: pos.includes("bottom") ? -2 : "auto",
-                              left:   pos.includes("left")   ? -2 : "auto",
-                              right:  pos.includes("right")  ? -2 : "auto",
-                              width: 14, height: 14,
-                              borderTop:    pos.includes("top")    ? "3px solid #3ecf6e" : "none",
-                              borderBottom: pos.includes("bottom") ? "3px solid #3ecf6e" : "none",
-                              borderLeft:   pos.includes("left")   ? "3px solid #3ecf6e" : "none",
-                              borderRight:  pos.includes("right")  ? "3px solid #3ecf6e" : "none",
-                              borderRadius: 2,
-                            }} />
-                          ))}
-                          <span style={{ fontSize: 28 }}>📷</span>
-                        </div>
-                        <div style={{ color: "#3ecf6e", fontSize: 12, fontWeight: 600 }}>Upload ảnh QR chuyển khoản</div>
-                        <div style={{ color: "#6a5a40", fontSize: 11, textAlign: "center" }}>
-                          Canh mã QR vào khung vuông · Ảnh tự cắt về hình vuông
-                        </div>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
             </div>
           )}
         </div>
@@ -599,6 +669,58 @@ export default function MerchantGiaoHoPage() {
             initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }}
             style={{ position: "fixed", bottom: 90, left: 16, right: 16, background: "rgba(20,15,8,0.97)", border: "1px solid rgba(255,107,0,0.3)", borderRadius: 12, padding: "12px 16px", color: "#f8f0e0", fontSize: 13, fontFamily: "Lexend", zIndex: 200, textAlign: "center" }}>
             {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Cropper Modal ── */}
+      <AnimatePresence>
+        {showCropper && cropSrc && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: "fixed", inset: 0, zIndex: 300, background: "#000", display: "flex", flexDirection: "column" }}>
+            {/* Header */}
+            <div style={{ padding: "16px 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(8,8,6,0.9)", borderBottom: "1px solid rgba(255,107,0,0.2)", flexShrink: 0 }}>
+              <button onClick={() => { setShowCropper(false); URL.revokeObjectURL(cropSrc); setCropSrc(null) }}
+                style={{ background: "none", border: "none", color: "#b0956a", fontSize: 13, fontFamily: "Lexend", cursor: "pointer" }}>
+                ✕ Huỷ
+              </button>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ color: "#f8f0e0", fontSize: 13, fontWeight: 700 }}>Căn mã QR vào khung</div>
+                <div style={{ color: "#6a5a40", fontSize: 10, marginTop: 2 }}>Kéo để di chuyển · Pinch/scroll để zoom</div>
+              </div>
+              <button onClick={handleCropConfirm}
+                style={{ background: "linear-gradient(135deg,#FF6B00,#FF8C00)", border: "none", borderRadius: 8, padding: "6px 14px", color: "#fff", fontSize: 13, fontFamily: "Lexend", fontWeight: 700, cursor: "pointer" }}>
+                Dùng ảnh
+              </button>
+            </div>
+
+            {/* Cropper area */}
+            <div style={{ position: "relative", flex: 1 }}>
+              <Cropper
+                image={cropSrc}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                cropShape="rect"
+                showGrid={true}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+                style={{
+                  containerStyle: { background: "#000" },
+                  cropAreaStyle: { border: "2px solid #3ecf6e", boxShadow: "0 0 0 9999px rgba(0,0,0,0.7)" },
+                }}
+              />
+            </div>
+
+            {/* Zoom slider */}
+            <div style={{ padding: "14px 24px", background: "rgba(8,8,6,0.9)", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+              <span style={{ color: "#6a5a40", fontSize: 12 }}>🔍</span>
+              <input type="range" min={1} max={3} step={0.05} value={zoom} onChange={e => setZoom(Number(e.target.value))}
+                style={{ flex: 1, accentColor: "#FF6B00" }} />
+              <span style={{ color: "#6a5a40", fontSize: 12 }}>🔍+</span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
