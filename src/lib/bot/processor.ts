@@ -944,34 +944,28 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
         const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
         const mapUrl   = `${appUrl}/bot-address?sid=${senderId}`
 
-        const sendMapLink = async (reason: string): Promise<BotResponse> => {
-          // Xóa địa chỉ vừa extract — chưa có tọa độ
-          const cleaned = { ...newData }
-          delete (cleaned as Record<string, unknown>)[f.addr]
-          await saveSession(senderId, { collected_data: cleaned })
-          await saveMessage(senderId, "model", reason)
+        // Luôn lưu địa chỉ text vào session (không xóa)
+        // Sau đó thử geocode để có lat/lng, và gợi ý bản đồ nếu cần
+        await saveSession(senderId, { collected_data: newData })
+
+        // Địa chỉ mơ hồ (buôn/thôn/xã ngoài Phước An) → gợi ý ghim bản đồ
+        if (!isGeocodable(addrText)) {
+          const msg = `📍 Đã lưu địa chỉ: "${addrText}"\n\nĐịa chỉ này khó xác định chính xác — bạn có thể ghim vị trí trên bản đồ để tài xế tìm đúng hơn, hoặc nhắn "đúng rồi" để tiếp tục:`
+          await saveMessage(senderId, "model", msg)
           return {
             type:          "text_with_webview",
-            content:       reason,
-            buttonTitle:   "🗺️ Chọn vị trí trên bản đồ",
+            content:       msg,
+            buttonTitle:   "🗺️ Ghim vị trí chính xác",
             url:           mapUrl,
-            quick_replies: [{ content_type: "location" }],
+            quick_replies: QR_CONFIRM_CANCEL,
           } as TextWithWebviewResponse
-        }
-
-        // Địa chỉ xã / buôn / thôn → không có số nhà → cần chọn map
-        if (!isGeocodable(addrText)) {
-          return sendMapLink(
-            `📍 Địa chỉ "${addrText}" ở khu vực ngoài thị trấn, mình cần bạn ghim vị trí chính xác nhé!\n\nDùng link bên dưới hoặc share GPS trực tiếp:`
-          )
         }
 
         // Phước An / có số nhà → thử geocode
         const coords = await tryGeocodeAddress(addrText)
         if (!coords) {
           // Không geocode được → giữ địa chỉ text, cho user xác nhận hoặc ghim bản đồ
-          await saveSession(senderId, { collected_data: newData })
-          const mapMsg = `📍 Lưu địa chỉ: "${addrText}"\n\nMình chưa tìm được vị trí này trên bản đồ.\nNhắn "đúng rồi" để dùng địa chỉ này, hoặc ghim vị trí chính xác hơn:`
+          const mapMsg = `📍 Đã lưu: "${addrText}"\n\nMình chưa tìm được toạ độ địa chỉ này.\nNhắn "đúng rồi" để tiếp tục, hoặc ghim chính xác hơn:`
           await saveMessage(senderId, "model", mapMsg)
           return {
             type:          "text_with_webview",
