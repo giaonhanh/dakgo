@@ -29,6 +29,14 @@ export interface ActionInput {
   category?:      string
 }
 
+// Slug → tên hiển thị tiếng Việt
+const CATEGORY_LABELS: Record<string, string> = {
+  'com':     'cơm', 'bun':    'bún',      'pho':    'phở',
+  'ca-phe':  'cà phê', 'tra-sua': 'trà sữa', 'do-uong': 'đồ uống',
+  'banh-mi': 'bánh mì', 'lau':    'lẩu',     'ga-ran':  'gà rán',
+  'mi':      'mỳ',
+}
+
 // Câu trả lời FAQ cố định
 const FAQ_REPLIES: Record<string, string> = {
   delivery_fee:  'Phí giao hàng cố định 15.000đ trong xã Krông Pắc. Đơn trên 150k miễn phí ship!',
@@ -116,10 +124,11 @@ export function decideAction(inp: ActionInput): ActionDecision {
         quickReplies: [],
       }
     }
+    // Chào đơn thuần → không hiện card, chỉ text
     return {
-      action:       { type: 'SHOW_SHOP', payload: { shops: shopResults.slice(0, 3) } },
+      action:       { type: 'SHOW_SHOP', payload: { shops: [] } },
       extraActions: [],
-      reply:        'Trợ lý DakGo đây! Gõ tên món, địa chỉ hoặc dịch vụ cần là mình lo ngay 🏍️',
+      reply:        'Trợ lý DakGo đây! Gõ tên món, địa chỉ hoặc dịch vụ cần là mình lo ngay 🍜',
       quickReplies: [],
     }
   }
@@ -218,16 +227,27 @@ export function decideAction(inp: ActionInput): ActionDecision {
       }
     }
     // Chưa biết quán → show danh sách quán (đã lọc theo category nếu có)
-    const shops = shopResults.slice(0, 5)
-    const catLabel = category ? ` ${category}` : ''
+    const shops    = shopResults.slice(0, 5)
+    const catVi    = category ? (CATEGORY_LABELS[category] ?? category) : ''
+    const catLabel = catVi ? ` ${catVi}` : ''
+
+    if (shops.length === 0) {
+      // Không có quán nào → giải thích rõ lý do
+      const noShopReply = catVi
+        ? `Hiện các quán ${catVi} chưa mở hoặc ngoài giờ phục vụ 😔\nBạn thử lại sau hoặc hỏi món khác nhé!`
+        : 'Hiện tất cả các quán đều chưa mở hoặc ngoài giờ phục vụ của DakGo 😔\nQuý khách thông cảm, thử lại sau nhé!'
+      return {
+        action:       { type: 'SHOW_SHOP', payload: { shops: [] } },
+        extraActions: [],
+        reply:        noShopReply,
+        quickReplies: [],
+      }
+    }
+
     return {
       action:       { type: 'SHOW_SHOP', payload: { shops } },
       extraActions: [],
-      reply:        shops.length > 0
-        ? `${shops.length} quán${catLabel} đang mở — chọn quán để xem menu:`
-        : category
-          ? `Chưa tìm thấy quán ${category} nào đang mở. Thử món khác hoặc hỏi mình nhé!`
-          : 'Chưa có quán nào mở, thử lại sau nhé!',
+      reply:        `${shops.length} quán${catLabel} đang mở — chọn quán để xem menu:`,
       quickReplies: [],
     }
   }

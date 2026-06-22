@@ -85,23 +85,26 @@ export async function fuzzySearchShops(query: string): Promise<ShopSearchResult[
   return (data ?? []).map(s => mapShop({ ...s, similarity: 0.4 }))
 }
 
-// Mapping category keyword → Supabase category value
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  'com':        ['Cơm', 'Cơm hộp', 'Cơm tấm'],
-  'bun':        ['Bún', 'Bún bò', 'Bún riêu'],
-  'pho':        ['Phở'],
-  'ca-phe':     ['Cà phê', 'Đồ uống', 'Trà sữa'],
-  'tra-sua':    ['Trà sữa', 'Đồ uống'],
-  'banh-mi':    ['Bánh mì'],
-  'lau':        ['Lẩu', 'Nướng', 'Lẩu nướng'],
-  'ga':         ['Gà', 'Gà rán', 'Đồ chiên'],
+// Mapping keyword/slug → Supabase category values + từ khoá nhận diện tiếng Việt
+const CATEGORY_KEYWORDS: Record<string, { dbValues: string[]; keywords: string[] }> = {
+  'com':      { dbValues: ['Cơm', 'Cơm hộp', 'Cơm tấm'], keywords: ['cơm', 'com', 'cơm gà', 'cơm tấm', 'cơm rang'] },
+  'bun':      { dbValues: ['Bún', 'Bún bò', 'Bún riêu'], keywords: ['bún', 'bun', 'bún bò', 'bún riêu'] },
+  'pho':      { dbValues: ['Phở'],                        keywords: ['phở', 'pho'] },
+  'ca-phe':   { dbValues: ['Cà phê', 'Đồ uống'],         keywords: ['cà phê', 'cafe', 'coffee', 'ca phe', 'ca-phe'] },
+  'tra-sua':  { dbValues: ['Trà sữa', 'Đồ uống'],        keywords: ['trà sữa', 'tra sua', 'bubble tea', 'trà'] },
+  'do-uong':  { dbValues: ['Đồ uống', 'Trà sữa', 'Cà phê', 'Nước giải khát'],
+                keywords: ['đồ uống', 'nước', 'nước ngọt', 'nước mát', 'uống', 'giải khát', 'do uong', 'do-uong'] },
+  'banh-mi':  { dbValues: ['Bánh mì'],                    keywords: ['bánh mì', 'banh mi'] },
+  'lau':      { dbValues: ['Lẩu', 'Nướng', 'Lẩu nướng'], keywords: ['lẩu', 'nướng', 'lau'] },
+  'ga-ran':   { dbValues: ['Gà rán', 'Gà', 'Đồ chiên'],  keywords: ['gà rán', 'gà chiên', 'ga ran', 'ga-ran'] },
+  'mi':       { dbValues: ['Mỳ', 'Mì'],                   keywords: ['mỳ', 'mì', 'mỳ cay', 'mì cay', 'my cay'] },
 }
 
 function detectCategory(query: string): string | undefined {
   const q = query.toLowerCase()
-  for (const [key, categories] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (q.includes(key) || categories.some(c => q.includes(c.toLowerCase()))) {
-      return categories[0]
+  for (const [, { dbValues, keywords }] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(k => q.includes(k)) || dbValues.some(c => q.includes(c.toLowerCase()))) {
+      return dbValues[0]   // trả về giá trị DB (category đầu tiên)
     }
   }
 }

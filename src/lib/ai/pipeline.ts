@@ -71,7 +71,7 @@ export async function runPipeline(
   const [extracted, openShops, shopMenu] = await Promise.all([
     intent === 'FAQ' ? Promise.resolve({ items: [], shopName: null, phone: null, address: null, intent: null, confidence: 0 })
                      : extractFromMessage(message, contextSummary),
-    needOpenShops ? getOpenShops(category ?? undefined) : Promise.resolve([]),
+    needOpenShops ? getOpenShops(message) : Promise.resolve([]),
     needShopMenu  ? getShopProducts(ctx.shopId!)        : Promise.resolve([]),
   ])
 
