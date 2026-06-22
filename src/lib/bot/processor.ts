@@ -618,8 +618,13 @@ export async function processPostback(senderId: string, payload: string): Promis
     const parts    = payload.split(":")
     const shopId   = parts[1]
     const shopName = decodeURIComponent(parts.slice(2).join(":"))
-    const newData  = mergeData(session.collected_data, { shop_id: shopId, shop_name: shopName })
-    await saveSession(senderId, { state: "collecting", intent: "food_order", collected_data: newData })
+    // Bắt đầu đơn mới: giữ phone, xóa items + địa chỉ cũ để bot hỏi lại
+    const freshData: CollectedData = {
+      phone:    session.collected_data.phone,
+      shop_id:  shopId,
+      shop_name: shopName,
+    }
+    await saveSession(senderId, { state: "collecting", intent: "food_order", collected_data: freshData })
     await saveMessage(senderId, "user", `[Chọn quán: ${shopName}]`)
     return buildMenuCards(shopId, shopName)
   }
