@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { getAdminContact } from "@/lib/adminContact"
 import { createClient } from "@/lib/supabase/client"
-import AddressPicker from "@/components/map/AddressPicker"
-import type { AddressPickerResult } from "@/types"
 
 /* ── helpers ── */
 function Toggle({ on, onToggle, color = "#3ecf6e" }: { on: boolean; onToggle: () => void; color?: string }) {
@@ -112,164 +110,6 @@ function PwSheet({ onClose }: { onClose: () => void }) {
   )
 }
 
-/* ── hours sheet ── */
-const DAYS_LABEL = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"]
-
-export type TimeSlot  = { from: string; to: string }
-export type DayHours  = { day: string; open: boolean; slots: TimeSlot[] }
-
-const DEFAULT_HOURS: DayHours[] = DAYS_LABEL.map(d => ({
-  day: d, open: true, slots: [{ from: "07:00", to: "21:00" }],
-}))
-
-/** Chuẩn hoá opening_hours từ DB (cả format cũ lẫn mới) thành DayHours[] */
-function normalizeHours(raw: unknown): DayHours[] {
-  if (!raw) return DEFAULT_HOURS
-  // Mảng DayHours[] — format mới
-  if (Array.isArray(raw)) {
-    return (raw as DayHours[]).map(d => ({
-      day:   d.day,
-      open:  d.open ?? true,
-      slots: d.slots?.length ? d.slots : [{ from: "07:00", to: "21:00" }],
-    }))
-  }
-  // Format cũ: { open: "HH:mm", close: "HH:mm", days?: [] }
-  const obj = raw as Record<string, unknown>
-  if (obj.open && obj.close) {
-    return DAYS_LABEL.map(d => ({
-      day: d, open: true,
-      slots: [{ from: obj.open as string, to: obj.close as string }],
-    }))
-  }
-  return DEFAULT_HOURS
-}
-
-/** Tóm tắt giờ để hiển thị trên Row */
-function summarizeHours(hours: DayHours[]): string {
-  const open = hours.filter(h => h.open)
-  if (!open.length) return "Nghỉ tất cả các ngày"
-  const first = open[0].slots[0]
-  const allSame = open.every(h => h.slots[0]?.from === first?.from && h.slots[0]?.to === first?.to)
-  if (allSame && first) return `${open.map(h => h.day.replace("Thứ ", "T")).join("·")}: ${first.from}–${first.to}`
-  return `${open.length}/7 ngày · ${first?.from ?? ""}–${first?.to ?? ""}`
-}
-
-const timeInputStyle: React.CSSProperties = {
-  flex: 1, height: 34, padding: "0 8px",
-  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)",
-  borderRadius: 8, color: "#f8f0e0", fontSize: 11, fontFamily: "Lexend", colorScheme: "dark",
-}
-
-/* ── hours sheet ── */
-function HoursSheet({ onClose, shopId, initialHours, onSaved }: {
-  onClose: () => void; shopId: string | null
-  initialHours: DayHours[]; onSaved: (h: DayHours[]) => void
-}) {
-  const supabase = createClient()
-  const [hours,   setHours]   = useState<DayHours[]>(initialHours)
-  const [saving,  setSaving]  = useState(false)
-
-  const toggle     = (i: number) =>
-    setHours(h => h.map((x, j) => j === i ? { ...x, open: !x.open } : x))
-  const addSlot    = (i: number) =>
-    setHours(h => h.map((x, j) => j === i
-      ? { ...x, slots: [...x.slots, { from: "14:00", to: "21:00" }] } : x))
-  const removeSlot = (i: number, si: number) =>
-    setHours(h => h.map((x, j) => j === i
-      ? { ...x, slots: x.slots.filter((_, k) => k !== si) } : x))
-  const updateSlot = (i: number, si: number, field: keyof TimeSlot, val: string) =>
-    setHours(h => h.map((x, j) => j === i
-      ? { ...x, slots: x.slots.map((s, k) => k === si ? { ...s, [field]: val } : s) } : x))
-
-  const handleSave = async () => {
-    if (!shopId) return
-    setSaving(true)
-    const { error } = await supabase.from("shops")
-      .update({ opening_hours: hours, updated_at: new Date().toISOString() })
-      .eq("id", shopId)
-    setSaving(false)
-    if (error) { alert("Lỗi lưu: " + error.message); return }
-    onSaved(hours)
-    onClose()
-  }
-
-  return (
-    <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-      transition={{ type: "spring", damping: 26, stiffness: 280 }}
-      style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)",
-        backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-      <div style={{ background: "#0e0b07", borderTop: "1px solid rgba(255,107,0,0.3)",
-        borderRadius: "22px 22px 0 0", padding: "20px 20px calc(env(safe-area-inset-bottom) + 20px)",
-        maxHeight: "88dvh", overflowY: "auto" }}>
-
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
-          <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🕐 Giờ hoạt động từng ngày</div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none",
-            borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
-        </div>
-        <div style={{ color: "#6a5a40", fontSize: 9, marginBottom: 16 }}>
-          Mỗi ngày có thể có 2 khung giờ — VD: 07:00–11:00 và 14:00–21:00 (nghỉ trưa).
-        </div>
-
-        {hours.map((h, i) => (
-          <div key={h.day} style={{ padding: "10px 0",
-            borderBottom: i < hours.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-
-            {/* Day header row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: h.open ? 8 : 0 }}>
-              <div style={{ width: 56, color: h.open ? "#f8f0e0" : "#6a5a40",
-                fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{h.day}</div>
-              <Toggle on={h.open} onToggle={() => toggle(i)} />
-              {!h.open && <div style={{ color: "#6a5a40", fontSize: 10 }}>Nghỉ cả ngày</div>}
-            </div>
-
-            {/* Time slots */}
-            {h.open && (
-              <div style={{ paddingLeft: 66 }}>
-                {h.slots.map((slot, si) => (
-                  <div key={si} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                    <span style={{ color: "#6a5a40", fontSize: 9, width: 12 }}>{si + 1}</span>
-                    <input type="time" value={slot.from}
-                      onChange={e => updateSlot(i, si, "from", e.target.value)}
-                      style={timeInputStyle} />
-                    <span style={{ color: "#6a5a40", fontSize: 10 }}>–</span>
-                    <input type="time" value={slot.to}
-                      onChange={e => updateSlot(i, si, "to", e.target.value)}
-                      style={timeInputStyle} />
-                    {h.slots.length > 1 && (
-                      <button onClick={() => removeSlot(i, si)}
-                        style={{ width: 26, height: 26, borderRadius: 7, border: "none",
-                          background: "rgba(255,64,64,0.1)", color: "#ff4040",
-                          fontSize: 13, cursor: "pointer", flexShrink: 0 }}>×</button>
-                    )}
-                  </div>
-                ))}
-                {h.slots.length < 2 && (
-                  <button onClick={() => addSlot(i)}
-                    style={{ marginTop: 2, padding: "4px 10px", borderRadius: 7, border: "none",
-                      background: "rgba(255,255,255,0.04)", color: "#6a5a40",
-                      fontSize: 9, cursor: "pointer", fontFamily: "Lexend" }}>
-                    + Thêm khung giờ 2 (có nghỉ trưa)
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-
-        <button onClick={handleSave} disabled={saving}
-          style={{ width: "100%", height: 48, borderRadius: 14, border: "none",
-            background: saving ? "rgba(255,255,255,0.08)" : "linear-gradient(90deg,#FF6B00,#FF8C00)",
-            color: saving ? "#6a5a40" : "#fff",
-            fontSize: 13, fontWeight: 800, cursor: saving ? "not-allowed" : "pointer",
-            fontFamily: "Lexend", marginTop: 16 }}>
-          {saving ? "Đang lưu..." : "✓ Lưu giờ hoạt động"}
-        </button>
-      </div>
-    </motion.div>
-  )
-}
-
 /* ── prep time sheet ── */
 function PrepTimeSheet({ value, onSelect, onClose }: { value: string; onSelect: (v: string) => void; onClose: () => void }) {
   const OPTIONS = ["5–10", "10–15", "15–20", "20–30", "30–45"]
@@ -335,15 +175,11 @@ export default function MerchantSettingsPage() {
     analytics:      true,
   })
 
-  /* hours */
-  const [hours, setHours] = useState<DayHours[]>(DEFAULT_HOURS)
-
   /* sheets */
   const [prepTime,      setPrepTime]      = useState(() => {
     try { return localStorage.getItem("merchant_prep_time") ?? "10–15" } catch { return "10–15" }
   })
   const [showPw,        setShowPw]        = useState(false)
-  const [showHours,     setShowHours]     = useState(false)
   const [showPrepSheet, setShowPrepSheet] = useState(false)
   const [toast, setToast]           = useState("")
   const [adminContactLink, setAdminContactLink] = useState("mailto:DakGo.phuocan@gmail.com")
@@ -355,8 +191,6 @@ export default function MerchantSettingsPage() {
   const [shopRating,       setShopRating]       = useState<number | null>(null)
   const [shopCommission,   setShopCommission]   = useState(15)
   const [isNegotiated,     setIsNegotiated]     = useState(false)
-  const [shopHasLocation,  setShopHasLocation]  = useState(false)
-  const [showLocationPicker, setShowLocationPicker] = useState(false)
 
   useEffect(() => {
     getAdminContact().then(c => {
@@ -368,7 +202,7 @@ export default function MerchantSettingsPage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       supabase.from("shops")
-        .select("id,name,address,location,is_open,rating_avg,commission_rate,is_negotiated_commission,prep_time,auto_accept,busy_mode,preorder_allow,show_rating,show_sold_count,opening_hours,notif_settings,privacy_settings")
+        .select("id,name,address,location,is_open,rating_avg,commission_rate,is_negotiated_commission,prep_time,auto_accept,busy_mode,preorder_allow,show_rating,show_sold_count,notif_settings,privacy_settings")
         .eq("owner_id", user.id).maybeSingle()
         .then(({ data }) => {
           if (!data) return
@@ -376,7 +210,6 @@ export default function MerchantSettingsPage() {
           setShopId(data.id)
           setShopName(data.name ?? "")
           setShopAddress(data.address ?? "")
-          setShopHasLocation(!!d.location)
           setShopIsOpen(data.is_open ?? false)
           setShopRating(data.rating_avg ?? null)
           setShopCommission(data.commission_rate ?? 15)
@@ -391,8 +224,6 @@ export default function MerchantSettingsPage() {
             })
           }
           if (d.prep_time) setPrepTime(d.prep_time as string)
-          // Giờ hoạt động từ DB
-          setHours(normalizeHours(d.opening_hours))
           // Thông báo từ DB
           if (d.notif_settings) setNotif(prev => ({ ...prev, ...(d.notif_settings as object) }))
           // Quyền riêng tư từ DB
@@ -521,18 +352,6 @@ export default function MerchantSettingsPage() {
             <Row icon="⏱️" label="Thời gian chuẩn bị đơn" sub={`${prepTime} phút · hiển thị cho khách trên trang quán`} onClick={() => setShowPrepSheet(true)} arrow last />
           </Section>
 
-          {/* hours */}
-          <Section title="Lịch hoạt động">
-            <Row icon="🕐" label="Giờ mở cửa từng ngày" sub={summarizeHours(hours)} onClick={() => setShowHours(true)} arrow last />
-          </Section>
-
-          {/* location */}
-          <Section title="Địa điểm">
-            <Row icon="📍" label="Vị trí quán trên bản đồ"
-              sub={shopHasLocation ? "Đã xác định — bấm để cập nhật lại" : "⚠️ Chưa xác định — tài xế/khách sẽ thấy sai vị trí trên bản đồ"}
-              onClick={() => setShowLocationPicker(true)} arrow last />
-          </Section>
-
           {/* quick links */}
           <Section title="Quản lý">
             <Row icon="🍽️" label="Quản lý thực đơn" sub="Thêm, sửa, xóa món ăn" onClick={() => { window.location.href = "/merchant/menu" }} arrow />
@@ -601,7 +420,6 @@ export default function MerchantSettingsPage() {
       {/* sheets */}
       <AnimatePresence>
         {showPw        && <PwSheet      onClose={() => setShowPw(false)}        />}
-        {showHours     && <HoursSheet   onClose={() => setShowHours(false)} shopId={shopId} initialHours={hours} onSaved={h => { setHours(h); fire("✅ Đã lưu giờ hoạt động") }} />}
         {showPrepSheet && <PrepTimeSheet value={prepTime} onSelect={v => {
           setPrepTime(v)
           try { localStorage.setItem("merchant_prep_time", v) } catch { /* ignore */ }
@@ -611,34 +429,6 @@ export default function MerchantSettingsPage() {
               .then(({ error }) => { if (error) console.error("prep_time save error:", error.message) })
           }
         }} onClose={() => setShowPrepSheet(false)} />}
-        {showLocationPicker && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ position: "fixed", inset: 0, zIndex: 220 }}>
-            <AddressPicker
-              height="100dvh"
-              onClose={() => setShowLocationPicker(false)}
-              onConfirm={(result: AddressPickerResult) => {
-                setShowLocationPicker(false)
-                if (!shopId) return
-                const sb = createClient()
-                sb.from("shops")
-                  .update({
-                    address:  result.address,
-                    lat:      result.lat,
-                    lng:      result.lng,
-                    location: `POINT(${result.lng} ${result.lat})`,
-                  })
-                  .eq("id", shopId)
-                  .then(({ error }) => {
-                    if (error) { console.error("shop location save error:", error.message); return }
-                    setShopAddress(result.address)
-                    setShopHasLocation(true)
-                    fire("✅ Đã cập nhật vị trí quán")
-                  })
-              }}
-            />
-          </motion.div>
-        )}
       </AnimatePresence>
     </>
   )
