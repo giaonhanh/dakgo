@@ -343,14 +343,15 @@ export default function AddressPickerClient({
       const addr = detail.address || (s.secondaryText ? `${s.mainText}, ${s.secondaryText}` : s.mainText)
       setAddress(addr)
       applyNote(detail.houseNote)
-      onConfirm({ lat: detail.lat, lng: detail.lng, address: addr, note: detail.houseNote })
+      // KHÔNG auto-confirm — chỉ di chuyển pin về địa chỉ tìm kiếm
+      // Người dùng có thể kéo tinh chỉnh vị trí, rồi bấm "XÁC NHẬN VỊ TRÍ"
     } catch {
       setSuggestions([])
       setShowSuggest(false)
     } finally {
       setGeocoding(false)
     }
-  }, [applyNote, onConfirm])
+  }, [applyNote])
 
   const handleConfirm = useCallback(() => {
     onConfirm({ lat: center.lat, lng: center.lng, address, note })
