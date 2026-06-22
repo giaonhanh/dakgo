@@ -975,6 +975,7 @@ export default function MerchantDashboard() {
             {[
               { href: "/merchant/orders",     icon: "📋", label: "Lịch sử đơn"   },
               { href: "/merchant/menu",       icon: "🍽️", label: "Quản lý menu"  },
+              { href: "/merchant/giao-ho",    icon: "🛵", label: "Tạo đơn giao"  },
               { href: "/merchant/revenue",    icon: "📊", label: "Doanh thu"      },
               { href: "/merchant/reviews",    icon: "⭐", label: "Đánh giá"       },
               { href: "/merchant/promotions", icon: "🎁", label: "Khuyến mãi"    },
