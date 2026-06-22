@@ -43,14 +43,20 @@ const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
     ],
   },
 
-  // ── Find shop ────────────────────────────────────────────────────────────────
+  // ── Find shop / Browse menu ───────────────────────────────────────────────────
   {
     intent: 'FIND_SHOP',
     regexes: [
+      // Tìm quán
       /(quán|shop|cửa hàng|nhà hàng)\s*(nào|gần|đang mở|hay|ngon|tốt)/i,
       /gợi ý|recommend|ngon nhất|gần đây|đang mở/i,
       /có (quán|chỗ|nơi) nào/i,
       /xem quán|danh sách quán/i,
+      // Hỏi menu / có gì ngon
+      /có (gì|những gì|món gì|những món)/i,
+      /menu|thực đơn|xem món|món gì|đồ gì/i,
+      /hôm nay (có|bán) gì/i,
+      /ngon (không|gì|lắm)/i,
     ],
   },
 

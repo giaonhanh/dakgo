@@ -102,13 +102,25 @@ export function decideAction(inp: ActionInput): ActionDecision {
     }
   }
 
-  // ── FIND_SHOP ────────────────────────────────────────────────────────────────
-  if (intent === 'FIND_SHOP' && ctx.items.length === 0) {
+  // ── FIND_SHOP / Browse menu ───────────────────────────────────────────────────
+  if (intent === 'FIND_SHOP') {
+    // Đã biết quán → show menu của quán đó
+    if (ctx.shopId && productResults.length > 0) {
+      return {
+        action:       { type: 'SHOW_PRODUCTS', payload: { products: productResults.slice(0, 12) } },
+        extraActions: [],
+        reply:        `Menu ${ctx.shopName ?? 'quán'} — gõ tên món muốn đặt:`,
+        quickReplies: [],
+      }
+    }
+    // Chưa biết quán → show danh sách quán
     const shops = shopResults.slice(0, 5)
     return {
       action:       { type: 'SHOW_SHOP', payload: { shops } },
       extraActions: [],
-      reply:        shops.length > 0 ? `${shops.length} quán đang mở:` : 'Chưa có quán nào mở. Thử lại sau nhé!',
+      reply:        shops.length > 0
+        ? `${shops.length} quán đang mở — chọn quán để xem menu:`
+        : 'Chưa có quán nào mở, thử lại sau nhé!',
       quickReplies: [],
     }
   }
