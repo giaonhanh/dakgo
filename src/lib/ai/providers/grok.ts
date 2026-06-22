@@ -2,8 +2,39 @@ import type { AIProvider } from './base'
 import type { AIExtraction, ExtractedItem } from '../types'
 import { EXTRACTION_SCHEMA, EXTRACTION_RULES } from './base'
 
-const GROK_BASE  = 'https://api.x.ai/v1'
-const GROK_MODEL = process.env.GROK_MODEL ?? 'grok-3-mini'
+const GROK_BASE = 'https://api.x.ai/v1'
+
+// Danh sách model free của xAI — thứ tự ưu tiên: nhanh nhất trước
+// Khi một model hit quota (429) → tự động thử model tiếp theo
+const FREE_MODELS = [
+  'grok-3-mini',        // nhanh nhất, quota thấp nhất
+  'grok-3-mini-fast',   // faster variant nếu có
+  'grok-2-1212',        // model cũ, quota riêng biệt
+  'grok-beta',          // fallback cuối
+] as const
+
+// Cho phép override toàn bộ chain qua env
+const MODEL_CHAIN: string[] = process.env.GROK_MODEL_CHAIN
+  ? process.env.GROK_MODEL_CHAIN.split(',').map(s => s.trim()).filter(Boolean)
+  : [...FREE_MODELS]
+
+// Rate-limit tracker: model → timestamp hết hạn tạm nghỉ
+// Mỗi server instance giữ state này trong memory (đủ cho serverless per-request)
+// Cooldown 60s — sau đó thử lại model đó
+const RATE_LIMITED = new Map<string, number>()
+const COOLDOWN_MS  = 60_000
+
+function isRateLimited(model: string): boolean {
+  const until = RATE_LIMITED.get(model)
+  if (!until) return false
+  if (Date.now() > until) { RATE_LIMITED.delete(model); return false }
+  return true
+}
+
+function markRateLimited(model: string): void {
+  RATE_LIMITED.set(model, Date.now() + COOLDOWN_MS)
+  console.warn(`[grok] model ${model} rate-limited — cooldown 60s, thử model khác`)
+}
 
 const SYSTEM_PROMPT = `Bạn là module trích xuất dữ liệu đơn hàng cho app giao đồ ăn DakGo tại Krông Pắc, Đắk Lắk.
 
@@ -40,6 +71,10 @@ Output: {"items":[],"shopName":null,"phone":null,"address":null,"intent":"FIND",
 Input: "gà rán mr ben 3 phần giao gần cây xăng phước an"
 Output: {"items":[{"name":"gà rán","quantity":3,"modifiers":[]}],"shopName":"Mr Ben","phone":null,"address":"cây xăng Krông Pắc","intent":"ORDER","confidence":0.92}`
 
+const EMPTY: AIExtraction = {
+  items: [], shopName: null, phone: null, address: null, intent: null, confidence: 0,
+}
+
 export class GrokProvider implements AIProvider {
   readonly name = 'grok'
 
@@ -47,13 +82,45 @@ export class GrokProvider implements AIProvider {
     const apiKey = process.env.GROK_API_KEY
     if (!apiKey) {
       console.warn('[grok] GROK_API_KEY not set')
-      return { items: [], shopName: null, phone: null, address: null, intent: null, confidence: 0 }
+      return EMPTY
     }
 
     const userContent = contextSummary
       ? `[Ngữ cảnh: ${contextSummary}]\n\nKhách nhắn: "${message}"`
       : `Khách nhắn: "${message}"`
 
+    // Thử từng model trong chain, bỏ qua model đang bị rate-limit
+    for (const model of MODEL_CHAIN) {
+      if (isRateLimited(model)) {
+        console.info(`[grok] skip ${model} (rate-limited, cooldown)`)
+        continue
+      }
+
+      const result = await this.callModel(model, apiKey, userContent)
+
+      if (result === 'RATE_LIMITED') {
+        markRateLimited(model)
+        continue   // thử model tiếp theo
+      }
+
+      if (result === 'ERROR') {
+        continue   // lỗi khác (network, parse) → thử model tiếp theo
+      }
+
+      // Thành công
+      return result
+    }
+
+    // Tất cả model đều fail
+    console.error('[grok] all models failed or rate-limited')
+    return EMPTY
+  }
+
+  private async callModel(
+    model:      string,
+    apiKey:     string,
+    content:    string,
+  ): Promise<AIExtraction | 'RATE_LIMITED' | 'ERROR'> {
     try {
       const res = await fetch(`${GROK_BASE}/chat/completions`, {
         method:  'POST',
@@ -62,10 +129,10 @@ export class GrokProvider implements AIProvider {
           Authorization:  `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model:           GROK_MODEL,
+          model,
           messages:        [
             { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user',   content: userContent },
+            { role: 'user',   content },
           ],
           temperature:     0,
           max_tokens:      400,
@@ -74,17 +141,37 @@ export class GrokProvider implements AIProvider {
         signal: AbortSignal.timeout(5000),
       })
 
+      // 429 = quota hoặc rate limit
+      if (res.status === 429) {
+        const body = await res.text().catch(() => '')
+        console.warn(`[grok] ${model} 429:`, body.slice(0, 100))
+        return 'RATE_LIMITED'
+      }
+
+      // 402 = hết credit/quota billing
+      if (res.status === 402) {
+        console.warn(`[grok] ${model} 402: quota/billing exceeded`)
+        return 'RATE_LIMITED'
+      }
+
       if (!res.ok) {
-        console.error('[grok] API error:', res.status)
-        return { items: [], shopName: null, phone: null, address: null, intent: null, confidence: 0 }
+        console.error(`[grok] ${model} HTTP ${res.status}`)
+        return 'ERROR'
       }
 
       const data    = await res.json()
-      const content = data.choices?.[0]?.message?.content ?? '{}'
-      return this.parse(content)
+      const text    = data.choices?.[0]?.message?.content ?? '{}'
+      return this.parse(text)
+
     } catch (err) {
-      console.error('[grok] request error:', err)
-      return { items: [], shopName: null, phone: null, address: null, intent: null, confidence: 0 }
+      // AbortError = timeout
+      const isTimeout = (err as Error).name === 'AbortError'
+      if (isTimeout) {
+        console.warn(`[grok] ${model} timeout 5s`)
+      } else {
+        console.error(`[grok] ${model} error:`, (err as Error).message)
+      }
+      return 'ERROR'
     }
   }
 
@@ -115,7 +202,7 @@ export class GrokProvider implements AIProvider {
                       : 0.5,
       }
     } catch {
-      return { items: [], shopName: null, phone: null, address: null, intent: null, confidence: 0 }
+      return EMPTY
     }
   }
 }
