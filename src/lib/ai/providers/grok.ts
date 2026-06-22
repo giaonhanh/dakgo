@@ -6,12 +6,23 @@ const GROK_BASE  = 'https://api.x.ai/v1'
 const GROK_MODEL = process.env.GROK_MODEL ?? 'grok-3-mini'
 
 const SYSTEM_PROMPT = `Bạn là module trích xuất dữ liệu đơn hàng cho app giao đồ ăn DakGo tại Phước An, Đắk Lắk.
-Phân tích tin nhắn đặt đồ ăn tiếng Việt (có thể không dấu, viết tắt, sai chính tả).
+
+QUY TẮC ĐẦU RA TUYỆT ĐỐI:
+- Chỉ trả về JSON hợp lệ. Không markdown. Không giải thích. Không text thừa.
+- Không chào hỏi. Không bình luận. Không gợi ý ngoài schema.
+- Output không phải JSON hợp lệ = lỗi nghiêm trọng.
 
 SCHEMA bắt buộc:
 ${EXTRACTION_SCHEMA}
 
 ${EXTRACTION_RULES}
+
+HÀNH VI BỊ CẤM:
+- Không chat với user
+- Không giải thích reasoning
+- Không gợi ý món ăn
+- Không thêm field ngoài schema
+- Không output text ngoài JSON
 
 VÍ DỤ:
 Input: "2 my cay lam hoa cap 2 it bot ngot"
@@ -21,7 +32,13 @@ Input: "cho mình 1 com ga khong hanh giao 123 le loi sdt 0901234567"
 Output: {"items":[{"name":"cơm gà","quantity":1,"modifiers":["không hành"]}],"shopName":null,"phone":"0901234567","address":"123 Lê Lợi","intent":"ORDER","confidence":0.95}
 
 Input: "2 mỳ cayy ko hanh"
-Output: {"items":[{"name":"mỳ cay","quantity":2,"modifiers":["không hành"]}],"shopName":null,"phone":null,"address":null,"intent":"ORDER","confidence":0.75}`
+Output: {"items":[{"name":"mỳ cay","quantity":2,"modifiers":["không hành"]}],"shopName":null,"phone":null,"address":null,"intent":"ORDER","confidence":0.75}
+
+Input: "mỳ cay có cay không"
+Output: {"items":[],"shopName":null,"phone":null,"address":null,"intent":"FIND","confidence":0.88}
+
+Input: "gà rán mr ben 3 phần giao gần cây xăng phước an"
+Output: {"items":[{"name":"gà rán","quantity":3,"modifiers":[]}],"shopName":"Mr Ben","phone":null,"address":"cây xăng Phước An","intent":"ORDER","confidence":0.92}`
 
 export class GrokProvider implements AIProvider {
   readonly name = 'grok'
