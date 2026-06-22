@@ -1,41 +1,45 @@
 // Layer 4: Fuzzy Search — pg_trgm via Supabase RPC
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import type { ProductSearchResult, ShopSearchResult } from '../types'
 
-function sb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
+// ── Singleton client (tránh tạo mới mỗi call trong serverless) ────────────────
+let _client: SupabaseClient | null = null
+function sb(): SupabaseClient {
+  if (!_client) {
+    _client = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    )
+  }
+  return _client
 }
 
-export async function fuzzySearchProducts(query: string): Promise<ProductSearchResult[]> {
+// Ngưỡng similarity: 0.18 — loại bỏ nhiễu, vẫn đủ nhạy cho từ ngắn tiếng Việt
+const MIN_SIMILARITY = 0.18
+
+export async function fuzzySearchProducts(query: string, shopId?: string): Promise<ProductSearchResult[]> {
   const supabase = sb()
 
-  // Try pg_trgm RPC first
+  // pg_trgm RPC
   const { data: rpc } = await supabase.rpc('search_products_fuzzy', {
     query,
-    min_similarity: 0.12,
+    min_similarity: MIN_SIMILARITY,
   })
 
   if (rpc && rpc.length > 0) {
-    return rpc.map((r: {
-      id: string; name: string; price: number; shop_id: string
-      shop_name: string; is_open: boolean; image_url: string | null; similarity: number
-    }) => ({
-      id:         r.id,
-      name:       r.name,
-      price:      r.price,
-      shopId:     r.shop_id,
-      shopName:   r.shop_name,
-      isOpen:     r.is_open,
-      imageUrl:   r.image_url,
-      similarity: r.similarity,
-    }))
+    let results = rpc.map(mapProduct)
+    // Nếu có shopId, ưu tiên sản phẩm của quán đó lên đầu
+    if (shopId) {
+      results = [
+        ...results.filter(r => r.shopId === shopId),
+        ...results.filter(r => r.shopId !== shopId),
+      ]
+    }
+    return results.slice(0, 8)
   }
 
   // Fallback: ilike
-  const { data } = await supabase
+  let q = supabase
     .from('products')
     .select('id, name, price, image_url, shop_id, shops!inner(name, is_open, status)')
     .ilike('name', `%${query}%`)
@@ -43,6 +47,9 @@ export async function fuzzySearchProducts(query: string): Promise<ProductSearchR
     .eq('shops.status', 'approved')
     .limit(8)
 
+  if (shopId) q = (q as typeof q).eq('shop_id', shopId)
+
+  const { data } = await q
   type RawProduct = {
     id: string; name: string; price: number; image_url: string | null; shop_id: string
     shops: { name: string; is_open: boolean }
@@ -62,21 +69,47 @@ export async function fuzzySearchProducts(query: string): Promise<ProductSearchR
 export async function fuzzySearchShops(query: string): Promise<ShopSearchResult[]> {
   const supabase = sb()
 
-  const { data: rpc } = await supabase.rpc('search_shops_fuzzy', { query, min_similarity: 0.12 })
-  if (rpc && rpc.length > 0) return rpc.map(mapShop)
+  const { data: rpc } = await supabase.rpc('search_shops_fuzzy', {
+    query,
+    min_similarity: MIN_SIMILARITY,
+  })
+  if (rpc && rpc.length > 0) return rpc.map(mapShop).slice(0, 6)
 
   const { data } = await supabase
     .from('shops')
     .select('id, name, category, is_open, cover_image_url, logo_url, rating_avg')
     .ilike('name', `%${query}%`)
     .eq('status', 'approved')
-    .limit(5)
+    .limit(6)
 
   return (data ?? []).map(s => mapShop({ ...s, similarity: 0.4 }))
 }
 
-export async function getOpenShops(category?: string): Promise<ShopSearchResult[]> {
-  const supabase = sb()
+// Mapping category keyword → Supabase category value
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  'com':        ['Cơm', 'Cơm hộp', 'Cơm tấm'],
+  'bun':        ['Bún', 'Bún bò', 'Bún riêu'],
+  'pho':        ['Phở'],
+  'ca-phe':     ['Cà phê', 'Đồ uống', 'Trà sữa'],
+  'tra-sua':    ['Trà sữa', 'Đồ uống'],
+  'banh-mi':    ['Bánh mì'],
+  'lau':        ['Lẩu', 'Nướng', 'Lẩu nướng'],
+  'ga':         ['Gà', 'Gà rán', 'Đồ chiên'],
+}
+
+function detectCategory(query: string): string | undefined {
+  const q = query.toLowerCase()
+  for (const [key, categories] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (q.includes(key) || categories.some(c => q.includes(c.toLowerCase()))) {
+      return categories[0]
+    }
+  }
+}
+
+export async function getOpenShops(query?: string): Promise<ShopSearchResult[]> {
+  const supabase  = sb()
+  const category  = query ? detectCategory(query) : undefined
+
   let q = supabase
     .from('shops')
     .select('id, name, category, is_open, cover_image_url, logo_url, rating_avg')
@@ -85,13 +118,13 @@ export async function getOpenShops(category?: string): Promise<ShopSearchResult[
     .order('rating_avg', { ascending: false })
     .limit(8)
 
-  if (category) q = q.eq('category', category)
+  if (category) q = (q as typeof q).eq('category', category)
 
   const { data } = await q
   return (data ?? []).map(s => mapShop({ ...s, similarity: 1 }))
 }
 
-export async function getShopProducts(shopId: string): Promise<ProductSearchResult[]> {
+export async function getShopProducts(shopId: string, limit = 12): Promise<ProductSearchResult[]> {
   const supabase = sb()
   const { data } = await supabase
     .from('products')
@@ -99,9 +132,12 @@ export async function getShopProducts(shopId: string): Promise<ProductSearchResu
     .eq('shop_id', shopId)
     .eq('is_available', true)
     .order('sold_count', { ascending: false })
-    .limit(8)
+    .limit(limit)
 
-  type Row = { id: string; name: string; price: number; image_url: string | null; shop_id: string; shops: { name: string; is_open: boolean } }
+  type Row = {
+    id: string; name: string; price: number; image_url: string | null
+    shop_id: string; shops: { name: string; is_open: boolean }
+  }
   return ((data ?? []) as unknown as Row[]).map(p => ({
     id:         p.id,
     name:       p.name,
@@ -112,6 +148,22 @@ export async function getShopProducts(shopId: string): Promise<ProductSearchResu
     imageUrl:   p.image_url,
     similarity: 1,
   }))
+}
+
+function mapProduct(r: {
+  id: string; name: string; price: number; shop_id: string
+  shop_name: string; is_open: boolean; image_url: string | null; similarity: number
+}): ProductSearchResult {
+  return {
+    id:         r.id,
+    name:       r.name,
+    price:      r.price,
+    shopId:     r.shop_id,
+    shopName:   r.shop_name,
+    isOpen:     r.is_open,
+    imageUrl:   r.image_url,
+    similarity: r.similarity,
+  }
 }
 
 function mapShop(s: {

@@ -22,10 +22,21 @@ export interface ActionInput {
   productResults: ProductSearchResult[]
   shopResults:    ShopSearchResult[]
   offTopic:       boolean
+  isCompetitor?:  boolean
 }
 
 export function decideAction(inp: ActionInput): ActionDecision {
-  const { intent, ctx, confidence, validation, missingField, productResults, shopResults, offTopic } = inp
+  const { intent, ctx, confidence, validation, missingField, productResults, shopResults, offTopic, isCompetitor } = inp
+
+  // ── Competitor mention ────────────────────────────────────────────────────────
+  if (isCompetitor) {
+    return {
+      action:       { type: 'SHOW_PRODUCTS', payload: { products: [] } },
+      extraActions: [],
+      reply:        'DakGo phục vụ riêng Krông Pắc — giao nhanh hơn, giá tốt hơn 🍜',
+      quickReplies: ['🍜 Xem quán đang mở', '🍱 Cơm', '☕ Cà phê'],
+    }
+  }
 
   // ── Off-topic ────────────────────────────────────────────────────────────────
   if (offTopic) {
@@ -33,7 +44,7 @@ export function decideAction(inp: ActionInput): ActionDecision {
       action:       { type: 'HUMAN_HANDOFF' },
       extraActions: [],
       reply:        'Mình chỉ hỗ trợ đặt đồ ăn thôi nhé 🍜',
-      quickReplies: ['🍜 Xem quán', '📦 Giao hộ'],
+      quickReplies: ['🍜 Xem quán', '🍱 Cơm hộp'],
     }
   }
 
@@ -54,6 +65,20 @@ export function decideAction(inp: ActionInput): ActionDecision {
       extraActions: [],
       reply:        'Đã hủy 👍',
       quickReplies: ['🍜 Đặt lại'],
+    }
+  }
+
+  // ── MODIFY_CART ───────────────────────────────────────────────────────────────
+  if (intent === 'MODIFY_CART') {
+    return {
+      action:       { type: 'SHOW_PRODUCTS', payload: { products: ctx.items.length > 0 ? [] : productResults.slice(0, 6) } },
+      extraActions: [],
+      reply:        ctx.items.length > 0
+        ? `Đang có: ${buildItemSummary(ctx)} — bạn muốn sửa gì?`
+        : 'Giỏ hàng đang trống. Bạn muốn đặt gì?',
+      quickReplies: ctx.items.length > 0
+        ? ['🗑️ Xóa hết', '➕ Thêm món']
+        : ['🍜 Xem quán'],
     }
   }
 
@@ -165,16 +190,6 @@ export function decideAction(inp: ActionInput): ActionDecision {
       extraActions: [],
       reply:        `${buildItemSummary(ctx)} — giao đến đâu? 📍`,
       quickReplies: ['📍 Vị trí của tôi'],
-    }
-  }
-
-  // ── Thiếu phone ──────────────────────────────────────────────────────────────
-  if (missingField === 'phone') {
-    return {
-      action:       { type: 'ASK_PHONE' },
-      extraActions: [],
-      reply:        'Số điện thoại? (VD: 0901 234 567)',
-      quickReplies: ['⏩ Bỏ qua'],
     }
   }
 

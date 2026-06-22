@@ -1,13 +1,15 @@
 // Layer 9: Context Memory — Supabase, anonymous session (no auth required)
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import type { ChatSession, ChatMessage, SessionContext } from '../types'
 import { EMPTY_CONTEXT } from '../types'
 
-function sb() {
-  return createClient(
+let _client: SupabaseClient | null = null
+function sb(): SupabaseClient {
+  if (!_client) _client = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
+  return _client
 }
 
 export async function loadOrCreateSession(sessionKey: string): Promise<ChatSession> {

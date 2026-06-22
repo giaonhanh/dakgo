@@ -71,7 +71,7 @@ export class GrokProvider implements AIProvider {
           max_tokens:      400,
           response_format: { type: 'json_object' },
         }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(5000),
       })
 
       if (!res.ok) {

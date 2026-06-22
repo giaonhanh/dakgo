@@ -73,6 +73,14 @@ export function formatForWeb(output: PipelineOutput, sessionId: string): UIRespo
         // No rich content — cart sync happens in page.tsx
         break
       }
+
+      case 'HUMAN_HANDOFF': {
+        richContent.push({
+          type: 'location_picker',   // tái dùng slot — hiện nút liên hệ
+          url: 'https://zalo.me/0000000000',  // TODO: thay bằng số Zalo thật
+        })
+        break
+      }
     }
   }
 

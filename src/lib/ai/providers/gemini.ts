@@ -42,7 +42,7 @@ export class GeminiProvider implements AIProvider {
               responseMimeType: 'application/json',
             },
           }),
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(5000),
         },
       )
 

@@ -41,6 +41,16 @@ export async function runPipeline(
   if (gate.blocked) {
     return formatForWeb(blocked(gate.blockMsg ?? 'Nội dung không phù hợp.'), session.id)
   }
+  if (gate.isCompetitor) {
+    return formatForWeb({
+      reply:          'DakGo phục vụ riêng khu vực Krông Pắc — giao nhanh hơn, giá tốt hơn 🍜 Bạn muốn đặt gì?',
+      actions:        [],
+      quickReplies:   ['🍜 Xem quán đang mở', '🍱 Cơm hộp', '☕ Cà phê'],
+      updatedContext: ctx,
+      blocked:        false,
+      confidence:     0,
+    }, session.id)
+  }
 
   // ── Layer 3: Intent Classifier ────────────────────────────────────────────
   const intent = classifyIntent({ message, sessionKey, session, history })
@@ -135,8 +145,8 @@ export async function runPipeline(
   // ── Layer 6: Confidence Layer ─────────────────────────────────────────────
   const confidence = calculateConfidence(newCtx, extracted.confidence)
 
-  // ── Layer 7: Business Validator ───────────────────────────────────────────
-  const validation = newCtx.shopId
+  // ── Layer 7: Business Validator — skip nếu confidence quá thấp (tiết kiệm DB call)
+  const validation = (newCtx.shopId && confidence.total >= 0.30)
     ? await validateOrder(newCtx)
     : { valid: true, issues: [], shopIsOpen: true, shopName: null }
 
@@ -147,14 +157,15 @@ export async function runPipeline(
   // ── Layer 10: Action Layer ────────────────────────────────────────────────
   const decision = decideAction({
     intent,
-    aiIntent:       extracted.intent,
-    ctx:            newCtx,
+    aiIntent:        extracted.intent,
+    ctx:             newCtx,
     confidence,
     validation,
     missingField,
     productResults,
     shopResults,
-    offTopic:       gate.offTopic,
+    offTopic:        gate.offTopic,
+    isCompetitor:    gate.isCompetitor,
   })
 
   const output: PipelineOutput = {
