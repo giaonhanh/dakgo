@@ -53,7 +53,7 @@ export function decideAction(inp: ActionInput): ActionDecision {
     return {
       action:       { type: 'SHOW_SHOP', payload: { shops: shopResults.slice(0, 3) } },
       extraActions: [],
-      reply:        'Chào! Gõ tên món muốn ăn là mình lo ngay 🍜',
+      reply:        'Mình là Vù! Gõ tên món, địa chỉ hoặc dịch vụ cần là mình lo ngay 🏍️',
       quickReplies: [],
     }
   }
