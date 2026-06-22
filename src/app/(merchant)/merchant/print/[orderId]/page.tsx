@@ -204,7 +204,7 @@ export default function PrintPage() {
         <div style={{ borderTop: "1px dashed #000", paddingTop: 8, marginTop: 8, textAlign: "center", fontSize: 10, color: "#555" }}>
           Cảm ơn quý khách!
           <br />
-          Giao Nhanh — Phước An
+          Giao Nhanh — Krông Pắc
         </div>
       </div>
     </>

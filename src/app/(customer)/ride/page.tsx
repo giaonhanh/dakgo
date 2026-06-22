@@ -34,7 +34,7 @@ function RideContent() {
   const supabase = createClient();
 
   const [service,       setService]       = useState(params.get("type") === "taxi" ? "taxi" : "xe-om");
-  const [pickup,        setPickup]        = useState("Phước An, Krông Pắc");
+  const [pickup,        setPickup]        = useState("Krông Pắc, Đắk Lắk");
   const [dest,          setDest]          = useState("");
   const [loading,       setLoading]       = useState(false);
   const [toast,         setToast]         = useState("");

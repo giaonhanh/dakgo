@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
       await adminClient.from("shops").insert({
         owner_id:        userId,
         name:            shopName || `Cửa hàng của ${name}`,
-        address:         shopAddr || "Phước An, Krông Pắc",
+        address:         shopAddr || "Krông Pắc, Đắk Lắk",
         category:        shopCat ? shopCat.replace(/^[^\s]+ /, "").trim() : "Đồ ăn",
         status:          "pending",
         is_open:         false,

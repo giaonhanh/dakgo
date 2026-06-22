@@ -158,7 +158,7 @@ export default function AdminSettingsPage() {
     taxi7: { baseFare: 20000, perKm: 15000, perKmOver30: 12000, commissionRate: 10 },
   })
   const [taxiRoutes, setTaxiRoutes] = useState<TaxiRoute[]>([
-    { id: "1", from: "Phước An", to: "BMT (Buôn Ma Thuột)", oneWay: 300000, twoWay: 400000, note: "" },
+    { id: "1", from: "Krông Pắc", to: "BMT (Buôn Ma Thuột)", oneWay: 300000, twoWay: 400000, note: "" },
   ])
   const [taxiWaiting, setTaxiWaiting] = useState({ freeMinutes: 90, extraHourFee: 50000, doubleAfterHours: 3 })
 
@@ -348,7 +348,7 @@ export default function AdminSettingsPage() {
   /* ── Area ── */
   const [areaSettings, setAreaSettings] = useState({
     centerLat: "12.6521", centerLng: "108.5073",
-    serviceName: "Phước An, Krông Pắc, Đắk Lắk",
+    serviceName: "Krông Pắc, Đắk Lắk",
     coverageRadius: "10", timezone: "Asia/Ho_Chi_Minh",
   })
 
@@ -963,7 +963,7 @@ export default function AdminSettingsPage() {
                 <input value={areaSettings.serviceName} onChange={e=>setAreaSettings(p=>({...p,serviceName:e.target.value}))} style={{ width:"100%", padding:"10px 14px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, color:"#f0eaff", fontSize:12 }} />
               </div>
               <div style={{ marginTop:12, padding:"14px 16px", background:"rgba(74,143,245,0.06)", border:"1px solid rgba(74,143,245,0.15)", borderRadius:12 }}>
-                <div style={{ color:"#4a8ff5", fontSize:11, fontWeight:700 }}>ℹ️ Phước An, Krông Pắc, Đắk Lắk</div>
+                <div style={{ color:"#4a8ff5", fontSize:11, fontWeight:700 }}>ℹ️ Krông Pắc, Đắk Lắk</div>
                 <div style={{ color:"#6a5a40", fontSize:10, marginTop:4 }}>Tọa độ hiện tại: 12.6521°N, 108.5073°E · Múi giờ: GMT+7</div>
               </div>
             </div>

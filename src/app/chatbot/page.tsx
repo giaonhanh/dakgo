@@ -457,7 +457,7 @@ export default function ChatbotPage() {
     setMessages([{
       id:           'welcome',
       role:         'assistant',
-      content:      'Chào bạn! Mình giúp giao đồ ăn tại Phước An nhanh nhất 🍜\nHôm nay bạn muốn ăn gì?',
+      content:      'Chào bạn! Mình giúp giao đồ ăn tại Krông Pắc nhanh nhất 🍜\nHôm nay bạn muốn ăn gì?',
       quickReplies: ['🍜 Xem quán đang mở', '🍱 Cơm hộp', '☕ Cà phê', '📦 Giao hộ'],
       richContent:  [],
       actions:      [],

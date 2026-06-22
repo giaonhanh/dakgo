@@ -683,7 +683,7 @@ function LoginContent() {
                         <Field label="Tên cửa hàng" icon="🏪" placeholder="Quán Bún Bò Huế Ngon"
                           value={shopName} onChange={setShopName}
                           focused={fShop} onFocus={() => setFShop(true)} onBlur={() => setFShop(false)} />
-                        <Field label="Địa chỉ" icon="📍" placeholder="147 Trần Phú, Phước An"
+                        <Field label="Địa chỉ" icon="📍" placeholder="Krông Pắc, Đắk Lắk"
                           value={shopAddr} onChange={setShopAddr}
                           focused={fAddr} onFocus={() => setFAddr(true)} onBlur={() => setFAddr(false)} />
                         <ChipGroup label="Loại cửa hàng"

@@ -78,7 +78,7 @@ export default function TaxiPage() {
 
   // Auto-detect GPS pickup khi vào trang
   useEffect(() => {
-    if (!navigator.geolocation) { setPickupLoading(false); setPickup("Phước An, Krông Pắc"); return }
+    if (!navigator.geolocation) { setPickupLoading(false); setPickup("Krông Pắc, Đắk Lắk"); return }
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         const { latitude: lat, longitude: lng } = coords
@@ -88,7 +88,7 @@ export default function TaxiPage() {
           setPickupLoading(false)
         })
       },
-      () => { setPickup("Phước An, Krông Pắc"); setPickupLoading(false) },
+      () => { setPickup("Krông Pắc, Đắk Lắk"); setPickupLoading(false) },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     )
   // eslint-disable-next-line react-hooks/exhaustive-deps

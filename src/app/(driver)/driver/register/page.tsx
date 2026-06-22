@@ -496,7 +496,7 @@ export default function DriverRegisterPage() {
                 <div style={{ background:"rgba(255,107,0,0.07)",border:"1px solid rgba(255,107,0,0.2)",
                   borderRadius:13,padding:"12px 14px",marginBottom:10 }}>
                   <div style={{ color:"#FF8C00",fontSize:10.5,fontWeight:700,marginBottom:8 }}>Trong khi chờ, bạn có thể:</div>
-                  {["Đọc hướng dẫn tài xế mới trong app","Chuẩn bị giá đỡ điện thoại trên xe","Tìm hiểu khu vực Phước An, Krông Pắc","Kiểm tra sạc pin đầy cho thiết bị"].map((t,i)=>(
+                  {["Đọc hướng dẫn tài xế mới trong app","Chuẩn bị giá đỡ điện thoại trên xe","Tìm hiểu khu vực Krông Pắc, Đắk Lắk","Kiểm tra sạc pin đầy cho thiết bị"].map((t,i)=>(
                     <div key={i} style={{ display:"flex",gap:8,marginBottom:5 }}>
                       <span style={{ color:"#FF8C00",fontSize:12 }}>•</span>
                       <span style={{ color:"#b0956a",fontSize:10,lineHeight:1.5 }}>{t}</span>

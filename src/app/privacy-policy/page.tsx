@@ -56,7 +56,7 @@ export default function PrivacyPolicyPage() {
         Mọi thắc mắc về quyền riêng tư, vui lòng liên hệ:<br />
         📧 hongmy.daklak@gmail.com<br />
         📱 035 447 4474<br />
-        📍 Phước An, Krông Pắc, Đắk Lắk
+        📍 Krông Pắc, Đắk Lắk
       </p>
     </div>
   )

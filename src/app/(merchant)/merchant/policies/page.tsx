@@ -115,7 +115,7 @@ const SECTIONS = [
     items: [
       {
         q: "Điều kiện để được duyệt lên sàn?",
-        a: "Cửa hàng phải có địa chỉ rõ ràng tại khu vực Phước An – Krông Pắc, ảnh thực tế, menu cập nhật giá đúng và số điện thoại liên hệ hoạt động.",
+        a: "Cửa hàng phải có địa chỉ rõ ràng tại khu vực Krông Pắc, Đắk Lắk, ảnh thực tế, menu cập nhật giá đúng và số điện thoại liên hệ hoạt động.",
       },
       {
         q: "Trường hợp nào bị tạm đình chỉ?",
@@ -337,7 +337,7 @@ export default function MerchantPoliciesPage() {
           {/* Footer note */}
           <div style={{ textAlign: "center", marginTop: 20, color: "#6a5a40", fontSize: 9.5, lineHeight: 1.6 }}>
             Cập nhật lần cuối: tháng 6/2026<br />
-            DakGo — Phước An, Krông Pắc, Đắk Lắk
+            DakGo — Krông Pắc, Đắk Lắk
           </div>
 
         </div>

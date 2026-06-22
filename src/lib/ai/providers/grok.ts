@@ -5,7 +5,7 @@ import { EXTRACTION_SCHEMA, EXTRACTION_RULES } from './base'
 const GROK_BASE  = 'https://api.x.ai/v1'
 const GROK_MODEL = process.env.GROK_MODEL ?? 'grok-3-mini'
 
-const SYSTEM_PROMPT = `Bạn là module trích xuất dữ liệu đơn hàng cho app giao đồ ăn DakGo tại Phước An, Đắk Lắk.
+const SYSTEM_PROMPT = `Bạn là module trích xuất dữ liệu đơn hàng cho app giao đồ ăn DakGo tại Krông Pắc, Đắk Lắk.
 
 QUY TẮC ĐẦU RA TUYỆT ĐỐI:
 - Chỉ trả về JSON hợp lệ. Không markdown. Không giải thích. Không text thừa.
@@ -38,7 +38,7 @@ Input: "mỳ cay có cay không"
 Output: {"items":[],"shopName":null,"phone":null,"address":null,"intent":"FIND","confidence":0.88}
 
 Input: "gà rán mr ben 3 phần giao gần cây xăng phước an"
-Output: {"items":[{"name":"gà rán","quantity":3,"modifiers":[]}],"shopName":"Mr Ben","phone":null,"address":"cây xăng Phước An","intent":"ORDER","confidence":0.92}`
+Output: {"items":[{"name":"gà rán","quantity":3,"modifiers":[]}],"shopName":"Mr Ben","phone":null,"address":"cây xăng Krông Pắc","intent":"ORDER","confidence":0.92}`
 
 export class GrokProvider implements AIProvider {
   readonly name = 'grok'

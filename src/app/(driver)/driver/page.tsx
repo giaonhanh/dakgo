@@ -1575,7 +1575,7 @@ export default function DriverDashboard() {
                   <RadarRings />
                   <div style={{ textAlign:"center" }}>
                     <div style={{ color:"#FF8C00", fontSize:12, fontWeight:700 }}>Đang tìm đơn gần bạn...</div>
-                    <div style={{ color:"#6a5a40", fontSize:9, marginTop:3 }}>Phước An, Krông Pắc</div>
+                    <div style={{ color:"#6a5a40", fontSize:9, marginTop:3 }}>Krông Pắc, Đắk Lắk</div>
                   </div>
                 </motion.div>
               ) : (
@@ -1609,7 +1609,7 @@ export default function DriverDashboard() {
               display:"flex", alignItems:"center", gap:5,
             }}>
               <div style={{ width:5, height:5, borderRadius:"50%", background:online?"#3ecf6e":"#6a5a40" }} />
-              <span style={{ color:"#b0956a", fontSize:9 }}>Phước An · Krông Pắc</span>
+              <span style={{ color:"#b0956a", fontSize:9 }}>Krông Pắc, Đắk Lắk</span>
             </div>
           </div>
 

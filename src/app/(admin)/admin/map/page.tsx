@@ -280,7 +280,7 @@ export default function AdminMapPage() {
       `}</style>
       <AdminShell
         pageTitle="🗺️ Bản đồ tài xế live"
-        pageSubtitle="Phước An · Krông Pắc · Đắk Lắk · OSM"
+        pageSubtitle="Krông Pắc, Đắk Lắk · Đắk Lắk · OSM"
         actions={
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 10px", borderRadius:8, background:"rgba(62,207,110,0.1)", border:"1px solid rgba(62,207,110,0.2)" }}>

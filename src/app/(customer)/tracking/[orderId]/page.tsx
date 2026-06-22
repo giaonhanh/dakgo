@@ -52,7 +52,7 @@ const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
 const DEFAULT_LAT = 12.6830
 const DEFAULT_LNG = 108.4800
 
-// Tốc độ trung bình xe máy trong thị trấn (đã trừ hao đèn đỏ/dừng đỗ) + hệ số cung đường
+// Tốc độ trung bình xe máy trong khu vực (đã trừ hao đèn đỏ/dừng đỗ) + hệ số cung đường
 const AVG_SPEED_KMH  = 22
 const ROAD_FACTOR     = 1.3
 const PREP_BUFFER_MIN = 8    // chuẩn bị món + điều phối tài xế (trước khi "delivering")
@@ -155,7 +155,7 @@ export default function TrackingPage() {
       if (shopGeo) {
         setShopPos(shopGeo)
         // Trước khi có GPS tài xế thật, dùng vị trí quán làm marker tạm —
-        // tránh hiện nhầm toạ độ mặc định DEFAULT_LAT/DEFAULT_LNG (tâm thị trấn)
+        // tránh hiện nhầm toạ độ mặc định DEFAULT_LAT/DEFAULT_LNG (tâm xã Krông Pắc)
         setDriverPos(shopGeo)
       }
 

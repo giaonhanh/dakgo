@@ -40,7 +40,7 @@ export default function HeaderGPS() {
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 2 }}>
               <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 700, lineHeight: 1 }}>
-                Phước An, Krông Pắc
+                Krông Pắc, Đắk Lắk
               </p>
               <ChevronDown size={14} style={{ color: 'var(--acc)', marginTop: 1 }} />
             </div>

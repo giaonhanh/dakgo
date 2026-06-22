@@ -111,7 +111,8 @@
       "Bash(findstr SUPABASE_URL)",
       "Bash(findstr error *)",
       "Bash(grep -v \"^$\")",
-      "Bash(xargs grep -l \"bot\\\\|messenger\\\\|facebook\\\\|FB_PAGE\")"
+      "Bash(xargs grep -l \"bot\\\\|messenger\\\\|facebook\\\\|FB_PAGE\")",
+      "PowerShell(Get-Content \"C:\\\\Users\\\\Admin\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--Projects-giaonhanh-ai\\\\f1b93986-08b0-48f0-9790-ba2068e151e5\\\\tasks\\\\bwk4tqb7e.output\" -Wait -Tail 20 2>&1)"
     ],
     "additionalDirectories": [
       "d:\\Projects\\giaonhanh-ai\\src\\app\\(merchant)\\merchant\\print",

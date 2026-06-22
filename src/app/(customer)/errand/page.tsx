@@ -210,7 +210,7 @@ function ErrandContent() {
               <div style={{ width:8,height:8,borderRadius:"50%",background:"#FF6B00",marginTop:6,flexShrink:0,boxShadow:"0 0 8px #FF6B00" }} />
               <div style={{ flex:1 }}>
                 <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:4 }}>{tab==="buy"?"Đến cửa hàng / chợ":"Lấy hàng tại"}</div>
-                <input value={pickup} onChange={e=>setPickup(e.target.value)} placeholder={tab==="buy"?"VD: Chợ Phước An...":"Địa chỉ lấy hàng..."} style={{ width:"100%",background:"none",border:"none",color:"#f8f0e0",fontSize:11.5,padding:0 }} />
+                <input value={pickup} onChange={e=>setPickup(e.target.value)} placeholder={tab==="buy"?"VD: Chợ Krông Pắc...":"Địa chỉ lấy hàng..."} style={{ width:"100%",background:"none",border:"none",color:"#f8f0e0",fontSize:11.5,padding:0 }} />
               </div>
               <button onClick={() => setMapMode("pickup")}
                 style={{ width:28,height:28,borderRadius:8,border:"none",cursor:"pointer",

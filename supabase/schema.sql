@@ -1874,7 +1874,7 @@ INSERT INTO app_settings (key, value) VALUES
   ('pricing', '{"food":{"rows":["15000","12000","10000","9000","8000","7500","7000","6500","6000","5500"],"extra":"5000"},"delivery_pkg":{"rows":["18000","15000","12000","10000","9000","8500","8000","7500","7000","6500"],"extra":"6000"},"errand":{"rows":["20000","17000","14000","12000","11000","10000","9000","8500","8000","7500"],"extra":"7000"},"motorbike":{"rows":["10000","8000","7000","6500","6000","5500","5000","4800","4600","4500"],"extra":"4000"},"taxi":{"rows":["15000","13000","11000","10000","9500","9000","8500","8000","7500","7000"],"extra":"6500"}}'),
   ('commission', '{"defaultRate":"15","minRate":"10","maxRate":"25","driverSharePercent":"80","platformSharePercent":"20","loyaltyPointsRate":"1","driver_rate":"15","shop_rate":"15"}'),
   ('features', '{"maintenance_mode":false,"new_user_register":true,"driver_register":true,"merchant_register":true,"flash_sale":true,"loyalty_program":true,"surge_pricing":false,"ride_service":true,"errand_service":true,"wallet_topup":false}'),
-  ('area', '{"centerLat":"12.6521","centerLng":"108.5073","serviceName":"Phước An, Krông Pắc, Đắk Lắk","coverageRadius":"10"}'),
+  ('area', '{"centerLat":"12.6521","centerLng":"108.5073","serviceName":"Krông Pắc, Đắk Lắk","coverageRadius":"10"}'),
   ('delivery', '{"maxRadius":"10","rushHourMultiplier":"1.3","rainMultiplier":"1.2","minDriverRating":"4.0"}'),
   ('app_hours', '{"open":"07:00","close":"21:00"}'),
   ('weather_surcharge', '{"enabled":false,"type":"percent","value":"20"}'),

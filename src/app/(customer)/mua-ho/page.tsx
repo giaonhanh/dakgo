@@ -176,7 +176,7 @@ export default function MuaHoPage() {
               <div style={{ flex:1 }}>
                 <div style={{ color:"#6a5a40",fontSize: 11,marginBottom:3 }}>Đến mua tại (chợ / cửa hàng)</div>
                 <input value={pickup} onChange={e=>setPickup(e.target.value)}
-                  placeholder="VD: Chợ Phước An, Siêu thị Go!..."
+                  placeholder="VD: Chợ Krông Pắc, Siêu thị Go!..."
                   style={{ width:"100%",background:"none",border:"none",color:"#f8f0e0",fontSize:11.5,padding:0 }} />
               </div>
               <button onClick={() => setMapMode("pickup")}
