@@ -457,7 +457,7 @@ export default function ChatbotPage() {
     setMessages([{
       id:           'welcome',
       role:         'assistant',
-      content:      'Xin chào! Mình là Vù 👋\nMình hỗ trợ các dịch vụ tại xã Krông Pắc và các xã lân cận:\n🍜 Giao đồ ăn  •  📦 Giao hộ  •  🛒 Mua hộ  •  🏍️ Xe ôm  •  🚖 Taxi\n\nMình có thể giúp gì cho bạn?',
+      content:      'Xin chào! Mình là trợ lý ảo thông minh của DakGo 👋\nMình hỗ trợ các dịch vụ tại xã Krông Pắc và các xã lân cận:\n🍜 Giao đồ ăn  •  📦 Giao hộ  •  🛒 Mua hộ  •  🏍️ Xe ôm  •  🚖 Taxi\n\nMình có thể giúp gì cho bạn?',
       quickReplies: [],
       richContent:  [],
       actions:      [],
