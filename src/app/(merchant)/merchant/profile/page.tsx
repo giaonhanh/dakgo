@@ -341,7 +341,7 @@ export default function MerchantProfilePage() {
 
   const handleImageUpload = async (file: File, type: "logo" | "cover") => {
     if (!shopId) return
-    const [maxW, maxH] = type === "cover" ? [1200, 480] : [400, 400]
+    const [maxW, maxH] = type === "cover" ? [800, 400] : [400, 400]
     const compressed = await compressImage(file, maxW, maxH, 0.92).catch(() => file)
     const path = `${shopId}/${type}`
     const { error: upErr } = await supabase.storage.from("shops").upload(path, compressed, { upsert: true, contentType: "image/webp" })

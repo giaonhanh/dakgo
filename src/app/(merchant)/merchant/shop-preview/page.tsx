@@ -142,7 +142,7 @@ export default function ShopPreviewPage() {
     const localUrl = URL.createObjectURL(file)
     setCoverUrl(localUrl)
     setUploading("cover")
-    const compressed = await compressImage(file, 1200, 480, 0.92).catch(() => file)
+    const compressed = await compressImage(file, 800, 400, 0.92).catch(() => file)
     const path = `${shopId}/cover`
     const { error: upErr } = await supabase.storage.from("shops").upload(path, compressed, { upsert: true, contentType: "image/webp" })
     if (upErr) { fire("❌ Lỗi tải ảnh bìa: " + upErr.message); setUploading(null); return }
