@@ -80,13 +80,45 @@
       "Read(//c/Users/Admin/**)",
       "Bash(xargs grep -l \"push_subscriptions\\\\|web-push\\\\|webpush\\\\|sendNotification\\\\|notify/send\")",
       "Bash(node -e \"require\\('sharp'\\); console.log\\('sharp ok'\\)\")",
-      "PowerShell(ls \"d:\\\\Projects\\\\giaonhanh-ai\\\\public\\\\\" | Where-Object { $_.Name -match \"favicon|icon\" })"
+      "PowerShell(ls \"d:\\\\Projects\\\\giaonhanh-ai\\\\public\\\\\" | Where-Object { $_.Name -match \"favicon|icon\" })",
+      "PowerShell(cd \"d:\\\\Projects\\\\giaonhanh-ai\"; npx tsc --noEmit 2>&1; echo \"EXIT:$LASTEXITCODE\")",
+      "Skill(run)",
+      "Skill(run:*)",
+      "PowerShell(vercel --version 2>&1)",
+      "PowerShell(vercel --prod 2>&1)",
+      "Bash(mkdir -p \"d:/Projects/giaonhanh-ai/src/app/s/[slug]\")",
+      "Bash(vercel --prod)",
+      "Bash(curl -s -A \"facebookexternalhit/1.1\" \"https://www.dakgo.com/s/anvatgau\")",
+      "Bash(curl -s -A \"facebookexternalhit/1.1\" \"https://www.dakgo.com/s/quananvatgau\")",
+      "Bash(curl -s -A \"facebookexternalhit/1.1\" \"https://www.dakgo.com/s/quananvatgau\" -L -o /tmp/og_check.html)",
+      "Read(//tmp/**)",
+      "Bash(curl -sv -A \"facebookexternalhit/1.1\" \"https://www.dakgo.com/s/quananvatgau\")",
+      "Bash(curl -s -A \"facebookexternalhit/1.1\" \"https://www.dakgo.com/s/quananvatgau\" -I)",
+      "Bash(curl -s -A \"facebookexternalhit/1.1\" \"https://www.dakgo.com/s/quananvatgau\" -L)",
+      "Bash(vercel env *)",
+      "Bash(curl -s -A \"ZaloPC/2.0 \\(+https://zalo.me\\)\" \"https://www.dakgo.com/s/anvatgau\" -I)",
+      "Bash(curl -s -A \"ZaloPC/2.0\" \"https://www.dakgo.com/s/anvatgau\")",
+      "Bash(curl -s -A \"facebookexternalhit/1.1 \\(+http://www.facebook.com/externalhit_uatext.php\\)\" \"https://www.dakgo.com/s/anvatgau\")",
+      "Bash(curl -s -A \"facebookexternalhit/1.1\" \"https://www.dakgo.com/s/\" -I)",
+      "Bash(curl -s -A \"facebookexternalhit/1.1\" \"https://www.dakgo.com/s\" -I)",
+      "PowerShell(shutdown /s /t 60)",
+      "PowerShell(cd d:\\\\Projects\\\\giaonhanh-ai; npx tsc --noEmit 2>&1; Write-Host \"EXIT:$LASTEXITCODE\")",
+      "PowerShell(cd \"d:/Projects/giaonhanh-ai\"; $out = npm run build 2>&1; $out | Where-Object { $_ -match \"error|Error|Type\" } | Select-Object -First 20; Write-Host \"---EXIT---\"; $LASTEXITCODE)",
+      "Bash(find \"d:/Projects/giaonhanh-ai/src\" -path \"*/s/*\" -name \"*.tsx\" 2>/dev/null; find \"d:/Projects/giaonhanh-ai/src\" -path \"*/\\\\[slug\\\\]*\" -name \"*.tsx\" 2>/dev/null)",
+      "Read(//d/Projects/giaonhanh-ai/*/[slug/**)",
+      "Bash(xargs grep -l \"generic_template\\\\|CardResponse\")",
+      "Bash(xargs grep -l \"generic_template\\\\|sendToMessenger\\\\|fb_send\")",
+      "Bash(findstr SUPABASE_URL)",
+      "Bash(findstr error *)",
+      "Bash(grep -v \"^$\")",
+      "Bash(xargs grep -l \"bot\\\\|messenger\\\\|facebook\\\\|FB_PAGE\")"
     ],
     "additionalDirectories": [
       "d:\\Projects\\giaonhanh-ai\\src\\app\\(merchant)\\merchant\\print",
       "d:\\Projects\\giaonhanh-ai\\supabase\\migrations",
       "C:\\Users\\Admin\\Desktop\\anh app",
-      "C:\\Users\\Admin\\Desktop"
+      "C:\\Users\\Admin\\Desktop",
+      "d:\\Projects\\giaonhanh-ai\\src\\app\\s"
     ]
   }
 }
