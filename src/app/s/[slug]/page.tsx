@@ -12,10 +12,10 @@ interface Props { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  // Dùng anon client trực tiếp — crawler không có session, tránh phụ thuộc cookies
+  // Dùng service role key — crawler không có session, bypass RLS để đọc được shops
   const supabase = createAnonClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
   let { data: shop } = await supabase
     .from("shops")
