@@ -144,6 +144,46 @@ export async function buildShopCards(keyword: string, page = 0): Promise<CardRes
   const supabase = createClient()
   const PAGE_SIZE = 2  // mỗi lần show 2 quán
 
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
+
+  // Không có keyword → show tất cả quán đang mở (không qua product search)
+  if (!keyword.trim()) {
+    const { data: allShops } = await supabase
+      .from("shops")
+      .select("id, name, cover_image_url, logo_url, is_open, category, slug")
+      .eq("status", "approved")
+      .eq("is_open", true)
+      .order("rating_avg", { ascending: false })
+      .limit(20)
+
+    if (!allShops || allShops.length === 0) return null
+
+    const pagedAll   = allShops.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+    const hasMoreAll = (page + 1) * PAGE_SIZE < allShops.length
+
+    const elemAll: FBCard[] = pagedAll.map(shop => {
+      const shopUrl = shop.slug
+        ? `${APP_URL}/s/${shop.slug}`
+        : `${APP_URL}/shop/${shop.id}`
+      return {
+        title:     shop.name,
+        subtitle:  `📂 ${shop.category ?? "Xem menu tại quán"}`,
+        image_url: shop.cover_image_url ?? shop.logo_url ?? undefined,
+        buttons: [
+          { type: "postback" as const, title: "🛵 Đặt ngay", payload: `ORDER_SHOP:${shop.id}:${encodeURIComponent(shop.name)}` },
+          { type: "web_url"  as const, title: "🏪 Vào quán",  url: shopUrl },
+        ],
+      }
+    })
+
+    let introAll = allShops.length === 1
+      ? "🏪 Hiện có 1 quán đang mở bạn nhé!"
+      : `🏪 Có ${allShops.length} quán đang mở!\nBạn chọn quán nhé:`
+    if (hasMoreAll) introAll += "\n\n💬 Nhắn 'xem thêm' để xem thêm quán!"
+
+    return { type: "cards", intro: introAll, elements: elemAll, totalOpen: allShops.length, page }
+  }
+
   // Thử tìm với full keyword trước, sau đó fallback từng từ
   let products = null
   const tries = [keyword, ...keyword.split(/\s+/).filter(w => w.length >= 2)]
@@ -172,8 +212,6 @@ export async function buildShopCards(keyword: string, page = 0): Promise<CardRes
     .limit(20)
 
   if (!shops || shops.length === 0) return null
-
-  const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
 
   const elements: FBCard[] = shops.map(shop => {
     const shopProducts = products

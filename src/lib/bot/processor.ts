@@ -16,7 +16,7 @@ import { extractAndReply, INTENT_MAP, type ChatTurn } from "./extractor"
 import { detectServiceType, checkServiceAvailable } from "./service-check"
 import {
   buildShopCards,
-  type BotResponse, type TextWithWebviewResponse, type ButtonTemplateResponse, type ReceiptTemplateResponse,
+  type BotResponse, type FBButton, type TextWithWebviewResponse, type ButtonTemplateResponse, type ReceiptTemplateResponse,
   QR_SERVICE_MENU, QR_LOCATION, QR_CONFIRM_CANCEL, QR_PAYMENT,
   QR_ORDER_ACTION, QR_RESUME, makeConfirmButtons,
 } from "./cards"
@@ -440,30 +440,90 @@ export async function processPostback(senderId: string, payload: string): Promis
     const intent = intentMap[svc]
     if (!intent) return { type: "text", content: "Dịch vụ không hợp lệ 😅", quick_replies: QR_SERVICE_MENU }
 
-    const svcKey = svcKeyMap[svc]
-    if (svcKey) {
-      const status = await checkServiceAvailable(svcKey)
+    const initData = session.collected_data.phone ? { phone: session.collected_data.phone } : {}
+
+    // ── Đồ ăn: show tất cả quán đang mở ─────────────────────────────────────
+    if (svc === "food") {
+      const status = await checkServiceAvailable("food")
       if (!status.available) {
         const msg = status.customerMsg ?? "Dịch vụ tạm thời chưa hoạt động bạn ơi 😔"
         await saveMessage(senderId, "model", msg)
         return { type: "text", content: msg, quick_replies: QR_SERVICE_MENU }
       }
-    }
-
-    await saveMessage(senderId, "user", `[${labelMap[svc] ?? svc}]`)
-    const initData = session.collected_data.phone ? { phone: session.collected_data.phone } : {}
-
-    if (svc === "food") {
-      await saveSession(senderId, { state: "collecting", intent: "food_order", collected_data: initData })
-      const cards = await buildShopCards("đồ ăn", 0)
+      await saveMessage(senderId, "user", `[${labelMap.food}]`)
+      await saveSession(senderId, { state: "collecting", intent: "food_order", collected_data: initData, confusion_count: 0 })
+      const cards = await buildShopCards("", 0)
       if (cards?.elements && cards.elements.length > 0) return cards
       const msg = "🍜 Bạn muốn ăn gì? Nhắn tên món hoặc tên quán nhé!"
       await saveMessage(senderId, "model", msg)
       return { type: "text", content: msg }
     }
 
-    await saveSession(senderId, { state: "collecting", intent, collected_data: initData })
+    // ── Taxi: chọn loại xe 4 chỗ hoặc 7 chỗ ─────────────────────────────────
+    if (svc === "taxi") {
+      const [status4, status7] = await Promise.all([
+        checkServiceAvailable("taxi"),
+        checkServiceAvailable("taxi7"),
+      ])
+      const taxiBtns: FBButton[] = []
+      if (status4.available) taxiBtns.push({ type: "postback", title: "🚕 Taxi 4 chỗ", payload: "TAXI_TYPE:taxi" })
+      if (status7.available) taxiBtns.push({ type: "postback", title: "🚐 Taxi 7 chỗ", payload: "TAXI_TYPE:taxi7" })
+
+      await saveMessage(senderId, "user", "[🚕 Taxi]")
+
+      if (taxiBtns.length === 0) {
+        const msg = status4.customerMsg ?? "😔 Taxi hiện đang kín. Bạn thử Xe ôm nhé!"
+        await saveMessage(senderId, "model", msg)
+        return { type: "text", content: msg, quick_replies: QR_SERVICE_MENU }
+      }
+
+      await saveSession(senderId, { state: "collecting", intent: "taxi", collected_data: initData, confusion_count: 0 })
+
+      // Chỉ còn 1 loại → đi thẳng
+      if (taxiBtns.length === 1) {
+        const tType = taxiBtns[0].payload!.replace("TAXI_TYPE:", "")
+        await saveSession(senderId, { intent: tType })
+        return askNextField({ ...session, state: "collecting" as const, intent: tType, collected_data: initData })
+      }
+
+      const msg = "Bạn muốn đặt taxi mấy chỗ ạ? 🚕"
+      await saveMessage(senderId, "model", msg)
+      return { type: "button_template", text: msg, buttons: taxiBtns } as ButtonTemplateResponse
+    }
+
+    // ── Các dịch vụ còn lại ───────────────────────────────────────────────────
+    const svcKey = svcKeyMap[svc]
+    if (svcKey) {
+      const status = await checkServiceAvailable(svcKey)
+      if (!status.available) {
+        const msg = status.customerMsg ?? "Dịch vụ tạm thời chưa hoạt động bạn ơi 😔"
+        await saveMessage(senderId, "user", `[${labelMap[svc] ?? svc}]`)
+        await saveMessage(senderId, "model", msg)
+        return { type: "text", content: msg, quick_replies: QR_SERVICE_MENU }
+      }
+    }
+
+    await saveMessage(senderId, "user", `[${labelMap[svc] ?? svc}]`)
+    await saveSession(senderId, { state: "collecting", intent, collected_data: initData, confusion_count: 0 })
     return askNextField({ ...session, state: "collecting" as const, intent, collected_data: initData })
+  }
+
+  // ── Chọn loại taxi ─────────────────────────────────────────────────────────
+  if (payload.startsWith("TAXI_TYPE:")) {
+    const tType  = payload.slice(10)   // "taxi" hoặc "taxi7"
+    const svcKey = (tType === "taxi7" ? "taxi7" : "taxi") as Parameters<typeof checkServiceAvailable>[0]
+    const status = await checkServiceAvailable(svcKey)
+    if (!status.available) {
+      const seats = tType === "taxi7" ? "7 chỗ" : "4 chỗ"
+      const msg   = status.customerMsg ?? `😔 Taxi ${seats} hiện chưa hoạt động. Bạn chọn loại khác không?`
+      await saveMessage(senderId, "model", msg)
+      return { type: "text", content: msg }
+    }
+    const taxiLabel = tType === "taxi7" ? "🚐 Taxi 7 chỗ" : "🚕 Taxi 4 chỗ"
+    await saveMessage(senderId, "user", `[Chọn: ${taxiLabel}]`)
+    const initData = session.collected_data.phone ? { phone: session.collected_data.phone } : {}
+    await saveSession(senderId, { state: "collecting", intent: tType, collected_data: initData, confusion_count: 0 })
+    return askNextField({ ...session, state: "collecting" as const, intent: tType, collected_data: initData })
   }
 
   // ── Xác nhận / Sửa đơn hàng ───────────────────────────────────────────────
@@ -862,9 +922,17 @@ export async function processMessage(senderId: string, text: string): Promise<Bo
         // Phước An / có số nhà → thử geocode
         const coords = await tryGeocodeAddress(addrText)
         if (!coords) {
-          return sendMapLink(
-            `😔 Mình chưa tìm được "${addrText}" trên bản đồ.\n\nBạn chọn vị trí giúp mình nhé:`
-          )
+          // Không geocode được → giữ địa chỉ text, cho user xác nhận hoặc ghim bản đồ
+          await saveSession(senderId, { collected_data: newData })
+          const mapMsg = `📍 Lưu địa chỉ: "${addrText}"\n\nMình chưa tìm được vị trí này trên bản đồ.\nNhắn "đúng rồi" để dùng địa chỉ này, hoặc ghim vị trí chính xác hơn:`
+          await saveMessage(senderId, "model", mapMsg)
+          return {
+            type:          "text_with_webview",
+            content:       mapMsg,
+            buttonTitle:   "🗺️ Ghim vị trí chính xác",
+            url:           mapUrl,
+            quick_replies: QR_CONFIRM_CANCEL,
+          } as TextWithWebviewResponse
         }
 
         // Tìm được → lưu coords + hỏi xác nhận

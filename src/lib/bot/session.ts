@@ -84,7 +84,8 @@ const REQUIRED: Record<string, (keyof CollectedData)[]> = {
 }
 
 const FIELD_PRIORITY: Record<string, number> = {
-  pickup_address: 1, delivery_address: 1, dropoff_address: 1,
+  pickup_address: 0, dropoff_address: 0,  // luôn hỏi điểm đi trước
+  delivery_address: 1,
   shop_id: 2, items: 2, items_description: 2,
   phone: 3, sender_phone: 3, receiver_phone: 3,
   sender_name: 4, receiver_name: 4, customer_name: 4,

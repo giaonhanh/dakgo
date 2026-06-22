@@ -3,8 +3,165 @@
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import dynamic from "next/dynamic"
+import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/lib/categories"
+
+/* ── hours types & helpers ── */
+type TimeSlot = { from: string; to: string }
+type DayHours = { day: string; open: boolean; slots: TimeSlot[] }
+
+const DAYS_LABEL = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"]
+const DEFAULT_HOURS: DayHours[] = DAYS_LABEL.map(d => ({
+  day: d, open: true, slots: [{ from: "07:00", to: "21:00" }],
+}))
+
+function normalizeHours(raw: unknown): DayHours[] {
+  if (!raw) return DEFAULT_HOURS
+  if (Array.isArray(raw)) {
+    return (raw as DayHours[]).map(d => ({
+      day: d.day, open: d.open ?? true,
+      slots: d.slots?.length ? d.slots : [{ from: "07:00", to: "21:00" }],
+    }))
+  }
+  const obj = raw as Record<string, unknown>
+  if (obj.open && obj.close) {
+    return DAYS_LABEL.map(d => ({
+      day: d, open: true,
+      slots: [{ from: obj.open as string, to: obj.close as string }],
+    }))
+  }
+  return DEFAULT_HOURS
+}
+
+function summarizeHours(hours: DayHours[]): string {
+  const open = hours.filter(h => h.open)
+  if (!open.length) return "Nghỉ tất cả các ngày"
+  const first = open[0].slots[0]
+  const allSame = open.every(h => h.slots[0]?.from === first?.from && h.slots[0]?.to === first?.to)
+  if (allSame && first) return `${open.map(h => h.day.replace("Thứ ", "T")).join("·")}: ${first.from}–${first.to}`
+  return `${open.length}/7 ngày · ${first?.from ?? ""}–${first?.to ?? ""}`
+}
+
+const timeInputStyle: React.CSSProperties = {
+  flex: 1, height: 34, padding: "0 8px",
+  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,107,0,0.2)",
+  borderRadius: 8, color: "#f8f0e0", fontSize: 11, fontFamily: "Lexend", colorScheme: "dark",
+}
+
+function HoursToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button onClick={onToggle} style={{
+      width: 46, height: 26, borderRadius: 13, flexShrink: 0, cursor: "pointer", border: "none",
+      background: on ? "#3ecf6e" : "rgba(255,255,255,0.1)", position: "relative", transition: "background .25s",
+    }}>
+      <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 3, left: on ? 23 : 3, transition: "left .2s", boxShadow: "0 1px 4px rgba(0,0,0,0.35)" }} />
+    </button>
+  )
+}
+
+function HoursSheet({ onClose, shopId, initialHours, onSaved }: {
+  onClose: () => void; shopId: string | null
+  initialHours: DayHours[]; onSaved: (h: DayHours[]) => void
+}) {
+  const supabase = createClient()
+  const [hours,  setHours]  = useState<DayHours[]>(initialHours)
+  const [saving, setSaving] = useState(false)
+
+  const toggle     = (i: number) =>
+    setHours(h => h.map((x, j) => j === i ? { ...x, open: !x.open } : x))
+  const addSlot    = (i: number) =>
+    setHours(h => h.map((x, j) => j === i
+      ? { ...x, slots: [...x.slots, { from: "14:00", to: "21:00" }] } : x))
+  const removeSlot = (i: number, si: number) =>
+    setHours(h => h.map((x, j) => j === i
+      ? { ...x, slots: x.slots.filter((_, k) => k !== si) } : x))
+  const updateSlot = (i: number, si: number, field: keyof TimeSlot, val: string) =>
+    setHours(h => h.map((x, j) => j === i
+      ? { ...x, slots: x.slots.map((s, k) => k === si ? { ...s, [field]: val } : s) } : x))
+
+  const handleSave = async () => {
+    if (!shopId) return
+    setSaving(true)
+    const { error } = await supabase.from("shops")
+      .update({ opening_hours: hours, updated_at: new Date().toISOString() })
+      .eq("id", shopId)
+    setSaving(false)
+    if (error) { alert("Lỗi lưu: " + error.message); return }
+    onSaved(hours)
+    onClose()
+  }
+
+  return (
+    <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+      transition={{ type: "spring", damping: 26, stiffness: 280 }}
+      style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(8,8,6,0.75)",
+        backdropFilter: "blur(6px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div style={{ background: "#0e0b07", borderTop: "1px solid rgba(255,107,0,0.3)",
+        borderRadius: "22px 22px 0 0", padding: "20px 20px calc(env(safe-area-inset-bottom) + 20px)",
+        maxHeight: "88dvh", overflowY: "auto" }}>
+
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
+          <div style={{ flex: 1, color: "#f8f0e0", fontSize: 15, fontWeight: 800 }}>🕐 Giờ hoạt động từng ngày</div>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none",
+            borderRadius: 8, width: 30, height: 30, color: "#6a5a40", fontSize: 16, cursor: "pointer" }}>×</button>
+        </div>
+        <div style={{ color: "#6a5a40", fontSize: 9, marginBottom: 16 }}>
+          Mỗi ngày có thể có 2 khung giờ — VD: 07:00–11:00 và 14:00–21:00 (nghỉ trưa).
+        </div>
+
+        {hours.map((h, i) => (
+          <div key={h.day} style={{ padding: "10px 0",
+            borderBottom: i < hours.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: h.open ? 8 : 0 }}>
+              <div style={{ width: 56, color: h.open ? "#f8f0e0" : "#6a5a40",
+                fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{h.day}</div>
+              <HoursToggle on={h.open} onToggle={() => toggle(i)} />
+              {!h.open && <div style={{ color: "#6a5a40", fontSize: 10 }}>Nghỉ cả ngày</div>}
+            </div>
+            {h.open && (
+              <div style={{ paddingLeft: 66 }}>
+                {h.slots.map((slot, si) => (
+                  <div key={si} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                    <span style={{ color: "#6a5a40", fontSize: 9, width: 12 }}>{si + 1}</span>
+                    <input type="time" value={slot.from}
+                      onChange={e => updateSlot(i, si, "from", e.target.value)} style={timeInputStyle} />
+                    <span style={{ color: "#6a5a40", fontSize: 10 }}>–</span>
+                    <input type="time" value={slot.to}
+                      onChange={e => updateSlot(i, si, "to", e.target.value)} style={timeInputStyle} />
+                    {h.slots.length > 1 && (
+                      <button onClick={() => removeSlot(i, si)}
+                        style={{ width: 26, height: 26, borderRadius: 7, border: "none",
+                          background: "rgba(255,64,64,0.1)", color: "#ff4040",
+                          fontSize: 13, cursor: "pointer", flexShrink: 0 }}>×</button>
+                    )}
+                  </div>
+                ))}
+                {h.slots.length < 2 && (
+                  <button onClick={() => addSlot(i)}
+                    style={{ marginTop: 2, padding: "4px 10px", borderRadius: 7, border: "none",
+                      background: "rgba(255,255,255,0.04)", color: "#6a5a40",
+                      fontSize: 9, cursor: "pointer", fontFamily: "Lexend" }}>
+                    + Thêm khung giờ 2 (có nghỉ trưa)
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+
+        <button onClick={handleSave} disabled={saving}
+          style={{ width: "100%", height: 48, borderRadius: 14, border: "none",
+            background: saving ? "rgba(255,255,255,0.08)" : "linear-gradient(90deg,#FF6B00,#FF8C00)",
+            color: saving ? "#6a5a40" : "#fff",
+            fontSize: 13, fontWeight: 800, cursor: saving ? "not-allowed" : "pointer",
+            fontFamily: "Lexend", marginTop: 16 }}>
+          {saving ? "Đang lưu..." : "✓ Lưu giờ hoạt động"}
+        </button>
+      </div>
+    </motion.div>
+  )
+}
 
 const MapPicker = dynamic(() => import("@/components/merchant/MapPicker"), {
   ssr: false,
@@ -62,8 +219,10 @@ export default function MerchantProfilePage() {
   const origRef = useRef({ name: "", address: "" })
   const [dirty, setDirty] = useState(false)
 
+  const [hours,            setHours]            = useState<DayHours[]>(DEFAULT_HOURS)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   const [showMapPicker,    setShowMapPicker]    = useState(false)
+  const [showHours,        setShowHours]        = useState(false)
   const [toasts,           setToasts]           = useState<Toast[]>([])
 
   useEffect(() => {
@@ -75,7 +234,7 @@ export default function MerchantProfilePage() {
         const [{ data: profile }, { data: shop }] = await Promise.all([
           supabase.from("profiles").select("created_at").eq("id", user.id).single(),
           supabase.from("shops")
-            .select("id,name,phone,address,description,category,categories,is_open,rating_avg,total_reviews,commission_rate,lat,lng,logo_url,cover_image_url,slug")
+            .select("id,name,phone,address,description,category,categories,is_open,rating_avg,total_reviews,commission_rate,lat,lng,logo_url,cover_image_url,slug,opening_hours")
             .eq("owner_id", user.id)
             .single(),
         ])
@@ -104,6 +263,7 @@ export default function MerchantProfilePage() {
           }
           setLogoUrl((shop as Record<string,unknown>).logo_url as string ?? null)
           setCoverUrl((shop as Record<string,unknown>).cover_image_url as string ?? null)
+          setHours(normalizeHours((shop as Record<string,unknown>).opening_hours))
           const loadedSlug = (shop as Record<string,unknown>).slug as string ?? ""
           setSlug(loadedSlug)
           savedSlugRef.current = loadedSlug
@@ -163,18 +323,36 @@ export default function MerchantProfilePage() {
     }
   }
 
+  const compressImage = (file: File, maxW: number, maxH: number, quality: number): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width, maxH / img.height)
+        const w = Math.round(img.width * scale)
+        const h = Math.round(img.height * scale)
+        const canvas = document.createElement("canvas")
+        canvas.width = w; canvas.height = h
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h)
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error("compress failed")), "image/webp", quality)
+      }
+      img.onerror = reject
+      img.src = URL.createObjectURL(file)
+    })
+
   const handleImageUpload = async (file: File, type: "logo" | "cover") => {
     if (!shopId) return
-    const ext    = file.name.split(".").pop() ?? "jpg"
-    const path   = `${shopId}/${type}.${ext}`
-    const { error: upErr } = await supabase.storage.from("shops").upload(path, file, { upsert: true, contentType: file.type })
+    const [maxW, maxH] = type === "cover" ? [1200, 480] : [400, 400]
+    const compressed = await compressImage(file, maxW, maxH, 0.92).catch(() => file)
+    const path = `${shopId}/${type}`
+    const { error: upErr } = await supabase.storage.from("shops").upload(path, compressed, { upsert: true, contentType: "image/webp" })
     if (upErr) { addToast("❌ Lỗi upload: " + upErr.message, "error"); return }
     const { data: { publicUrl } } = supabase.storage.from("shops").getPublicUrl(path)
+    const urlWithBust = `${publicUrl}?t=${Date.now()}`
     const col = type === "logo" ? "logo_url" : "cover_image_url"
-    const { error } = await supabase.from("shops").update({ [col]: publicUrl }).eq("id", shopId)
+    const { error } = await supabase.from("shops").update({ [col]: urlWithBust }).eq("id", shopId)
     if (error) { addToast("❌ Lỗi lưu ảnh: " + error.message, "error"); return }
-    if (type === "logo") setLogoUrl(publicUrl)
-    else setCoverUrl(publicUrl)
+    if (type === "logo") setLogoUrl(urlWithBust)
+    else setCoverUrl(urlWithBust)
     addToast(type === "logo" ? "✅ Đã cập nhật ảnh đại diện" : "✅ Đã cập nhật ảnh bìa")
   }
 
@@ -468,6 +646,20 @@ export default function MerchantProfilePage() {
             </div>
           </div>
 
+          {/* Giờ hoạt động */}
+          <div style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:14,marginBottom:10 }}>
+            <div style={{ color:"#6a5a40",fontSize:10,fontWeight:600,marginBottom:10 }}>LỊCH HOẠT ĐỘNG</div>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+              <div>
+                <div style={{ color:"#f8f0e0",fontSize:12,fontWeight:600,marginBottom:2 }}>🕐 Giờ mở cửa từng ngày</div>
+                <div style={{ color:"#6a5a40",fontSize:10 }}>{summarizeHours(hours)}</div>
+              </div>
+              <button onClick={() => setShowHours(true)}
+                style={{ padding:"7px 14px",borderRadius:10,background:"rgba(255,107,0,0.1)",border:"1px solid rgba(255,107,0,0.28)",color:"#FF8C00",fontSize:10,fontWeight:700,cursor:"pointer",flexShrink:0 }}>
+                Chỉnh sửa
+              </button>
+            </div>
+          </div>
 
         </div>
 
@@ -503,6 +695,18 @@ export default function MerchantProfilePage() {
           </div>
         </>
       )}
+
+      {/* Hours sheet */}
+      <AnimatePresence>
+        {showHours && (
+          <HoursSheet
+            onClose={() => setShowHours(false)}
+            shopId={shopId}
+            initialHours={hours}
+            onSaved={h => { setHours(h); addToast("✅ Đã lưu giờ hoạt động") }}
+          />
+        )}
+      </AnimatePresence>
     </>
   )
 }

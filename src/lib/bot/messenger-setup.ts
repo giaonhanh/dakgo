@@ -20,6 +20,16 @@ export async function setupMessengerProfile(pageToken: string) {
   // Gửi 1 request duy nhất — get_started + persistent_menu cùng lúc
   const result = await fbProfilePost({
     get_started: { payload: "GET_STARTED" },
+    greeting: [
+      {
+        locale: "default",
+        text:   "Chào {{user_first_name}}! 👋\nMình là trợ lý ảo của DakGo — giao đồ ăn · Giao Hộ · Mua hộ · Xe ôm · Taxi tại xã Krông Pắc 🛵\n\nBấm Bắt đầu để đặt dịch vụ nhé!",
+      },
+      {
+        locale: "vi_VN",
+        text:   "Chào {{user_first_name}}! 👋\nMình là trợ lý ảo của DakGo — giao đồ ăn · Giao Hộ · Mua hộ · Xe ôm · Taxi tại xã Krông Pắc 🛵\n\nBấm Bắt đầu để đặt dịch vụ nhé!",
+      },
+    ],
     ice_breakers: [
       { question: "🍜 Tôi muốn đặt đồ ăn",      payload: "SERVICE:food" },
       { question: "🛵 Đặt xe ôm hoặc taxi",       payload: "SERVICE:motorbike" },

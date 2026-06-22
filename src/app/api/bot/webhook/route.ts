@@ -225,6 +225,7 @@ async function handleEvents(body: Record<string, unknown>) {
         const message = event.message as {
           text?: string
           is_echo?: boolean
+          quick_reply?: { payload: string }
           attachments?: Array<{
             type: string
             payload: { coordinates?: { lat: number; long: number } }
@@ -238,6 +239,13 @@ async function handleEvents(body: Record<string, unknown>) {
         if (locationAttachment?.payload?.coordinates) {
           const { lat, long: lng } = locationAttachment.payload.coordinates
           const reply = await processLocation(senderId, lat, lng)
+          await sendBotResponse(senderId, reply)
+          continue
+        }
+
+        // Quick reply — dùng payload thay vì text (tránh emoji/title gây nhầm)
+        if (message.quick_reply?.payload) {
+          const reply = await processPostback(senderId, message.quick_reply.payload)
           await sendBotResponse(senderId, reply)
           continue
         }
