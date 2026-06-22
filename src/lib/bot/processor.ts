@@ -15,7 +15,7 @@ import { guard, sanitizeReply } from "./guard"
 import { extractAndReply, INTENT_MAP, type ChatTurn } from "./extractor"
 import { detectServiceType, checkServiceAvailable } from "./service-check"
 import {
-  buildShopCards,
+  buildShopCards, buildFoodCategoryMessage,
   type BotResponse, type FBButton, type TextWithWebviewResponse, type ButtonTemplateResponse, type ReceiptTemplateResponse,
   QR_SERVICE_MENU, QR_LOCATION, QR_CONFIRM_CANCEL, QR_PAYMENT,
   QR_ORDER_ACTION, QR_RESUME, makeConfirmButtons,
@@ -452,7 +452,7 @@ export async function processPostback(senderId: string, payload: string): Promis
 
     const initData = session.collected_data.phone ? { phone: session.collected_data.phone } : {}
 
-    // ── Đồ ăn: show tất cả quán đang mở ─────────────────────────────────────
+    // ── Đồ ăn: hỏi danh mục trước ───────────────────────────────────────────
     if (svc === "food") {
       const status = await checkServiceAvailable("food")
       if (!status.available) {
@@ -462,11 +462,9 @@ export async function processPostback(senderId: string, payload: string): Promis
       }
       await saveMessage(senderId, "user", `[${labelMap.food}]`)
       await saveSession(senderId, { state: "collecting", intent: "food_order", collected_data: initData, confusion_count: 0 })
-      const cards = await buildShopCards("", 0)
-      if (cards?.elements && cards.elements.length > 0) return cards
-      const msg = "🍜 Bạn muốn ăn gì? Nhắn tên món hoặc tên quán nhé!"
-      await saveMessage(senderId, "model", msg)
-      return { type: "text", content: msg }
+      const catMsg = await buildFoodCategoryMessage()
+      await saveMessage(senderId, "model", catMsg.content)
+      return catMsg
     }
 
     // ── Taxi: chọn loại xe 4 chỗ hoặc 7 chỗ ─────────────────────────────────
@@ -614,6 +612,20 @@ export async function processPostback(senderId: string, payload: string): Promis
   }
 
   // ── Shop / Product selection ───────────────────────────────────────────────
+  // ── Chọn danh mục đồ ăn ──────────────────────────────────────────────────
+  if (payload.startsWith("CATEGORY:")) {
+    const cat      = payload.slice(9)  // rỗng = tất cả, "bun-pho" = lọc theo danh mục
+    const keyword  = cat ? `cat:${cat}` : ""
+    const cards    = await buildShopCards(keyword, 0)
+    if (cards?.elements?.length) return cards
+    const msg = cat
+      ? `😔 Danh mục này chưa có quán nào đang mở bạn ơi!\nBạn thử chọn danh mục khác nhé:`
+      : "😔 Hiện chưa có quán nào đang mở bạn ơi!"
+    await saveMessage(senderId, "model", msg)
+    const catMsg = await buildFoodCategoryMessage()
+    return { ...catMsg, content: msg }
+  }
+
   if (payload.startsWith("ORDER_SHOP:")) {
     const parts    = payload.split(":")
     const shopId   = parts[1]

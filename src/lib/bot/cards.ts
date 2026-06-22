@@ -141,49 +141,84 @@ export function makeConfirmButtons(intent: string): FBButton[] {
   ]
 }
 
+const CATEGORY_LABEL: Record<string, string> = {
+  "bun-pho":  "🍜 Bún/Phở",
+  "com-hop":  "🍱 Cơm hộp",
+  "lau-nuong":"🔥 Lẩu/Nướng",
+  "an-vat":   "🍢 Ăn vặt",
+  "ca-phe":   "☕ Cà phê",
+  "khac":     "🍽️ Khác",
+}
+
+export async function buildFoodCategoryMessage(): Promise<TextResponse> {
+  const supabase = createClient()
+  const { data: shops } = await supabase
+    .from("shops")
+    .select("category")
+    .eq("status", "approved")
+    .eq("is_open", true)
+
+  const cats = [...new Set(shops?.map(s => s.category as string).filter(Boolean) ?? [])]
+
+  const chips: QuickReply[] = cats.map(cat => ({
+    content_type: "text" as const,
+    title: CATEGORY_LABEL[cat] ?? `📂 ${cat}`,
+    payload: `CATEGORY:${cat}`,
+  }))
+  chips.push({ content_type: "text" as const, title: "📋 Tất cả quán", payload: "CATEGORY:" })
+
+  return {
+    type: "text",
+    content: "Bạn muốn ăn gì? 😋\nChọn danh mục bên dưới hoặc nhắn tên món/quán nhé!",
+    quick_replies: chips,
+  }
+}
+
 export async function buildShopCards(keyword: string, page = 0): Promise<CardResponse | null> {
   const supabase = createClient()
   const PAGE_SIZE = 2  // mỗi lần show 2 quán
 
   const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
 
-  // Không có keyword → show tất cả quán đang mở (không qua product search)
-  if (!keyword.trim()) {
-    const { data: allShops } = await supabase
+  const makeCard = (shop: { id: string; name: string; cover_image_url: string | null; logo_url: string | null; category: string | null; slug: string | null }): FBCard => {
+    const shopUrl = shop.slug ? `${APP_URL}/s/${shop.slug}` : `${APP_URL}/shop/${shop.id}`
+    return {
+      title:     shop.name,
+      subtitle:  CATEGORY_LABEL[shop.category ?? ""] ?? `📂 ${shop.category ?? "Xem menu"}`,
+      image_url: shop.cover_image_url ?? shop.logo_url ?? undefined,
+      buttons: [
+        { type: "postback" as const, title: "🛵 Đặt ngay", payload: `ORDER_SHOP:${shop.id}:${encodeURIComponent(shop.name)}` },
+        { type: "web_url"  as const, title: "🏪 Vào quán",  url: shopUrl },
+      ],
+    }
+  }
+
+  // Lọc theo danh mục (prefix cat:) hoặc tất cả quán (keyword rỗng)
+  if (!keyword.trim() || keyword.startsWith("cat:")) {
+    const category = keyword.startsWith("cat:") ? keyword.slice(4) : null
+    let q = supabase
       .from("shops")
       .select("id, name, cover_image_url, logo_url, is_open, category, slug")
       .eq("status", "approved")
       .eq("is_open", true)
       .order("rating_avg", { ascending: false })
       .limit(20)
+    if (category) q = q.eq("category", category)
 
+    const { data: allShops } = await q
     if (!allShops || allShops.length === 0) return null
 
-    const pagedAll   = allShops.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-    const hasMoreAll = (page + 1) * PAGE_SIZE < allShops.length
+    const paged   = allShops.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+    const hasMore = (page + 1) * PAGE_SIZE < allShops.length
 
-    const elemAll: FBCard[] = pagedAll.map(shop => {
-      const shopUrl = shop.slug
-        ? `${APP_URL}/s/${shop.slug}`
-        : `${APP_URL}/shop/${shop.id}`
-      return {
-        title:     shop.name,
-        subtitle:  `📂 ${shop.category ?? "Xem menu tại quán"}`,
-        image_url: shop.cover_image_url ?? shop.logo_url ?? undefined,
-        buttons: [
-          { type: "postback" as const, title: "🛵 Đặt ngay", payload: `ORDER_SHOP:${shop.id}:${encodeURIComponent(shop.name)}` },
-          { type: "web_url"  as const, title: "🏪 Vào quán",  url: shopUrl },
-        ],
-      }
-    })
-
-    const introAll = allShops.length === 1
-      ? "🏪 Hiện có 1 quán đang mở bạn nhé!"
-      : `🏪 Có ${allShops.length} quán đang mở!\nBạn chọn quán nhé:`
+    const catLabel = category ? (CATEGORY_LABEL[category] ?? category) : ""
+    const intro = allShops.length === 1
+      ? `🏪 Có 1 quán ${catLabel} đang mở bạn nhé!`
+      : `🏪 Có ${allShops.length} quán${catLabel ? ` ${catLabel}` : ""} đang mở!\nBạn chọn quán nhé:`
 
     return {
-      type: "cards", intro: introAll, elements: elemAll, totalOpen: allShops.length, page,
-      quick_replies: hasMoreAll ? [{ content_type: "text" as const, title: "📋 Xem thêm quán", payload: `MORE_SHOPS:${page + 1}:` }] : undefined,
+      type: "cards", intro, elements: paged.map(makeCard), totalOpen: allShops.length, page,
+      quick_replies: hasMore ? [{ content_type: "text" as const, title: "📋 Xem thêm quán", payload: `MORE_SHOPS:${page + 1}:${encodeURIComponent(keyword)}` }] : undefined,
     }
   }
 
