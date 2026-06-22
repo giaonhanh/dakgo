@@ -598,8 +598,11 @@ export default function ChatbotPage() {
   }
 
   function handleCheckoutComplete() {
+    if (checkoutSheet) {
+      sessionStorage.setItem('chatbot_checkout', JSON.stringify(checkoutSheet))
+    }
     setCheckoutSheet(null)
-    router.push('/checkout')
+    router.push('/chatbot/checkout')
   }
 
   function handleReset() {

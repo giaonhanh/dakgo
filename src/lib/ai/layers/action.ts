@@ -200,7 +200,7 @@ export function decideAction(inp: ActionInput): ActionDecision {
       return {
         action: {
           type: 'CHECKOUT',
-          payload: { items: ctx.items, address: ctx.address, phone: ctx.phone, total },
+          payload: { items: ctx.items, shopId: ctx.shopId, shopName: ctx.shopName, address: ctx.address, phone: ctx.phone, total },
         },
         extraActions: [],
         reply:        '',
@@ -268,7 +268,7 @@ export function decideAction(inp: ActionInput): ActionDecision {
     return {
       action: {
         type: 'CHECKOUT',
-        payload: { items: ctx.items, address: ctx.address, phone: ctx.phone, total, mode: 'auto' },
+        payload: { items: ctx.items, shopId: ctx.shopId, shopName: ctx.shopName, address: ctx.address, phone: ctx.phone, total, mode: 'auto' },
       },
       extraActions: [],
       reply:        '',
@@ -348,7 +348,7 @@ export function decideAction(inp: ActionInput): ActionDecision {
     return {
       action: {
         type: 'CHECKOUT',
-        payload: { items: ctx.items, address: ctx.address, phone: ctx.phone, total },
+        payload: { items: ctx.items, shopId: ctx.shopId, shopName: ctx.shopName, address: ctx.address, phone: ctx.phone, total },
       },
       extraActions: [],
       reply:        '',

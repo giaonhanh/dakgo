@@ -24,12 +24,13 @@ export function formatForWeb(output: PipelineOutput, sessionId: string): UIRespo
 
       case 'SHOW_ORDER_CARD':
       case 'CHECKOUT': {
-        type ItemLike = { productName: string; quantity: number; price: number; modifiers?: string[] }
+        type ItemLike = { productId?: string; productName: string; quantity: number; price: number; modifiers?: string[]; note?: string | null }
         const items    = (action.payload?.items ?? []) as ItemLike[]
         const total    = typeof action.payload?.total === 'number' ? action.payload.total : 0
         const mode     = action.payload?.mode === 'auto' ? 'auto' : 'confirm'
         const address  = action.payload?.address as string | null ?? null
         const phone    = action.payload?.phone as string | null ?? null
+        const shopId   = action.payload?.shopId as string ?? ''
         const shopName = action.payload?.shopName as string ?? ''
 
         if (action.type === 'SHOW_ORDER_CARD') {
@@ -49,11 +50,16 @@ export function formatForWeb(output: PipelineOutput, sessionId: string): UIRespo
             type: 'checkout_sheet',
             data: {
               items: items.map(i => ({
-                name: i.productName, quantity: i.quantity, price: i.price,
+                productId: i.productId ?? '',
+                name:      i.productName,
+                quantity:  i.quantity,
+                price:     i.price,
                 modifiers: i.modifiers ?? [],
+                note:      i.note ?? null,
               })),
+              shopId,
               shopName,
-              address: address ?? '',
+              address:     address ?? '',
               phone,
               subtotal:    total,
               deliveryFee: DELIVERY_FEE,

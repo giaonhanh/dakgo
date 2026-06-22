@@ -202,13 +202,14 @@ export interface OrderCardData {
 }
 
 export interface CheckoutSheetData {
-  items:      Array<{ name: string; quantity: number; price: number; modifiers: string[] }>
-  shopName:   string
-  address:    string
-  phone:      string | null
-  subtotal:   number
+  items:       Array<{ productId: string; name: string; quantity: number; price: number; modifiers: string[]; note?: string | null }>
+  shopId:      string
+  shopName:    string
+  address:     string
+  phone:       string | null
+  subtotal:    number
   deliveryFee: number
-  total:      number
+  total:       number
 }
 
 export interface CartPreviewData {
