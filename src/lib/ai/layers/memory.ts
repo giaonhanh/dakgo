@@ -72,7 +72,7 @@ export async function persistTurn(
 ): Promise<void> {
   const supabase = sb()
 
-  await Promise.all([
+  const [msgResult, ctxResult] = await Promise.all([
     supabase.from('chat_messages').insert([
       { session_id: sessionId, role: 'user',      content: userMsg,  metadata: {} },
       { session_id: sessionId, role: 'assistant', content: assistMsg, metadata },
@@ -83,6 +83,8 @@ export async function persistTurn(
       last_message_at: new Date().toISOString(),
     }).eq('id', sessionId),
   ])
+  if (msgResult.error)  console.error('[L9] persist messages fail:', msgResult.error.message)
+  if (ctxResult.error)  console.error('[L9] persist context fail:', ctxResult.error.message)
 }
 
 export async function resetSession(sessionKey: string): Promise<void> {

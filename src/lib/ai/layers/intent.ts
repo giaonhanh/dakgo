@@ -17,6 +17,7 @@ const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
     intent: 'CANCEL',
     regexes: [
       /^(thôi|hủy|không (đặt|mua|cần|lấy)|cancel|stop)(\s|$|[!?])/i,
+      /^hủy\s*(đơn|hết|tất|toàn bộ)?(\s|$)/i,
       /đặt lại từ đầu|làm lại từ đầu|bắt đầu lại/i,
     ],
   },
@@ -60,6 +61,8 @@ const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
       // Động từ đặt hàng
       /\b(đặt|order|mua|thêm|lấy|cho (tôi|mình|em|con))\b/i,
       /\b(muốn (ăn|uống|order|đặt))\b/i,
+      // "đặt lại" theo sau bởi tên món = đặt mới
+      /^đặt lại\s+\w/i,
       // Số lượng + đơn vị
       /\d+\s*(phần|tô|ly|hộp|cái|gói|chai|suất|bịch|dĩa|đĩa|tô|bát|khẩu phần)/i,
       // Format "Tên — 35k" từ quick reply

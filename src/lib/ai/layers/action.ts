@@ -31,10 +31,10 @@ export function decideAction(inp: ActionInput): ActionDecision {
   // ── Competitor mention ────────────────────────────────────────────────────────
   if (isCompetitor) {
     return {
-      action:       { type: 'SHOW_PRODUCTS', payload: { products: [] } },
+      action:       { type: 'SHOW_SHOP', payload: { shops: shopResults.slice(0, 3) } },
       extraActions: [],
-      reply:        'DakGo phục vụ riêng Krông Pắc — giao nhanh hơn, giá tốt hơn 🍜',
-      quickReplies: ['🍜 Xem quán đang mở', '🍱 Cơm', '☕ Cà phê'],
+      reply:        'DakGo giao tại Krông Pắc, nhanh và giá tốt hơn 🍜 Gõ tên món là đặt được ngay!',
+      quickReplies: [],
     }
   }
 
@@ -43,18 +43,18 @@ export function decideAction(inp: ActionInput): ActionDecision {
     return {
       action:       { type: 'HUMAN_HANDOFF' },
       extraActions: [],
-      reply:        'Mình chỉ hỗ trợ đặt đồ ăn thôi nhé 🍜',
-      quickReplies: ['🍜 Xem quán', '🍱 Cơm hộp'],
+      reply:        'Mình chỉ hỗ trợ đặt đồ ăn và dịch vụ giao hàng tại Krông Pắc thôi nhé',
+      quickReplies: [],
     }
   }
 
   // ── GREET ────────────────────────────────────────────────────────────────────
   if (intent === 'GREET') {
     return {
-      action:       { type: 'SHOW_PRODUCTS', payload: { products: [] } },
+      action:       { type: 'SHOW_SHOP', payload: { shops: shopResults.slice(0, 3) } },
       extraActions: [],
       reply:        'Chào! Gõ tên món muốn ăn là mình lo ngay 🍜',
-      quickReplies: ['🍜 Xem quán đang mở', '🍱 Cơm', '☕ Cà phê', '🍜 Bún phở'],
+      quickReplies: [],
     }
   }
 
@@ -63,22 +63,20 @@ export function decideAction(inp: ActionInput): ActionDecision {
     return {
       action:       { type: 'HUMAN_HANDOFF' },
       extraActions: [],
-      reply:        'Đã hủy 👍',
-      quickReplies: ['🍜 Đặt lại'],
+      reply:        'Đã hủy. Muốn đặt lại thì gõ tên món nhé!',
+      quickReplies: [],
     }
   }
 
   // ── MODIFY_CART ───────────────────────────────────────────────────────────────
   if (intent === 'MODIFY_CART') {
     return {
-      action:       { type: 'SHOW_PRODUCTS', payload: { products: ctx.items.length > 0 ? [] : productResults.slice(0, 6) } },
+      action:       { type: 'SHOW_PRODUCTS', payload: { products: productResults.slice(0, 6) } },
       extraActions: [],
       reply:        ctx.items.length > 0
-        ? `Đang có: ${buildItemSummary(ctx)} — bạn muốn sửa gì?`
-        : 'Giỏ hàng đang trống. Bạn muốn đặt gì?',
-      quickReplies: ctx.items.length > 0
-        ? ['🗑️ Xóa hết', '➕ Thêm món']
-        : ['🍜 Xem quán'],
+        ? `Đang có: ${buildItemSummary(ctx)} — gõ món muốn sửa/thêm/bỏ`
+        : 'Giỏ đang trống, gõ tên món muốn đặt',
+      quickReplies: [],
     }
   }
 
@@ -178,8 +176,10 @@ export function decideAction(inp: ActionInput): ActionDecision {
     return {
       action:       { type: 'SHOW_SHOP', payload: { shops: shopResults.slice(0, 5) } },
       extraActions: [],
-      reply:        'Bạn muốn ăn gì? Gõ tên món hoặc chọn quán 👇',
-      quickReplies: ['🍜 Bún phở', '🍱 Cơm', '☕ Cà phê', '🔥 Lẩu'],
+      reply:        shopResults.length > 0
+        ? 'Gõ tên món muốn ăn — ví dụ "2 tô phở bò" hoặc "1 cơm gà":'
+        : 'Chưa có quán nào mở lúc này, thử lại sau nhé!',
+      quickReplies: [],
     }
   }
 
@@ -188,7 +188,7 @@ export function decideAction(inp: ActionInput): ActionDecision {
     return {
       action:       { type: 'ASK_LOCATION' },
       extraActions: [],
-      reply:        `${buildItemSummary(ctx)} — giao đến đâu? 📍`,
+      reply:        `${buildItemSummary(ctx)} — giao đến địa chỉ nào?`,
       quickReplies: ['📍 Vị trí của tôi'],
     }
   }
@@ -198,8 +198,8 @@ export function decideAction(inp: ActionInput): ActionDecision {
     return {
       action:       { type: 'SHOW_PRODUCTS', payload: {} },
       extraActions: [],
-      reply:        validation.issues[0],
-      quickReplies: ['🔄 Chọn quán khác'],
+      reply:        validation.issues[0] + ' — gõ tên món khác để tìm quán khác nhé',
+      quickReplies: [],
     }
   }
 

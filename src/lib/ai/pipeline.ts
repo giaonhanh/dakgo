@@ -43,9 +43,9 @@ export async function runPipeline(
   }
   if (gate.isCompetitor) {
     return formatForWeb({
-      reply:          'DakGo phục vụ riêng khu vực Krông Pắc — giao nhanh hơn, giá tốt hơn 🍜 Bạn muốn đặt gì?',
+      reply:          'DakGo giao tại Krông Pắc, nhanh và giá tốt hơn 🍜 Gõ tên món là đặt được ngay!',
       actions:        [],
-      quickReplies:   ['🍜 Xem quán đang mở', '🍱 Cơm hộp', '☕ Cà phê'],
+      quickReplies:   [],
       updatedContext: ctx,
       blocked:        false,
       confidence:     0,
@@ -192,7 +192,7 @@ function blocked(reason: string): PipelineOutput {
   return {
     reply:          reason,
     actions:        [],
-    quickReplies:   ['🍜 Đặt đồ ăn', '📦 Giao hộ'],
+    quickReplies:   [],
     updatedContext: EMPTY_CONTEXT,
     blocked:        true,
     confidence:     0,
