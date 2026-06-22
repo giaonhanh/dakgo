@@ -28,14 +28,20 @@ export async function loadOrCreateSession(sessionKey: string): Promise<ChatSessi
     }
   }
 
-  const { data: created } = await supabase
+  const { data: created, error } = await supabase
     .from('chat_sessions')
     .insert({ session_key: sessionKey, context: EMPTY_CONTEXT, message_count: 0 })
     .select('id, session_key, context, message_count')
     .single()
 
+  if (!created || error) {
+    console.error('[memory] Failed to create session:', error)
+    // Return a temporary in-memory session so pipeline can still run
+    return { id: crypto.randomUUID(), sessionKey, context: EMPTY_CONTEXT, messageCount: 0 }
+  }
+
   return {
-    id:           created!.id,
+    id:           created.id,
     sessionKey,
     context:      EMPTY_CONTEXT,
     messageCount: 0,

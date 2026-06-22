@@ -3,11 +3,19 @@ import type { Intent, PipelineInput } from '../types'
 
 const PATTERNS: Array<{ intent: Intent; regexes: RegExp[] }> = [
   {
+    intent: 'CONFIRM_ORDER',
+    regexes: [
+      /^✅\s*(đặt ngay|xác nhận|đồng ý|ok)$/i,
+      /^(đặt ngay|xác nhận đặt|đồng ý đặt|đặt luôn)$/i,
+    ],
+  },
+  {
     intent: 'ORDER_FOOD',
     regexes: [
       /\b(đặt|order|mua|thêm|lấy|cho (tôi|mình|em))\b/i,
       /\b(muốn (ăn|uống|order))\b/i,
       /\d+\s*(phần|tô|ly|hộp|cái|gói|chai|suất|bịch)/i,
+      /^.+\s*[–—-]\s*\d+k$/i,  // quick reply format "Bún bò — 35k"
     ],
   },
   {

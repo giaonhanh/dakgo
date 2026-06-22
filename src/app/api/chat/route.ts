@@ -11,8 +11,15 @@ export async function POST(req: Request) {
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
       return NextResponse.json({ error: 'Tin nhắn không hợp lệ' }, { status: 400 })
     }
-    if (!sessionKey || typeof sessionKey !== 'string') {
+    if (message.trim().length > 500) {
+      return NextResponse.json({ error: 'Tin nhắn quá dài' }, { status: 400 })
+    }
+    if (!sessionKey || typeof sessionKey !== 'string' || sessionKey.length > 64) {
       return NextResponse.json({ error: 'Thiếu sessionKey' }, { status: 400 })
+    }
+    // Validate UUID format (v4)
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionKey)) {
+      return NextResponse.json({ error: 'sessionKey không hợp lệ' }, { status: 400 })
     }
 
     const result = await runPipeline(message.trim(), sessionKey.trim())

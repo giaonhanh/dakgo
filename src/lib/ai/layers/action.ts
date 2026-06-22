@@ -44,8 +44,8 @@ export function decideAction(inp: ActionInput): ActionDecision {
     return {
       action:       { type: 'SHOW_PRODUCTS', payload: { products: [] } },
       extraActions: [],
-      reply:        'Chào bạn! Mình là DakGo AI 🤖\nBạn muốn đặt đồ ăn, giao hộ hay đặt xe ôm?',
-      quickReplies: ['🍜 Đặt đồ ăn', '📦 Giao hộ', '🛵 Xe ôm', '🚕 Taxi'],
+      reply:        'Chào bạn! Mình giúp giao đồ ăn tại Phước An nhanh nhất 🍜\nHôm nay bạn muốn ăn gì?',
+      quickReplies: ['🍜 Xem quán đang mở', '🍱 Cơm hộp', '☕ Cà phê', '📦 Giao hộ'],
     }
   }
 
@@ -59,6 +59,20 @@ export function decideAction(inp: ActionInput): ActionDecision {
     }
   }
 
+  // CONFIRM_ORDER — user bấm "✅ Đặt ngay" khi đủ thông tin
+  if (intent === 'CONFIRM_ORDER' && ctx.items.length > 0 && missingField === null) {
+    const total = ctx.items.reduce((s, i) => s + i.price * i.quantity, 0)
+    return {
+      action: {
+        type: 'CHECKOUT',
+        payload: { items: ctx.items, address: ctx.address, phone: ctx.phone, total },
+      },
+      extraActions: [],
+      reply:        '✅ Xác nhận đặt hàng! Đang chuyển sang thanh toán...',
+      quickReplies: [],
+    }
+  }
+
   // FIND_SHOP — không có items, chỉ tìm quán
   if (intent === 'FIND_SHOP' && ctx.items.length === 0) {
     const shops = shopResults.slice(0, 4)
@@ -66,9 +80,13 @@ export function decideAction(inp: ActionInput): ActionDecision {
       action:       { type: 'SHOW_SHOP', payload: { shops } },
       extraActions: [],
       reply:        shops.length > 0
-        ? `Mình tìm được ${shopResults.length} quán đang mở! Chọn quán bạn thích:`
+        ? shops.length === 1
+          ? `Tìm được 1 quán đang mở! Chọn bạn thích:`
+          : `Tìm được ${shops.length} quán đang mở! Chọn bạn thích:`
         : 'Hiện chưa có quán nào đang mở. Bạn thử lại sau nhé!',
-      quickReplies: shops.map(s => s.name),
+      quickReplies: shops.length > 0
+        ? ['☕ Cà phê', '🍜 Bún phở', '🍱 Cơm hộp', '🔥 Lẩu nướng']
+        : ['🔄 Thử lại sau'],
     }
   }
 
@@ -86,10 +104,10 @@ export function decideAction(inp: ActionInput): ActionDecision {
   if (ctx.items.length === 0 && ctx.shopId && productResults.length > 0) {
     const shopName = ctx.shopName ?? 'quán'
     return {
-      action:       { type: 'SHOW_PRODUCTS', payload: { products: productResults.slice(0, 6) } },
+      action:       { type: 'SHOW_PRODUCTS', payload: { products: productResults.slice(0, 8) } },
       extraActions: [],
-      reply:        `Menu ${shopName}:\nNhắn tên món hoặc tap nút "+" để thêm vào giỏ nhé! 👇`,
-      quickReplies: productResults.slice(0, 4).map(p => `${p.name} — ${(p.price/1000).toFixed(0)}k`),
+      reply:        `Menu ${shopName} — tap "+" để thêm vào giỏ 👇`,
+      quickReplies: ['🔍 Tìm món khác', '🏪 Đổi quán'],
     }
   }
 
@@ -100,14 +118,14 @@ export function decideAction(inp: ActionInput): ActionDecision {
         action:       { type: 'SHOW_PRODUCTS', payload: { products: productResults.slice(0, 4) } },
         extraActions: [],
         reply:        'Mình tìm được mấy món này, bạn xem có ưng không?',
-        quickReplies: productResults.slice(0, 4).map(p => `${p.name} — ${(p.price/1000).toFixed(0)}k`),
+        quickReplies: ['🍜 Xem thêm quán', '🍱 Cơm hộp', '🧋 Trà sữa'],
       }
     }
     return {
       action:       { type: 'SHOW_PRODUCTS', payload: { products: [] } },
       extraActions: [],
-      reply:        'Bạn muốn đặt gì? Nhắn tên món hoặc xem quán gần đây nhé 😋',
-      quickReplies: ['🍜 Xem quán gần đây', '🍱 Cơm hộp', '🧋 Trà sữa', '🔥 Lẩu/Nướng'],
+      reply:        'Bạn muốn ăn gì? Nhắn tên món hoặc chọn danh mục nhé 😋',
+      quickReplies: ['🍜 Xem quán đang mở', '🍱 Cơm hộp', '🧋 Trà sữa', '🔥 Lẩu/Nướng'],
     }
   }
 
@@ -115,9 +133,9 @@ export function decideAction(inp: ActionInput): ActionDecision {
   if (missingField === 'address') {
     return {
       action:       { type: 'ASK_LOCATION' },
-      extraActions: [{ type: 'ADD_TO_CART', payload: { items: ctx.items } }],
-      reply:        buildCartSummary(ctx) + '\n\nGiao đến đâu bạn? Nhắn địa chỉ hoặc ghim vị trí nhé:',
-      quickReplies: ['📍 Ghim vị trí'],
+      extraActions: [],
+      reply:        buildCartSummary(ctx) + '\n\nGiao đến đâu bạn? 📍\nNhắn địa chỉ (VD: "số 5 Lê Lợi") hoặc dùng vị trí hiện tại:',
+      quickReplies: ['📍 Vị trí của tôi', '✍️ Nhắn địa chỉ'],
     }
   }
 
@@ -126,8 +144,8 @@ export function decideAction(inp: ActionInput): ActionDecision {
     return {
       action:       { type: 'ASK_PHONE' },
       extraActions: [],
-      reply:        'Gần xong rồi! Số điện thoại để tài xế liên hệ là gì bạn? 📞',
-      quickReplies: [],
+      reply:        'Gần xong rồi! 📞 Số điện thoại để tài xế liên hệ?\n(VD: 0901 234 567)',
+      quickReplies: ['⏩ Bỏ qua'],
     }
   }
 
@@ -155,10 +173,10 @@ export function decideAction(inp: ActionInput): ActionDecision {
         ...ctx.items.map(i => `• ${i.quantity}x ${i.productName} — ${formatPrice(i.price * i.quantity)}`),
         `📍 ${ctx.address}`,
         ctx.phone ? `📞 ${ctx.phone}` : '',
-        `\nTổng: ${formatPrice(total)} + phí ship`,
+        `\nTổng: ${formatPrice(total)} + phí ship 15.000đ`,
         '\nXác nhận đặt không?',
       ].filter(Boolean).join('\n'),
-      quickReplies: ['✅ Đặt ngay', '✏️ Sửa đơn', '❌ Hủy'],
+      quickReplies: ['✅ Đặt ngay', '✏️ Sửa đơn', '❌ Hủy đơn'],
     }
   }
 
@@ -167,14 +185,14 @@ export function decideAction(inp: ActionInput): ActionDecision {
     action:       { type: 'ADD_TO_CART', payload: { items: ctx.items } },
     extraActions: [],
     reply:        'Đã thêm vào giỏ! Bạn muốn đặt thêm gì nữa không?',
-    quickReplies: ['✅ Chốt đơn', '➕ Thêm món', '🗑️ Xem giỏ hàng'],
+    quickReplies: ['✅ Chốt đơn', '➕ Thêm món', '🛒 Xem giỏ hàng'],
   }
 }
 
 function buildCartSummary(ctx: SessionContext): string {
   const lines = ctx.items
     .slice(0, 3)
-    .map(i => `• ${i.quantity}x ${i.productName} — ${formatPrice(i.price)}`)
+    .map(i => `• ${i.quantity}x ${i.productName} — ${formatPrice(i.price * i.quantity)}`)
   if (ctx.items.length > 3) lines.push(`• +${ctx.items.length - 3} món khác`)
   return `🛒 Giỏ hàng:\n${lines.join('\n')}`
 }

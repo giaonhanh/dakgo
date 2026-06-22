@@ -53,10 +53,10 @@ function ProductCard({ data, onAdd }: {
         🍽️
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 12, fontWeight: 700, color: '#f8f0e0', marginBottom: 2 }}
+        <p style={{ fontSize: 14, fontWeight: 700, color: '#f8f0e0', marginBottom: 2 }}
            className="truncate">{data.name}</p>
-        <p style={{ fontSize: 10, color: '#6a5a40' }}>{data.shopName}</p>
-        <p style={{ fontSize: 11, fontWeight: 800, color: '#FF8C00', marginTop: 2 }}>
+        <p style={{ fontSize: 11, color: '#6a5a40' }}>{data.shopName}</p>
+        <p style={{ fontSize: 13, fontWeight: 800, color: '#FF8C00', marginTop: 2 }}>
           {formatPrice(data.price)}
         </p>
       </div>
@@ -99,16 +99,16 @@ function ShopCard({ data, onSelect }: {
         {CATEGORY_EMOJI[data.category] ?? '🍽️'}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 12, fontWeight: 700, color: '#f8f0e0' }} className="truncate">
+        <p style={{ fontSize: 14, fontWeight: 700, color: '#f8f0e0' }} className="truncate">
           {data.name}
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
           <span style={{
-            fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+            fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
             background: data.isOpen ? 'rgba(62,207,110,0.15)' : 'rgba(255,64,64,0.15)',
             color:      data.isOpen ? '#3ecf6e' : '#ff4040',
           }}>{data.isOpen ? 'Đang mở' : 'Đóng cửa'}</span>
-          <span style={{ fontSize: 10, color: '#6a5a40' }}>⭐ {data.ratingAvg?.toFixed(1)}</span>
+          <span style={{ fontSize: 11, color: '#6a5a40' }}>⭐ {data.ratingAvg?.toFixed(1)}</span>
         </div>
       </div>
       <ChevronRight size={14} color="#6a5a40" />
@@ -148,11 +148,13 @@ function CartPreviewCard({ data }: { data: Extract<RichContent, { type: 'cart_pr
 
 // ─── Message Bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({ msg, onQuickReply, onProductAdd, onShopSelect }: {
+function MessageBubble({ msg, onQuickReply, onProductAdd, onShopSelect, onUseLocation, onCheckout }: {
   msg:           Message
   onQuickReply:  (text: string) => void
   onProductAdd:  (data: Extract<RichContent, { type: 'product_card' }>['data']) => void
   onShopSelect:  (data: Extract<RichContent, { type: 'shop_card' }>['data'])    => void
+  onUseLocation: () => void
+  onCheckout:    (url: string) => void
 }) {
   const isUser = msg.role === 'user'
 
@@ -174,7 +176,7 @@ function MessageBubble({ msg, onQuickReply, onProductAdd, onShopSelect }: {
       }}>
         {!isUser && (
           <span style={{ fontSize: 10, fontWeight: 700, color: '#FF8C00', display: 'block', marginBottom: 4 }}>
-            DakGo AI 🤖
+            DakGo 🍜
           </span>
         )}
         {msg.content}
@@ -198,26 +200,26 @@ function MessageBubble({ msg, onQuickReply, onProductAdd, onShopSelect }: {
             }
             if (rc.type === 'checkout_button') {
               return (
-                <a key={i} href={rc.url} style={{
-                  display: 'block', padding: '12px 0', borderRadius: 12, textAlign: 'center',
+                <button key={i} onClick={() => onCheckout(rc.url ?? '')} style={{
+                  display: 'block', width: '100%', padding: '12px 0', borderRadius: 12, textAlign: 'center',
                   background: 'linear-gradient(to right, #FF6B00, #FF8C00)',
-                  color: '#fff', fontWeight: 700, fontSize: 13, textDecoration: 'none',
-                  boxShadow: '0 4px 16px rgba(255,107,0,0.35)',
+                  color: '#fff', fontWeight: 700, fontSize: 14, border: 'none',
+                  boxShadow: '0 4px 16px rgba(255,107,0,0.35)', cursor: 'pointer',
                 }}>
-                  ✅ Thanh toán ngay
-                </a>
+                  ✅ Thanh toán ngay →
+                </button>
               )
             }
             if (rc.type === 'location_picker') {
               return (
-                <a key={i} href={rc.url} style={{
+                <button key={i} onClick={onUseLocation} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  padding: '10px 0', borderRadius: 12, textAlign: 'center',
+                  width: '100%', padding: '10px 0', borderRadius: 12,
                   background: 'rgba(74,143,245,0.1)', border: '1px solid rgba(74,143,245,0.25)',
-                  color: '#4a8ff5', fontWeight: 600, fontSize: 13, textDecoration: 'none',
+                  color: '#4a8ff5', fontWeight: 600, fontSize: 14, cursor: 'pointer',
                 }}>
-                  <MapPin size={14} /> Ghim vị trí trên bản đồ
-                </a>
+                  <MapPin size={14} /> Dùng vị trí hiện tại của tôi
+                </button>
               )
             }
             return null
@@ -233,9 +235,9 @@ function MessageBubble({ msg, onQuickReply, onProductAdd, onShopSelect }: {
               key={i}
               onClick={() => onQuickReply(qr)}
               style={{
-                padding: '5px 12px', borderRadius: 999,
+                padding: '6px 14px', borderRadius: 999,
                 background: 'rgba(255,107,0,0.08)', border: '1px solid rgba(255,107,0,0.25)',
-                color: '#FF8C00', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                color: '#FF8C00', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -275,13 +277,15 @@ function TypingDots() {
 
 export default function ChatbotPage() {
   const router                      = useRouter()
-  const { addItem, totalQty }       = useCartStore()
+  const { addItem, clearCart, totalQty } = useCartStore()
   const [messages, setMessages]     = useState<Message[]>([])
   const [input, setInput]           = useState('')
   const [loading, setLoading]       = useState(false)
   const [sessionKey, setSessionKey] = useState('')
   const bottomRef                   = useRef<HTMLDivElement>(null)
   const inputRef                    = useRef<HTMLInputElement>(null)
+  // Track synced productIds to avoid doubling cart from repeated ADD_TO_CART payloads (BUG-002)
+  const syncedProductIds            = useRef<Set<string>>(new Set())
 
   // Init session + welcome message
   useEffect(() => {
@@ -291,8 +295,8 @@ export default function ChatbotPage() {
     setMessages([{
       id:           'welcome',
       role:         'assistant',
-      content:      'Chào bạn! Mình là DakGo AI 🤖\nBạn muốn đặt đồ ăn, giao hộ hay đặt xe ôm?',
-      quickReplies: ['🍜 Đặt đồ ăn', '📦 Giao hộ', '🛵 Xe ôm', '🚕 Taxi'],
+      content:      'Chào bạn! Mình giúp giao đồ ăn tại Phước An nhanh nhất 🍜\nHôm nay bạn muốn ăn gì?',
+      quickReplies: ['🍜 Xem quán đang mở', '🍱 Cơm hộp', '☕ Cà phê', '📦 Giao hộ'],
       richContent:  [],
       actions:      [],
       timestamp:    Date.now(),
@@ -342,14 +346,31 @@ export default function ChatbotPage() {
 
       setMessages(prev => [...prev, botMsg])
 
-      // Sync cart actions
+      // Sync cart — only add NEW products (BUG-002: avoid re-adding on every message)
+      type ItemLike = { productId: string; productName: string; price: number; quantity: number; shopId: string; shopName: string }
       for (const action of data.actions) {
         if (action.type === 'ADD_TO_CART') {
-          type ItemLike = { productId: string; productName: string; price: number; quantity: number; shopId: string; shopName: string; note?: string }
           const items = (action.payload?.items ?? []) as ItemLike[]
           for (const it of items) {
-            for (let q = 0; q < it.quantity; q++) {
-              addItem({ id: it.productId, name: it.productName, price: it.price, shop: it.shopName, shopId: it.shopId })
+            if (!syncedProductIds.current.has(it.productId)) {
+              syncedProductIds.current.add(it.productId)
+              for (let q = 0; q < it.quantity; q++) {
+                addItem({ id: it.productId, name: it.productName, price: it.price, shop: it.shopName, shopId: it.shopId })
+              }
+            }
+          }
+        }
+        // Sync full checkout items to cart before redirecting
+        if (action.type === 'CHECKOUT') {
+          const items = (action.payload?.items ?? []) as ItemLike[]
+          if (items.length > 0) {
+            clearCart()
+            syncedProductIds.current.clear()
+            for (const it of items) {
+              syncedProductIds.current.add(it.productId)
+              for (let q = 0; q < it.quantity; q++) {
+                addItem({ id: it.productId, name: it.productName, price: it.price, shop: it.shopName, shopId: it.shopId })
+              }
             }
           }
         }
@@ -371,12 +392,45 @@ export default function ChatbotPage() {
   }, [loading, sessionKey, addItem])
 
   function handleProductAdd(data: Extract<RichContent, { type: 'product_card' }>['data']) {
-    addItem({ id: data.id, name: data.name, price: data.price, shop: data.shopName, shopId: data.shopId })
+    // Chỉ gửi message lên pipeline — cart được sync từ ADD_TO_CART response (BUG-013)
     sendMessage(`Thêm 1 ${data.name}`)
   }
 
   function handleShopSelect(data: Extract<RichContent, { type: 'shop_card' }>['data']) {
     sendMessage(`Tôi muốn đặt từ quán ${data.name}`)
+  }
+
+  function handleUseLocation() {
+    if (!navigator.geolocation) {
+      sendMessage('Thiết bị không hỗ trợ GPS. Địa chỉ của tôi là:')
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords
+        try {
+          const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`)
+          const json = await res.json()
+          const addr = json.display_name?.split(',').slice(0, 3).join(',').trim() ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
+          sendMessage(`Giao đến địa chỉ: ${addr}`)
+        } catch {
+          sendMessage(`Giao đến tọa độ: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
+        }
+      },
+      () => { sendMessage('Không lấy được vị trí, địa chỉ của tôi là:') }
+    )
+  }
+
+  function handleCheckout(url: string) {
+    // Cart đã được sync từ CHECKOUT action — navigate to checkout
+    router.push(url || '/checkout')
+  }
+
+  function handleReset() {
+    if (!confirm('Bắt đầu cuộc hội thoại mới? Thông tin đơn hàng đang chat sẽ bị xóa.')) return
+    localStorage.removeItem('dakgo-chat-session')
+    syncedProductIds.current.clear()
+    window.location.reload()
   }
 
   const cartQty = totalQty()
@@ -402,9 +456,9 @@ export default function ChatbotPage() {
             background: 'linear-gradient(135deg, #FF6B00, #FF8C00)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 18, boxShadow: '0 0 12px rgba(255,107,0,0.4)',
-          }}>🤖</div>
+          }}>🍜</div>
           <div>
-            <p style={{ fontSize: 13, fontWeight: 700, color: '#f8f0e0', margin: 0 }}>DakGo AI</p>
+            <p style={{ fontSize: 13, fontWeight: 700, color: '#f8f0e0', margin: 0 }}>DakGo</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3ecf6e' }} />
               <span style={{ fontSize: 10, color: '#3ecf6e' }}>Đang hoạt động</span>
@@ -414,10 +468,7 @@ export default function ChatbotPage() {
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={() => {
-              localStorage.removeItem('dakgo-chat-session')
-              window.location.reload()
-            }}
+            onClick={handleReset}
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: '#b0956a' }}
             title="Chat mới"
           >
@@ -452,6 +503,8 @@ export default function ChatbotPage() {
               onQuickReply={sendMessage}
               onProductAdd={handleProductAdd}
               onShopSelect={handleShopSelect}
+              onUseLocation={handleUseLocation}
+              onCheckout={handleCheckout}
             />
           ))}
           <AnimatePresence>{loading && <TypingDots />}</AnimatePresence>

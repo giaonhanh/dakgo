@@ -60,10 +60,16 @@ export async function runPipeline(
   let productResults: Awaited<ReturnType<typeof fuzzySearchProducts>> = shopMenu
   let shopResults:    Awaited<ReturnType<typeof fuzzySearchShops>>    = openShops
 
+  if (extracted.shopName && intent === 'FIND_SHOP') {
+    // Tìm quán theo tên cụ thể
+    const found = await fuzzySearchShops(extracted.shopName)
+    if (found.length > 0) shopResults = found
+  }
+
   if (extracted.items.length > 0) {
     const keyword = extracted.items[0].rawName
     if (ctx.shopId && shopMenu.length > 0) {
-      // Tìm trong menu của quán đã chọn trước, sau đó fallback global
+      // Tìm trong menu của quán đã chọn, fallback về full menu
       const filtered = shopMenu.filter(p =>
         p.name.toLowerCase().includes(keyword.toLowerCase().slice(0, Math.max(2, keyword.length - 1)))
       )
@@ -71,9 +77,6 @@ export async function runPipeline(
     } else {
       productResults = await fuzzySearchProducts(keyword)
     }
-  }
-  if (intent === 'FIND_SHOP' && extracted.items.length === 0) {
-    shopResults = openShops
   }
 
   // Resolve extracted items against search results

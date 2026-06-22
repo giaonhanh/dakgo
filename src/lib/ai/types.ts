@@ -11,6 +11,7 @@ export type Intent =
   | 'GENERAL_QUESTION'
   | 'CANCEL'
   | 'GREET'
+  | 'CONFIRM_ORDER'
   | 'UNKNOWN'
 
 export type ActionType =
