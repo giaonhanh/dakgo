@@ -82,7 +82,18 @@ export function decideAction(inp: ActionInput): ActionDecision {
     }
   }
 
-  // Chưa có món → show product gợi ý
+  // Chưa có món nhưng đã chọn quán → show menu của quán
+  if (ctx.items.length === 0 && ctx.shopId && productResults.length > 0) {
+    const shopName = ctx.shopName ?? 'quán'
+    return {
+      action:       { type: 'SHOW_PRODUCTS', payload: { products: productResults.slice(0, 6) } },
+      extraActions: [],
+      reply:        `Menu ${shopName}:\nNhắn tên món hoặc tap nút "+" để thêm vào giỏ nhé! 👇`,
+      quickReplies: productResults.slice(0, 4).map(p => `${p.name} — ${(p.price/1000).toFixed(0)}k`),
+    }
+  }
+
+  // Chưa có món + chưa chọn quán → gợi ý
   if (ctx.items.length === 0) {
     if (productResults.length > 0) {
       return {

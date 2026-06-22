@@ -6,7 +6,7 @@
 import { checkAntiSpam }        from './layers/spam'
 import { checkGatekeeper }      from './layers/gatekeeper'
 import { classifyIntent }       from './layers/intent'
-import { fuzzySearchProducts, fuzzySearchShops, getOpenShops } from './layers/search'
+import { fuzzySearchProducts, fuzzySearchShops, getOpenShops, getShopProducts } from './layers/search'
 import { extractFromMessage }   from './layers/extractor'
 import { calculateConfidence }  from './layers/confidence'
 import { validateOrder }        from './layers/validator'
@@ -47,17 +47,30 @@ export async function runPipeline(
     : ''
 
   // ── Layers 4 & 5: Fuzzy Search + AI Extract in parallel ──────────────────
-  const [extracted, openShops] = await Promise.all([
+  const needShopMenu  = ctx.shopId !== null && ctx.items.length === 0
+  const needOpenShops = !needShopMenu && (intent === 'FIND_SHOP' || ctx.items.length === 0)
+
+  const [extracted, openShops, shopMenu] = await Promise.all([
     extractFromMessage(message, contextSummary),
-    (intent === 'FIND_SHOP' || ctx.items.length === 0) ? getOpenShops() : Promise.resolve([]),
+    needOpenShops ? getOpenShops()               : Promise.resolve([]),
+    needShopMenu  ? getShopProducts(ctx.shopId!) : Promise.resolve([]),
   ])
 
   // Layer 4: Fuzzy search products from extracted item names
-  let productResults: Awaited<ReturnType<typeof fuzzySearchProducts>> = []
+  let productResults: Awaited<ReturnType<typeof fuzzySearchProducts>> = shopMenu
   let shopResults:    Awaited<ReturnType<typeof fuzzySearchShops>>    = openShops
 
   if (extracted.items.length > 0) {
-    productResults = await fuzzySearchProducts(extracted.items[0].rawName)
+    const keyword = extracted.items[0].rawName
+    if (ctx.shopId && shopMenu.length > 0) {
+      // Tìm trong menu của quán đã chọn trước, sau đó fallback global
+      const filtered = shopMenu.filter(p =>
+        p.name.toLowerCase().includes(keyword.toLowerCase().slice(0, Math.max(2, keyword.length - 1)))
+      )
+      productResults = filtered.length > 0 ? filtered : shopMenu
+    } else {
+      productResults = await fuzzySearchProducts(keyword)
+    }
   }
   if (intent === 'FIND_SHOP' && extracted.items.length === 0) {
     shopResults = openShops

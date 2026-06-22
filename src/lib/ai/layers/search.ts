@@ -91,6 +91,29 @@ export async function getOpenShops(category?: string): Promise<ShopSearchResult[
   return (data ?? []).map(s => mapShop({ ...s, similarity: 1 }))
 }
 
+export async function getShopProducts(shopId: string): Promise<ProductSearchResult[]> {
+  const supabase = sb()
+  const { data } = await supabase
+    .from('products')
+    .select('id, name, price, image_url, shop_id, shops!inner(name, is_open)')
+    .eq('shop_id', shopId)
+    .eq('is_available', true)
+    .order('sold_count', { ascending: false })
+    .limit(8)
+
+  type Row = { id: string; name: string; price: number; image_url: string | null; shop_id: string; shops: { name: string; is_open: boolean } }
+  return ((data ?? []) as unknown as Row[]).map(p => ({
+    id:         p.id,
+    name:       p.name,
+    price:      p.price,
+    shopId:     p.shop_id,
+    shopName:   p.shops.name,
+    isOpen:     p.shops.is_open,
+    imageUrl:   p.image_url,
+    similarity: 1,
+  }))
+}
+
 function mapShop(s: {
   id: string; name: string; category: string; is_open: boolean
   cover_image_url: string | null; logo_url: string | null
