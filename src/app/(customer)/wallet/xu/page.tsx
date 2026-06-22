@@ -130,14 +130,17 @@ export default function XuPage() {
           cancelUrl:   `${window.location.origin}/wallet/xu`,
         }),
       })
-      const data = await res.json() as { qrCode?: string; error?: string }
-      if (data.error || !data.qrCode) {
+      const data = await res.json() as { qrCode?: string; bin?: string; accountNumber?: string; error?: string }
+      if (data.error || !data.bin || !data.accountNumber) {
         // Cleanup record pending nếu PayOS fail
         await supabase.from("wallet_topups").delete().eq("payment_code", code)
         throw new Error(data.error ?? "Không thể tạo QR")
       }
 
-      setQrUrl(data.qrCode)
+      // Dùng VietQR Image API thay vì raw EMVCo string
+      const qrImageUrl = `https://img.vietqr.io/image/${data.bin}-${data.accountNumber}-compact2.png` +
+        `?amount=${finalTopup}&addInfo=${encodeURIComponent(`NAP XU GN${code}`)}`
+      setQrUrl(qrImageUrl)
       setTopupCode(code)
       setShowQR(true)
 
