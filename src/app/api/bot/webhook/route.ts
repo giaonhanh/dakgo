@@ -122,13 +122,11 @@ async function sendWebviewButton(recipientId: string, text: string, buttonTitle:
         type: "template",
         payload: {
           template_type: "button",
-          text: "👇 Nhấn nút bên dưới để xác định vị trí:",
+          text: "👇 Nhấn nút bên dưới để chọn vị trí:",
           buttons: [{
             type: "web_url",
             url,
             title: buttonTitle,
-            webview_height_ratio: "compact",
-            messenger_extensions: false,
           }],
         },
       },
