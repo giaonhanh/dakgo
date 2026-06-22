@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, Package, MapPin, User, Phone, StickyNote, CheckCircle2, Loader2 } from "lucide-react"
@@ -52,8 +52,11 @@ export default function MerchantGiaoHoPage() {
   const [note,    setNote]    = useState("")
 
   // COD — tiền hàng thu hộ
-  const [codEnabled, setCodEnabled] = useState(false)
-  const [codAmount,  setCodAmount]  = useState("")
+  const [codEnabled,  setCodEnabled]  = useState(false)
+  const [codAmount,   setCodAmount]   = useState("")
+  const [qrUrl,       setQrUrl]       = useState<string | null>(null)
+  const [qrUploading, setQrUploading] = useState(false)
+  const qrInputRef = useRef<HTMLInputElement>(null)
 
   // Pricing
   const [pricingRows,    setPricingRows]    = useState<string[]>(["18000","15000","12000","10000","9000","8500","8000","7500","7000","6500"])
@@ -119,6 +122,38 @@ export default function MerchantGiaoHoPage() {
   const serviceFee = baseFee + weightSurcharge
   const codValue   = codEnabled ? (parseInt(codAmount.replace(/\D/g, "")) || 0) : 0
 
+  // Crop ảnh về hình vuông (center crop) rồi nén
+  const cropSquare = (file: File, size: number): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        const s = Math.min(img.width, img.height)
+        const sx = (img.width  - s) / 2
+        const sy = (img.height - s) / 2
+        const canvas = document.createElement("canvas")
+        canvas.width = size; canvas.height = size
+        canvas.getContext("2d")!.drawImage(img, sx, sy, s, s, 0, 0, size, size)
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error("crop failed")), "image/webp", 0.92)
+      }
+      img.onerror = reject
+      img.src = URL.createObjectURL(file)
+    })
+
+  const handleQrUpload = async (file: File) => {
+    if (!shopId) return
+    setQrUploading(true)
+    try {
+      const blob = await cropSquare(file, 400).catch(() => file)
+      const path = `${shopId}/payment-qr`
+      const { error } = await supabase.storage.from("shops").upload(path, blob, { upsert: true, contentType: "image/webp" })
+      if (error) { fireToast("❌ Lỗi upload QR: " + error.message); return }
+      const { data: { publicUrl } } = supabase.storage.from("shops").getPublicUrl(path)
+      setQrUrl(`${publicUrl}?t=${Date.now()}`)
+    } finally {
+      setQrUploading(false)
+    }
+  }
+
   function handleAddrPick(res: AddressPickerResult) {
     setDelivery(res.address + (res.note ? ` (${res.note})` : ""))
     setDeliveryCoord({ lat: res.lat, lng: res.lng })
@@ -150,6 +185,7 @@ export default function MerchantGiaoHoPage() {
         delivery_lng:         deliveryCoord?.lng ?? shopLng,
         package_description:  pkgDesc,
         estimated_items_cost: codValue || null,
+        package_photo_url:    qrUrl || null,
         note:                 [
           `Quán: ${shopName}`,
           note ? `Ghi chú: ${note}` : "",
@@ -199,7 +235,7 @@ export default function MerchantGiaoHoPage() {
         </div>
         <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: 320 }}>
           <button
-            onClick={() => { setSuccess(false); setRecipientName(""); setRecipientPhone(""); setDelivery(""); setDeliveryCoord(null); setPkgDesc(""); setNote(""); setCodEnabled(false); setCodAmount("") }}
+            onClick={() => { setSuccess(false); setRecipientName(""); setRecipientPhone(""); setDelivery(""); setDeliveryCoord(null); setPkgDesc(""); setNote(""); setCodEnabled(false); setCodAmount(""); setQrUrl(null) }}
             style={{ flex: 1, height: 44, borderRadius: 10, border: "1px solid rgba(255,107,0,0.3)", background: "rgba(255,107,0,0.07)", color: "#FF8C00", fontFamily: "Lexend", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
           >
             + Tạo đơn mới
@@ -350,18 +386,100 @@ export default function MerchantGiaoHoPage() {
             </button>
           </div>
           {codEnabled && (
-            <div>
-              <label style={lbl}>Số tiền thu hộ *</label>
-              <input
-                value={codAmount}
-                onChange={e => {
-                  const raw = e.target.value.replace(/\D/g, "")
-                  setCodAmount(raw ? Number(raw).toLocaleString("vi-VN") : "")
-                }}
-                placeholder="0đ" inputMode="numeric"
-                style={{ ...inp, borderColor: "rgba(62,207,110,0.3)" }} />
-              <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 5 }}>
-                Tài xế sẽ thu tiền của người nhận và trả lại cho quán
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* Số tiền */}
+              <div>
+                <label style={lbl}>Số tiền thu hộ *</label>
+                <input
+                  value={codAmount}
+                  onChange={e => {
+                    const raw = e.target.value.replace(/\D/g, "")
+                    setCodAmount(raw ? Number(raw).toLocaleString("vi-VN") : "")
+                  }}
+                  placeholder="0đ" inputMode="numeric"
+                  style={{ ...inp, borderColor: "rgba(62,207,110,0.3)" }} />
+                <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 5 }}>
+                  Tài xế sẽ thu tiền của người nhận và trả lại cho quán sau khi giao thành công.
+                </div>
+              </div>
+
+              {/* Upload QR chuyển khoản */}
+              <div>
+                <label style={lbl}>Mã QR nhận tiền (tùy chọn)</label>
+                <input
+                  ref={qrInputRef} type="file" accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleQrUpload(f) }}
+                />
+
+                {qrUrl ? (
+                  /* Preview QR đã upload */
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <div style={{ position: "relative", width: 90, height: 90, borderRadius: 10, overflow: "hidden", border: "2px solid rgba(62,207,110,0.4)", flexShrink: 0 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={qrUrl} alt="QR" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      {/* Khung canh góc */}
+                      {["topleft","topright","bottomleft","bottomright"].map(pos => (
+                        <div key={pos} style={{
+                          position: "absolute",
+                          top:    pos.includes("top")    ? 4 : "auto",
+                          bottom: pos.includes("bottom") ? 4 : "auto",
+                          left:   pos.includes("left")   ? 4 : "auto",
+                          right:  pos.includes("right")  ? 4 : "auto",
+                          width: 12, height: 12,
+                          borderTop:    pos.includes("top")    ? "2px solid #3ecf6e" : "none",
+                          borderBottom: pos.includes("bottom") ? "2px solid #3ecf6e" : "none",
+                          borderLeft:   pos.includes("left")   ? "2px solid #3ecf6e" : "none",
+                          borderRight:  pos.includes("right")  ? "2px solid #3ecf6e" : "none",
+                        }} />
+                      ))}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: "#3ecf6e", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>✅ Đã upload QR</div>
+                      <div style={{ color: "#6a5a40", fontSize: 11, lineHeight: 1.5 }}>Tài xế sẽ quét mã này để chuyển khoản hoặc trả tay</div>
+                      <button onClick={() => qrInputRef.current?.click()}
+                        style={{ marginTop: 6, background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, padding: "4px 10px", color: "#b0956a", fontSize: 11, fontFamily: "Lexend", cursor: "pointer" }}>
+                        Đổi ảnh
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Nút upload + khung hướng dẫn */
+                  <button
+                    onClick={() => qrInputRef.current?.click()}
+                    disabled={qrUploading}
+                    style={{ width: "100%", background: "rgba(62,207,110,0.06)", border: "1.5px dashed rgba(62,207,110,0.3)", borderRadius: 12, padding: "16px 12px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                    {qrUploading ? (
+                      <div style={{ color: "#3ecf6e", fontSize: 12 }}>Đang xử lý...</div>
+                    ) : (
+                      <>
+                        {/* Khung vuông giả lập QR */}
+                        <div style={{ position: "relative", width: 72, height: 72, border: "2px dashed rgba(62,207,110,0.5)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {["topleft","topright","bottomleft","bottomright"].map(pos => (
+                            <div key={pos} style={{
+                              position: "absolute",
+                              top:    pos.includes("top")    ? -2 : "auto",
+                              bottom: pos.includes("bottom") ? -2 : "auto",
+                              left:   pos.includes("left")   ? -2 : "auto",
+                              right:  pos.includes("right")  ? -2 : "auto",
+                              width: 14, height: 14,
+                              borderTop:    pos.includes("top")    ? "3px solid #3ecf6e" : "none",
+                              borderBottom: pos.includes("bottom") ? "3px solid #3ecf6e" : "none",
+                              borderLeft:   pos.includes("left")   ? "3px solid #3ecf6e" : "none",
+                              borderRight:  pos.includes("right")  ? "3px solid #3ecf6e" : "none",
+                              borderRadius: 2,
+                            }} />
+                          ))}
+                          <span style={{ fontSize: 28 }}>📷</span>
+                        </div>
+                        <div style={{ color: "#3ecf6e", fontSize: 12, fontWeight: 600 }}>Upload ảnh QR chuyển khoản</div>
+                        <div style={{ color: "#6a5a40", fontSize: 11, textAlign: "center" }}>
+                          Canh mã QR vào khung vuông · Ảnh tự cắt về hình vuông
+                        </div>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           )}
