@@ -35,8 +35,7 @@ export async function POST(req: NextRequest) {
     .select(`
       id, total_amount, subtotal, delivery_fee, delivery_address, payment_method, note,
       shops!orders_shop_id_fkey(name, owner_id),
-      profiles!orders_customer_id_fkey(full_name, phone),
-      order_items(name, quantity, price)
+      order_items(name, quantity, price, note)
     `)
     .eq('id', orderId)
     .single()
@@ -45,8 +44,7 @@ export async function POST(req: NextRequest) {
 
   type OrderRow = typeof order & {
     shops:       { name: string; owner_id: string } | null
-    profiles:    { full_name: string | null; phone: string } | null
-    order_items: Array<{ name: string; quantity: number; price: number }>
+    order_items: Array<{ name: string; quantity: number; price: number; note: string | null }>
   }
   const o = order as unknown as OrderRow
 
@@ -66,23 +64,24 @@ export async function POST(req: NextRequest) {
   const shortId = orderId.slice(0, 6).toUpperCase()
   const fmt     = (n: number) => n.toLocaleString('vi-VN') + 'đ'
 
-  const items       = o.order_items ?? []
-  const itemsDetail = items.map(i => `• ${i.quantity}× ${i.name} — ${fmt(i.price * i.quantity)}`).join('\n')
-  const payLabel    = o.payment_method === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'
+  const items    = o.order_items ?? []
+  const payLabel = o.payment_method === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'
 
-  // ── Tin 1: Văn bản đầy đủ thông tin khách + đơn ──────────────────────────
+  const itemsDetail = items.map(i => {
+    let line = `• ${i.quantity}× ${i.name} — ${fmt(i.price * i.quantity)}`
+    if (i.note) line += `\n   └ ${i.note}`
+    return line
+  }).join('\n')
+
+  // ── Tin 1: Chỉ nội dung đơn (không có thông tin khách) ───────────────────
   const fullText = [
     `🛵 ĐƠN MỚI · #GN-${shortId}`,
-    `━━━━━━━━━━━━━━━━━━━`,
-    `👤 ${o.profiles?.full_name ?? 'Khách hàng'}`,
-    `📞 ${o.profiles?.phone ?? 'Chưa có SĐT'}`,
-    `📍 ${o.delivery_address}`,
     `━━━━━━━━━━━━━━━━━━━`,
     `🍜 MÓN ĐẶT:`,
     itemsDetail,
     `━━━━━━━━━━━━━━━━━━━`,
     `💰 Tổng: ${fmt(o.total_amount)} · ${payLabel}`,
-    ...(o.note ? [`📝 Ghi chú: ${o.note}`] : []),
+    ...(o.note ? [`📝 Ghi chú đơn: ${o.note}`] : []),
   ].join('\n')
 
   await fetch(ZALO_OA_SEND, {
