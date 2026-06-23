@@ -73,11 +73,10 @@ async function reverseGeocodeAddr(lat: number, lng: number): Promise<string> {
   const cached = getCachedGeocode(lat, lng)
   if (cached) return cached
   try {
-    const res = await fetch(`/api/geocode?latlng=${lat},${lng}`)
+    const res = await fetch(`/api/geocode-google?latlng=${lat},${lng}`)
     if (res.ok) {
-      const data = await res.json()
-      const addr = Array.isArray(data) ? data[0]?.display : undefined
-      if (addr) { setCachedGeocode(lat, lng, addr); return addr }
+      const data = await res.json() as { address?: string }
+      if (data.address) { setCachedGeocode(lat, lng, data.address); return data.address }
     }
   } catch { /* fallback */ }
   return ""

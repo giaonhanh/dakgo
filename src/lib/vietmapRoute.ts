@@ -6,36 +6,34 @@ interface VietmapReverseResult {
   ref_id?:  string
 }
 
-/** Reverse geocode — trả về địa chỉ đầy đủ */
+/** Reverse geocode — trả về địa chỉ đầy đủ (Google → VietMap fallback) */
 export async function reverseGeocodeStructured(lat: number, lng: number): Promise<{ address: string; houseNote: string }> {
   const cached = getCachedGeocode(lat, lng)
   if (cached) return { address: cached, houseNote: "" }
 
   try {
-    const res = await fetch(`/api/geocode?latlng=${lat},${lng}`)
+    const res = await fetch(`/api/geocode-google?latlng=${lat},${lng}`)
     if (res.ok) {
-      const data: VietmapReverseResult[] = await res.json()
-      const address = data[0]?.display ?? ""
-      if (address) {
-        setCachedGeocode(lat, lng, address)
-        return { address, houseNote: "" }
+      const data = await res.json() as { address?: string }
+      if (data.address) {
+        setCachedGeocode(lat, lng, data.address)
+        return { address: data.address, houseNote: "" }
       }
     }
   } catch { /* fallback */ }
   return { address: "", houseNote: "" }
 }
 
-/** Reverse geocode — trả về chuỗi địa chỉ đơn giản */
+/** Reverse geocode — trả về chuỗi địa chỉ đơn giản (Google → VietMap fallback) */
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   const cached = getCachedGeocode(lat, lng)
   if (cached) return cached
 
   try {
-    const res = await fetch(`/api/geocode?latlng=${lat},${lng}`)
+    const res = await fetch(`/api/geocode-google?latlng=${lat},${lng}`)
     if (res.ok) {
-      const data: VietmapReverseResult[] = await res.json()
-      const address = data[0]?.display ?? ""
-      if (address) { setCachedGeocode(lat, lng, address); return address }
+      const data = await res.json() as { address?: string }
+      if (data.address) { setCachedGeocode(lat, lng, data.address); return data.address }
     }
   } catch { /* fallback */ }
   return ""
@@ -97,15 +95,17 @@ export function calcDeliveryFeeFromPricing(
     total += Math.round(fracKm * fracPrice)
   }
 
-  return total
+  return Math.round(total / 500) * 500
 }
 
 /** Fallback nếu chưa load được cấu hình admin */
 export function calcDeliveryFee(km: number): number {
   const k = Math.max(km, 1)
-  if (k <= 1) return 10000
-  if (k <= 3) return 10000 + Math.round((k - 1) * 5000)
-  return 20000 + Math.round((k - 3) * 3500)
+  let fee: number
+  if (k <= 1) fee = 10000
+  else if (k <= 3) fee = 10000 + Math.round((k - 1) * 5000)
+  else fee = 20000 + Math.round((k - 3) * 3500)
+  return Math.round(fee / 500) * 500
 }
 
 export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
