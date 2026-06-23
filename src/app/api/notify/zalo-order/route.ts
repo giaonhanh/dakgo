@@ -66,18 +66,35 @@ export async function POST(req: NextRequest) {
   const shortId = orderId.slice(0, 6).toUpperCase()
   const fmt     = (n: number) => n.toLocaleString('vi-VN') + 'đ'
 
-  const itemsSummary = (o.order_items ?? []).slice(0, 4)
-    .map(i => `${i.quantity}× ${i.name}`)
-    .join(' · ')
+  const items       = o.order_items ?? []
+  const itemsDetail = items.map(i => `• ${i.quantity}× ${i.name} — ${fmt(i.price * i.quantity)}`).join('\n')
+  const payLabel    = o.payment_method === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'
 
-  const subtitle = [
-    `👤 ${o.profiles?.full_name ?? 'Khách'} · ${o.profiles?.phone ?? ''}`,
+  // ── Tin 1: Văn bản đầy đủ thông tin khách + đơn ──────────────────────────
+  const fullText = [
+    `🛵 ĐƠN MỚI · #GN-${shortId}`,
+    `━━━━━━━━━━━━━━━━━━━`,
+    `👤 ${o.profiles?.full_name ?? 'Khách hàng'}`,
+    `📞 ${o.profiles?.phone ?? 'Chưa có SĐT'}`,
     `📍 ${o.delivery_address}`,
-    `🍜 ${itemsSummary}`,
-    `💰 ${fmt(o.total_amount)} · ${o.payment_method === 'cash' ? 'Tiền mặt' : 'CK'}`,
+    `━━━━━━━━━━━━━━━━━━━`,
+    `🍜 MÓN ĐẶT:`,
+    itemsDetail,
+    `━━━━━━━━━━━━━━━━━━━`,
+    `💰 Tổng: ${fmt(o.total_amount)} · ${payLabel}`,
+    ...(o.note ? [`📝 Ghi chú: ${o.note}`] : []),
   ].join('\n')
 
-  // ── Bước 1: Upload ảnh đơn lên Zalo ────────────────────────────────────────
+  await fetch(ZALO_OA_SEND, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'access_token': accessToken },
+    body:    JSON.stringify({
+      recipient: { user_id: owner.zalo_id },
+      message:   { text: fullText },
+    }),
+  })
+
+  // ── Tin 2: Ảnh đơn + nút [✅ Xác nhận] [❌ Từ chối] ─────────────────────
   let attachmentId: string | null = null
   try {
     const imageUrl = `${baseUrl}/api/orders/render-image?orderId=${orderId}`
@@ -85,79 +102,35 @@ export async function POST(req: NextRequest) {
     const imgBlob  = await imgRes.blob()
     const form     = new FormData()
     form.append('file', imgBlob, 'order.png')
-
-    const up      = await fetch(ZALO_UPLOAD, {
+    const up       = await fetch(ZALO_UPLOAD, {
       method: 'POST', headers: { 'access_token': accessToken }, body: form,
     })
-    const upData  = await up.json() as { data?: { attachment_id?: string } }
-    attachmentId  = upData.data?.attachment_id ?? null
+    const upData   = await up.json() as { data?: { attachment_id?: string } }
+    attachmentId   = upData.data?.attachment_id ?? null
   } catch (e) {
     console.warn('[zalo-order] image upload failed:', e)
   }
 
-  // ── Bước 2: Gửi list template với nút bấm ──────────────────────────────────
-  // oa.query.hide: merchant bấm → Zalo gửi payload text về webhook của OA
   const element: Record<string, unknown> = {
-    title:   `🛵 ĐƠN MỚI · #GN-${shortId}`,
-    subtitle,
-    default_action: {
-      type: 'oa.open.url',
-      url:  `${baseUrl}/merchant`,
-    },
+    title:   `#GN-${shortId} · ${fmt(o.total_amount)}`,
+    subtitle: `Bấm để xác nhận hoặc từ chối đơn này`,
+    default_action: { type: 'oa.open.url', url: `${baseUrl}/merchant` },
     buttons: [
-      {
-        title:   '✅ Xác nhận đơn',
-        type:    'oa.query.hide',
-        payload: `CONFIRM_${orderId}`,
-      },
-      {
-        title:   '❌ Từ chối',
-        type:    'oa.query.hide',
-        payload: `REJECT_${orderId}`,
-      },
+      { title: '✅ Xác nhận đơn', type: 'oa.query.hide', payload: `CONFIRM_${orderId}` },
+      { title: '❌ Từ chối',      type: 'oa.query.hide', payload: `REJECT_${orderId}`  },
     ],
   }
-
-  if (attachmentId) {
-    element.image_url = `https://zalo.me/oa/image/${attachmentId}`
-  }
-
-  const body = {
-    recipient: { user_id: owner.zalo_id },
-    message: {
-      attachment: {
-        type:    'template',
-        payload: {
-          template_type: 'list',
-          elements:      [element],
-        },
-      },
-    },
-  }
+  if (attachmentId) element.image_url = `https://zalo.me/oa/image/${attachmentId}`
 
   const res  = await fetch(ZALO_OA_SEND, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'access_token': accessToken },
-    body:    JSON.stringify(body),
+    body:    JSON.stringify({
+      recipient: { user_id: owner.zalo_id },
+      message:   { attachment: { type: 'template', payload: { template_type: 'list', elements: [element] } } },
+    }),
   })
-  const data = await res.json() as { error?: number; message?: string }
+  const data = await res.json() as { error?: number }
 
-  if (data.error && data.error !== 0) {
-    // Fallback về text nếu template thất bại
-    console.warn('[zalo-order] template failed, trying text:', data)
-    const textRes = await fetch(ZALO_OA_SEND, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'access_token': accessToken },
-      body: JSON.stringify({
-        recipient: { user_id: owner.zalo_id },
-        message: {
-          text: `🛵 ĐƠN MỚI #GN-${shortId}\n${subtitle}\n\nXác nhận tại: ${baseUrl}/merchant`,
-        },
-      }),
-    })
-    const textData = await textRes.json() as { error?: number }
-    return NextResponse.json({ ok: textData.error === 0, fallback: true })
-  }
-
-  return NextResponse.json({ ok: true, hasImage: !!attachmentId, zaloUserId: owner.zalo_id })
+  return NextResponse.json({ ok: !data.error || data.error === 0, hasImage: !!attachmentId, zaloUserId: owner.zalo_id })
 }
