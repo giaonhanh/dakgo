@@ -2,7 +2,6 @@
 import { useState, useCallback } from "react"
 import Cropper from "react-easy-crop"
 import type { Area } from "react-easy-crop"
-import ManualMaskEditor from "./ManualMaskEditor"
 
 interface Props {
   src: string
@@ -29,35 +28,34 @@ async function cropToFile(src: string, pixelCrop: Area): Promise<File> {
   )
 }
 
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((res, rej) => {
+    const reader = new FileReader()
+    reader.onload  = () => res(reader.result as string)
+    reader.onerror = rej
+    reader.readAsDataURL(blob)
+  })
+}
+
 export default function ImageCropper({ src, onDone, onCancel }: Props) {
-  const [activeSrc, setActiveSrc] = useState(src)
-  const [crop,      setCrop]      = useState({ x: 0, y: 0 })
-  const [zoom,      setZoom]      = useState(1)
-  const [pixels,    setPixels]    = useState<Area | null>(null)
-  const [busy,      setBusy]      = useState(false)
+  const [activeSrc,  setActiveSrc]  = useState(src)
+  const [crop,       setCrop]       = useState({ x: 0, y: 0 })
+  const [zoom,       setZoom]       = useState(1)
+  const [pixels,     setPixels]     = useState<Area | null>(null)
+  const [busy,       setBusy]       = useState(false)
   const [removing,   setRemoving]   = useState(false)
   const [bgRemoved,  setBgRemoved]  = useState(false)
   const [removeErr,  setRemoveErr]  = useState("")
-  const [progress,   setProgress]   = useState("")
-  const [showManual, setShowManual] = useState(false)
 
   const onCropComplete = useCallback((_: Area, p: Area) => setPixels(p), [])
 
-  async function handleRemoveBg(attempt = 1) {
+  async function handleRemoveBg() {
     setRemoving(true)
     setRemoveErr("")
-    setProgress(attempt > 1 ? `Đang thử lại (${attempt}/3)...` : "Đang gửi ảnh lên AI...")
     try {
-      // Đọc ảnh hiện tại thành base64
       const res0   = await fetch(activeSrc)
       const blob0  = await res0.blob()
-      const b64    = await new Promise<string>((resolve) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result as string)
-        reader.readAsDataURL(blob0)
-      })
-
-      setProgress("AI đang phân tích và xóa nền...")
+      const b64    = await blobToBase64(blob0)
 
       const res = await fetch("/api/merchant/remove-bg", {
         method:  "POST",
@@ -66,21 +64,13 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
       })
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        // Model cold start — tự retry tối đa 3 lần
-        if (data.retry && attempt < 3) {
-          setRemoving(false)
-          setProgress(`Model đang khởi động... thử lại sau 12s (${attempt}/3)`)
-          await new Promise(r => setTimeout(r, 12000))
-          return handleRemoveBg(attempt + 1)
-        }
+        const data = await res.json().catch(() => ({})) as { error?: string }
         setRemoveErr(data.error ?? "Không xóa được nền. Thử lại sau.")
         return
       }
 
       const resultBlob = await res.blob()
-      const url = URL.createObjectURL(resultBlob)
-      setActiveSrc(url)
+      setActiveSrc(URL.createObjectURL(resultBlob))
       setBgRemoved(true)
       setCrop({ x: 0, y: 0 })
       setZoom(1)
@@ -88,7 +78,6 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
       setRemoveErr("Lỗi kết nối. Kiểm tra mạng và thử lại.")
     } finally {
       setRemoving(false)
-      setProgress("")
     }
   }
 
@@ -122,7 +111,7 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
           Hủy
         </button>
         <div style={{ textAlign:"center" }}>
-          <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700 }}>Cắt ảnh</div>
+          <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700 }}>Cắt ảnh món</div>
           <div style={{ color:"#6a5a40", fontSize:9, marginTop:1 }}>Kéo · Pinch zoom để căn chỉnh</div>
         </div>
         <button onClick={handleConfirm} disabled={busy}
@@ -134,23 +123,21 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
         </button>
       </div>
 
-      {/* Xóa nền AI toolbar */}
+      {/* Toolbar xóa nền */}
       <div style={{ padding:"10px 16px 8px", borderBottom:"1px solid rgba(255,255,255,0.05)",
-        display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+        display:"flex", alignItems:"center", gap:8, flexShrink:0, flexWrap:"wrap" }}>
 
         {!bgRemoved ? (
-          <button onClick={() => handleRemoveBg()} disabled={removing}
+          <button onClick={handleRemoveBg} disabled={removing}
             style={{ display:"flex", alignItems:"center", gap:6,
               background: removing ? "rgba(180,100,255,0.1)" : "rgba(180,100,255,0.15)",
               border:"1px solid rgba(180,100,255,0.4)",
-              borderRadius:10, padding:"7px 14px", cursor: removing ? "not-allowed" : "pointer",
+              borderRadius:10, padding:"7px 14px",
+              cursor: removing ? "not-allowed" : "pointer",
               color:"#b464ff", fontSize:11, fontWeight:700, fontFamily:"Lexend",
-              opacity: removing ? 0.8 : 1, transition:"all .2s" }}>
+              opacity: removing ? 0.8 : 1 }}>
             {removing ? (
-              <>
-                <span style={{ animation:"spin 1s linear infinite", display:"inline-block" }}>⏳</span>
-                <span>{progress || "Đang xử lý..."}</span>
-              </>
+              <><span style={{ animation:"spin 1s linear infinite", display:"inline-block" }}>⏳</span> Đang xử lý...</>
             ) : (
               <>✨ Xóa nền AI</>
             )}
@@ -174,21 +161,10 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
           </div>
         )}
 
-        {removeErr && (
-          <span style={{ color:"#ff8080", fontSize:10 }}>⚠️ {removeErr}</span>
-        )}
-
-        {/* Chỉnh tay — luôn hiển thị sau khi có ảnh */}
-        <button onClick={() => setShowManual(true)}
-          style={{ display:"flex", alignItems:"center", gap:5,
-            background:"rgba(74,143,245,0.12)", border:"1px solid rgba(74,143,245,0.35)",
-            borderRadius:10, padding:"7px 12px", cursor:"pointer",
-            color:"#4a8ff5", fontSize:11, fontWeight:700, fontFamily:"Lexend" }}>
-          ✏️ Chỉnh tay
-        </button>
+        {removeErr && <span style={{ color:"#ff8080", fontSize:10 }}>⚠️ {removeErr}</span>}
 
         <div style={{ marginLeft:"auto", color:"#6a5a40", fontSize:9, textAlign:"right", lineHeight:1.4 }}>
-          HuggingFace RMBG-1.4<br/>~2–5 giây/ảnh
+          Clipdrop AI · 100 ảnh/ngày free
         </div>
       </div>
 
@@ -206,8 +182,9 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
           onCropComplete={onCropComplete}
           style={{
             containerStyle: {
-              background: bgRemoved ? "repeating-conic-gradient(#1a1a1a 0% 25%, #0d0d0d 0% 50%) 0 0 / 16px 16px"
-                                    : "#080806",
+              background: bgRemoved
+                ? "repeating-conic-gradient(#1a1a1a 0% 25%, #0d0d0d 0% 50%) 0 0 / 16px 16px"
+                : "#080806",
             },
             cropAreaStyle: {
               border: "2px solid #FF6B00",
@@ -216,22 +193,19 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
           }}
         />
 
-        {/* Loading overlay khi đang xóa nền */}
         {removing && (
-          <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.7)",
+          <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.75)",
             display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
             zIndex:10, gap:12 }}>
-            <div style={{ fontSize:36 }}>🤖</div>
-            <div style={{ color:"#b464ff", fontSize:13, fontWeight:700 }}>{progress || "Đang xử lý..."}</div>
-            <div style={{ color:"#6a5a40", fontSize:10, textAlign:"center", maxWidth:220 }}>
-              {progress.includes("thử lại") ? "Model AI đang khởi động, tự động thử lại..." : "AI đang phân tích và xóa nền, vui lòng chờ..."}
-            </div>
+            <div style={{ fontSize:36 }}>✨</div>
+            <div style={{ color:"#b464ff", fontSize:13, fontWeight:700 }}>Clipdrop đang xóa nền...</div>
+            <div style={{ color:"#6a5a40", fontSize:10 }}>Thường mất 2–4 giây</div>
           </div>
         )}
       </div>
 
       {/* Zoom slider */}
-      <div style={{ padding:"14px 24px 28px", display:"flex", alignItems:"center", gap:12,
+      <div style={{ padding:"14px 24px 32px", display:"flex", alignItems:"center", gap:12,
         borderTop:"1px solid rgba(255,107,0,0.12)", flexShrink:0 }}>
         <span style={{ fontSize:12 }}>🔍</span>
         <input type="range" min={1} max={3} step={0.05} value={zoom}
@@ -242,22 +216,6 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-
-      {/* Manual mask editor */}
-      {showManual && (
-        <ManualMaskEditor
-          src={activeSrc}
-          originalSrc={src}
-          onDone={(resultSrc) => {
-            setActiveSrc(resultSrc)
-            setBgRemoved(true)
-            setCrop({ x: 0, y: 0 })
-            setZoom(1)
-            setShowManual(false)
-          }}
-          onCancel={() => setShowManual(false)}
-        />
-      )}
     </div>
   )
 }

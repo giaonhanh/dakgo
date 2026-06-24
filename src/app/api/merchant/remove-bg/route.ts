@@ -1,6 +1,9 @@
+// API: POST /api/merchant/remove-bg
+// Xóa nền ảnh món bằng Clipdrop API (100 ảnh/ngày free)
+// Docs: https://clipdrop.co/apis/docs/remove-background
+
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import sharp from "sharp"
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,73 +11,39 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 })
 
-    const hfToken = process.env.HF_TOKEN
-    if (!hfToken) return NextResponse.json({ error: "HF_TOKEN chưa được cấu hình" }, { status: 503 })
+    const apiKey = process.env.CLIPDROP_API_KEY
+    if (!apiKey) return NextResponse.json({ error: "CLIPDROP_API_KEY chưa được cấu hình" }, { status: 503 })
 
-    // Nhận base64 data URL từ client
-    const { image } = await req.json()
+    // Nhận base64 từ client
+    const { image } = await req.json() as { image: string }
     if (!image) return NextResponse.json({ error: "Thiếu dữ liệu ảnh" }, { status: 400 })
 
-    const base64   = image.replace(/^data:image\/\w+;base64,/, "")
-    const origBuf  = Buffer.from(base64, "base64")
+    const base64  = image.replace(/^data:image\/\w+;base64,/, "")
+    const buffer  = Buffer.from(base64, "base64")
 
-    // Gọi HuggingFace Inference API — RMBG-1.4 (image segmentation)
-    const hfRes = await fetch(
-      "https://api-inference.huggingface.co/models/briaai/RMBG-1.4",
-      {
-        method:  "POST",
-        headers: {
-          Authorization:  `Bearer ${hfToken}`,
-          "Content-Type": "application/octet-stream",
-        },
-        body: origBuf,
-      }
-    )
+    // Gửi lên Clipdrop
+    const form = new FormData()
+    form.append("image_file", new Blob([buffer], { type: "image/png" }), "image.png")
 
-    if (!hfRes.ok) {
-      const errText = await hfRes.text()
-      console.error("[remove-bg] HF status:", hfRes.status, errText)
-      if (hfRes.status === 503) {
-        return NextResponse.json({ error: "Model đang khởi động, thử lại sau 10 giây", retry: true }, { status: 503 })
+    const res = await fetch("https://clipdrop-api.co/remove-background/v1", {
+      method:  "POST",
+      headers: { "x-api-key": apiKey },
+      body:    form,
+      signal:  AbortSignal.timeout(20000),
+    })
+
+    if (!res.ok) {
+      const errText = await res.text()
+      console.error("[remove-bg] Clipdrop error:", res.status, errText)
+      if (res.status === 402) {
+        return NextResponse.json({ error: "Đã hết lượt miễn phí hôm nay (100 ảnh/ngày). Thử lại ngày mai." }, { status: 402 })
       }
-      return NextResponse.json({ error: `HF lỗi ${hfRes.status}: ${errText.slice(0, 120)}` }, { status: 502 })
+      return NextResponse.json({ error: `Clipdrop lỗi ${res.status}` }, { status: 502 })
     }
 
-    const respContentType = hfRes.headers.get("content-type") ?? ""
+    const resultBuffer = Buffer.from(await res.arrayBuffer())
 
-    let resultPng: Buffer
-
-    if (respContentType.includes("image/")) {
-      // HF trả thẳng binary PNG — dùng luôn
-      resultPng = Buffer.from(await hfRes.arrayBuffer())
-    } else {
-      // HF trả JSON segmentation: [{score, label, mask}]
-      // mask là base64-encoded grayscale PNG (trắng = giữ, đen = xóa)
-      const json = await hfRes.json()
-      const entry = Array.isArray(json) ? json[0] : json
-      if (!entry?.mask) {
-        console.error("[remove-bg] unexpected HF response:", JSON.stringify(json).slice(0, 200))
-        return NextResponse.json({ error: "Định dạng phản hồi không hỗ trợ" }, { status: 502 })
-      }
-
-      const maskBuf = Buffer.from(entry.mask, "base64")
-
-      // Resize mask khớp kích thước ảnh gốc
-      const { width, height } = await sharp(origBuf).metadata()
-      const maskResized = await sharp(maskBuf)
-        .resize(width, height)
-        .greyscale()
-        .toBuffer()
-
-      // Ghép mask làm alpha channel: joinChannel thêm kênh thứ 4 (alpha)
-      resultPng = await sharp(origBuf)
-        .removeAlpha()
-        .joinChannel(maskResized)
-        .png()
-        .toBuffer()
-    }
-
-    return new NextResponse(resultPng.buffer as ArrayBuffer, {
+    return new NextResponse(resultBuffer.buffer as ArrayBuffer, {
       status: 200,
       headers: {
         "Content-Type":  "image/png",
