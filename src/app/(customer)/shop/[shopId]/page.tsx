@@ -227,13 +227,12 @@ function ProductSheet({
           {/* Hero image + nút × overlay */}
           <div style={{ margin:"10px 14px 0", borderRadius:16,
             overflow:"hidden", position:"relative", height:200,
-            background:"rgba(255,255,255,0.04)" }}>
+            background: product.imageUrl ? "rgba(255,255,255,0.04)" : "#3d4a5c" }}>
             <Image
               src={product.imageUrl || "/logo.png"}
               alt={product.name} fill
               sizes="(max-width: 600px) 100vw, 50vw"
-              style={{ objectFit: product.imageUrl ? "cover" : "contain",
-                padding: product.imageUrl ? 0 : 32 }} />
+              style={{ objectFit: product.imageUrl ? "cover" : "contain" }} />
             <div style={{ position:"absolute", bottom:0, left:0, right:0, height:80,
               background:"linear-gradient(to top,#0e0c09,transparent)" }} />
             <button onClick={onClose}
