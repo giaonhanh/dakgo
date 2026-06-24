@@ -206,19 +206,23 @@ function ProductSheet({
           zIndex:120, backdropFilter:"blur(4px)" }} />
       <motion.div initial={{ y:"100%" }} animate={{ y:0 }} exit={{ y:"100%" }}
         transition={{ type:"spring", damping:26, stiffness:280 }}
+        drag="y" dragConstraints={{ top:0, bottom:0 }} dragElastic={{ top:0, bottom:0.3 }}
+        onDragEnd={(_, info) => { if (info.offset.y > 80 || info.velocity.y > 500) onClose() }}
         style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:121,
           background:"#0e0c09", borderRadius:"22px 22px 0 0",
           border:"1px solid rgba(255,107,0,0.18)",
-          maxHeight:"92svh", display:"flex", flexDirection:"column" }}>
+          maxHeight:"92svh", display:"flex", flexDirection:"column",
+          touchAction:"none" }}>
 
-        {/* Handle bar */}
-        <div style={{ padding:"10px 16px 0", flexShrink:0 }}>
-          <div style={{ width:36, height:4, background:"rgba(255,255,255,0.12)",
+        {/* Handle bar — kéo xuống để đóng */}
+        <div style={{ padding:"10px 16px 0", flexShrink:0, cursor:"grab" }}>
+          <div style={{ width:36, height:4, background:"rgba(255,255,255,0.2)",
             borderRadius:2, margin:"0 auto" }} />
         </div>
 
-        {/* Scrollable body */}
-        <div style={{ flex:1, overflowY:"auto" }}>
+        {/* Scrollable body — dừng drag khi đang scroll */}
+        <div style={{ flex:1, overflowY:"auto" }}
+          onPointerDown={e => e.stopPropagation()}>
 
           {/* Hero image + nút × overlay */}
           <div style={{ margin:"10px 14px 0", borderRadius:16,
