@@ -71,6 +71,13 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
         return
       }
 
+      // Hiện số lượt còn lại nếu gần hết
+      const usedToday = Number(res.headers.get("X-Usage-Today") ?? 0)
+      const limit     = Number(res.headers.get("X-Usage-Limit") ?? 95)
+      if (usedToday >= limit - 10) {
+        setRemoveErr(`⚠️ Còn ${limit - usedToday} lượt xóa nền hôm nay`)
+      }
+
       const resultBlob = await res.blob()
       setActiveSrc(URL.createObjectURL(resultBlob))
       setBgRemoved(true)
