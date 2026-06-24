@@ -2,6 +2,7 @@
 import { useState, useCallback } from "react"
 import Cropper from "react-easy-crop"
 import type { Area } from "react-easy-crop"
+import ManualMaskEditor from "./ManualMaskEditor"
 
 interface Props {
   src: string
@@ -46,6 +47,7 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
   const [removing,   setRemoving]   = useState(false)
   const [bgRemoved,  setBgRemoved]  = useState(false)
   const [removeErr,  setRemoveErr]  = useState("")
+  const [showManual, setShowManual] = useState(false)
 
   const onCropComplete = useCallback((_: Area, p: Area) => setPixels(p), [])
 
@@ -161,6 +163,16 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
           </div>
         )}
 
+        {bgRemoved && (
+          <button onClick={() => setShowManual(true)}
+            style={{ display:"flex", alignItems:"center", gap:5,
+              background:"rgba(74,143,245,0.12)", border:"1px solid rgba(74,143,245,0.35)",
+              borderRadius:10, padding:"7px 12px", cursor:"pointer",
+              color:"#4a8ff5", fontSize:11, fontWeight:700, fontFamily:"Lexend" }}>
+            ✏️ Chỉnh tay
+          </button>
+        )}
+
         {removeErr && <span style={{ color:"#ff8080", fontSize:10 }}>⚠️ {removeErr}</span>}
 
         <div style={{ marginLeft:"auto", color:"#6a5a40", fontSize:9, textAlign:"right", lineHeight:1.4 }}>
@@ -216,6 +228,21 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+
+      {showManual && (
+        <ManualMaskEditor
+          src={activeSrc}
+          originalSrc={src}
+          onDone={resultSrc => {
+            setActiveSrc(resultSrc)
+            setBgRemoved(true)
+            setCrop({ x: 0, y: 0 })
+            setZoom(1)
+            setShowManual(false)
+          }}
+          onCancel={() => setShowManual(false)}
+        />
+      )}
     </div>
   )
 }
