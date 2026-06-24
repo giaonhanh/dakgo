@@ -380,8 +380,8 @@ function LoginContent() {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               exit={{ opacity: 0, scale: .95 }} transition={{ duration: .4 }}
               style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-              <div style={{ width: 110, height: 110, position: "relative" }}>
-                <Image src="/logo.png" alt="DakGo" fill style={{ objectFit: "contain" }} priority />
+              <div style={{ width: 110, height: 110, position: "relative", borderRadius: "22%", overflow: "hidden" }}>
+                <Image src="/logo.png" alt="DakGo" fill style={{ objectFit: "cover" }} priority />
               </div>
               <div style={{ color: "rgba(176,149,106,0.9)", fontSize: 12, textAlign: "center", lineHeight: 1.6 }}>
                 Giao hàng · Mua hộ · Xe ôm · Taxi<br />tại Krông Pắc, Đắk Lắk
@@ -412,8 +412,8 @@ function LoginContent() {
               <motion.div
                 initial={{ scale: 0, rotate: -10 }} animate={{ scale: 1, rotate: 0 }}
                 transition={{ delay: .1, type: "spring", damping: 12 }}
-                style={{ width: 68, height: 68, marginBottom: 12, position: "relative" }}>
-                <Image src="/logo.png" alt="DakGo" fill style={{ objectFit: "contain" }} />
+                style={{ width: 68, height: 68, marginBottom: 12, position: "relative", borderRadius: "22%", overflow: "hidden" }}>
+                <Image src="/logo.png" alt="DakGo" fill style={{ objectFit: "cover" }} />
               </motion.div>
               <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, marginBottom: 18, textAlign: "center" }}>
                 Giao đồ ăn · Giao hàng · Xe ôm · Taxi tại Krông Pắc
