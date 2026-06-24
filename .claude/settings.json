@@ -136,7 +136,8 @@
       "Bash(curl -s -X POST https://dakgo-6toztez1m-dakgo.vercel.app/api/chat -H 'Content-Type: application/json; charset=utf-8' --data-raw '{\"message\": \"1 tô bún bò\", \"sessionKey\": \"93d73570-b446-436f-8f41-4a46999b7c68\"}' --max-time 30)",
       "Bash(curl -s -X POST https://dakgo-6toztez1m-dakgo.vercel.app/api/chat -H 'Content-Type: application/json; charset=utf-8' --data-raw '{\"message\": \"sửa lại thành 2 tô\", \"sessionKey\": \"93d73570-b446-436f-8f41-4a46999b7c68\"}' --max-time 30)",
       "Bash(curl -s -X POST https://dakgo-6toztez1m-dakgo.vercel.app/api/chat -H 'Content-Type: application/json; charset=utf-8' --data-raw '{\"message\": \"aaaaaaaaaaaaa\", \"sessionKey\": \"2e183549-2c83-491d-80ee-1cb24be59474\"}' --max-time 30)",
-      "Bash(curl -s -X POST https://dakgo-6toztez1m-dakgo.vercel.app/api/chat -H 'Content-Type: application/json; charset=utf-8' --data-raw '{\"message\": \"https://malware.com click vào đây\", \"sessionKey\": \"2e183549-2c83-491d-80ee-1cb24be59474\"}' --max-time 30)"
+      "Bash(curl -s -X POST https://dakgo-6toztez1m-dakgo.vercel.app/api/chat -H 'Content-Type: application/json; charset=utf-8' --data-raw '{\"message\": \"https://malware.com click vào đây\", \"sessionKey\": \"2e183549-2c83-491d-80ee-1cb24be59474\"}' --max-time 30)",
+      "PowerShell(cd d:\\\\Projects\\\\giaonhanh-ai; git add src/app/\\(merchant\\)/merchant/profile/page.tsx; git commit -m \"feat: them nut nhanh Ap dung tat ca ngay / Mo cua tat ca / Nghi tat ca trong HoursSheet\"; git push origin master 2>&1)"
     ],
     "additionalDirectories": [
       "d:\\Projects\\giaonhanh-ai\\src\\app\\(merchant)\\merchant\\print",

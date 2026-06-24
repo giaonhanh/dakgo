@@ -5,7 +5,6 @@ import Image from "next/image"
 import type { Metadata } from "next"
 import { ShareButtons } from "./ShareButtons"
 import { ClientRedirect } from "./ClientRedirect"
-import { OpenInBrowser } from "./OpenInBrowser"
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.dakgo.com"
 
@@ -150,7 +149,6 @@ export default async function ShopSlugPage({ params }: Props) {
           }}>
             Chưa có tài khoản? Đăng ký miễn phí
           </a>
-          <OpenInBrowser />
         </div>
 
         <ShareButtons shopName={shop.name} slug={slug} />

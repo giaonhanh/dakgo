@@ -1,0 +1,120 @@
+import { getCachedGeocode, setCachedGeocode } from "./geocodeCache"
+
+interface VietmapReverseResult {
+  display?: string
+  name?:    string
+  ref_id?:  string
+}
+
+/** Reverse geocode — trả về địa chỉ đầy đủ */
+export async function reverseGeocodeStructured(lat: number, lng: number): Promise<{ address: string; houseNote: string }> {
+  const cached = getCachedGeocode(lat, lng)
+  if (cached) return { address: cached, houseNote: "" }
+
+  try {
+    const res = await fetch(`/api/geocode?latlng=${lat},${lng}`)
+    if (res.ok) {
+      const data: VietmapReverseResult[] = await res.json()
+      const address = data[0]?.display ?? ""
+      if (address) {
+        setCachedGeocode(lat, lng, address)
+        return { address, houseNote: "" }
+      }
+    }
+  } catch { /* fallback */ }
+  return { address: "", houseNote: "" }
+}
+
+/** Reverse geocode — trả về chuỗi địa chỉ đơn giản */
+export async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const cached = getCachedGeocode(lat, lng)
+  if (cached) return cached
+
+  try {
+    const res = await fetch(`/api/geocode?latlng=${lat},${lng}`)
+    if (res.ok) {
+      const data: VietmapReverseResult[] = await res.json()
+      const address = data[0]?.display ?? ""
+      if (address) { setCachedGeocode(lat, lng, address); return address }
+    }
+  } catch { /* fallback */ }
+  return ""
+}
+
+/** Lấy khoảng cách km theo cung đường thực — dùng VietMap Route API */
+export async function getRouteKm(
+  fromLat: number, fromLng: number,
+  toLat: number,   toLng: number,
+): Promise<number> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+    const res = await fetch("/api/routes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        origin:      { location: { latLng: { latitude: fromLat, longitude: fromLng } } },
+        destination: { location: { latLng: { latitude: toLat,   longitude: toLng   } } },
+      }),
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+    if (res.ok) {
+      const data = await res.json()
+      const meters: number = data?.routes?.[0]?.distanceMeters
+      if (typeof meters === "number" && meters > 0) return meters / 1000
+    }
+  } catch { /* fallback */ }
+  return haversineKm(fromLat, fromLng, toLat, toLng)
+}
+
+/** Tính phí theo cấu hình admin — dùng cho food delivery, xe ôm, giao hộ, mua hộ */
+export function calcDeliveryFeeFromPricing(
+  km: number,
+  rows: string[],
+  extra: string,
+): number {
+  const extraPrice = parseInt(extra) || 0
+
+  const getPriceAt = (i: number): number => {
+    const idx = Math.min(i, rows.length - 1)
+    for (let j = idx; j >= 0; j--) {
+      if (rows[j] && rows[j] !== "") return parseInt(rows[j]) || 0
+    }
+    return 0
+  }
+
+  const effectiveKm = Math.max(km, 1)
+  const wholeKm = Math.floor(effectiveKm)
+  const fracKm  = effectiveKm - wholeKm
+  let total = 0
+
+  for (let i = 0; i < Math.min(wholeKm, 10); i++) total += getPriceAt(i)
+  if (wholeKm > 10) total += (wholeKm - 10) * extraPrice
+
+  if (fracKm > 0) {
+    const fracPrice = wholeKm < 10 ? getPriceAt(wholeKm) : extraPrice
+    total += Math.round(fracKm * fracPrice)
+  }
+
+  return Math.round(total / 500) * 500
+}
+
+/** Fallback nếu chưa load được cấu hình admin */
+export function calcDeliveryFee(km: number): number {
+  const k = Math.max(km, 1)
+  let fee: number
+  if (k <= 1) fee = 10000
+  else if (k <= 3) fee = 10000 + Math.round((k - 1) * 5000)
+  else fee = 20000 + Math.round((k - 3) * 3500)
+  return Math.round(fee / 500) * 500
+}
+
+export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R    = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a    = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
