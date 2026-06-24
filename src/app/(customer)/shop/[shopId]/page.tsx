@@ -222,17 +222,16 @@ function ProductSheet({
 
           {/* Hero image + nút × overlay */}
           <div style={{ margin:"10px 14px 0", borderRadius:16,
-            overflow:"hidden", position:"relative",
-            height: product.imageUrl ? 200 : 0,
+            overflow:"hidden", position:"relative", height:200,
             background:"rgba(255,255,255,0.04)" }}>
-            {product.imageUrl && (
-              <Image src={product.imageUrl} alt={product.name} fill
-                sizes="(max-width: 600px) 100vw, 50vw"
-                style={{ objectFit:"cover" }} />
-            )}
+            <Image
+              src={product.imageUrl || "/logo.png"}
+              alt={product.name} fill
+              sizes="(max-width: 600px) 100vw, 50vw"
+              style={{ objectFit: product.imageUrl ? "cover" : "contain",
+                padding: product.imageUrl ? 0 : 32 }} />
             <div style={{ position:"absolute", bottom:0, left:0, right:0, height:80,
               background:"linear-gradient(to top,#0e0c09,transparent)" }} />
-            {/* Nút X luôn nổi trên ảnh */}
             <button onClick={onClose}
               style={{ position:"absolute", top:10, right:10, width:34, height:34,
                 borderRadius:10, border:"none",
@@ -241,15 +240,6 @@ function ProductSheet({
                 display:"flex", alignItems:"center", justifyContent:"center",
                 zIndex:10, lineHeight:1 }}>×</button>
           </div>
-
-          {/* Nút X riêng khi không có ảnh */}
-          {!product.imageUrl && (
-            <button onClick={onClose}
-              style={{ position:"absolute", top:16, right:14, width:34, height:34,
-                borderRadius:10, border:"none", background:"rgba(255,255,255,0.08)",
-                color:"#6a5a40", fontSize:18, cursor:"pointer",
-                display:"flex", alignItems:"center", justifyContent:"center", zIndex:10 }}>×</button>
-          )}
 
           {/* Product name + price + description */}
           <div style={{ padding:"14px 16px 0" }}>
