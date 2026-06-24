@@ -22,22 +22,22 @@ export async function POST(req: NextRequest) {
     // Lấy thông tin đơn + shop + merchant
     const { data: order } = await db
       .from("orders")
-      .select("id, total_amount, ship_fee, delivery_address, shop_id, customer_id, status, shops(owner_id, name)")
+      .select("id, total_amount, ship_fee, delivery_address, shop_id, customer_id, status, shops(owner_id, name, shop_type)")
       .eq("id", order_id)
       .single()
 
     if (!order) return NextResponse.json({ error: "Không tìm thấy đơn" }, { status: 404 })
     if (order.status === "cancelled") return NextResponse.json({ skipped: true })
 
-    type ShopRef = { owner_id: string; name: string } | { owner_id: string; name: string }[] | null
-    const shopRef = order.shops as ShopRef
-    const shop    = Array.isArray(shopRef) ? shopRef[0] : shopRef
+    type ShopRef = { owner_id: string; name: string; shop_type: string | null } | { owner_id: string; name: string; shop_type: string | null }[] | null
+    const shopRef    = order.shops as ShopRef
+    const shop       = Array.isArray(shopRef) ? shopRef[0] : shopRef
     const merchantId = shop?.owner_id
-    const shopName   = shop?.name ?? "Cửa hàng"
+    const isBuyForMe = shop?.shop_type === "delivery"
     const shortId    = order_id.slice(0, 8).toUpperCase()
 
-    // ── 1. Notify merchant ────────────────────────────────────────────
-    if (merchantId) {
+    // ── 1. Notify merchant (chỉ với quán Đối tác — Mua hộ bỏ qua) ───
+    if (merchantId && !isBuyForMe) {
       const total = Number(order.total_amount).toLocaleString("vi-VN")
       await Promise.all([
         sendPushToUser(merchantId, {
@@ -55,6 +55,14 @@ export async function POST(req: NextRequest) {
           data:    { order_id, url: "/merchant" },
         }),
       ])
+    }
+
+    // ── 1b. Quán Mua hộ: tự động accept đơn, không cần merchant xác nhận ──
+    if (isBuyForMe) {
+      await db.from("orders").update({
+        status:      "accepted",
+        accepted_at: new Date().toISOString(),
+      }).eq("id", order_id)
     }
 
     // ── 2. Dispatch tài xế gần nhất ──────────────────────────────────
