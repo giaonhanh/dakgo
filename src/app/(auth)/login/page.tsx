@@ -380,17 +380,8 @@ function LoginContent() {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               exit={{ opacity: 0, scale: .95 }} transition={{ duration: .4 }}
               style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-              <div style={{
-                width: 110, height: 110, borderRadius: 28,
-                position: "relative", overflow: "hidden",
-                boxShadow: "0 0 0 3px rgba(255,255,255,0.15), 0 8px 32px rgba(0,0,0,0.5)",
-              }}>
-                <Image src="/logo.png" alt="DakGo" fill style={{ objectFit: "cover" }} priority />
-                <div style={{
-                  position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
-                  background: "linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent)",
-                  animation: "logoShine 2s ease-in-out infinite",
-                }} />
+              <div style={{ width: 110, height: 110, position: "relative" }}>
+                <Image src="/logo.png" alt="DakGo" fill style={{ objectFit: "contain" }} priority />
               </div>
               <div style={{ color: "rgba(176,149,106,0.9)", fontSize: 12, textAlign: "center", lineHeight: 1.6 }}>
                 Giao hàng · Mua hộ · Xe ôm · Taxi<br />tại Krông Pắc, Đắk Lắk
@@ -421,17 +412,8 @@ function LoginContent() {
               <motion.div
                 initial={{ scale: 0, rotate: -10 }} animate={{ scale: 1, rotate: 0 }}
                 transition={{ delay: .1, type: "spring", damping: 12 }}
-                style={{
-                  width: 68, height: 68, borderRadius: 20,
-                  marginBottom: 12, position: "relative", overflow: "hidden",
-                  boxShadow: "0 0 0 3px rgba(255,255,255,0.2), 0 8px 24px rgba(0,0,0,0.4)",
-                }}>
-                <Image src="/logo.png" alt="DakGo" fill style={{ objectFit: "cover" }} />
-                <div style={{
-                  position: "absolute", top: 0, left: "-80%", width: "50%", height: "100%",
-                  background: "linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent)",
-                  animation: "logoShine 3s ease-in-out infinite",
-                }} />
+                style={{ width: 68, height: 68, marginBottom: 12, position: "relative" }}>
+                <Image src="/logo.png" alt="DakGo" fill style={{ objectFit: "contain" }} />
               </motion.div>
               <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, marginBottom: 18, textAlign: "center" }}>
                 Giao đồ ăn · Giao hàng · Xe ôm · Taxi tại Krông Pắc
