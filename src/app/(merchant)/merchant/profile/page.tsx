@@ -123,20 +123,6 @@ function HoursSheet({ onClose, shopId, initialHours, onSaved }: {
               cursor: "pointer", fontFamily: "Lexend" }}>
             📋 Áp dụng tất cả ngày
           </button>
-          <button
-            onClick={() => setHours(prev => prev.map(h => ({ ...h, open: true })))}
-            style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid rgba(62,207,110,0.35)",
-              background: "rgba(62,207,110,0.08)", color: "#3ecf6e", fontSize: 10, fontWeight: 700,
-              cursor: "pointer", fontFamily: "Lexend" }}>
-            ✅ Mở cửa tất cả
-          </button>
-          <button
-            onClick={() => setHours(prev => prev.map(h => ({ ...h, open: false })))}
-            style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid rgba(255,64,64,0.25)",
-              background: "rgba(255,64,64,0.07)", color: "#ff8080", fontSize: 10, fontWeight: 700,
-              cursor: "pointer", fontFamily: "Lexend" }}>
-            🚫 Nghỉ tất cả
-          </button>
         </div>
 
         {hours.map((h, i) => (
