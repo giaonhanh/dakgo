@@ -68,7 +68,7 @@ interface DriverRow {
 }
 
 interface MerchantRow {
-  id: string; shopName: string; ownerName: string; phone: string
+  id: string; shopName: string; ownerId: string; ownerName: string; phone: string; ownerIsActive: boolean
   shopStatus: ShopStatus; isOpen: boolean
   ratingAvg: number | null; totalReviews: number
   commissionRate: number; isNegotiated: boolean; createdDate: string
@@ -101,7 +101,7 @@ export default function AdminUsersPage() {
   const [confirmAction, setConfirmAction] = useState<{ type: "lock" | "unlock"; id: string } | null>(null)
   const [usersLoading,  setUsersLoading]  = useState(true)
   const [saving,        setSaving]        = useState(false)
-  const [resetModal,    setResetModal]    = useState<AppUser | null>(null)
+  const [resetModal,    setResetModal]    = useState<{ id: string; fullName: string; phone: string } | null>(null)
   const [newPassword,   setNewPassword]   = useState("")
   const [resetSaving,   setResetSaving]   = useState(false)
   const [resetMsg,      setResetMsg]      = useState("")
@@ -136,6 +136,12 @@ export default function AdminUsersPage() {
   const [merchantFilter,   setMerchantFilter]   = useState<"all" | ShopStatus>("all")
   const [merchantInline,   setMerchantInline]   = useState<{ id: string; value: string } | null>(null)
   const [merchantSaving,   setMerchantSaving]   = useState(false)
+  const [merchantDetail,   setMerchantDetail]   = useState<MerchantRow | null>(null)
+  const [merchantConfirm,  setMerchantConfirm]  = useState<{ type: "lock" | "unlock"; ownerId: string; name: string } | null>(null)
+  const [phoneModal,       setPhoneModal]       = useState<{ ownerId: string; name: string; current: string } | null>(null)
+  const [newPhone,         setNewPhone]         = useState("")
+  const [phoneMsg,         setPhoneMsg]         = useState("")
+  const [phoneSaving,      setPhoneSaving]      = useState(false)
   const [shopTypeModal,    setShopTypeModal]    = useState<{ id: string; name: string; current: "partner" | "delivery" | null } | null>(null)
   const [shopTypeSaving,   setShopTypeSaving]   = useState(false)
   const [catModal,         setCatModal]         = useState<{ id: string; name: string; current: string[] } | null>(null)
@@ -539,15 +545,17 @@ export default function AdminUsersPage() {
     if (shopErr) console.error("[loadMerchants] shops query error:", shopErr)
     if (!rows || rows.length === 0) { setMerchantsLoading(false); setMerchantsLoaded(true); return }
     const ownerIds = [...new Set(rows.map(r => r.owner_id).filter(Boolean))]
-    const { data: profiles } = await supabase.from("profiles").select("id, full_name, phone").in("id", ownerIds)
+    const { data: profiles } = await supabase.from("profiles").select("id, full_name, phone, is_active").in("id", ownerIds)
     const profMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p]))
     setMerchants(rows.map(r => {
       const p = profMap[r.owner_id] ?? {}
       return {
         id: r.id,
         shopName: r.name,
+        ownerId: r.owner_id,
         ownerName: (p as { full_name?: string }).full_name ?? "Chủ quán",
         phone: (p as { phone?: string }).phone ?? "—",
+        ownerIsActive: (p as { is_active?: boolean }).is_active ?? true,
         shopStatus: (r.status ?? "pending") as ShopStatus,
         isOpen: r.is_open ?? false,
         ratingAvg: r.rating_avg ?? null,
@@ -617,6 +625,46 @@ export default function AdminUsersPage() {
     if (confirmAction.type === "lock")   await lockUser(confirmAction.id)
     if (confirmAction.type === "unlock") await unlockUser(confirmAction.id)
     setConfirmAction(null); setSelected(null)
+  }
+  const lockMerchant = async (ownerId: string) => {
+    setSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from("profiles").update({ is_active: false }).eq("id", ownerId)
+    if (error) { fire("❌ Lỗi khoá tài khoản: " + error.message, false); setSaving(false); return }
+    await supabase.from("blacklist").upsert({ user_id: ownerId, reason: "Khóa bởi admin", auto_triggered: false })
+    setMerchants(p => p.map(m => m.ownerId === ownerId ? { ...m, ownerIsActive: false } : m))
+    if (merchantDetail?.ownerId === ownerId) setMerchantDetail(s => s ? { ...s, ownerIsActive: false } : s)
+    fire("🔒 Đã khoá tài khoản cửa hàng"); setSaving(false)
+  }
+  const unlockMerchant = async (ownerId: string) => {
+    setSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from("profiles").update({ is_active: true }).eq("id", ownerId)
+    if (error) { fire("❌ Lỗi mở khóa: " + error.message, false); setSaving(false); return }
+    await supabase.from("blacklist").delete().eq("user_id", ownerId)
+    setMerchants(p => p.map(m => m.ownerId === ownerId ? { ...m, ownerIsActive: true } : m))
+    if (merchantDetail?.ownerId === ownerId) setMerchantDetail(s => s ? { ...s, ownerIsActive: true } : s)
+    fire("🔓 Đã mở khoá tài khoản cửa hàng"); setSaving(false)
+  }
+  const execMerchantConfirm = async () => {
+    if (!merchantConfirm) return
+    if (merchantConfirm.type === "lock")   await lockMerchant(merchantConfirm.ownerId)
+    if (merchantConfirm.type === "unlock") await unlockMerchant(merchantConfirm.ownerId)
+    setMerchantConfirm(null)
+  }
+  const changePhone = async () => {
+    if (!phoneModal) return
+    const phone = newPhone.trim()
+    if (!/^0\d{9}$/.test(phone)) { setPhoneMsg("SĐT không hợp lệ (10 số, bắt đầu 0)"); return }
+    setPhoneSaving(true); setPhoneMsg("")
+    const supabase = createClient()
+    const { error } = await supabase.from("profiles").update({ phone }).eq("id", phoneModal.ownerId)
+    if (error) { setPhoneMsg("❌ Lỗi: " + error.message); setPhoneSaving(false); return }
+    setMerchants(p => p.map(m => m.ownerId === phoneModal.ownerId ? { ...m, phone } : m))
+    if (merchantDetail?.ownerId === phoneModal.ownerId) setMerchantDetail(s => s ? { ...s, phone } : s)
+    setPhoneMsg("✅ Đã cập nhật SĐT")
+    setTimeout(() => { setPhoneModal(null); setNewPhone(""); setPhoneMsg("") }, 1500)
+    setPhoneSaving(false)
   }
   const addPoints = async () => {
     if (!pointsModal) return
@@ -1133,9 +1181,9 @@ export default function AdminUsersPage() {
               {/* Table */}
               <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 13, overflow: "hidden" }}>
                 <div style={{ overflowX: "auto" }}>
-                  <div style={{ minWidth: 780 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 55px 72px 80px 70px", gap: 8, padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
-                      {["", "Cửa hàng", "Chủ / SĐT", "Trạng thái", "Rating", "Hoa hồng", "Ngày tạo", "Nhãn"].map(h => (
+                  <div style={{ minWidth: 880 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 55px 72px 80px 70px 90px", gap: 8, padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
+                      {["", "Cửa hàng", "Chủ / SĐT", "Trạng thái", "Rating", "Hoa hồng", "Ngày tạo", "Nhãn", "Thao tác"].map(h => (
                         <div key={h} style={{ color: "rgba(144,128,176,0.4)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>{h}</div>
                       ))}
                     </div>
@@ -1147,7 +1195,7 @@ export default function AdminUsersPage() {
                       const ss = SHOP_STATUS_CFG[m.shopStatus]
                       return (
                         <div key={m.id} className="user-row"
-                          style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 55px 72px 80px 70px", gap: 8, padding: "10px 14px", alignItems: "center", borderBottom: idx < shownMerchants.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", transition: "all 0.15s" }}>
+                          style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 55px 72px 80px 70px 90px", gap: 8, padding: "10px 14px", alignItems: "center", borderBottom: idx < shownMerchants.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", transition: "all 0.15s" }}>
                           <div style={{ width: 34, height: 34, borderRadius: 9, background: getCategoryByValue(m.category).color, border: "1px solid rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, position: "relative" }}>
                             {getCategoryByValue(m.category).emoji}
                             {m.isOpen && <div style={{ position: "absolute", bottom: -2, right: -2, width: 10, height: 10, borderRadius: "50%", background: "#3ecf6e", border: "1.5px solid #06050a", boxShadow: "0 0 4px #3ecf6e" }} />}
@@ -1187,6 +1235,14 @@ export default function AdminUsersPage() {
                               style={{ fontSize: 8, padding: "2px 5px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(144,128,176,0.6)", cursor: "pointer", fontFamily: "Lexend" }}>
                               ✏️ Sửa
                             </button>
+                          </div>
+                          {/* Thao tác */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }} onClick={e => e.stopPropagation()}>
+                            {m.ownerIsActive
+                              ? <button onClick={() => setMerchantConfirm({ type: "lock",   ownerId: m.ownerId, name: m.ownerName })} style={{ padding: "4px 7px", borderRadius: 6, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,64,64,0.08)",  border: "1px solid rgba(255,64,64,0.2)",  color: "#ff4040", fontSize: 8, fontWeight: 700, whiteSpace: "nowrap" }}>🔒 Khóa TK</button>
+                              : <button onClick={() => setMerchantConfirm({ type: "unlock", ownerId: m.ownerId, name: m.ownerName })} style={{ padding: "4px 7px", borderRadius: 6, cursor: "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.08)",  border: "1px solid rgba(62,207,110,0.2)",  color: "#3ecf6e", fontSize: 8, fontWeight: 700, whiteSpace: "nowrap" }}>🔓 Mở TK</button>
+                            }
+                            <button onClick={() => setMerchantDetail(m)} style={{ padding: "4px 7px", borderRadius: 6, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(144,128,176,0.7)", fontSize: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Chi tiết</button>
                           </div>
                         </div>
                       )
@@ -1283,6 +1339,101 @@ export default function AdminUsersPage() {
                   )}
                 </div>
               </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ── Merchant Detail Drawer ──────────────────────────────────────────── */}
+        <AnimatePresence>
+          {merchantDetail && (
+            <>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setMerchantDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 60, backdropFilter: "blur(4px)" }} />
+              <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }}
+                style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: 300, maxWidth: "100vw", background: "#0c0a14", border: "1px solid rgba(255,107,0,0.15)", borderRadius: "16px 0 0 16px", zIndex: 61, display: "flex", flexDirection: "column" }}>
+                <div style={{ padding: "18px 18px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#f0eaff" }}>Chi tiết cửa hàng</div>
+                  <button onClick={() => setMerchantDetail(null)} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(144,128,176,0.6)", cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+                </div>
+                <div style={{ flex: 1, overflowY: "auto", padding: "16px 18px" }}>
+                  {/* Avatar + tên */}
+                  <div style={{ textAlign: "center", marginBottom: 16 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 14, background: getCategoryByValue(merchantDetail.category).color, border: "1px solid rgba(255,255,255,0.12)", fontSize: 26, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px" }}>{getCategoryByValue(merchantDetail.category).emoji}</div>
+                    <div style={{ color: "#f0eaff", fontSize: 13, fontWeight: 700 }}>{merchantDetail.shopName}</div>
+                    <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 9, marginTop: 3 }}>{merchantDetail.address}</div>
+                    <div style={{ marginTop: 6, display: "flex", justifyContent: "center", gap: 6 }}>
+                      {(() => { const ss = SHOP_STATUS_CFG[merchantDetail.shopStatus]; return <span style={{ fontSize: 8, fontWeight: 700, padding: "2px 8px", borderRadius: 5, border: `1px solid ${ss.border}`, background: ss.bg, color: ss.color }}>{ss.label}</span> })()}
+                      {!merchantDetail.ownerIsActive && <span style={{ fontSize: 8, fontWeight: 700, padding: "2px 8px", borderRadius: 5, border: "1px solid rgba(255,64,64,0.3)", background: "rgba(255,64,64,0.08)", color: "#ff4040" }}>TK bị khóa</span>}
+                    </div>
+                  </div>
+                  {/* Thông tin */}
+                  {([
+                    ["Chủ quán", merchantDetail.ownerName],
+                    ["Số điện thoại", merchantDetail.phone],
+                    ["Hoa hồng", merchantDetail.commissionRate + "%"],
+                    ["Rating", merchantDetail.ratingAvg !== null ? "⭐ " + merchantDetail.ratingAvg : "—"],
+                    ["Nhãn", merchantDetail.shopType === "delivery" ? "🛒 Mua hộ" : merchantDetail.shopType === "partner" ? "🤝 Đối tác" : "—"],
+                    ["Ngày tạo", merchantDetail.createdDate],
+                  ] as [string, string][]).map(([k, v]) => (
+                    <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                      <span style={{ color: "rgba(144,128,176,0.5)", fontSize: 9 }}>{k}</span>
+                      <span style={{ color: "#f0eaff", fontSize: 9, fontWeight: 600, textAlign: "right" }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ padding: "12px 18px 18px", borderTop: "1px solid rgba(255,255,255,0.07)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <button onClick={() => { setPhoneModal({ ownerId: merchantDetail.ownerId, name: merchantDetail.ownerName, current: merchantDetail.phone }); setNewPhone(merchantDetail.phone); setPhoneMsg("") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(74,143,245,0.08)", border: "1px solid rgba(74,143,245,0.25)", color: "#4a8ff5", fontSize: 11, fontWeight: 700 }}>📱 Đổi số điện thoại</button>
+                  <button onClick={() => { setResetModal({ id: merchantDetail.ownerId, fullName: merchantDetail.ownerName, phone: merchantDetail.phone }); setNewPassword(""); setResetMsg("") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.25)", color: "#FF8C00", fontSize: 11, fontWeight: 700 }}>🔑 Đặt lại mật khẩu</button>
+                  {merchantDetail.ownerIsActive
+                    ? <button onClick={() => setMerchantConfirm({ type: "lock",   ownerId: merchantDetail.ownerId, name: merchantDetail.ownerName })} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,64,64,0.08)",  border: "1px solid rgba(255,64,64,0.2)",  color: "#ff4040", fontSize: 11, fontWeight: 700 }}>🔒 Khóa tài khoản</button>
+                    : <button onClick={() => setMerchantConfirm({ type: "unlock", ownerId: merchantDetail.ownerId, name: merchantDetail.ownerName })} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.08)", border: "1px solid rgba(62,207,110,0.2)", color: "#3ecf6e", fontSize: 11, fontWeight: 700 }}>🔓 Mở khóa tài khoản</button>
+                  }
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ── Merchant Lock Confirm ─────────────────────────────────────────────── */}
+        <AnimatePresence>
+          {merchantConfirm && (
+            <>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setMerchantConfirm(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 70, backdropFilter: "blur(6px)" }} />
+              <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 71, width: 300, maxWidth: "calc(100vw - 32px)" }}>
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
+                  style={{ background: "#0d0b19", border: "1px solid rgba(255,107,0,0.2)", borderRadius: 18, padding: "22px 20px 18px" }}>
+                  <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>{merchantConfirm.type === "lock" ? "🔒" : "🔓"}</div>
+                  <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 6 }}>{merchantConfirm.type === "lock" ? "Khóa tài khoản?" : "Mở khóa tài khoản?"}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, textAlign: "center", background: merchantConfirm.type === "lock" ? "rgba(255,64,64,0.1)" : "rgba(62,207,110,0.1)", border: `1px solid ${merchantConfirm.type === "lock" ? "rgba(255,64,64,0.25)" : "rgba(62,207,110,0.25)"}`, borderRadius: 7, padding: "5px 10px", marginBottom: 14, color: merchantConfirm.type === "lock" ? "#ff4040" : "#3ecf6e" }}>{merchantConfirm.name}</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setMerchantConfirm(null)} style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(144,128,176,0.6)", fontSize: 11, fontWeight: 600 }}>Hủy</button>
+                    <button onClick={execMerchantConfirm} disabled={saving} style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", background: merchantConfirm.type === "lock" ? "rgba(255,64,64,0.12)" : "rgba(62,207,110,0.12)", border: `1px solid ${merchantConfirm.type === "lock" ? "rgba(255,64,64,0.3)" : "rgba(62,207,110,0.3)"}`, color: merchantConfirm.type === "lock" ? "#ff4040" : "#3ecf6e", fontSize: 11, fontWeight: 800 }}>{merchantConfirm.type === "lock" ? "🔒 Khóa" : "🔓 Mở khóa"}</button>
+                  </div>
+                </motion.div>
+              </div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ── Phone Change Modal ───────────────────────────────────────────────── */}
+        <AnimatePresence>
+          {phoneModal && (
+            <>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPhoneModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 70, backdropFilter: "blur(6px)" }} />
+              <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 71, width: 320, maxWidth: "calc(100vw - 32px)" }}>
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ type: "spring", damping: 22, stiffness: 350 }}
+                  style={{ background: "#0d0b19", border: "1px solid rgba(74,143,245,0.2)", borderRadius: 18, padding: "22px 20px 18px" }}>
+                  <div style={{ fontSize: 34, textAlign: "center", marginBottom: 10 }}>📱</div>
+                  <div style={{ color: "#f0eaff", fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>Đổi số điện thoại</div>
+                  <div style={{ color: "rgba(144,128,176,0.5)", fontSize: 10, textAlign: "center", marginBottom: 16 }}>{phoneModal.name} · Hiện tại: {phoneModal.current}</div>
+                  <input value={newPhone} onChange={e => setNewPhone(e.target.value)} type="tel" placeholder="Số điện thoại mới (10 số)"
+                    style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: "10px 13px", color: "#f0eaff", fontSize: 12, fontFamily: "Lexend", marginBottom: 8, boxSizing: "border-box" }} />
+                  {phoneMsg && <div style={{ fontSize: 10, color: phoneMsg.startsWith("✅") ? "#3ecf6e" : "#ff6060", marginBottom: 10, textAlign: "center", background: phoneMsg.startsWith("✅") ? "rgba(62,207,110,0.08)" : "rgba(255,64,64,0.08)", borderRadius: 8, padding: "6px 10px" }}>{phoneMsg}</div>}
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <button onClick={() => setPhoneModal(null)} style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(144,128,176,0.6)", fontSize: 11, fontWeight: 600 }}>Hủy</button>
+                    <button onClick={changePhone} disabled={phoneSaving} style={{ flex: 1, height: 40, borderRadius: 10, cursor: "pointer", fontFamily: "Lexend", background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.3)", color: "#4a8ff5", fontSize: 11, fontWeight: 800 }}>{phoneSaving ? "Đang lưu..." : "✅ Xác nhận"}</button>
+                  </div>
+                </motion.div>
+              </div>
             </>
           )}
         </AnimatePresence>
