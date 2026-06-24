@@ -211,36 +211,45 @@ function ProductSheet({
           border:"1px solid rgba(255,107,0,0.18)",
           maxHeight:"92svh", display:"flex", flexDirection:"column" }}>
 
-        {/* Handle bar + close button */}
-        <div style={{ padding:"10px 16px 0", flexShrink:0, position:"relative" }}>
+        {/* Handle bar */}
+        <div style={{ padding:"10px 16px 0", flexShrink:0 }}>
           <div style={{ width:36, height:4, background:"rgba(255,255,255,0.12)",
             borderRadius:2, margin:"0 auto" }} />
-          <button onClick={onClose}
-            style={{ position:"absolute", top:6, right:12, width:32, height:32,
-              borderRadius:9, border:"none", background:"rgba(255,255,255,0.08)",
-              color:"#6a5a40", fontSize:18, cursor:"pointer",
-              display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
         </div>
 
         {/* Scrollable body */}
         <div style={{ flex:1, overflowY:"auto" }}>
 
-          {/* Hero image */}
-          <div style={{ width:"100%", height:220, background:"rgba(255,255,255,0.04)",
-            overflow:"hidden", position:"relative" }}>
-            {product.imageUrl ? (
+          {/* Hero image + nút × overlay */}
+          <div style={{ margin:"10px 14px 0", borderRadius:16,
+            overflow:"hidden", position:"relative",
+            height: product.imageUrl ? 200 : 0,
+            background:"rgba(255,255,255,0.04)" }}>
+            {product.imageUrl && (
               <Image src={product.imageUrl} alt={product.name} fill
                 sizes="(max-width: 600px) 100vw, 50vw"
                 style={{ objectFit:"cover" }} />
-            ) : (
-              <div style={{ width:"100%", height:"100%", display:"flex",
-                alignItems:"center", justifyContent:"center", fontSize:72, opacity:.3 }}>
-                🍽️
-              </div>
             )}
             <div style={{ position:"absolute", bottom:0, left:0, right:0, height:80,
               background:"linear-gradient(to top,#0e0c09,transparent)" }} />
+            {/* Nút X luôn nổi trên ảnh */}
+            <button onClick={onClose}
+              style={{ position:"absolute", top:10, right:10, width:34, height:34,
+                borderRadius:10, border:"none",
+                background:"rgba(0,0,0,0.55)", backdropFilter:"blur(8px)",
+                color:"#f8f0e0", fontSize:18, cursor:"pointer",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                zIndex:10, lineHeight:1 }}>×</button>
           </div>
+
+          {/* Nút X riêng khi không có ảnh */}
+          {!product.imageUrl && (
+            <button onClick={onClose}
+              style={{ position:"absolute", top:16, right:14, width:34, height:34,
+                borderRadius:10, border:"none", background:"rgba(255,255,255,0.08)",
+                color:"#6a5a40", fontSize:18, cursor:"pointer",
+                display:"flex", alignItems:"center", justifyContent:"center", zIndex:10 }}>×</button>
+          )}
 
           {/* Product name + price + description */}
           <div style={{ padding:"14px 16px 0" }}>
