@@ -182,9 +182,6 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
 
         {removeErr && <span style={{ color:"#ff8080", fontSize:10 }}>⚠️ {removeErr}</span>}
 
-        <div style={{ marginLeft:"auto", color:"#6a5a40", fontSize:9, textAlign:"right", lineHeight:1.4 }}>
-          Clipdrop AI · 100 ảnh/ngày free
-        </div>
       </div>
 
       {/* Cropper area */}
