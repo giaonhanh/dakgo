@@ -142,7 +142,7 @@ export default function ShopPreviewPage() {
     const localUrl = URL.createObjectURL(file)
     setCoverUrl(localUrl)
     setUploading("cover")
-    const compressed = await compressImage(file, 800, 400, 0.92).catch(() => file)
+    const compressed = await compressImage(file, 1600, 800, 0.92).catch(() => file)
     const path = `${shopId}/cover`
     const { error: upErr } = await supabase.storage.from("shops").upload(path, compressed, { upsert: true, contentType: "image/webp" })
     if (upErr) { fire("❌ Lỗi tải ảnh bìa: " + upErr.message); setUploading(null); return }
@@ -239,7 +239,7 @@ export default function ShopPreviewPage() {
           <div style={{color:"#4a8ff5",fontSize:9,fontWeight:800,marginBottom:6}}>📐 Kích thước ảnh tối ưu</div>
           <div style={{display:"flex",gap:6,overflowX:"auto"} as React.CSSProperties}>
             {[
-              {icon:"🖼️", label:"Ảnh bìa",  size:"800×400px", note:"Tỉ lệ 2:1"},
+              {icon:"🖼️", label:"Ảnh bìa",  size:"1600×800px", note:"Tỉ lệ 2:1"},
               {icon:"🏪", label:"Logo",      size:"300×300px", note:"Tỉ lệ 1:1"},
               {icon:"🍽️", label:"Ảnh món",  size:"400×400px", note:"Tỉ lệ 1:1"},
             ].map(t => (
@@ -263,7 +263,7 @@ export default function ShopPreviewPage() {
               <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8}}>
                 <div style={{fontSize:36,opacity:0.3}}>🖼</div>
                 <div style={{color:"rgba(255,255,255,0.25)",fontSize:11,fontWeight:600}}>Nhấn để tải ảnh bìa</div>
-                <div style={{color:"rgba(255,107,0,0.5)",fontSize:9,fontWeight:700}}>Kích thước tối ưu: 800 × 400 px</div>
+                <div style={{color:"rgba(255,107,0,0.5)",fontSize:9,fontWeight:700}}>Kích thước tối ưu: 1600 × 800 px</div>
               </div>
             )
           }
