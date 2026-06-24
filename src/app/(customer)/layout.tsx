@@ -17,13 +17,14 @@ async function fetchGps(
 ) {
   if (!navigator.geolocation) { setDenied(); return }
 
+  // Dùng network/WiFi location (enableHighAccuracy: false) — nhanh hơn GPS chip
+  // đủ chính xác cho giao hàng trong thị trấn nhỏ (sai số ~50-100m)
   navigator.geolocation.getCurrentPosition(
     async ({ coords }) => {
       const { latitude: lat, longitude: lng } = coords
       try {
         const res  = await fetch(`/api/geocode?latlng=${lat},${lng}`)
         const data = await res.json()
-        // VietMap trả về mảng, lấy display của phần tử đầu tiên
         const address = (Array.isArray(data) ? data[0]?.display : null) ?? "Vị trí hiện tại"
         setLocation(lat, lng, address)
       } catch {
@@ -31,7 +32,7 @@ async function fetchGps(
       }
     },
     () => setDenied(),
-    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+    { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
   )
 }
 
