@@ -795,6 +795,7 @@ export default function AdminUsersPage() {
     setShopTypeSaving(false)
     if (error) { fire("❌ Lỗi cập nhật nhãn cửa hàng", false); return }
     setMerchants(ms => ms.map(m => m.id === shopTypeModal.id ? { ...m, shopType } : m))
+    if (merchantDetail?.id === shopTypeModal.id) setMerchantDetail(s => s ? { ...s, shopType } : s)
     setShopTypeModal(null)
     fire(`✅ Đã đặt nhãn: ${shopType === "partner" ? "Cửa hàng đối tác" : "Cửa hàng mua hộ"}`)
   }
@@ -1181,9 +1182,9 @@ export default function AdminUsersPage() {
               {/* Table */}
               <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 13, overflow: "hidden" }}>
                 <div style={{ overflowX: "auto" }}>
-                  <div style={{ minWidth: 880 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 55px 72px 80px 70px 90px", gap: 8, padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
-                      {["", "Cửa hàng", "Chủ / SĐT", "Trạng thái", "Rating", "Hoa hồng", "Ngày tạo", "Nhãn", "Thao tác"].map(h => (
+                  <div style={{ minWidth: 680 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 55px 90px 70px", gap: 8, padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
+                      {["", "Cửa hàng", "Chủ / SĐT", "Trạng thái", "Rating", "Nhãn", "Thao tác"].map(h => (
                         <div key={h} style={{ color: "rgba(144,128,176,0.4)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>{h}</div>
                       ))}
                     </div>
@@ -1195,7 +1196,7 @@ export default function AdminUsersPage() {
                       const ss = SHOP_STATUS_CFG[m.shopStatus]
                       return (
                         <div key={m.id} className="user-row"
-                          style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 55px 72px 80px 70px 90px", gap: 8, padding: "10px 14px", alignItems: "center", borderBottom: idx < shownMerchants.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", transition: "all 0.15s" }}>
+                          style={{ display: "grid", gridTemplateColumns: "36px 1.8fr 1.2fr 80px 55px 90px 70px", gap: 8, padding: "10px 14px", alignItems: "center", borderBottom: idx < shownMerchants.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", transition: "all 0.15s" }}>
                           <div style={{ width: 34, height: 34, borderRadius: 9, background: getCategoryByValue(m.category).color, border: "1px solid rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, position: "relative" }}>
                             {getCategoryByValue(m.category).emoji}
                             {m.isOpen && <div style={{ position: "absolute", bottom: -2, right: -2, width: 10, height: 10, borderRadius: "50%", background: "#3ecf6e", border: "1.5px solid #06050a", boxShadow: "0 0 4px #3ecf6e" }} />}
@@ -1218,31 +1219,19 @@ export default function AdminUsersPage() {
                           <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
                             {m.ratingAvg !== null ? <><span style={{ color: "#f5c542", fontSize: 10 }}>⭐</span><span style={{ color: "#f0eaff", fontSize: 10, fontWeight: 700 }}>{m.ratingAvg}</span></> : <span style={{ color: "rgba(144,128,176,0.3)", fontSize: 9 }}>—</span>}
                           </div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <CommCell id={m.id} rate={m.commissionRate} isNegotiated={m.isNegotiated} inline={merchantInline} setInline={setMerchantInline} onSave={saveMerchantCommission} saving={merchantSaving} />
-                          </div>
-                          <div style={{ color: "rgba(144,128,176,0.45)", fontSize: 9 }}>{m.createdDate}</div>
-                          {/* Nhãn loại cửa hàng + nút sửa */}
-                          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                            <span style={{ fontSize: 7.5, fontWeight: 700, padding: "2px 5px", borderRadius: 5, whiteSpace: "nowrap",
+                          {/* Nhãn — hiển thị, click để vào Chi tiết */}
+                          <div style={{ display: "flex", alignItems: "center" }}>
+                            <span style={{ fontSize: 7.5, fontWeight: 700, padding: "2px 6px", borderRadius: 5, whiteSpace: "nowrap",
                               background: m.shopType === "delivery" ? "rgba(255,107,0,0.12)" : m.shopType === "partner" ? "rgba(62,207,110,0.1)" : "rgba(255,255,255,0.05)",
                               border: `1px solid ${m.shopType === "delivery" ? "rgba(255,107,0,0.3)" : m.shopType === "partner" ? "rgba(62,207,110,0.25)" : "rgba(255,255,255,0.1)"}`,
                               color: m.shopType === "delivery" ? "#FF8C00" : m.shopType === "partner" ? "#3ecf6e" : "rgba(144,128,176,0.5)",
                             }}>
                               {m.shopType === "delivery" ? "🛒 Mua hộ" : m.shopType === "partner" ? "🤝 Đối tác" : "—"}
                             </span>
-                            <button onClick={() => setShopTypeModal({ id: m.id, name: m.shopName, current: m.shopType })}
-                              style={{ fontSize: 8, padding: "2px 5px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(144,128,176,0.6)", cursor: "pointer", fontFamily: "Lexend" }}>
-                              ✏️ Sửa
-                            </button>
                           </div>
-                          {/* Thao tác */}
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }} onClick={e => e.stopPropagation()}>
-                            {m.ownerIsActive
-                              ? <button onClick={() => setMerchantConfirm({ type: "lock",   ownerId: m.ownerId, name: m.ownerName })} style={{ padding: "4px 7px", borderRadius: 6, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,64,64,0.08)",  border: "1px solid rgba(255,64,64,0.2)",  color: "#ff4040", fontSize: 8, fontWeight: 700, whiteSpace: "nowrap" }}>🔒 Khóa TK</button>
-                              : <button onClick={() => setMerchantConfirm({ type: "unlock", ownerId: m.ownerId, name: m.ownerName })} style={{ padding: "4px 7px", borderRadius: 6, cursor: "pointer", fontFamily: "Lexend", background: "rgba(62,207,110,0.08)",  border: "1px solid rgba(62,207,110,0.2)",  color: "#3ecf6e", fontSize: 8, fontWeight: 700, whiteSpace: "nowrap" }}>🔓 Mở TK</button>
-                            }
-                            <button onClick={() => setMerchantDetail(m)} style={{ padding: "4px 7px", borderRadius: 6, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(144,128,176,0.7)", fontSize: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Chi tiết</button>
+                          {/* Thao tác — chỉ Chi tiết */}
+                          <div onClick={e => e.stopPropagation()}>
+                            <button onClick={() => setMerchantDetail(m)} style={{ padding: "5px 10px", borderRadius: 7, cursor: "pointer", fontFamily: "Lexend", background: "rgba(255,107,0,0.08)", border: "1px solid rgba(255,107,0,0.25)", color: "#FF8C00", fontSize: 8.5, fontWeight: 700, whiteSpace: "nowrap" }}>Chi tiết →</button>
                           </div>
                         </div>
                       )
@@ -1365,13 +1354,11 @@ export default function AdminUsersPage() {
                       {!merchantDetail.ownerIsActive && <span style={{ fontSize: 8, fontWeight: 700, padding: "2px 8px", borderRadius: 5, border: "1px solid rgba(255,64,64,0.3)", background: "rgba(255,64,64,0.08)", color: "#ff4040" }}>TK bị khóa</span>}
                     </div>
                   </div>
-                  {/* Thông tin */}
+                  {/* Thông tin cơ bản */}
                   {([
                     ["Chủ quán", merchantDetail.ownerName],
                     ["Số điện thoại", merchantDetail.phone],
-                    ["Hoa hồng", merchantDetail.commissionRate + "%"],
                     ["Rating", merchantDetail.ratingAvg !== null ? "⭐ " + merchantDetail.ratingAvg : "—"],
-                    ["Nhãn", merchantDetail.shopType === "delivery" ? "🛒 Mua hộ" : merchantDetail.shopType === "partner" ? "🤝 Đối tác" : "—"],
                     ["Ngày tạo", merchantDetail.createdDate],
                   ] as [string, string][]).map(([k, v]) => (
                     <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
@@ -1379,6 +1366,26 @@ export default function AdminUsersPage() {
                       <span style={{ color: "#f0eaff", fontSize: 9, fontWeight: 600, textAlign: "right" }}>{v}</span>
                     </div>
                   ))}
+                  {/* Hoa hồng — có thể chỉnh inline */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", gap: 8 }}>
+                    <span style={{ color: "rgba(144,128,176,0.5)", fontSize: 9, flexShrink: 0 }}>Hoa hồng</span>
+                    <CommCell id={merchantDetail.id} rate={merchantDetail.commissionRate} isNegotiated={merchantDetail.isNegotiated} inline={merchantInline} setInline={setMerchantInline} onSave={saveMerchantCommission} saving={merchantSaving} />
+                  </div>
+                  {/* Nhãn loại — có nút sửa */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                    <span style={{ color: "rgba(144,128,176,0.5)", fontSize: 9 }}>Nhãn</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 8, fontWeight: 700, padding: "2px 7px", borderRadius: 5,
+                        background: merchantDetail.shopType === "delivery" ? "rgba(255,107,0,0.12)" : merchantDetail.shopType === "partner" ? "rgba(62,207,110,0.1)" : "rgba(255,255,255,0.05)",
+                        border: `1px solid ${merchantDetail.shopType === "delivery" ? "rgba(255,107,0,0.3)" : merchantDetail.shopType === "partner" ? "rgba(62,207,110,0.25)" : "rgba(255,255,255,0.1)"}`,
+                        color: merchantDetail.shopType === "delivery" ? "#FF8C00" : merchantDetail.shopType === "partner" ? "#3ecf6e" : "rgba(144,128,176,0.5)",
+                      }}>
+                        {merchantDetail.shopType === "delivery" ? "🛒 Mua hộ" : merchantDetail.shopType === "partner" ? "🤝 Đối tác" : "—"}
+                      </span>
+                      <button onClick={() => setShopTypeModal({ id: merchantDetail.id, name: merchantDetail.shopName, current: merchantDetail.shopType })}
+                        style={{ fontSize: 8, padding: "2px 7px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(144,128,176,0.6)", cursor: "pointer", fontFamily: "Lexend" }}>✏️ Sửa</button>
+                    </div>
+                  </div>
                 </div>
                 <div style={{ padding: "12px 18px 18px", borderTop: "1px solid rgba(255,255,255,0.07)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
                   <button onClick={() => { setPhoneModal({ ownerId: merchantDetail.ownerId, name: merchantDetail.ownerName, current: merchantDetail.phone }); setNewPhone(merchantDetail.phone); setPhoneMsg("") }} style={{ width: "100%", height: 38, borderRadius: 12, cursor: "pointer", fontFamily: "Lexend", background: "rgba(74,143,245,0.08)", border: "1px solid rgba(74,143,245,0.25)", color: "#4a8ff5", fontSize: 11, fontWeight: 700 }}>📱 Đổi số điện thoại</button>
