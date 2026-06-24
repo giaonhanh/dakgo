@@ -12,6 +12,7 @@ interface LocationState {
   setLocation:     (lat: number, lng: number, address: string) => void
   setDenied:       () => void
   setPromptShown:  () => void
+  resetDenied:     () => void
 }
 
 const LS_KEY = "gps_prompt_shown"
@@ -33,6 +34,7 @@ export const useLocationStore = create<LocationState>((set) => ({
   setLocation:    (lat, lng, address) =>
     set({ lat, lng, address, ready: true, denied: false, lastUpdated: Date.now() }),
   setDenied:      () => set({ ready: true, denied: true }),
+  resetDenied:    () => set({ denied: false, ready: false }),
   setPromptShown: () => {
     try { localStorage.setItem(LS_KEY, "1") } catch {}
     set({ promptShown: true })

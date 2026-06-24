@@ -17,8 +17,15 @@ async function fetchGps(
 ) {
   if (!navigator.geolocation) { setDenied(); return }
 
-  // Dùng network/WiFi location (enableHighAccuracy: false) — nhanh hơn GPS chip
-  // đủ chính xác cho giao hàng trong thị trấn nhỏ (sai số ~50-100m)
+  // Kiểm tra permission state hiện tại (nếu browser đã chặn, báo ngay)
+  try {
+    const perm = await navigator.permissions.query({ name: "geolocation" as PermissionName })
+    if (perm.state === "denied") { setDenied(); return }
+  } catch {
+    // Một số browser không hỗ trợ permissions API — tiếp tục bình thường
+  }
+
+  // Dùng network/WiFi location — nhanh hơn GPS chip, đủ chính xác cho giao hàng
   navigator.geolocation.getCurrentPosition(
     async ({ coords }) => {
       const { latitude: lat, longitude: lng } = coords
@@ -133,15 +140,19 @@ function SoundPlayer() {
 
 // ── GPS Manager: permission prompt + periodic refresh ──────────────────────
 function GpsManager() {
-  const { ready, denied, promptShown, lastUpdated, setLocation, setDenied, setPromptShown } =
+  const { ready, denied, promptShown, lastUpdated, setLocation, setDenied, setPromptShown, resetDenied } =
     useLocationStore()
   const [showModal, setShowModal] = useState(false)
-  const [gpsFailedMsg, setGpsFailedMsg] = useState(false)
+  const [retrying,  setRetrying]  = useState(false)
+  const [browserDenied, setBrowserDenied] = useState(false)
 
-  const handleGpsFail = useCallback(() => {
+  const handleGpsFail = useCallback(async () => {
+    // Phân biệt: browser chặn vĩnh viễn hay chỉ timeout
+    try {
+      const perm = await navigator.permissions.query({ name: "geolocation" as PermissionName })
+      setBrowserDenied(perm.state === "denied")
+    } catch { setBrowserDenied(false) }
     setDenied()
-    setGpsFailedMsg(true)
-    setTimeout(() => setGpsFailedMsg(false), 4000)
   }, [setDenied])
 
   // Lần đầu vào app — hiện custom UI trước khi gọi browser permission
@@ -149,13 +160,12 @@ function GpsManager() {
     if (!promptShown) {
       setShowModal(true)
     } else if (!denied) {
-      // Đã đồng ý trước đó → lấy GPS ngay không hỏi lại
       fetchGps(setLocation, handleGpsFail)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Periodic refresh mỗi 5 phút — đảm bảo vị trí luôn cập nhật
+  // Periodic refresh mỗi 5 phút
   useEffect(() => {
     if (denied || !ready) return
     const interval = setInterval(() => {
@@ -165,13 +175,13 @@ function GpsManager() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, denied])
 
-  // Refresh khi app từ background → foreground (user mở lại tab / unlock phone)
+  // Refresh khi app từ background → foreground
   useEffect(() => {
     if (denied) return
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
       const stale = Date.now() - lastUpdated > REFRESH_MS
-      if (stale) fetchGps(setLocation, setDenied)
+      if (stale) fetchGps(setLocation, handleGpsFail)
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
@@ -190,17 +200,49 @@ function GpsManager() {
     setDenied()
   }
 
+  const handleRetry = async () => {
+    setRetrying(true)
+    setBrowserDenied(false)
+    resetDenied()
+    await fetchGps(setLocation, handleGpsFail)
+    setRetrying(false)
+  }
+
   return (
     <>
       {showModal && <GpsPermissionModal onAllow={handleAllow} onDeny={handleDeny} />}
-      {gpsFailedMsg && (
+
+      {/* Banner GPS bị từ chối — hiện cho đến khi lấy được vị trí */}
+      {ready && denied && !showModal && (
         <div style={{
           position: 'fixed', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16,
-          zIndex: 9999, background: 'rgba(255,100,0,0.14)', border: '1px solid rgba(255,100,0,0.3)',
-          borderRadius: 12, padding: '10px 14px',
-          color: '#FF8C00', fontSize: 11.5, fontWeight: 600, fontFamily: "'Lexend',sans-serif",
+          zIndex: 9999, background: 'rgba(14,12,9,0.95)', border: '1px solid rgba(255,100,0,0.35)',
+          borderRadius: 14, padding: '12px 14px', backdropFilter: 'blur(8px)',
+          fontFamily: "'Lexend',sans-serif",
         }}>
-          📍 Không lấy được GPS — vui lòng tự nhập địa chỉ khi đặt hàng
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>📍</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: '#FF8C00', fontSize: 12, fontWeight: 700, marginBottom: 3 }}>
+                {browserDenied ? 'GPS bị chặn bởi trình duyệt' : 'Không lấy được vị trí'}
+              </div>
+              <div style={{ color: '#6a5a40', fontSize: 10, lineHeight: 1.6 }}>
+                {browserDenied
+                  ? 'Vào Cài đặt trình duyệt → Quyền trang web → Vị trí → Cho phép dakgo.com'
+                  : 'Kiểm tra kết nối mạng rồi thử lại, hoặc tự nhập địa chỉ khi đặt hàng'}
+              </div>
+            </div>
+            {!browserDenied && (
+              <button onClick={handleRetry} disabled={retrying} style={{
+                flexShrink: 0, padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,107,0,0.35)',
+                background: 'rgba(255,107,0,0.1)', color: '#FF8C00', fontSize: 10,
+                fontWeight: 700, cursor: 'pointer', fontFamily: "'Lexend',sans-serif",
+                opacity: retrying ? 0.5 : 1,
+              }}>
+                {retrying ? '...' : '🔄 Thử lại'}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </>
