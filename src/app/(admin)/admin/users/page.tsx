@@ -571,6 +571,8 @@ export default function AdminUsersPage() {
 
   function switchTab(t: MainTab) {
     setActiveTab(t)
+    setFilterStatus("all")
+    setSearch("")
     if (t === "drivers"   && !driversLoaded)   loadDrivers()
     if (t === "merchants" && !merchantsLoaded) loadMerchants()
   }
@@ -782,7 +784,10 @@ export default function AdminUsersPage() {
   const totalCommission   = users.filter(u => u.role === "merchant").reduce((s, u) => s + u.shopCommission, 0)
   const totalCustSpent    = users.filter(u => u.role === "customer").reduce((s, u) => s + u.totalSpent, 0)
 
+  const tabRole: Record<MainTab, UserRole> = { customers: "customer", drivers: "driver", merchants: "merchant" }
+
   const shownUsers = users
+    .filter(u => u.role === tabRole[activeTab])
     .filter(u => filterStatus === "all" || u.status === filterStatus)
     .filter(u => !search || u.fullName.toLowerCase().includes(search.toLowerCase()) || u.phone.includes(search))
 
