@@ -19,24 +19,38 @@ export async function POST(req: NextRequest) {
 
     const db = adminDb()
 
-    // Lấy thông tin đơn + shop + merchant
-    const { data: order } = await db
+    // Lấy thông tin đơn + shop + merchant (KHÔNG join shop_type để tránh lỗi nếu cột chưa có)
+    const { data: order, error: orderErr } = await db
       .from("orders")
-      .select("id, total_amount, ship_fee, delivery_address, shop_id, customer_id, status, shops(owner_id, name, shop_type)")
+      .select("id, total_amount, ship_fee, delivery_address, shop_id, customer_id, status, shops(owner_id, name)")
       .eq("id", order_id)
       .single()
 
+    if (orderErr) {
+      console.error("parallel-dispatch: query error", orderErr)
+      return NextResponse.json({ error: "Lỗi truy vấn đơn hàng", detail: orderErr.message }, { status: 500 })
+    }
     if (!order) return NextResponse.json({ error: "Không tìm thấy đơn" }, { status: 404 })
     if (order.status === "cancelled") return NextResponse.json({ skipped: true })
 
-    type ShopRef = { owner_id: string; name: string; shop_type: string | null } | { owner_id: string; name: string; shop_type: string | null }[] | null
+    type ShopRef = { owner_id: string; name: string } | { owner_id: string; name: string }[] | null
     const shopRef    = order.shops as ShopRef
     const shop       = Array.isArray(shopRef) ? shopRef[0] : shopRef
     const merchantId = shop?.owner_id
-    const isBuyForMe = shop?.shop_type === "delivery"
     const shortId    = order_id.slice(0, 8).toUpperCase()
 
-    // ── 1. Notify merchant (chỉ với quán Đối tác — Mua hộ bỏ qua) ───
+    // Lấy shop_type riêng — cột này có thể không tồn tại, dùng try/catch để không block
+    let shopType: string | null = null
+    try {
+      const { data: shopRow } = await db
+        .from("shops").select("shop_type").eq("id", order.shop_id).single()
+      shopType = (shopRow as { shop_type?: string | null } | null)?.shop_type ?? null
+    } catch { /* shop_type chưa có trong DB, bỏ qua */ }
+
+    // Quán Mua hộ (shop_type = "delivery") không cần merchant xác nhận — tự động accept
+    const isBuyForMe = shopType === "delivery"
+
+    // ── 1. Notify merchant (chỉ quán Đối tác — Mua hộ bỏ qua) ───────
     if (merchantId && !isBuyForMe) {
       const total = Number(order.total_amount).toLocaleString("vi-VN")
       await Promise.all([
@@ -57,7 +71,7 @@ export async function POST(req: NextRequest) {
       ])
     }
 
-    // ── 1b. Quán Mua hộ: tự động accept đơn, không cần merchant xác nhận ──
+    // ── 1b. Quán Mua hộ: auto accept, tài xế nhận luôn ─────────────
     if (isBuyForMe) {
       await db.from("orders").update({
         status:      "accepted",
