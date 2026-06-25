@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useCartStore } from "@/store/cartStore"
 import { useLocationStore } from "@/store/locationStore"
+import { fetchGps } from "@/lib/gps"
 import { createClient } from "@/lib/supabase/client"
 import { SHOP_CATEGORIES, getCategoryByValue, normalizeCategoryValue } from "@/lib/categories"
 import Badge from "@/components/ui/Badge"
@@ -252,9 +253,10 @@ export default function HomePage() {
   const [conflictItem,  setConflictItem]  = useState<PendingItem | null>(null)
   const [weatherTip,    setWeatherTip]    = useState<string | null>(null)
 
-  // Vị trí thực tế của khách — GPS lấy từ layout GpsManager
+  // Vị trí thực tế của khách
   const locationData = useLocationStore()
-  const location = locationData.address || (locationData.ready ? "Không lấy được vị trí" : "Đang lấy vị trí...")
+  const [gpsLoading, setGpsLoading] = useState(false)
+  const hasLocation = !!(locationData.lat && locationData.lng)
   const containerRef = useRef<HTMLDivElement>(null)
   const cartIconRef  = useRef<HTMLDivElement>(null)
 
@@ -712,28 +714,46 @@ export default function HomePage() {
             justifyContent:"space-between", alignItems:"center" }}>
             {/* GPS + location */}
             <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-              {/* Radar */}
-              <div style={{ position:"relative", width:16, height:16, flexShrink:0 }}>
-                <div style={{ position:"absolute", width:5, height:5, background:"#FF6B00",
-                  borderRadius:"50%", top:5.5, left:5.5,
-                  boxShadow:"0 0 5px #FF6B00" }} />
-                {[{w:10,t:3,l:3,d:"0s"},{w:16,t:0,l:0,d:".7s"}].map((r,i)=>(
-                  <div key={i} style={{ position:"absolute", width:r.w, height:r.w,
-                    borderRadius:"50%", border:"1px solid #FF6B00", opacity:0,
-                    top:r.t, left:r.l,
-                    animation:`radarPulse 2s ${r.d} infinite` }} />
-                ))}
-              </div>
-              <div>
-                <div style={{ color:"#6a5a40", fontSize: 11 }}>Vị trí của bạn</div>
-                <div onClick={() => router.push("/addresses")}
-                  style={{ color:"#f8f0e0", fontSize:12, fontWeight:600, cursor:"pointer",
-                    display:"flex", alignItems:"center", gap:4 }}>
-                  <span style={{ maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                    {location}
-                  </span>
-                  <span style={{ color:"#FF8C00", fontSize:10 }}>▾</span>
+              {/* Radar — chỉ hiện khi có vị trí */}
+              {hasLocation ? (
+                <div style={{ position:"relative", width:16, height:16, flexShrink:0 }}>
+                  <div style={{ position:"absolute", width:5, height:5, background:"#FF6B00",
+                    borderRadius:"50%", top:5.5, left:5.5, boxShadow:"0 0 5px #FF6B00" }} />
+                  {[{w:10,t:3,l:3,d:"0s"},{w:16,t:0,l:0,d:".7s"}].map((r,i)=>(
+                    <div key={i} style={{ position:"absolute", width:r.w, height:r.w,
+                      borderRadius:"50%", border:"1px solid #FF6B00", opacity:0,
+                      top:r.t, left:r.l, animation:`radarPulse 2s ${r.d} infinite` }} />
+                  ))}
                 </div>
+              ) : (
+                <span style={{ fontSize:16, lineHeight:1 }}>📍</span>
+              )}
+              <div>
+                <div style={{ color:"#6a5a40", fontSize:11 }}>Vị trí của bạn</div>
+                {hasLocation ? (
+                  /* Đã có vị trí → tap để đổi địa chỉ */
+                  <div onClick={() => router.push("/addresses")}
+                    style={{ color:"#f8f0e0", fontSize:12, fontWeight:600, cursor:"pointer",
+                      display:"flex", alignItems:"center", gap:4 }}>
+                    <span style={{ maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                      {locationData.address || "Vị trí hiện tại"}
+                    </span>
+                    <span style={{ color:"#FF8C00", fontSize:10 }}>▾</span>
+                  </div>
+                ) : (
+                  /* Chưa có vị trí → tap để lấy GPS (iOS gesture requirement) */
+                  <div
+                    onClick={async () => {
+                      if (gpsLoading) return
+                      setGpsLoading(true)
+                      await fetchGps(locationData.setLocation, locationData.setDenied)
+                      setGpsLoading(false)
+                    }}
+                    style={{ color: gpsLoading ? "#6a5a40" : "#FF8C00", fontSize:12, fontWeight:600,
+                      cursor:"pointer", display:"flex", alignItems:"center", gap:4 }}>
+                    {gpsLoading ? "Đang lấy vị trí..." : "Nhấn để lấy vị trí ▾"}
+                  </div>
+                )}
               </div>
             </div>
             {/* Bell + Avatar */}

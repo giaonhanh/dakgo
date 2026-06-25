@@ -8,40 +8,9 @@ import { useLocationStore } from '@/store/locationStore'
 import MaintenanceGate from '@/components/MaintenanceGate'
 import PushPermissionPrompt from '@/components/PushPermissionPrompt'
 
-const REFRESH_MS    = 5 * 60 * 1000   // 5 phút — tự cập nhật lại vị trí
+const REFRESH_MS = 5 * 60 * 1000
 
-// ── Lấy GPS + reverse geocode → lưu vào store ──────────────────────────────
-async function fetchGps(
-  setLocation: (lat: number, lng: number, addr: string) => void,
-  setDenied: () => void,
-) {
-  if (!navigator.geolocation) { setDenied(); return }
-
-  // Kiểm tra permission state hiện tại (nếu browser đã chặn, báo ngay)
-  try {
-    const perm = await navigator.permissions.query({ name: "geolocation" as PermissionName })
-    if (perm.state === "denied") { setDenied(); return }
-  } catch {
-    // Một số browser không hỗ trợ permissions API — tiếp tục bình thường
-  }
-
-  // Dùng network/WiFi location — nhanh hơn GPS chip, đủ chính xác cho giao hàng
-  navigator.geolocation.getCurrentPosition(
-    async ({ coords }) => {
-      const { latitude: lat, longitude: lng } = coords
-      try {
-        const res  = await fetch(`/api/geocode?latlng=${lat},${lng}`)
-        const data = await res.json()
-        const address = (Array.isArray(data) ? data[0]?.display : null) ?? "Vị trí hiện tại"
-        setLocation(lat, lng, address)
-      } catch {
-        setLocation(lat, lng, "Vị trí hiện tại")
-      }
-    },
-    () => setDenied(),
-    { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
-  )
-}
+import { fetchGps } from '@/lib/gps'
 
 // ── Custom Permission UI (hiện trước browser dialog) ───────────────────────
 function GpsPermissionModal({ onAllow, onDeny }: { onAllow: () => void; onDeny: () => void }) {
@@ -149,12 +118,10 @@ function GpsManager() {
   }, [setDenied])
 
   // Lần đầu vào app — hiện custom UI trước khi gọi browser permission
+  // Returning users KHÔNG auto-call GPS (iOS Safari block gesture-less call)
+  // → header button trong page.tsx sẽ trigger khi user tap
   useEffect(() => {
-    if (!promptShown) {
-      setShowModal(true)
-    } else if (!denied) {
-      fetchGps(setLocation, handleGpsFail)
-    }
+    if (!promptShown) setShowModal(true)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
