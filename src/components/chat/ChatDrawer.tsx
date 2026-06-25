@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 
@@ -47,8 +47,22 @@ export function ChatDrawer({ orderId, currentUserId, currentRole, partnerId, par
   const [sending,  setSending]  = useState(false)
   const bottomRef  = useRef<HTMLDivElement>(null)
   const inputRef   = useRef<HTMLInputElement>(null)
+  // Track message IDs để dedup khi Realtime trả về tin đã optimistic insert
+  const msgIdsRef  = useRef<Set<string>>(new Set())
 
-  // Load history when drawer opens
+  const mergeMessages = useCallback((incoming: Message[]) => {
+    setMessages(prev => {
+      const known = new Set(prev.map(m => m.id))
+      const fresh = incoming.filter(m => !known.has(m.id))
+      if (!fresh.length) return prev
+      return [...prev, ...fresh].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      )
+    })
+    incoming.forEach(m => msgIdsRef.current.add(m.id))
+  }, [])
+
+  // Load history khi mở drawer
   useEffect(() => {
     if (!isOpen || !orderId) return
     supabase
@@ -56,10 +70,13 @@ export function ChatDrawer({ orderId, currentUserId, currentRole, partnerId, par
       .select("id, sender_id, role, content, created_at")
       .eq("order_id", orderId)
       .order("created_at", { ascending: true })
-      .then(({ data }) => setMessages((data ?? []) as Message[]))
-  }, [isOpen, orderId]) // eslint-disable-line react-hooks/exhaustive-deps
+      .then(({ data }) => {
+        if (data?.length) mergeMessages(data as Message[])
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, orderId])
 
-  // Realtime subscription
+  // Realtime subscription cho tin từ đối phương
   useEffect(() => {
     if (!isOpen || !orderId) return
     const ch = supabase
@@ -68,18 +85,42 @@ export function ChatDrawer({ orderId, currentUserId, currentRole, partnerId, par
         event: "INSERT", schema: "public", table: "chat_messages",
         filter: `order_id=eq.${orderId}`,
       }, ({ new: msg }) => {
-        setMessages(prev => [...prev, msg as Message])
+        const m = msg as Message
+        // Bỏ qua nếu đã có (optimistic insert)
+        if (msgIdsRef.current.has(m.id)) return
+        mergeMessages([m])
       })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [isOpen, orderId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, orderId])
 
-  // Scroll to bottom on new messages
+  // Poll 3 giây — fallback nếu Realtime miss (RLS phức tạp hoặc connection drop)
+  useEffect(() => {
+    if (!isOpen || !orderId) return
+    const timer = setInterval(async () => {
+      const lastId = msgIdsRef.current
+      // Lấy tin nhắn mới nhất — chỉ các tin chưa có trong state
+      const { data } = await supabase
+        .from("chat_messages")
+        .select("id, sender_id, role, content, created_at")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: false })
+        .limit(20)
+      if (!data?.length) return
+      const fresh = (data as Message[]).filter(m => !lastId.has(m.id))
+      if (fresh.length) mergeMessages(fresh)
+    }, 3000)
+    return () => clearInterval(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, orderId])
+
+  // Scroll xuống khi có tin mới
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Focus input when opened
+  // Focus input khi mở
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 350)
   }, [isOpen])
@@ -89,17 +130,30 @@ export function ChatDrawer({ orderId, currentUserId, currentRole, partnerId, par
     if (!content || sending) return
     setSending(true)
     if (!text) setInput("")
-    const { error } = await supabase.from("chat_messages").insert({
-      order_id:  orderId,
-      sender_id: currentUserId,
-      role:      currentRole,
-      content,
-    })
-    setSending(false)
-    if (error || !partnerId) return
 
-    // Push thật cho người nhận — để họ biết có tin nhắn mới ngay cả khi app
-    // đang đóng/ở màn hình khác, bấm vào mở thẳng khung chat của đơn này.
+    // Insert + select để lấy row với ID thật từ DB
+    const { data: inserted, error } = await supabase
+      .from("chat_messages")
+      .insert({ order_id: orderId, sender_id: currentUserId, role: currentRole, content })
+      .select("id, sender_id, role, content, created_at")
+      .single()
+
+    setSending(false)
+
+    if (error) {
+      // Khôi phục input nếu gửi lỗi
+      if (!text) setInput(content)
+      return
+    }
+
+    if (inserted) {
+      // Optimistic: thêm vào state ngay, Realtime sẽ bị dedup
+      mergeMessages([inserted as Message])
+    }
+
+    if (!partnerId) return
+
+    // Push notification cho đối phương
     const chatUrl = currentRole === "customer"
       ? `/driver/navigate/${orderId}?chat=1`
       : `/tracking/${orderId}?chat=1`
