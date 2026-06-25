@@ -1020,8 +1020,11 @@ export default function OrdersPage() {
                                     )}
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
                                       padding: "6px 0", borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 4 }}>
-                                      <span style={{ color: "#6a5a40", fontSize: 11 }}>{order.payMethod}</span>
-                                      <span style={{ color: statusColor, fontSize: 11, fontWeight: 600 }}>{statusText}</span>
+                                      <span style={{ color: "#6a5a40", fontSize: 11 }}>Phương thức thanh toán</span>
+                                      <div style={{ textAlign: "right" }}>
+                                        <div style={{ color: statusColor, fontSize: 11, fontWeight: 600 }}>{statusText}</div>
+                                        <div style={{ color: "#6a5a40", fontSize: 10 }}>{order.payMethod}</div>
+                                      </div>
                                     </div>
                                   </div>
                                 </>
