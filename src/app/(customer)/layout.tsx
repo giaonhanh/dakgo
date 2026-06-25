@@ -140,18 +140,11 @@ function SoundPlayer() {
 
 // ── GPS Manager: permission prompt + periodic refresh ──────────────────────
 function GpsManager() {
-  const { ready, denied, promptShown, lastUpdated, setLocation, setDenied, setPromptShown, resetDenied } =
+  const { ready, denied, promptShown, lastUpdated, setLocation, setDenied, setPromptShown } =
     useLocationStore()
   const [showModal, setShowModal] = useState(false)
-  const [retrying,  setRetrying]  = useState(false)
-  const [browserDenied, setBrowserDenied] = useState(false)
 
-  const handleGpsFail = useCallback(async () => {
-    // Phân biệt: browser chặn vĩnh viễn hay chỉ timeout
-    try {
-      const perm = await navigator.permissions.query({ name: "geolocation" as PermissionName })
-      setBrowserDenied(perm.state === "denied")
-    } catch { setBrowserDenied(false) }
+  const handleGpsFail = useCallback(() => {
     setDenied()
   }, [setDenied])
 
@@ -200,51 +193,9 @@ function GpsManager() {
     setDenied()
   }
 
-  const handleRetry = async () => {
-    setRetrying(true)
-    setBrowserDenied(false)
-    resetDenied()
-    await fetchGps(setLocation, handleGpsFail)
-    setRetrying(false)
-  }
-
   return (
     <>
       {showModal && <GpsPermissionModal onAllow={handleAllow} onDeny={handleDeny} />}
-
-      {/* Banner GPS bị từ chối — hiện cho đến khi lấy được vị trí */}
-      {ready && denied && !showModal && (
-        <div style={{
-          position: 'fixed', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16,
-          zIndex: 9999, background: 'rgba(14,12,9,0.95)', border: '1px solid rgba(255,100,0,0.35)',
-          borderRadius: 14, padding: '12px 14px', backdropFilter: 'blur(8px)',
-          fontFamily: "'Lexend',sans-serif",
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <span style={{ fontSize: 20, flexShrink: 0 }}>📍</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: '#FF8C00', fontSize: 12, fontWeight: 700, marginBottom: 3 }}>
-                {browserDenied ? 'GPS bị chặn bởi trình duyệt' : 'Không lấy được vị trí'}
-              </div>
-              <div style={{ color: '#6a5a40', fontSize: 10, lineHeight: 1.6 }}>
-                {browserDenied
-                  ? 'Vào Cài đặt trình duyệt → Quyền trang web → Vị trí → Cho phép dakgo.com'
-                  : 'Kiểm tra kết nối mạng rồi thử lại, hoặc tự nhập địa chỉ khi đặt hàng'}
-              </div>
-            </div>
-            {!browserDenied && (
-              <button onClick={handleRetry} disabled={retrying} style={{
-                flexShrink: 0, padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,107,0,0.35)',
-                background: 'rgba(255,107,0,0.1)', color: '#FF8C00', fontSize: 10,
-                fontWeight: 700, cursor: 'pointer', fontFamily: "'Lexend',sans-serif",
-                opacity: retrying ? 0.5 : 1,
-              }}>
-                {retrying ? '...' : '🔄 Thử lại'}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
     </>
   )
 }
