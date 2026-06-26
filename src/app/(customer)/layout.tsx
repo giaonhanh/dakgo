@@ -118,10 +118,10 @@ function GpsManager() {
   }, [setDenied])
 
   // Lần đầu vào app — hiện custom UI trước khi gọi browser permission
-  // Returning users KHÔNG auto-call GPS (iOS Safari block gesture-less call)
-  // → header button trong page.tsx sẽ trigger khi user tap
+  // Returning users: auto-fetch GPS (permission đã granted, không cần gesture)
   useEffect(() => {
-    if (!promptShown) setShowModal(true)
+    if (!promptShown) { setShowModal(true); return }
+    if (!denied) fetchGps(setLocation, handleGpsFail)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

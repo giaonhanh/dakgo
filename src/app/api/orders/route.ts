@@ -278,28 +278,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // ── Notify merchant ──────────────────────────────────
-    try {
-      const db = adminClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      )
-      const { data: shop } = await db
-        .from("shops").select("owner_id").eq("id", shop_id).single()
-      if (shop?.owner_id) {
-        const preview = (orderItems as { name: string; qty: number }[])
-          .slice(0, 2).map(i => `${i.name} ×${i.qty}`).join(", ")
-        const more  = orderItems.length > 2 ? ` +${orderItems.length - 2} món` : ""
-        const title = "🍜 Bạn có đơn mới!"
-        const body  = `${preview}${more} · ${total_amount.toLocaleString("vi-VN")}đ`
-        await db.from("notifications").insert({
-          user_id: shop.owner_id, type: "order", title, body,
-          data: { order_id: order.id, url: "/merchant" },
-        })
-        await sendPushToUser(shop.owner_id, { title, body, url: "/merchant", tag: `order-${order.id}`, sound: "merchant" })
-      }
-    } catch { /* never fail the order */ }
-
+    // Merchant notification xử lý bởi /api/orders/parallel-dispatch (gọi song song từ checkout)
     return NextResponse.json({ orderId: order.id, total_amount, payment_code }, { status: 201 })
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Lỗi server"

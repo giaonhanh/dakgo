@@ -25,18 +25,18 @@ const SERVICE_PRESETS: Record<string, { label: string; msg: string }[]> = {
     { label:"Tạm nghỉ",        msg:"Dịch vụ xe ôm tạm ngừng phục vụ. Xin lỗi vì sự bất tiện." },
   ],
   taxi_4cho: [
-    { label:"Tài xế bận hết",  msg:"Toàn bộ tài xế taxi 4 chỗ đang bận. Vui lòng thử lại sau hoặc chọn xe 7 chỗ." },
+    { label:"Tài xế bận hết",  msg:"Toàn bộ tài xế taxi 4 chỗ đang bận. Vui lòng thử lại sau hoặc chọn xe 5 chỗ." },
     { label:"Quá tải đơn",     msg:"Dịch vụ taxi 4 chỗ đang quá tải, tạm ngưng nhận đơn mới." },
     { label:"Không có xe",     msg:"Không có xe taxi 4 chỗ khả dụng trong khu vực lúc này." },
     { label:"Ngoài giờ",       msg:"Dịch vụ taxi 4 chỗ hoạt động từ 07:00 – 21:00." },
     { label:"Bảo trì",         msg:"Dịch vụ taxi 4 chỗ đang bảo trì, sẽ hoạt động trở lại sớm." },
   ],
   taxi_7cho: [
-    { label:"Tài xế bận hết",  msg:"Toàn bộ xe 7 chỗ đang bận. Vui lòng thử lại sau ít phút." },
-    { label:"Quá tải đơn",     msg:"Dịch vụ taxi 7 chỗ đang quá tải, tạm ngưng nhận đơn mới." },
-    { label:"Không có xe",     msg:"Không có xe 7 chỗ khả dụng trong khu vực lúc này." },
-    { label:"Ngoài giờ",       msg:"Dịch vụ taxi 7 chỗ hoạt động từ 07:00 – 21:00." },
-    { label:"Bảo trì",         msg:"Dịch vụ taxi 7 chỗ đang bảo trì, sẽ hoạt động trở lại sớm." },
+    { label:"Tài xế bận hết",  msg:"Toàn bộ xe 5 chỗ đang bận. Vui lòng thử lại sau ít phút." },
+    { label:"Quá tải đơn",     msg:"Dịch vụ taxi 5 chỗ đang quá tải, tạm ngưng nhận đơn mới." },
+    { label:"Không có xe",     msg:"Không có xe 5 chỗ khả dụng trong khu vực lúc này." },
+    { label:"Ngoài giờ",       msg:"Dịch vụ taxi 5 chỗ hoạt động từ 07:00 – 21:00." },
+    { label:"Bảo trì",         msg:"Dịch vụ taxi 5 chỗ đang bảo trì, sẽ hoạt động trở lại sớm." },
   ],
   mua_ho: [
     { label:"Tài xế bận hết",  msg:"Tất cả tài xế đang bận, không nhận đơn mua hộ lúc này. Vui lòng thử lại sau." },
@@ -130,7 +130,7 @@ export default function AdminSettingsPage() {
     errand:       { label: "Mua hộ",      icon: "🛒", color: "#3ecf6e", desc: "Tài xế mua hàng theo yêu cầu và giao" },
     motorbike:    { label: "Xe ôm",      icon: "🏍️", color: "#b464ff", desc: "Đặt xe ôm di chuyển cá nhân" },
     taxi:         { label: "Taxi 4 chỗ", icon: "🚕", color: "#f5c542", desc: "Đặt taxi Sedan 4 chỗ" },
-    taxi7:        { label: "Taxi 7 chỗ", icon: "🚙", color: "#3ecf6e", desc: "Đặt taxi SUV / 7 chỗ" },
+    taxi7:        { label: "Taxi 5 chỗ", icon: "🚙", color: "#3ecf6e", desc: "Đặt taxi SUV / 5 chỗ" },
   }
 
   const updateKmPrice = (service: ServiceType, kmIndex: number, value: string) =>
@@ -317,7 +317,7 @@ export default function AdminSettingsPage() {
     { key:"food",      label:"Đặt đồ ăn",  icon:"🍜", color:"#FF6B00", enabled:true, reason:"", customerMsg:"" },
     { key:"motorbike", label:"Xe ôm",      icon:"🛵", color:"#4a8ff5", enabled:true, reason:"", customerMsg:"" },
     { key:"taxi_4cho", label:"Taxi 4 chỗ", icon:"🚕", color:"#FF8C00", enabled:true, reason:"", customerMsg:"" },
-    { key:"taxi_7cho", label:"Taxi 7 chỗ", icon:"🚙", color:"#b464ff", enabled:true, reason:"", customerMsg:"" },
+    { key:"taxi_7cho", label:"Taxi 5 chỗ", icon:"🚙", color:"#b464ff", enabled:true, reason:"", customerMsg:"" },
     { key:"mua_ho",    label:"Mua hộ",     icon:"🛒", color:"#3ecf6e", enabled:true, reason:"", customerMsg:"" },
     { key:"giao_ho",   label:"Giao hộ",    icon:"📦", color:"#FFB347", enabled:true, reason:"", customerMsg:"" },
   ])
@@ -650,9 +650,10 @@ export default function AdminSettingsPage() {
 
               {/* ── Taxi: simple pricing inputs ── */}
               {(activeService === "taxi" || activeService === "taxi7") ? (() => {
-                const v = activeService === "taxi" ? "taxi4" : "taxi7"
-                const vc = taxiCfg[v]
-                const setVC = (k: keyof TaxiVehicle, val: number) => setTaxiCfg(p => ({ ...p, [v]: { ...p[v], [k]: val } }))
+                const vcKey  = activeService === "taxi" ? "taxi4" : "taxi7"  // key trong taxiCfg
+                const svcKey = activeService  // key trong svcTime ("taxi" hoặc "taxi7")
+                const vc = taxiCfg[vcKey]
+                const setVC = (k: keyof TaxiVehicle, val: number) => setTaxiCfg(p => ({ ...p, [vcKey]: { ...p[vcKey], [k]: val } }))
                 const ipt = (lbl: string, val: number, unit: string, step: number, setter: (n: number) => void) => (
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 20px", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
                     <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600 }}>{lbl}</div>
@@ -668,21 +669,21 @@ export default function AdminSettingsPage() {
                   <>
                     <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
                       <div style={{ padding:"10px 20px", background:"rgba(255,255,255,0.04)", borderBottom:"1px solid rgba(255,255,255,0.07)", color:"#6a5a40", fontSize:10, fontWeight:700 }}>
-                        CƯỚC CƠ BẢN — {activeService === "taxi" ? "TAXI 4 CHỖ" : "TAXI 7 CHỖ"}
+                        CƯỚC CƠ BẢN — {activeService === "taxi" ? "TAXI 4 CHỖ" : "TAXI 5 CHỖ"}
                       </div>
                       {ipt("💰 Giá mở cửa (bao gồm 1km đầu)", vc.baseFare, "đ", 1000, v => setVC("baseFare", v))}
                       {ipt("📏 Giá mỗi km (1–30km)", vc.perKm, "đ/km", 1000, v => setVC("perKm", v))}
                       {ipt("🛣️ Giá mỗi km (trên 30km)", vc.perKmOver30 ?? vc.perKm, "đ/km", 1000, v => setVC("perKmOver30", v))}
                       {ipt("🏦 Hoa hồng app", vc.commissionRate, "%", 1, v => setVC("commissionRate", v))}
                       <div style={{ padding:"10px 20px", background:"rgba(255,107,0,0.04)", borderTop:"1px solid rgba(255,107,0,0.1)", fontSize:11, color:"#6a5a40" }}>
-                        5km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 5, { ...svcTime[v].night, enabled: false }).toLocaleString("vi-VN")}đ</strong>
-                        {" · "}10km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 10, { ...svcTime[v].night, enabled: false }).toLocaleString("vi-VN")}đ</strong>
-                        {" · "}30km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 30, { ...svcTime[v].night, enabled: false }).toLocaleString("vi-VN")}đ</strong>
-                        {" · "}50km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 50, { ...svcTime[v].night, enabled: false }).toLocaleString("vi-VN")}đ</strong>
+                        5km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 5, { ...(svcTime[svcKey] ?? SVC_TIME_DEFAULT).night, enabled: false }).toLocaleString("vi-VN")}đ</strong>
+                        {" · "}10km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 10, { ...(svcTime[svcKey] ?? SVC_TIME_DEFAULT).night, enabled: false }).toLocaleString("vi-VN")}đ</strong>
+                        {" · "}30km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 30, { ...(svcTime[svcKey] ?? SVC_TIME_DEFAULT).night, enabled: false }).toLocaleString("vi-VN")}đ</strong>
+                        {" · "}50km: <strong style={{ color:"#FF8C00" }}>{calcTaxiFare(vc, 50, { ...(svcTime[svcKey] ?? SVC_TIME_DEFAULT).night, enabled: false }).toLocaleString("vi-VN")}đ</strong>
                       </div>
                     </div>
 
-                    {renderSvcTimeBlock(v)}
+                    {renderSvcTimeBlock(svcKey)}
 
                     {/* Thời gian chờ */}
                     <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"0 20px", marginBottom:14 }}>
@@ -760,27 +761,28 @@ export default function AdminSettingsPage() {
 
                     {/* Bảng giá ví dụ taxi */}
                     <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:"16px 20px", marginBottom:14 }}>
-                      <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700, marginBottom:12 }}>📊 Bảng giá ví dụ — {activeService === "taxi" ? "Taxi 4 chỗ" : "Taxi 7 chỗ"}</div>
+                      <div style={{ color:"#f0eaff", fontSize:12, fontWeight:700, marginBottom:12 }}>📊 Bảng giá ví dụ — {activeService === "taxi" ? "Taxi 4 chỗ" : "Taxi 5 chỗ"}</div>
                       <div style={{ overflowX:"auto" }}>
                         <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
                           <thead>
                             <tr style={{ borderBottom:"1px solid rgba(255,255,255,0.08)" }}>
-                              {["Km", "Giá khách", "Tài xế nhận", svcTime[v].night.enabled ? "🌙 Đêm" : ""].filter(Boolean).map(h => (
+                              {["Km", "Giá khách", "Tài xế nhận", (svcTime[svcKey] ?? SVC_TIME_DEFAULT).night.enabled ? "🌙 Đêm" : ""].filter(Boolean).map(h => (
                                 <th key={h} style={{ padding:"6px 8px", color:"#6a5a40", fontWeight:600, textAlign: h==="Km" ? "left" : "right" }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {[1,2,3,5,7,10,15,20,25,30,40,50].map((km, i) => {
-                              const fare  = calcTaxiFare(vc, km, { ...svcTime[v].night, enabled: false })
-                              const faren = calcTaxiFare(vc, km, svcTime[v].night)
+                              const svcT  = svcTime[svcKey] ?? SVC_TIME_DEFAULT
+                              const fare  = calcTaxiFare(vc, km, { ...svcT.night, enabled: false })
+                              const faren = calcTaxiFare(vc, km, svcT.night)
                               const drv   = Math.round(fare * (1 - vc.commissionRate / 100))
                               return (
                                 <tr key={km} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)", background: km > 30 ? "rgba(255,107,0,0.04)" : i%2===0 ? "rgba(255,255,255,0.01)" : "transparent" }}>
                                   <td style={{ padding:"6px 8px", color: km > 30 ? "#FF8C00" : "#6a5a40", fontWeight:700 }}>{km} km{km > 30 ? " 🛣️" : ""}</td>
                                   <td style={{ padding:"6px 8px", color:"#f5c542", textAlign:"right", fontWeight:700 }}>{fare.toLocaleString("vi-VN")}đ</td>
                                   <td style={{ padding:"6px 8px", color:"#3ecf6e", textAlign:"right" }}>{drv.toLocaleString("vi-VN")}đ</td>
-                                  {svcTime[v].night.enabled && <td style={{ padding:"6px 8px", color:"#9080c0", textAlign:"right" }}>{faren.toLocaleString("vi-VN")}đ</td>}
+                                  {svcT.night.enabled && <td style={{ padding:"6px 8px", color:"#9080c0", textAlign:"right" }}>{faren.toLocaleString("vi-VN")}đ</td>}
                                 </tr>
                               )
                             })}

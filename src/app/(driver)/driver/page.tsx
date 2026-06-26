@@ -1308,8 +1308,31 @@ export default function DriverDashboard() {
       })
       .subscribe()
 
+    // Khi dispatch gửi notification cho tài xế → trigger poll ngay lập tức (không chờ 8s)
+    // Cần thiết vì orders có RLS nên postgres_changes của orders bị block với tài xế chưa được assign
+    const chNotif = supabase
+      .channel("driver-dispatch-notif")
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "notifications",
+        filter: `user_id=eq.${driverId}`,
+      }, async (payload) => {
+        const notif = payload.new as { type: string }
+        if (notif.type !== "order") return
+        if (showOrderRef.current || acceptedRef.current) return
+        const exclude = [...rejectedIdsRef.current].join(",")
+        try {
+          const res = await fetch(`/api/driver/check-pending?driverLat=${gpsRef.current.lat}&driverLng=${gpsRef.current.lng}&excludeIds=${exclude}`)
+          if (!res.ok) return
+          const { order } = await res.json() as { order: OrderData | null }
+          if (order && !rejectedIdsRef.current.has(order.fullId)) {
+            setPendingOrder(order); setShowOrder(true); showOrderRef.current = true
+          }
+        } catch { /* ignore */ }
+      })
+      .subscribe()
+
     channelRef.current = ch
-    channelsRef.current = [ch, chErrands, chAccepted, chAssigned]
+    channelsRef.current = [ch, chErrands, chAccepted, chAssigned, chNotif]
     return () => {
       channelsRef.current.forEach(c => c.unsubscribe())
       channelsRef.current = []

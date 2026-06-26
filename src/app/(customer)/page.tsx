@@ -295,7 +295,8 @@ export default function HomePage() {
       const now = new Date().toISOString()
       const productSelectFields = "id,name,price,original_price,sold_count,shop_id,image_url,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),all_day,start_hour,end_hour"
 
-      // BATCH 1: 16 queries song song — giảm từ ~15 round trip xuống 1
+      // BATCH 1: 15 queries song song (bỏ get_recommendations ra ngoài để không block)
+      // get_recommendations là RPC nặng — chạy riêng sau khi content đã hiện
       const [
         { data: profile },
         { count: notifCount },
@@ -312,7 +313,6 @@ export default function HomePage() {
         { data: appSettings },
         { data: newMenuData },
         { data: orderData },
-        { data: recoData },
       ] = await Promise.all([
         supabase.from("profiles").select("full_name").eq("id", user.id).single(),
         supabase.from("notifications").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("is_read", false),
@@ -329,8 +329,9 @@ export default function HomePage() {
         supabase.from("app_settings").select("key,value").in("key", ["service_time_pricing", "service_toggles"]),
         supabase.from("products").select("id,name,price,image_url,shop_id,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),created_at,all_day,start_hour,end_hour").eq("is_available", true).eq("shops.status", "approved").order("created_at", { ascending: false }).limit(30),
         supabase.from("orders").select("id,shop_id,total_amount,shops(name),order_items(name)").eq("customer_id", user.id).eq("status", "delivered").order("created_at", { ascending: false }).limit(5),
-        supabase.rpc("get_recommendations", { uid: user.id, lim: 10 }),
       ])
+      // Recommendations chạy sau batch 1 — không block content hiển thị
+      const recoData = null // sẽ load deferred bên dưới
 
       // --- Xử lý kết quả batch 1 ---
       if (profile?.full_name) setUserName(profile.full_name.split(" ").pop() ?? profile.full_name)
@@ -492,6 +493,28 @@ export default function HomePage() {
     loadData()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Deferred: get_recommendations chạy sau khi content đã render (không block)
+  useEffect(() => {
+    if (!userId) return
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await supabase.rpc("get_recommendations", { uid: userId, lim: 10 })
+        if (!data || !Array.isArray(data) || data.length === 0) return
+        const shopIds = [...new Set((data as RecoRow[]).map(r => r.shop_id))]
+        const { data: statusData } = await supabase
+          .from("shops").select("id,is_open,status,opening_hours")
+          .in("id", shopIds).eq("status", "approved").eq("is_open", true)
+        const openIds = new Set(
+          (statusData ?? []).filter(s => checkOpeningHours(s.opening_hours, true)).map(s => s.id as string)
+        )
+        const filtered = (data as RecoRow[]).filter(r => openIds.has(r.shop_id))
+        if (filtered.length > 0) setRecos(filtered)
+      } catch { /* ignore — không critical */ }
+    }, 1500) // chờ 1.5s sau render
+    return () => clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
 
   // BUG-012: Realtime bell badge — tăng count khi nhận thông báo mới
   useEffect(() => {
