@@ -906,13 +906,13 @@ export default function ShopPage() {
       {/* Toast */}
       <AnimatePresence>
         {toast && (
-          <motion.div initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}}
-            exit={{opacity:0,y:-12}}
-            style={{ position:"fixed", top:"calc(env(safe-area-inset-top, 0px) + 56px)", left:"50%",
-              transform:"translateX(-50%)", zIndex:999, whiteSpace:"nowrap",
+          <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}}
+            exit={{opacity:0,y:8}}
+            style={{ position:"fixed", bottom:"calc(env(safe-area-inset-bottom, 0px) + 76px)",
+              left:16, right:16, zIndex:999, textAlign:"center",
               background:"rgba(255,107,0,0.15)",
               border:"1px solid rgba(255,107,0,0.35)",
-              borderRadius:12, padding:"7px 16px",
+              borderRadius:12, padding:"9px 16px",
               color:"#FF8C00", fontSize:11, fontWeight:600,
               backdropFilter:"blur(10px)" }}>
             ✓ {toast}

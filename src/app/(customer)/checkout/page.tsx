@@ -143,11 +143,8 @@ function VietQRSheet({
   payosData: PayOSData | null; payosLoading: boolean
   onClose: () => void; onConfirm: () => void; confirming: boolean
 }) {
-  const [localBankCode, setLocalBankCode] = useState<string | null>(null)
-  const [bankErr,       setBankErr]       = useState(false)
-  const [qrLoaded,      setQrLoaded]      = useState(false)
-  const [qrTimeout,     setQrTimeout]     = useState(false)
-  const myBank  = localBankCode ? (BANK_APPS.find(b => b.code === localBankCode) ?? null) : null
+  const [qrLoaded,  setQrLoaded]  = useState(false)
+  const [qrTimeout, setQrTimeout] = useState(false)
   const content = `GN${orderCode}`
 
   const qrImageUrl = payosData
@@ -161,21 +158,6 @@ function VietQRSheet({
     const t = setTimeout(() => setQrTimeout(true), 5000)
     return () => clearTimeout(t)
   }, [qrImageUrl, qrLoaded])
-
-  const handleOpenBank = () => {
-    if (!localBankCode) { setBankErr(true); setTimeout(() => setBankErr(false), 2500); return }
-    if (localBankCode === "momo") {
-      window.location.href = "momo://app"
-      setTimeout(() => window.open("https://nhantien.momo.vn", "_blank"), 500)
-      return
-    }
-    if (payosData) {
-      // VietQR deep link trực tiếp vào app ngân hàng — dùng tài khoản PayOS thật
-      window.location.href = `https://dl.vietqr.io/pay?bank=${payosData.bin}&account=${payosData.accountNumber}&amount=${total}&memo=${encodeURIComponent(content)}`
-      return
-    }
-    window.location.href = `https://dl.vietqr.io/pay?bank=${localBankCode}&amount=${total}&memo=${encodeURIComponent(content)}`
-  }
 
   return (
     <motion.div
@@ -210,7 +192,7 @@ function VietQRSheet({
           <div style={{ flex: 1 }}>
             <div style={{ color: "#f8f0e0", fontSize: 14, fontWeight: 700 }}>Thanh toán chuyển khoản</div>
             <div style={{ color: "#6a5a40", fontSize: 11, marginTop: 1 }}>
-              Quét mã QR · Ngân hàng · MoMo
+              Dùng app ngân hàng quét mã QR
             </div>
           </div>
           <div style={{
@@ -252,9 +234,56 @@ function VietQRSheet({
                 </div>
               )}
             </div>
-            <p style={{ marginTop: 10, fontSize: 10, color: "#6a5a40", textAlign: "center" }}>
-              Dùng app ngân hàng hoặc MoMo quét mã QR này
-            </p>
+            {/* Nút tải QR về máy */}
+            {qrImageUrl && qrLoaded && (
+              <a
+                href={qrImageUrl}
+                download={`dakgo-qr-${orderCode}.png`}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  marginTop: 8, padding: "6px 14px", borderRadius: 8,
+                  background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.25)",
+                  color: "#4a8ff5", fontSize: 11, fontWeight: 600,
+                  textDecoration: "none", cursor: "pointer",
+                }}>
+                ⬇️ Lưu ảnh QR
+              </a>
+            )}
+          </div>
+
+          {/* Hướng dẫn quét QR bằng hình */}
+          <div style={{
+            background: "rgba(74,143,245,0.05)", border: "1px solid rgba(74,143,245,0.15)",
+            borderRadius: 12, padding: "12px 14px", marginBottom: 12,
+          }}>
+            <div style={{ color: "#4a8ff5", fontSize: 11, fontWeight: 700, marginBottom: 10 }}>
+              📱 Cách quét mã QR thanh toán
+            </div>
+            {[
+              { step: "1", icon: "📲", text: "Mở app ngân hàng hoặc MoMo / ZaloPay" },
+              { step: "2", icon: "🔍", text: 'Chọn "Quét QR" hoặc biểu tượng camera' },
+              { step: "3", icon: "📸", text: "Hướng camera vào mã QR bên trên" },
+              { step: "4", icon: "✅", text: `Kiểm tra số tiền ${fmt(total)} và nội dung "${content}" rồi xác nhận` },
+            ].map(r => (
+              <div key={r.step} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
+                <div style={{
+                  minWidth: 20, height: 20, borderRadius: "50%",
+                  background: "rgba(74,143,245,0.2)", border: "1px solid rgba(74,143,245,0.3)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 9, fontWeight: 800, color: "#4a8ff5", flexShrink: 0,
+                }}>{r.step}</div>
+                <span style={{ fontSize: 10, color: "#b0956a", lineHeight: 1.5, paddingTop: 2 }}>
+                  {r.icon} {r.text}
+                </span>
+              </div>
+            ))}
+            <div style={{
+              marginTop: 6, padding: "7px 10px", borderRadius: 8,
+              background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.15)",
+              color: "#6a5a40", fontSize: 10, lineHeight: 1.6,
+            }}>
+              💡 <strong style={{ color: "#b0956a" }}>Mẹo:</strong> Nếu không quét được, nhấn <strong style={{ color: "#b0956a" }}>Lưu ảnh QR</strong> ở trên rồi mở app ngân hàng → Quét từ ảnh trong album.
+            </div>
           </div>
 
           {/* Ghi chú tài khoản đại diện */}
@@ -295,72 +324,9 @@ function VietQRSheet({
             ))}
           </div>
 
-          {/* Dropdown chọn ngân hàng (trống mặc định) */}
-          <BankDropdown selected={localBankCode} onSelect={code => { setLocalBankCode(code); setBankErr(false) }} />
-
-          {/* Cảnh báo chưa chọn ngân hàng */}
-          <AnimatePresence>
-            {bankErr && (
-              <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                style={{
-                  marginBottom: 10, padding: "8px 12px", borderRadius: 10,
-                  background: "rgba(255,64,64,0.08)", border: "1px solid rgba(255,64,64,0.25)",
-                  color: "#ff4040", fontSize: 10.5, fontWeight: 600, textAlign: "center",
-                }}>
-                ⚠️ Vui lòng chọn ngân hàng trước khi mở app
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Nút mở app ngân hàng / MoMo */}
-          <button type="button" onClick={handleOpenBank}
-            style={{
-              width: "100%", height: 52, borderRadius: 14, border: "none", cursor: "pointer",
-              background: myBank
-                ? myBank.isMomo
-                  ? "linear-gradient(90deg,#ae2070,#d72d8c)"
-                  : "linear-gradient(90deg,#FF6B00,#FF8C00,#FFB347)"
-                : "rgba(255,255,255,0.06)",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              marginBottom: myBank?.isMomo ? 8 : 4,
-              boxShadow: myBank
-                ? myBank.isMomo
-                  ? "0 4px 20px rgba(215,45,140,0.4)"
-                  : "0 4px 20px rgba(255,107,0,0.4)"
-                : "none",
-              position: "relative", overflow: "hidden", transition: "all .2s",
-            }}>
-            {myBank && (
-              <div style={{ position:"absolute", top:0, left:"-60%", width:"35%", height:"100%",
-                background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.22),transparent)",
-                animation:"ckShim 2.5s infinite" }} />
-            )}
-            {myBank ? (
-              <>
-                {myBank.isMomo ? (
-                  <span style={{ fontSize: 22, position: "relative" }}>💜</span>
-                ) : (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={`https://img.vietqr.io/image/${myBank.code}/logo.png`}
-                    alt={myBank.name} width={28} height={28} loading="lazy"
-                    style={{ borderRadius: 8, objectFit: "cover", flexShrink: 0, position: "relative" }}
-                    onError={e => { e.currentTarget.style.display = "none" }} />
-                )}
-                <span style={{ color: "#fff", fontSize: 14, fontWeight: 800, fontFamily: "Lexend", position: "relative" }}>
-                  {myBank.isMomo ? "Mở MoMo · Quét mã QR" : `Mở ${myBank.name}`}
-                </span>
-              </>
-            ) : (
-              <span style={{ color: "#6a5a40", fontSize: 13, fontWeight: 600, fontFamily: "Lexend" }}>
-                🏦 Chọn ngân hàng để mở app
-              </span>
-            )}
-          </button>
-          {myBank?.isMomo && (
-            <div style={{ color: "#6a5a40", fontSize: 11, textAlign: "center", marginBottom: 4 }}>
-              Trong MoMo: nhấn <strong style={{ color: "#b0956a" }}>Quét mã</strong> → scan QR bên trên để thanh toán
-            </div>
-          )}
+          <div style={{ color: "#6a5a40", fontSize: 11, textAlign: "center", marginBottom: 4 }}>
+            Mở app ngân hàng → chọn <strong style={{ color: "#b0956a" }}>Quét mã QR</strong> → scan mã bên trên
+          </div>
         </div>
 
         <div style={{ padding: "12px 16px 28px", flexShrink: 0, borderTop: "1px solid rgba(255,255,255,0.06)", background: "#0e0c09" }}>
@@ -1657,13 +1623,13 @@ export default function CheckoutPage() {
       {/* Toast */}
       <AnimatePresence>
         {toast && (
-          <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
             style={{
-              position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 62px)", left: "50%", transform: "translateX(-50%)",
-              zIndex: 500, whiteSpace: "nowrap",
+              position: "fixed", bottom: "calc(env(safe-area-inset-bottom, 0px) + 76px)",
+              left: 16, right: 16, zIndex: 500, textAlign: "center",
               background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.35)",
-              borderRadius: 12, padding: "7px 16px",
+              borderRadius: 12, padding: "9px 16px",
               color: "#FF8C00", fontSize: 11, fontWeight: 600, backdropFilter: "blur(10px)",
             }}>
             {toast}

@@ -233,10 +233,13 @@ export default function CartPage() {
                                     <span style={{ fontSize: 11, color: "#6a5a40" }}>📐 Size</span>
                                     <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 11, fontWeight: 700,
                                       background: "rgba(74,143,245,0.12)", border: "1px solid rgba(74,143,245,0.25)",
-                                      color: "#4a8ff5" }}>{item.breakdown.sizeLabel}</span>
+                                      color: "#4a8ff5" }}>
+                                      {/* Strip "Size " prefix nếu có — tránh hiện "Size Ly 25" */}
+                                      {item.breakdown.sizeLabel.replace(/^size\s+/i, "")}
+                                    </span>
                                   </div>
                                   <span style={{ fontSize: 11, color: "#4a8ff5", fontWeight: 600 }}>
-                                    {item.breakdown.sizeDiff ? `+${formatPrice(item.breakdown.sizeDiff)}` : "Miễn phí"}
+                                    {item.breakdown.sizeDiff ? `+${formatPrice(item.breakdown.sizeDiff)}` : "–"}
                                   </span>
                                 </div>
                               )}
