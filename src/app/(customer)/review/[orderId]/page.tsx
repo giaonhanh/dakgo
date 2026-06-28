@@ -97,6 +97,7 @@ export default function ReviewPage() {
   const [submitted,  setSubmitted]  = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitErr,  setSubmitErr]  = useState("")
+  const [earnedXu,   setEarnedXu]  = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -227,6 +228,17 @@ export default function ReviewPage() {
         }
       }
 
+      // Thưởng xu DakGo sau khi review thành công
+      const rewardRes = await fetch("/api/reviews/reward", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId, has_photo: uploadedUrls.length > 0 }),
+      })
+      if (rewardRes.ok) {
+        const rewardData = await rewardRes.json()
+        if (!rewardData.skipped) setEarnedXu(rewardData.xu ?? 0)
+      }
+
       setSubmitted(true)
     } catch (e) {
       console.error("[review] unexpected error:", e)
@@ -249,14 +261,18 @@ export default function ReviewPage() {
         <div style={{ color:"#6a5a40",fontSize:11,textAlign:"center",lineHeight:1.7 }}>
           Đánh giá của bạn giúp cải thiện<br/>chất lượng dịch vụ Giao Nhanh
         </div>
-        <div style={{ display:"flex",alignItems:"center",gap:6,marginTop:4,
-          background:"rgba(62,207,110,0.1)",border:"1px solid rgba(62,207,110,0.25)",
-          borderRadius:10,padding:"6px 14px" }}>
-          <span style={{ fontSize:14 }}>💎</span>
-          <span style={{ color:"#3ecf6e",fontSize:11,fontWeight:600 }}>
-            +50 điểm tích lũy đã được cộng!
-          </span>
-        </div>
+        {earnedXu > 0 && (
+          <motion.div initial={{ scale:0, opacity:0 }} animate={{ scale:1, opacity:1 }}
+            transition={{ type:"spring", damping:12, delay:0.3 }}
+            style={{ display:"flex",alignItems:"center",gap:6,marginTop:4,
+              background:"rgba(180,100,255,0.12)",border:"1px solid rgba(180,100,255,0.3)",
+              borderRadius:10,padding:"8px 16px" }}>
+            <span style={{ fontSize:16 }}>🎁</span>
+            <span style={{ color:"#b464ff",fontSize:12,fontWeight:700 }}>
+              +{earnedXu.toLocaleString("vi-VN")} xu DakGo đã vào ví!
+            </span>
+          </motion.div>
+        )}
         <a href="/orders" style={{ marginTop:8,padding:"11px 28px",
           borderRadius:12,border:"none",textDecoration:"none",
           background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
