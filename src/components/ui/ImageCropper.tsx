@@ -112,7 +112,9 @@ export default function ImageCropper({ src, onDone, onCancel }: Props) {
 
       {/* Header */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
-        padding:"14px 16px", borderBottom:"1px solid rgba(255,107,0,0.15)", flexShrink:0 }}>
+        paddingTop:"calc(env(safe-area-inset-top, 0px) + 14px)",
+        paddingBottom:"14px", paddingLeft:"16px", paddingRight:"16px",
+        borderBottom:"1px solid rgba(255,107,0,0.15)", flexShrink:0 }}>
         <button onClick={onCancel}
           style={{ background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.1)",
             borderRadius:10, padding:"7px 14px", color:"#b0956a", fontSize:11,
