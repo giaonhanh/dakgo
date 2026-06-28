@@ -502,6 +502,31 @@ export default function OrdersPage() {
 
     const { locked, count } = await logCancelAndCheckLock(supabase, "customer", userId, showCancel, cancelRsn)
 
+    // Notify merchant (shop owner)
+    const cancelledOrder = orders.find(o => o.id === showCancel)
+    if (cancelledOrder?.shopId) {
+      const { data: shop } = await supabase.from("shops").select("owner_id").eq("id", cancelledOrder.shopId).single()
+      if (shop?.owner_id) {
+        const totalStr = cancelledOrder.subtotal.toLocaleString("vi-VN") + "đ"
+        supabase.from("notifications").insert({
+          user_id: shop.owner_id, type: "order",
+          title: "❌ Khách hủy đơn hàng",
+          body:  `Đơn ${totalStr} vừa bị khách hủy trong 30 giây. Lý do: ${cancelRsn}`,
+          data:  { url: "/merchant" },
+        }).then(() => {
+          fetch("/api/notify/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: shop.owner_id, title: "❌ Khách hủy đơn hàng",
+              body: `Đơn ${totalStr} vừa bị khách hủy.`,
+              url: "/merchant", tag: `cancel-${showCancel}`,
+            }),
+          }).catch(() => {})
+        })
+      }
+    }
+
     if (locked) {
       setCancelLocked(true)
       fireToast("⚠️ Tài khoản bị khóa do hủy đơn quá nhiều lần · Liên hệ admin để mở khóa")

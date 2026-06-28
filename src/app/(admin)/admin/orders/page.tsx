@@ -17,7 +17,7 @@ interface OrderItem {
 interface Order {
   id: string; status: OrderStatus; total_amount: number; ship_fee: number
   delivery_address: string; created_at: string; pay_method: string; note: string | null
-  customer_id: string; driver_id: string | null
+  customer_id: string; driver_id: string | null; shop_id?: string
   shopName: string; customerName: string; customerPhone: string
   driverName: string | null; driverPhone: string | null
   items: OrderItem[]
@@ -280,7 +280,7 @@ export default function AdminOrdersPage() {
     // Không join order_items trong nested query để tránh RLS block
     const { data: rows, error } = await supabase
       .from("orders")
-      .select("id,status,total_amount,ship_fee,delivery_address,created_at,customer_id,driver_id,pay_method,note,shops!shop_id(name)")
+      .select("id,status,total_amount,ship_fee,delivery_address,created_at,customer_id,driver_id,shop_id,pay_method,note,shops!shop_id(name)")
       .gte("created_at", fromISO)
       .lte("created_at", toISO)
       .order("created_at", { ascending: false })
@@ -320,7 +320,7 @@ export default function AdminOrdersPage() {
         created_at:       r.created_at,
         pay_method:       (r.pay_method  as string)      ?? "cash",
         note:             (r.note        as string|null) ?? null,
-        customer_id: r.customer_id, driver_id: r.driver_id, shopName,
+        customer_id: r.customer_id, driver_id: r.driver_id, shop_id: r.shop_id ?? undefined, shopName,
         customerName:  pMap[r.customer_id]   ?? "Khách hàng",
         customerPhone: pPhone[r.customer_id] ?? "",
         driverName:  r.driver_id ? (dMap[r.driver_id]   ?? null) : null,
@@ -521,19 +521,30 @@ export default function AdminOrdersPage() {
     setCancelling(true)
     const supabase  = createClient()
     const finalRsn  = reason === "Khác" ? (cancelCustom.trim() || "Không có lý do") : reason
+    const shortId   = order.id.slice(0,8).toUpperCase()
     await supabase.from("orders").update({ status:"cancelled", cancelled_at: new Date().toISOString() }).eq("id", order.id)
     const notifs: { user_id:string; type:string; title:string; body:string; data:object }[] = [
       { user_id: order.customer_id, type:"order",
         title:"❌ Đơn hàng đã bị hủy",
-        body:`Đơn #${order.id.slice(0,8).toUpperCase()} đã bị hủy bởi admin. Lý do: ${finalRsn}`,
+        body:`Đơn #${shortId} đã bị hủy bởi admin. Lý do: ${finalRsn}`,
         data:{ order_id: order.id } },
     ]
     if (order.driver_id) notifs.push({
       user_id: order.driver_id, type:"order",
       title:"❌ Đơn bị hủy",
-      body:`Đơn #${order.id.slice(0,8).toUpperCase()} đã bị admin hủy. Lý do: ${finalRsn}`,
+      body:`Đơn #${shortId} đã bị admin hủy. Lý do: ${finalRsn}`,
       data:{ order_id: order.id },
     })
+    // Notify merchant (shop owner)
+    if (order.shop_id) {
+      const { data: shop } = await supabase.from("shops").select("owner_id").eq("id", order.shop_id).single()
+      if (shop?.owner_id) notifs.push({
+        user_id: shop.owner_id, type:"order",
+        title:"❌ Đơn bị admin hủy",
+        body:`Đơn #${shortId} của quán bạn đã bị admin hủy. Lý do: ${finalRsn}`,
+        data:{ order_id: order.id },
+      })
+    }
     await supabase.from("notifications").insert(notifs)
     setOrders(p => p.map(o => o.id === order.id ? {...o, status:"cancelled"} : o))
     setCancelModal(null); setCancelReason(""); setCancelCustom("")

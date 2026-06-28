@@ -50,6 +50,7 @@ interface OrderRow {
   discountAmount: number
   items: string
   note: string | null
+  customerId: string
 }
 
 function fmtDateTime(iso: string) {
@@ -124,7 +125,7 @@ export default function MerchantOrdersPage() {
 
       let q = supabase
         .from("orders")
-        .select("id,status,total_amount,delivery_fee,discount_amount,pay_method,note,created_at", { count: "exact" })
+        .select("id,status,total_amount,delivery_fee,discount_amount,pay_method,note,created_at,customer_id", { count: "exact" })
         .eq("shop_id", sid)
         .order("created_at", { ascending: false })
         .range(pg * PAGE_SIZE, pg * PAGE_SIZE + PAGE_SIZE - 1)
@@ -162,6 +163,7 @@ export default function MerchantOrdersPage() {
         discountAmount: r.discount_amount ?? 0,
         items:          itemMap.get(r.id) ?? "—",
         note:           r.note ?? null,
+        customerId:     r.customer_id ?? "",
       }))
 
       if (pg === 0) {
@@ -241,6 +243,29 @@ export default function MerchantOrdersPage() {
     const { locked, count } = await logCancelAndCheckLock(supabase, "merchant", ownerId, showCancelModal, cancelReason)
 
     setOrders(prev => prev.map(o => o.id === showCancelModal ? { ...o, status: "cancelled" } : o))
+
+    // Thông báo cho khách
+    const cancelledOrder = orders.find(o => o.id === showCancelModal)
+    if (cancelledOrder?.customerId) {
+      const cid = cancelledOrder.customerId
+      const totalStr = cancelledOrder.total.toLocaleString("vi-VN") + "đ"
+      supabase.from("notifications").insert({
+        user_id: cid, type: "order",
+        title: "❌ Quán từ chối đơn hàng",
+        body:  `Đơn ${totalStr} đã bị từ chối: ${cancelReason}. Vui lòng đặt lại hoặc chọn quán khác.`,
+        data:  { url: "/orders" },
+      }).then(() => {
+        fetch("/api/notify/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: cid, title: "❌ Quán từ chối đơn hàng",
+            body: `Đơn ${totalStr} đã bị từ chối. Vui lòng đặt lại.`,
+            url: "/orders", tag: `cancel-${showCancelModal}`,
+          }),
+        }).catch(() => {})
+      })
+    }
 
     if (locked) {
       setCancelLocked(true)

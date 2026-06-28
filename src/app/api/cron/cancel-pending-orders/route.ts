@@ -110,6 +110,37 @@ export async function GET(req: NextRequest) {
     }
   } catch { /* không ảnh hưởng kết quả chính */ }
 
+  // Thông báo cho quán (shop owner)
+  try {
+    const shopIds = [...new Set(expiredOrders.map(o => o.shop_id).filter(Boolean) as string[])]
+    if (shopIds.length > 0) {
+      const { data: shops } = await db.from("shops").select("id, owner_id").in("id", shopIds)
+      const ownerMap = Object.fromEntries((shops ?? []).map(s => [s.id, s.owner_id]))
+      const shopNotifs = expiredOrders
+        .filter(o => ownerMap[o.shop_id])
+        .map(o => ({
+          user_id: ownerMap[o.shop_id],
+          type:    "order",
+          title:   "⏰ Đơn hàng tự động hủy",
+          body:    `Đơn ${o.total_amount.toLocaleString("vi-VN")}đ đã bị hủy tự động do khách chưa thanh toán.`,
+          data:    { cancelled: true },
+        }))
+      if (shopNotifs.length > 0) {
+        await db.from("notifications").insert(shopNotifs)
+        for (const o of expiredOrders) {
+          const ownerId = ownerMap[o.shop_id]
+          if (ownerId) {
+            sendPushToUser(ownerId, {
+              title: "⏰ Đơn hàng tự động hủy",
+              body:  `Đơn ${o.total_amount.toLocaleString("vi-VN")}đ chưa được thanh toán, đã tự động hủy.`,
+              url:   "/merchant", tag: `cancel-shop-${o.id}`,
+            }).catch(() => {})
+          }
+        }
+      }
+    }
+  } catch { /* không ảnh hưởng kết quả chính */ }
+
   console.log(`[cancel-pending-orders] Cancelled ${ids.length} expired orders`)
   return NextResponse.json({ cancelled: ids.length, ids })
 }
