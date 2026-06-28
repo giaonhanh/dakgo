@@ -99,8 +99,9 @@ export default function PrintPage() {
       <style>{`
         @media print {
           @page { margin: 4mm; size: 80mm auto; }
-          body { margin: 0; }
+          body { margin: 0; padding: 0; }
           .no-print { display: none !important; }
+          .invoice-wrap { padding-top: 12px !important; }
         }
         html, body {
           background: #fff !important;
@@ -111,9 +112,15 @@ export default function PrintPage() {
         }
       `}</style>
 
-      <div className="no-print" style={{ position: "fixed", top: 12, right: 12, display: "flex", gap: 8 }}>
+      {/* Button bar — full width, không đè lên nội dung */}
+      <div className="no-print" style={{
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 99,
+        background: "#f5f5f5", borderBottom: "1px solid #ddd",
+        padding: "10px 16px", display: "flex", gap: 8, justifyContent: "flex-end",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+      }}>
         <button onClick={() => window.print()} style={{
-          padding: "8px 16px", borderRadius: 8, border: "none",
+          padding: "8px 20px", borderRadius: 8, border: "none",
           background: "#FF6B00", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",
         }}>
           🖨️ In ngay
@@ -126,7 +133,8 @@ export default function PrintPage() {
         </button>
       </div>
 
-      <div style={{ width: "100%", maxWidth: 320, margin: "0 auto", padding: "12px 8px" }}>
+      {/* Nội dung hoá đơn — paddingTop để không bị nút che */}
+      <div className="invoice-wrap" style={{ width: "100%", maxWidth: 320, margin: "0 auto", padding: "58px 8px 12px" }}>
         {/* Header */}
         <div style={{ textAlign: "center", borderBottom: "1px dashed #000", paddingBottom: 8, marginBottom: 8 }}>
           <div style={{ fontWeight: 900, fontSize: 16, letterSpacing: 1 }}>
