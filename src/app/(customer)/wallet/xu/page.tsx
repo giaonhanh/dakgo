@@ -208,7 +208,7 @@ export default function XuPage() {
         {toast && (
           <motion.div initial={{ opacity:0, y:-14 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-14 }}
             style={{ position:"fixed", top:"calc(env(safe-area-inset-top, 0px) + 62px)", left:"50%", transform:"translateX(-50%)",
-              zIndex:999, whiteSpace:"nowrap",
+              zIndex:999, maxWidth:"calc(100vw - 48px)",textAlign:"center",
               background:"rgba(180,100,255,0.15)", border:"1px solid rgba(180,100,255,0.35)",
               borderRadius:12, padding:"7px 18px", color:"#b464ff",
               fontSize:11, fontWeight:600, backdropFilter:"blur(10px)" }}>
@@ -551,7 +551,7 @@ export default function XuPage() {
                     {/* Info */}
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ color:"#f0eaff", fontSize:12, fontWeight:600,
-                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                        maxWidth:"calc(100vw - 48px)",textAlign:"center", overflow:"hidden", textOverflow:"ellipsis" }}>
                         {tx.label}
                       </div>
                       <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:3 }}>

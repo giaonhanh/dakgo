@@ -117,7 +117,7 @@ function VoucherCard({ v, onSave, onCopy, onUseNow }: { v: Voucher; onSave: () =
                   </span>
                 )}
               </div>
-              <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700, marginBottom:3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+              <div style={{ color:"#f8f0e0", fontSize:12, fontWeight:700, marginBottom:3, maxWidth:"calc(100vw - 48px)",textAlign:"center", overflow:"hidden", textOverflow:"ellipsis" }}>
                 {v.title}
               </div>
 
@@ -361,7 +361,7 @@ export default function VouchersPage() {
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity:0, y:-14 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-14 }}
-            style={{ position:"fixed", top:"calc(env(safe-area-inset-top, 0px) + 62px)", left:"50%", transform:"translateX(-50%)", zIndex:999, whiteSpace:"nowrap",
+            style={{ position:"fixed", top:"calc(env(safe-area-inset-top, 0px) + 62px)", left:"50%", transform:"translateX(-50%)", zIndex:999, maxWidth:"calc(100vw - 48px)",textAlign:"center",
               background:toastOk?"rgba(62,207,110,0.15)":"rgba(255,64,64,0.15)",
               border:`1px solid ${toastOk?"rgba(62,207,110,0.35)":"rgba(255,64,64,0.35)"}`,
               borderRadius:12, padding:"7px 18px", color:toastOk?"#3ecf6e":"#ff4040",

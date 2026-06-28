@@ -572,7 +572,7 @@ export default function OrdersPage() {
         {toast && (
           <motion.div initial={{ opacity: 0, y: -14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }}
             style={{ position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 62px)", left: "50%", transform: "translateX(-50%)",
-              zIndex: 999, whiteSpace: "nowrap", background: "rgba(62,207,110,0.15)",
+              zIndex: 999, maxWidth: "calc(100vw - 48px)", textAlign: "center", background: "rgba(62,207,110,0.15)",
               border: "1px solid rgba(62,207,110,0.35)", borderRadius: 12,
               padding: "7px 18px", color: "#3ecf6e", fontSize: 11, fontWeight: 600,
               backdropFilter: "blur(10px)" }}>
@@ -812,7 +812,7 @@ export default function OrdersPage() {
                           <span style={{ color: svc.color, fontSize: 11, fontWeight: 700 }}>{svc.label}</span>
                         </div>
                         <div style={{ flex: 1, color: "#f8f0e0", fontSize: 11.5, fontWeight: 700,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          overflow: "hidden", textOverflow: "ellipsis", maxWidth: "calc(100vw - 48px)", textAlign: "center" }}>
                           {order.shopName}
                         </div>
                         <StatusBadge status={order.status} />

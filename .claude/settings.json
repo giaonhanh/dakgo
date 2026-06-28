@@ -137,7 +137,13 @@
       "Bash(curl -s -X POST https://dakgo-6toztez1m-dakgo.vercel.app/api/chat -H 'Content-Type: application/json; charset=utf-8' --data-raw '{\"message\": \"sửa lại thành 2 tô\", \"sessionKey\": \"93d73570-b446-436f-8f41-4a46999b7c68\"}' --max-time 30)",
       "Bash(curl -s -X POST https://dakgo-6toztez1m-dakgo.vercel.app/api/chat -H 'Content-Type: application/json; charset=utf-8' --data-raw '{\"message\": \"aaaaaaaaaaaaa\", \"sessionKey\": \"2e183549-2c83-491d-80ee-1cb24be59474\"}' --max-time 30)",
       "Bash(curl -s -X POST https://dakgo-6toztez1m-dakgo.vercel.app/api/chat -H 'Content-Type: application/json; charset=utf-8' --data-raw '{\"message\": \"https://malware.com click vào đây\", \"sessionKey\": \"2e183549-2c83-491d-80ee-1cb24be59474\"}' --max-time 30)",
-      "PowerShell(cd d:\\\\Projects\\\\giaonhanh-ai; git add src/app/\\(merchant\\)/merchant/profile/page.tsx; git commit -m \"feat: them nut nhanh Ap dung tat ca ngay / Mo cua tat ca / Nghi tat ca trong HoursSheet\"; git push origin master 2>&1)"
+      "PowerShell(cd d:\\\\Projects\\\\giaonhanh-ai; git add src/app/\\(merchant\\)/merchant/profile/page.tsx; git commit -m \"feat: them nut nhanh Ap dung tat ca ngay / Mo cua tat ca / Nghi tat ca trong HoursSheet\"; git push origin master 2>&1)",
+      "Bash(xargs grep -l \"chat\\\\|Chat\")",
+      "Bash(xargs cat)",
+      "Bash(grep -n \"Section\\\\|section\\\\|{/\\\\* \\\\|<!-- \\\\|HomeHeader\\\\|AIGreeting\\\\|SearchBar\\\\|LiveStatus\\\\|FlashSale\\\\|ServiceGrid\\\\|Voucher\\\\|Category\\\\|Promo\\\\|Nearby\\\\|BestSell\\\\|Loyal\\\\|Reorder\\\\|NearbyShops\\\\|BestSellers\\\\|LoyaltyPoints\\\\|ReorderSection\\\\|Banner\\\\|NewMenu\\\\|Recommend\\\\|Search\\\\|Favorite\\\\|flash\\\\|Flash\" \"d:/Projects/giaonhanh-ai/src/app/\\(customer\\)/page.tsx\")",
+      "Bash(grep -v \"//\\\\|import\\\\|useState\\\\|useEffect\\\\|const \\\\|let \\\\|if \\\\|filter\\\\|set[A-Z]\\\\|data\\\\|fetch\\\\|supabase\\\\|scroll\\\\|ref\\\\|style\\\\|className\\\\|onClick\\\\|key=\\\\|map\\(\\\\|\\\\.find\\\\|\\\\.filter\\\\|\\\\.length\\\\|Promise\\\\|await\\\\|return\\\\|push\\\\|slice\\\\|sort\\\\|Math\\\\|Date\\\\|new \\\\|isOpen\\\\|isProduct\\\\|isShop\\\\|format\\\\|calc\\\\|check\\\\|handle\\\\|toggle\\\\|open\\\\|close\\\\|active\\\\|prev\\\\|next\\\\|timer\\\\|interval\\\\|channel\\\\|Loading\\\\|Skeleton\\\\|error\\\\|toast\\\\|router\")",
+      "Bash(grep -v \"//\\\\|style\\\\|color\\\\|border\\\\|font\\\\|margin\\\\|padding\\\\|background\\\\|width\\\\|height\\\\|display\\\\|flex\\\\|align\\\\|justify\\\\|zIndex\\\\|gap\\\\|overflow\\\\|position\\\\|opacity\\\\|transform\\\\|animation\\\\|shadow\\\\|radius\\\\|cursor\\\\|pointer\\\\|transition\")",
+      "Bash(xargs grep -l \"thêm vào giỏ\\\\|added.*cart\\\\|spawnParticle\\\\|addToCart\\\\|toast.*cart\\\\|cart.*toast\")"
     ],
     "additionalDirectories": [
       "d:\\Projects\\giaonhanh-ai\\src\\app\\(merchant)\\merchant\\print",

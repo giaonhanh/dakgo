@@ -126,7 +126,7 @@ export default function MuaHoPage() {
       {/* Toast */}
       {toast && (
         <div style={{ position:"fixed",top:"calc(env(safe-area-inset-top,0px) + 12px)",left:"50%",
-          transform:"translateX(-50%)",zIndex:9999,whiteSpace:"nowrap",
+          transform:"translateX(-50%)",zIndex:9999,maxWidth:"calc(100vw - 48px)",textAlign:"center",
           background:"rgba(62,207,110,0.15)",border:"1px solid rgba(62,207,110,0.35)",
           borderRadius:12,padding:"7px 16px",color:"#3ecf6e",fontSize:11,fontWeight:600,
           backdropFilter:"blur(10px)",fontFamily:"Lexend" }}>

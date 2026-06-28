@@ -357,7 +357,7 @@ export default function TrackingPage() {
         {toast && (
           <motion.div initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-12}}
             style={{ position:"fixed",top:50,left:"50%",transform:"translateX(-50%)",zIndex:999,
-              whiteSpace:"nowrap",background:"rgba(62,207,110,0.15)",
+              maxWidth:"calc(100vw - 48px)",textAlign:"center",background:"rgba(62,207,110,0.15)",
               border:"1px solid rgba(62,207,110,0.35)",borderRadius:12,
               padding:"7px 16px",color:"#3ecf6e",fontSize:11,fontWeight:600,backdropFilter:"blur(10px)" }}>
             ✓ {toast}

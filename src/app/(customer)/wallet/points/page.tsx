@@ -94,7 +94,7 @@ export default function PointsPage() {
         {toast && (
           <motion.div initial={{ opacity:0, y:-14 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-14 }}
             style={{ position:"fixed", top:"calc(env(safe-area-inset-top, 0px) + 62px)", left:"50%", transform:"translateX(-50%)",
-              zIndex:999, whiteSpace:"nowrap",
+              zIndex:999, maxWidth:"calc(100vw - 48px)",textAlign:"center",
               background:"rgba(245,197,66,0.12)", border:"1px solid rgba(245,197,66,0.3)",
               borderRadius:12, padding:"7px 18px", color:"#F5C542",
               fontSize:11, fontWeight:600, backdropFilter:"blur(10px)" }}>
@@ -359,7 +359,7 @@ export default function PointsPage() {
                       fontSize:18, flexShrink:0 }}>{rv.icon}</div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ color: canRedeem ? "#f8f0e0" : "#6a5a40", fontSize:10, fontWeight:500,
-                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{rv.title}</div>
+                        maxWidth:"calc(100vw - 48px)",textAlign:"center", overflow:"hidden", textOverflow:"ellipsis" }}>{rv.title}</div>
                       <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:2 }}>
                         <span style={{ color:"#F5C542", fontSize: 11, fontWeight:600 }}>
                           {rv.pointCost.toLocaleString()} điểm
@@ -427,7 +427,7 @@ export default function PointsPage() {
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:500,
-                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                        maxWidth:"calc(100vw - 48px)",textAlign:"center", overflow:"hidden", textOverflow:"ellipsis" }}>
                         {tx.label}
                       </div>
                       <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:2 }}>

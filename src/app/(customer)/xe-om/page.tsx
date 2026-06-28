@@ -127,7 +127,7 @@ export default function XeOmPage() {
         {toast && (
           <motion.div initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-12}}
             style={{ position:"fixed",top:"calc(env(safe-area-inset-top,0px) + 60px)",
-              left:"50%",transform:"translateX(-50%)",zIndex:999,whiteSpace:"nowrap",
+              left:"50%",transform:"translateX(-50%)",zIndex:999,maxWidth:"calc(100vw - 48px)",textAlign:"center",
               background:"rgba(74,143,245,0.15)",border:"1px solid rgba(74,143,245,0.35)",
               borderRadius:12,padding:"7px 16px",color:"#4a8ff5",fontSize:11,fontWeight:600,
               backdropFilter:"blur(10px)" }}>
