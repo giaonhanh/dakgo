@@ -2188,7 +2188,7 @@ export default function HomePage() {
             transition={{ type: "spring", damping: 28, stiffness: 340 }}
             style={{
               position: "fixed",
-              bottom: "calc(max(16px, env(safe-area-inset-bottom)) + 64px)",
+              top: "calc(env(safe-area-inset-top, 0px) + 62px)",
               left: 16, right: 16, zIndex: 200,
               background: "rgba(14,12,9,0.96)",
               backdropFilter: "blur(16px)",
@@ -2269,7 +2269,7 @@ export default function HomePage() {
             transition={{ type:"spring", damping:28, stiffness:340 }}
             style={{
               position:"fixed",
-              bottom:"calc(max(16px, env(safe-area-inset-bottom)) + 72px)",
+              top:"calc(env(safe-area-inset-top, 0px) + 62px)",
               left:16, right:16, zIndex:202,
               background:"rgba(14,12,9,0.96)", backdropFilter:"blur(16px)",
               border:"1px solid rgba(46,204,113,0.35)", borderRadius:14,
