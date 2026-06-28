@@ -24,12 +24,10 @@ interface PrintOrder {
   subtotal: number
   discountAmount: number
   totalAmount: number
-  merchantReceives: number
   createdAt: string
   items: PrintItem[]
   customerName: string
   customerPhone: string
-  deliveryAddress: string
 }
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ"
@@ -47,14 +45,6 @@ function maskPhone(phone: string): string {
   return `xxxx xxx ${digits.slice(-3)}`
 }
 
-function maskAddress(addr: string): string {
-  if (!addr) return ""
-  // Giữ phần từ dấu phẩy đầu tiên trở đi (xã/huyện/thành phố), che số nhà
-  const commaIdx = addr.indexOf(",")
-  if (commaIdx > 0) return `xxx,${addr.slice(commaIdx + 1)}`
-  // Không có dấu phẩy: che 3 ký tự đầu
-  return `xxx ${addr.slice(Math.min(4, addr.length))}`
-}
 
 function sizeDisplay(label: string): string {
   // Nếu label đã chứa "Size" thì không thêm prefix nữa
@@ -73,20 +63,17 @@ export default function PrintPage() {
 
       const { data: o, error: oErr } = await supabase
         .from("orders")
-        .select("id, shop_id, customer_id, note, subtotal, discount_amount, total_amount, delivery_address, created_at")
+        .select("id, shop_id, customer_id, note, subtotal, discount_amount, total_amount, created_at")
         .eq("id", orderId)
         .single()
 
       if (oErr || !o) { setError("Không tìm thấy đơn hàng"); return }
 
       const [{ data: shop }, { data: items }, { data: profile }] = await Promise.all([
-        supabase.from("shops").select("name, commission_rate").eq("id", o.shop_id).single(),
+        supabase.from("shops").select("name").eq("id", o.shop_id).single(),
         supabase.from("order_items").select("name, qty, price, note, options").eq("order_id", orderId),
         supabase.from("profiles").select("full_name, phone").eq("id", o.customer_id).single(),
       ])
-
-      const commRate         = Number(shop?.commission_rate ?? 0) / 100
-      const merchantReceives = Math.round(o.subtotal * (1 - commRate))
 
       setOrder({
         id:              o.id.slice(-6).toUpperCase(),
@@ -95,7 +82,6 @@ export default function PrintPage() {
         subtotal:        o.subtotal,
         discountAmount:  o.discount_amount ?? 0,
         totalAmount:     o.total_amount ?? o.subtotal,
-        merchantReceives,
         createdAt:       o.created_at,
         customerName:    profile?.full_name ?? "Khách hàng",
         customerPhone:   profile?.phone ?? "",
@@ -144,11 +130,13 @@ export default function PrintPage() {
         }
       `}</style>
 
-      {/* Button bar */}
+      {/* Button bar — safe-area cho Android & iOS */}
       <div className="no-print" style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 99,
         background: "#f5f5f5", borderBottom: "1px solid #ddd",
-        padding: "10px 16px", display: "flex", gap: 8, justifyContent: "flex-end",
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)",
+        paddingBottom: 10, paddingLeft: 16, paddingRight: 16,
+        display: "flex", gap: 8, justifyContent: "flex-end",
         boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
       }}>
         <button onClick={() => window.print()} style={{
@@ -165,14 +153,16 @@ export default function PrintPage() {
         </button>
       </div>
 
-      <div className="invoice-wrap" style={{ width: "100%", maxWidth: 320, margin: "0 auto", padding: "58px 8px 12px" }}>
+      <div className="invoice-wrap" style={{ width: "100%", maxWidth: 320, margin: "0 auto",
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 68px)",
+        paddingBottom: 12, paddingLeft: 8, paddingRight: 8 }}>
 
         {/* Header */}
         <div style={{ textAlign: "center", borderBottom: "1px dashed #000", paddingBottom: 8, marginBottom: 8 }}>
           <div style={{ fontWeight: 900, fontSize: 16, letterSpacing: 1 }}>
             {order.shopName.toUpperCase()}
           </div>
-          <div style={{ fontSize: 10, marginTop: 2 }}>--- HÓA ĐƠN GIAO HÀNG ---</div>
+          <div style={{ fontSize: 10, marginTop: 2 }}>- HÓA ĐƠN GIAO HÀNG -</div>
           <div style={{ fontSize: 11, marginTop: 4 }}>
             <strong>#{order.id}</strong> · {fmtDateTime(order.createdAt)}
           </div>
@@ -180,21 +170,16 @@ export default function PrintPage() {
 
         {/* Khách hàng */}
         <div style={{ borderBottom: "1px dashed #000", paddingBottom: 6, marginBottom: 8, fontSize: 11 }}>
-          <div style={{ fontWeight: 700, marginBottom: 3 }}>--- KHÁCH HÀNG ---</div>
+          <div style={{ fontWeight: 700, marginBottom: 3 }}>- KHÁCH HÀNG -</div>
           <div>
             {order.customerName}
             {order.customerPhone ? ` · ${maskPhone(order.customerPhone)}` : ""}
           </div>
-          {order.deliveryAddress && (
-            <div style={{ marginTop: 2, color: "#444" }}>
-              📍 {maskAddress(order.deliveryAddress)}
-            </div>
-          )}
         </div>
 
         {/* Món ăn */}
         <div style={{ marginBottom: 8 }}>
-          <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 6 }}>--- MÓN ĂN ---</div>
+          <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 6 }}>- MÓN ĂN -</div>
           {order.items.map((item, idx) => {
             const bd = item.options
             return (
@@ -240,33 +225,19 @@ export default function PrintPage() {
 
         {/* Thanh toán */}
         <div style={{ borderTop: "1px solid #000", paddingTop: 8 }}>
-          <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 6 }}>--- THANH TOÁN ---</div>
+          <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 6 }}>- THANH TOÁN -</div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 12 }}>
-            <span>Tiền món:</span>
-            <span>{fmt(order.subtotal)}</span>
-          </div>
-
-          {order.discountAmount > 0 && (
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 12 }}>
-              <span>Giảm giá:</span>
-              <span>-{fmt(order.discountAmount)}</span>
-            </div>
-          )}
-
-          <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-
-          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 900, fontSize: 14, marginBottom: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 900, fontSize: 14, marginBottom: 4 }}>
             <span>Tổng tiền:</span>
             <span>{fmt(order.totalAmount)}</span>
           </div>
 
-          <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
-            <span>Thực nhận (sau hoa hồng):</span>
-            <span style={{ fontWeight: 900 }}>{fmt(order.merchantReceives)}</span>
-          </div>
+          {order.discountAmount > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <span>Giảm giá:</span>
+              <span>-{fmt(order.discountAmount)}</span>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
