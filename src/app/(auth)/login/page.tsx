@@ -383,6 +383,9 @@ function LoginContent() {
               <div style={{ width: 110, height: 110, position: "relative", borderRadius: "22%", overflow: "hidden" }}>
                 <Image src="/logo.png" alt="DakGo" fill style={{ objectFit: "cover" }} priority />
               </div>
+              <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: -0.5, lineHeight: 1 }}>
+                <span style={{ color: "#FFFFFF" }}>Dak</span><span style={{ color: "#CC4A00" }}>Go</span>
+              </div>
               <div style={{ color: "rgba(176,149,106,0.9)", fontSize: 12, textAlign: "center", lineHeight: 1.6 }}>
                 Giao hàng · Mua hộ · Xe ôm · Taxi<br />tại Krông Pắc, Đắk Lắk
               </div>
@@ -412,9 +415,12 @@ function LoginContent() {
               <motion.div
                 initial={{ scale: 0, rotate: -10 }} animate={{ scale: 1, rotate: 0 }}
                 transition={{ delay: .1, type: "spring", damping: 12 }}
-                style={{ width: 68, height: 68, marginBottom: 12, position: "relative", borderRadius: "22%", overflow: "hidden" }}>
+                style={{ width: 68, height: 68, position: "relative", borderRadius: "22%", overflow: "hidden" }}>
                 <Image src="/logo.png" alt="DakGo" fill style={{ objectFit: "cover" }} />
               </motion.div>
+              <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: -0.5, lineHeight: 1, margin: "8px 0 4px" }}>
+                <span style={{ color: "#FFFFFF" }}>Dak</span><span style={{ color: "#CC4A00" }}>Go</span>
+              </div>
               <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, marginBottom: 18, textAlign: "center" }}>
                 Giao đồ ăn · Giao hàng · Xe ôm · Taxi tại Krông Pắc
               </div>
