@@ -24,6 +24,7 @@ interface PrintOrder {
   subtotal: number
   discountAmount: number
   totalAmount: number
+  merchantReceives: number
   createdAt: string
   items: PrintItem[]
   customerName: string
@@ -70,10 +71,13 @@ export default function PrintPage() {
       if (oErr || !o) { setError("Không tìm thấy đơn hàng"); return }
 
       const [{ data: shop }, { data: items }, { data: profile }] = await Promise.all([
-        supabase.from("shops").select("name").eq("id", o.shop_id).single(),
+        supabase.from("shops").select("name, commission_rate").eq("id", o.shop_id).single(),
         supabase.from("order_items").select("name, qty, price, note, options").eq("order_id", orderId),
         supabase.from("profiles").select("full_name, phone").eq("id", o.customer_id).single(),
       ])
+
+      const commRate         = Number(shop?.commission_rate ?? 0) / 100
+      const merchantReceives = Math.round(o.subtotal * (1 - commRate))
 
       setOrder({
         id:              o.id.slice(-6).toUpperCase(),
@@ -82,6 +86,7 @@ export default function PrintPage() {
         subtotal:        o.subtotal,
         discountAmount:  o.discount_amount ?? 0,
         totalAmount:     o.total_amount ?? o.subtotal,
+        merchantReceives,
         createdAt:       o.created_at,
         customerName:    profile?.full_name ?? "Khách hàng",
         customerPhone:   profile?.phone ?? "",
@@ -233,11 +238,18 @@ export default function PrintPage() {
           </div>
 
           {order.discountAmount > 0 && (
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
               <span>Giảm giá:</span>
               <span>-{fmt(order.discountAmount)}</span>
             </div>
           )}
+
+          <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+            <span>Thực nhận (sau hoa hồng):</span>
+            <span style={{ fontWeight: 900 }}>{fmt(order.merchantReceives)}</span>
+          </div>
         </div>
 
         {/* Footer */}
