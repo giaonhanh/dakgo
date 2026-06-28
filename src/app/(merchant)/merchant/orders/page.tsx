@@ -125,7 +125,7 @@ export default function MerchantOrdersPage() {
 
       let q = supabase
         .from("orders")
-        .select("id,status,total_amount,delivery_fee,discount_amount,pay_method,note,created_at,customer_id", { count: "exact" })
+        .select("id,status,total_amount,ship_fee,discount_amount,pay_method,note,created_at,customer_id", { count: "exact" })
         .eq("shop_id", sid)
         .order("created_at", { ascending: false })
         .range(pg * PAGE_SIZE, pg * PAGE_SIZE + PAGE_SIZE - 1)
@@ -159,7 +159,7 @@ export default function MerchantOrdersPage() {
         status:         r.status,
         payMethod:      r.pay_method ?? "cash",
         total:          r.total_amount ?? 0,
-        deliveryFee:    r.delivery_fee ?? 0,
+        deliveryFee:    r.ship_fee ?? 0,
         discountAmount: r.discount_amount ?? 0,
         items:          itemMap.get(r.id) ?? "—",
         note:           r.note ?? null,
