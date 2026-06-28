@@ -37,7 +37,8 @@ type MenuGroupMeta = { id: string; allDay: boolean; startHour: string; endHour: 
 type ProductShop = { name: string; is_open?: boolean; status?: string; opening_hours?: { open?: string; close?: string } | null; menu_groups_data?: MenuGroupMeta[] | null }
 type ProductRow = { id: string; name: string; price: number; original_price?: number | null; sold_count: number; shop_id: string; image_url: string | null; category?: string | null; shops: ProductShop | ProductShop[] | null; all_day?: boolean | null; start_hour?: string | null; end_hour?: string | null }
 type PromoProductRow = ProductRow & { promoTag: 'discount' | 'combo' | 'freeship' }
-type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: { name: string }[] }
+type OrderItem  = { product_id: string; name: string; price: number; qty: number }
+type OrderRow   = { id: string; shop_id: string; total_amount: number; shops: { name: string } | { name: string }[] | null; order_items: OrderItem[] }
 type VoucherRow = { id: string; code: string; title: string; discount_type: string; discount_value: number; valid_to: string; shop_id: string | null; min_order: number | null; shopName?: string | null }
 
 function distKm(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -284,6 +285,9 @@ export default function HomePage() {
   const [newMenuItems,   setNewMenuItems]   = useState<NewMenuRow[]>([])
   const [searchSuggest,  setSearchSuggest]  = useState<ProductRow[]>([])
   const [nearbyShowCount, setNearbyShowCount] = useState(5)
+  const [reorderLoading,  setReorderLoading]  = useState<string|null>(null)
+  const [pendingReorderItems, setPendingReorderItems] = useState<{id:string;name:string;price:number;shop:string;shopId:string;qty:number}[]|null>(null)
+  const [reorderToast, setReorderToast] = useState<string|null>(null)
 
   useEffect(() => { setNearbyShowCount(5) }, [nearbyFilter])
 
@@ -331,7 +335,7 @@ export default function HomePage() {
         supabase.from("banners").select("id,title,subtitle,image_url,link_url,sort_order").eq("is_active", true).order("sort_order", { ascending: true }).limit(5),
         supabase.from("app_settings").select("key,value").in("key", ["service_time_pricing", "service_toggles"]),
         supabase.from("products").select("id,name,price,image_url,shop_id,category,shops!inner(name,is_open,status,opening_hours,menu_groups_data),created_at,all_day,start_hour,end_hour").eq("is_available", true).eq("shops.status", "approved").order("created_at", { ascending: false }).limit(30),
-        supabase.from("orders").select("id,shop_id,total_amount,shops(name),order_items(name)").eq("customer_id", user.id).eq("status", "delivered").order("created_at", { ascending: false }).limit(5),
+        supabase.from("orders").select("id,shop_id,total_amount,shops(name),order_items(product_id,name,price,qty)").eq("customer_id", user.id).eq("status", "delivered").order("created_at", { ascending: false }).limit(5),
       ])
       // Recommendations chạy sau batch 1 — không block content hiển thị
       const recoData = null // sẽ load deferred bên dưới
@@ -678,6 +682,56 @@ export default function HomePage() {
     if (!conflictItem) return
     clearAndAdd(conflictItem)
     setConflictItem(null)
+  }
+
+  const handleReorder = async (r: OrderRow) => {
+    setReorderLoading(r.id)
+    const shopName = (r.shops as {name:string}|null)?.name ?? "Quán"
+    const productIds = r.order_items.map(i => i.product_id).filter(Boolean)
+
+    const { data: liveProducts } = await supabase
+      .from("products")
+      .select("id,name,price,is_available")
+      .in("id", productIds)
+      .eq("is_available", true)
+
+    setReorderLoading(null)
+
+    const availMap = new Map((liveProducts ?? []).map(p => [p.id, p]))
+    const items = r.order_items
+      .filter(oi => availMap.has(oi.product_id))
+      .map(oi => ({ id: oi.product_id, name: availMap.get(oi.product_id)!.name, price: availMap.get(oi.product_id)!.price, shop: shopName, shopId: r.shop_id, qty: oi.qty }))
+
+    if (items.length === 0) {
+      setReorderToast("Các món trong đơn này hiện không còn bán")
+      setTimeout(() => setReorderToast(null), 3000)
+      return
+    }
+
+    const skipped = r.order_items.length - items.length
+    if (storeShopId && storeShopId !== r.shop_id) {
+      setPendingReorderItems(items)
+      return
+    }
+
+    items.forEach(item => {
+      for (let q = 0; q < item.qty; q++) addItem({ id: item.id, name: item.name, price: item.price, shop: item.shop, shopId: item.shopId })
+    })
+    const msg = skipped > 0 ? `Đã thêm ${items.length} món (${skipped} món hết hàng bỏ qua)` : `Đã thêm ${items.length} món vào giỏ 🛒`
+    setReorderToast(msg)
+    setTimeout(() => setReorderToast(null), 3000)
+  }
+
+  const confirmReorderReplace = () => {
+    if (!pendingReorderItems) return
+    const { clearCart } = useCartStore.getState()
+    clearCart()
+    pendingReorderItems.forEach(item => {
+      for (let q = 0; q < item.qty; q++) addItem({ id: item.id, name: item.name, price: item.price, shop: item.shop, shopId: item.shopId })
+    })
+    setPendingReorderItems(null)
+    setReorderToast(`Đã thêm ${pendingReorderItems.length} món vào giỏ 🛒`)
+    setTimeout(() => setReorderToast(null), 3000)
   }
 
   const greet = () => {
@@ -1266,18 +1320,21 @@ export default function HomePage() {
                         </div>
                       </div>
                     </div>
-                    <a href={`/shop/${r.shop_id}`} style={{ textDecoration:"none" }}>
-                      <div className="reorder-btn" style={{
+                    <button
+                      onClick={() => handleReorder(r)}
+                      disabled={reorderLoading === r.id}
+                      style={{
                         width:"100%", height:28, borderRadius:8, border:"1px solid rgba(255,107,0,0.25)",
-                        background:"rgba(255,107,0,0.08)",
-                        color:"#FF8C00", fontSize: 11, fontWeight:600,
-                        cursor:"pointer", fontFamily:"Lexend",
+                        background: reorderLoading === r.id ? "rgba(255,107,0,0.04)" : "rgba(255,107,0,0.08)",
+                        color: reorderLoading === r.id ? "#6a5a40" : "#FF8C00",
+                        fontSize:11, fontWeight:600,
+                        cursor: reorderLoading === r.id ? "not-allowed" : "pointer",
+                        fontFamily:"Lexend",
                         display:"flex", alignItems:"center", justifyContent:"center", gap:4,
                         transition:"background .15s",
                       }}>
-                        🔁 Đặt lại · {Math.round(r.total_amount/1000)}k
-                      </div>
-                    </a>
+                      {reorderLoading === r.id ? "⏳ Đang kiểm tra..." : `🔁 Đặt lại · ${Math.round(r.total_amount/1000)}k`}
+                    </button>
                   </div>
                 )
               })}
@@ -2144,6 +2201,83 @@ export default function HomePage() {
             <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>🔒</span>
             <span style={{ color: "#FFB347", fontSize: 12, lineHeight: 1.5, fontWeight: 500 }}>
               {lockedSvcMsg}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* -- Reorder Conflict Modal -- */}
+      <AnimatePresence>
+        {pendingReorderItems && (
+          <motion.div
+            initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+            style={{ position:"fixed", inset:0, zIndex:201,
+              background:"rgba(0,0,0,0.72)", backdropFilter:"blur(6px)",
+              display:"flex", alignItems:"flex-end", justifyContent:"center",
+              padding:"0 16px 40px" }}
+            onClick={() => setPendingReorderItems(null)}>
+            <motion.div
+              initial={{ y:80, opacity:0 }} animate={{ y:0, opacity:1 }} exit={{ y:80, opacity:0 }}
+              transition={{ type:"spring", damping:22, stiffness:260 }}
+              onClick={e => e.stopPropagation()}
+              style={{ background:"#151210", border:"1px solid rgba(255,107,0,0.28)",
+                borderRadius:22, padding:"22px 18px 18px", width:"100%", maxWidth:420 }}>
+              <div style={{ fontSize:32, textAlign:"center", marginBottom:8 }}>🛒</div>
+              <div style={{ color:"#f8f0e0", fontSize:15, fontWeight:700,
+                textAlign:"center", marginBottom:10 }}>
+                Thay quán trong giỏ?
+              </div>
+              <div style={{ color:"#b0956a", fontSize:12, textAlign:"center",
+                lineHeight:1.7, marginBottom:20 }}>
+                Giỏ hàng đang có món từ{" "}
+                <span style={{ color:"#FF8C00", fontWeight:700 }}>{storeShopName}</span>.<br/>
+                Đặt lại sẽ <strong style={{ color:"#ff6060" }}>xóa giỏ hiện tại</strong> và thêm{" "}
+                <span style={{ color:"#FFB347", fontWeight:700 }}>{pendingReorderItems.length} món</span>.
+              </div>
+              <div style={{ display:"flex", gap:10 }}>
+                <button
+                  onClick={() => setPendingReorderItems(null)}
+                  style={{ flex:1, height:48, borderRadius:13,
+                    border:"1px solid rgba(255,255,255,0.1)",
+                    background:"rgba(255,255,255,0.06)",
+                    color:"#b0956a", fontSize:13, fontWeight:600,
+                    cursor:"pointer", fontFamily:"Lexend" }}>
+                  Giữ giỏ cũ
+                </button>
+                <button
+                  onClick={confirmReorderReplace}
+                  style={{ flex:1, height:48, borderRadius:13, border:"none",
+                    background:"linear-gradient(90deg,#FF6B00,#FF8C00)",
+                    color:"#fff", fontSize:13, fontWeight:700,
+                    cursor:"pointer", fontFamily:"Lexend",
+                    boxShadow:"0 4px 16px rgba(255,107,0,0.4)" }}>
+                  Xóa & đặt lại
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* -- Reorder Toast -- */}
+      <AnimatePresence>
+        {reorderToast && (
+          <motion.div
+            initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:20 }}
+            transition={{ type:"spring", damping:28, stiffness:340 }}
+            style={{
+              position:"fixed",
+              bottom:"calc(max(16px, env(safe-area-inset-bottom)) + 72px)",
+              left:16, right:16, zIndex:202,
+              background:"rgba(14,12,9,0.96)", backdropFilter:"blur(16px)",
+              border:"1px solid rgba(46,204,113,0.35)", borderRadius:14,
+              padding:"11px 14px",
+              display:"flex", alignItems:"center", gap:9,
+              boxShadow:"0 4px 24px rgba(0,0,0,0.5)",
+            }}>
+            <span style={{ fontSize:16, flexShrink:0 }}>✅</span>
+            <span style={{ color:"#3ecf6e", fontSize:12, lineHeight:1.5, fontWeight:600 }}>
+              {reorderToast}
             </span>
           </motion.div>
         )}
