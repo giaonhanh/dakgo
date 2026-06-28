@@ -283,6 +283,9 @@ export default function HomePage() {
   const [adminBannerIdx, setAdminBannerIdx] = useState(0)
   const [newMenuItems,   setNewMenuItems]   = useState<NewMenuRow[]>([])
   const [searchSuggest,  setSearchSuggest]  = useState<ProductRow[]>([])
+  const [nearbyShowCount, setNearbyShowCount] = useState(5)
+
+  useEffect(() => { setNearbyShowCount(5) }, [nearbyFilter])
 
   // --- Fetch real data from Supabase ------------------------
   useEffect(() => {
@@ -798,93 +801,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* --------------------------------------
-              S1 — AIGreeting
-          -------------------------------------- */}
-          <div style={{ padding:"2px 16px 12px" }}>
-            <div style={{ color:"#6a5a40", fontSize:10, marginBottom:2 }}>
-              {greet()}, {userName} 👋
-            </div>
-            <div style={{ fontSize:18, fontWeight:700, lineHeight:1.2, marginBottom:8 }}>
-              Hôm nay bạn{" "}
-              <span style={{
-                background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
-                WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
-                backgroundClip:"text",
-              }}>muốn đặt gì?</span>
-            </div>
-            {/* AI tip card */}
-            <div style={{
-              display:"flex", alignItems:"center", gap:8,
-              background:"rgba(180,100,255,0.07)",
-              border:"1px solid rgba(180,100,255,0.2)",
-              borderRadius:10, padding:"7px 11px",
-            }}>
-              <span style={{ fontSize:14 }}>✨</span>
-              <div style={{ color:"#b464ff", fontSize: 11, lineHeight:1.4, flex:1 }}>
-                <strong style={{ color:"#c87aff" }}>Gợi ý AI:</strong>{" "}
-                {weatherTip ?? aiTip()}
-              </div>
-              <span style={{ color:"rgba(180,100,255,0.5)", fontSize:12 }}>›</span>
-            </div>
-          </div>
 
           {/* --------------------------------------
-              S2 — SearchBar
-          -------------------------------------- */}
-          <div style={{ margin:"0 16px 12px",
-            background:"rgba(255,255,255,0.07)",
-            backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
-            border:"1px solid rgba(255,255,255,0.08)",
-            borderRadius:13, padding:"9px 13px",
-            display:"flex", alignItems:"center", gap:8 }}>
-            <span style={{ color:"#6a5a40", fontSize:15 }}>🔍</span>
-            <input readOnly placeholder="Tìm món ăn, cửa hàng, dịch vụ..."
-              onClick={() => { window.location.href="/search" }}
-              style={{ flex:1, background:"transparent", border:"none", outline:"none",
-                color:"#6a5a40", fontSize:11, fontFamily:"Lexend", cursor:"pointer" }} />
-            <a href="/search?filter=open" style={{ textDecoration:"none" }}>
-              <div style={{ width:26, height:26, borderRadius:8,
-                background:"rgba(255,107,0,0.10)", border:"1px solid rgba(255,107,0,0.25)",
-                display:"flex", alignItems:"center", justifyContent:"center", fontSize:13 }}>
-                ⚙️
-              </div>
-            </a>
-          </div>
-
-          {/* --------------------------------------
-              Banner: dịch vụ đặt đồ ăn bị admin khoá / ngoài giờ
-          -------------------------------------- */}
-          {(() => {
-            const foodToggle = svcToggleMap.food
-            const foodHours  = svcTimeMap.food
-            const manualOff  = foodToggle?.enabled === false
-            let outsideHours = false
-            if (foodHours && !foodHours.allDay) {
-              const now = new Date()
-              const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
-              const [oh, om] = foodHours.open.split(":").map(Number)
-              const [ch, cm] = foodHours.close.split(":").map(Number)
-              const oMin = (oh ?? 0) * 60 + (om ?? 0)
-              const cMin = (ch ?? 0) * 60 + (cm ?? 0)
-              outsideHours = oMin <= cMin ? !(vnMin >= oMin && vnMin < cMin) : !(vnMin >= oMin || vnMin < cMin)
-            }
-            if (!manualOff && !outsideHours) return null
-            const msg = manualOff
-              ? (foodToggle?.customerMsg || "Dịch vụ đặt đồ ăn tạm ngừng phục vụ.")
-              : `Dịch vụ đặt đồ ăn hoạt động từ ${foodHours?.open} – ${foodHours?.close}. Vui lòng quay lại trong giờ phục vụ.`
-            return (
-              <div style={{ margin:"0 16px 12px", padding:"10px 13px", borderRadius:13,
-                background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.25)",
-                display:"flex", alignItems:"flex-start", gap:9 }}>
-                <span style={{ fontSize:16, flexShrink:0 }}>🍜🚫</span>
-                <div style={{ color:"#FFB347", fontSize:11, lineHeight:1.5 }}>{msg}</div>
-              </div>
-            )
-          })()}
-
-          {/* --------------------------------------
-              S3 — LiveStatusBanner (carousel da don)
+              S3 — LiveStatusBanner (carousel đa đơn)
           -------------------------------------- */}
           <AnimatePresence>
             {liveOrders.length > 0 && (
@@ -902,10 +821,9 @@ export default function HomePage() {
                         background:"#3ecf6e", boxShadow:"0 0 5px #3ecf6e",
                         animation:"pulse 1.5s infinite" }} />
                       <span style={{ color:"#3ecf6e", fontSize: 11, fontWeight:600 }}>
-                        {liveOrders.length} don dang x? lư
+                        {liveOrders.length} đơn đang xử lý
                       </span>
                     </div>
-                    {/* Dots */}
                     <div style={{ display:"flex", gap:4 }}>
                       {liveOrders.map((_,i) => (
                         <div key={i} onClick={() => setLiveIdx(i)}
@@ -920,7 +838,6 @@ export default function HomePage() {
                   </div>
                 )}
 
-                {/* Carousel track */}
                 <div style={{ overflow:"hidden", borderRadius:14 }}>
                   <div style={{
                     display:"flex",
@@ -933,12 +850,12 @@ export default function HomePage() {
                       const isRide   = order._type === "ride"
                       const isErrand = order._type === "errand"
                       const statusLabel = isRide
-                        ? (order.status === "pending" ? "Đang t́m tài x?..." :
+                        ? (order.status === "pending" ? "Đang tìm tài xế..." :
                            order.status === "accepted" ? "Tài xế đang đến" :
                            order.status === "delivering" ? "Đang trên đường" : "Đang xử lý")
                         : isErrand
-                        ? (order.status === "pending" ? "Đang t́m tài x?..." :
-                           order.status === "accepted" ? "Tài x? dang x? lư" :
+                        ? (order.status === "pending" ? "Đang tìm tài xế..." :
+                           order.status === "accepted" ? "Tài xế đang xử lý" :
                            order.status === "delivering" ? "Đang giao" : "Đang xử lý")
                         : (order.status === "pending"    ? "Chờ quán xác nhận" :
                            order.status === "accepted" || order.status === "preparing" ? "Đã xác nhận · Đang làm" :
@@ -1004,6 +921,169 @@ export default function HomePage() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* --------------------------------------
+              S2 — SearchBar
+          -------------------------------------- */}
+          <div style={{ margin:"0 16px 12px",
+            background:"rgba(255,255,255,0.07)",
+            backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
+            border:"1px solid rgba(255,255,255,0.08)",
+            borderRadius:13, padding:"9px 13px",
+            display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ color:"#6a5a40", fontSize:15 }}>🔍</span>
+            <input readOnly placeholder="Tìm món ăn, cửa hàng, dịch vụ..."
+              onClick={() => { window.location.href="/search" }}
+              style={{ flex:1, background:"transparent", border:"none", outline:"none",
+                color:"#6a5a40", fontSize:11, fontFamily:"Lexend", cursor:"pointer" }} />
+            <a href="/search?filter=open" style={{ textDecoration:"none" }}>
+              <div style={{ width:26, height:26, borderRadius:8,
+                background:"rgba(255,107,0,0.10)", border:"1px solid rgba(255,107,0,0.25)",
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:13 }}>
+                ⚙️
+              </div>
+            </a>
+          </div>
+
+          {/* --------------------------------------
+              Banner: dịch vụ đặt đồ ăn bị admin khoá / ngoài giờ
+          -------------------------------------- */}
+          {(() => {
+            const foodToggle = svcToggleMap.food
+            const foodHours  = svcTimeMap.food
+            const manualOff  = foodToggle?.enabled === false
+            let outsideHours = false
+            if (foodHours && !foodHours.allDay) {
+              const now = new Date()
+              const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+              const [oh, om] = foodHours.open.split(":").map(Number)
+              const [ch, cm] = foodHours.close.split(":").map(Number)
+              const oMin = (oh ?? 0) * 60 + (om ?? 0)
+              const cMin = (ch ?? 0) * 60 + (cm ?? 0)
+              outsideHours = oMin <= cMin ? !(vnMin >= oMin && vnMin < cMin) : !(vnMin >= oMin || vnMin < cMin)
+            }
+            if (!manualOff && !outsideHours) return null
+            const msg = manualOff
+              ? (foodToggle?.customerMsg || "Dịch vụ đặt đồ ăn tạm ngừng phục vụ.")
+              : `Dịch vụ đặt đồ ăn hoạt động từ ${foodHours?.open} – ${foodHours?.close}. Vui lòng quay lại trong giờ phục vụ.`
+            return (
+              <div style={{ margin:"0 16px 12px", padding:"10px 13px", borderRadius:13,
+                background:"rgba(255,107,0,0.08)", border:"1px solid rgba(255,107,0,0.25)",
+                display:"flex", alignItems:"flex-start", gap:9 }}>
+                <span style={{ fontSize:16, flexShrink:0 }}>🍜🚫</span>
+                <div style={{ color:"#FFB347", fontSize:11, lineHeight:1.5 }}>{msg}</div>
+              </div>
+            )
+          })()}
+
+          {/* --------------------------------------
+              S1 — AIGreeting
+          -------------------------------------- */}
+          <div style={{ padding:"2px 16px 12px" }}>
+            <div style={{ color:"#6a5a40", fontSize:10, marginBottom:2 }}>
+              {greet()}, {userName} 👋
+            </div>
+            <div style={{ fontSize:18, fontWeight:700, lineHeight:1.2, marginBottom:8 }}>
+              Hôm nay bạn{" "}
+              <span style={{
+                background:"linear-gradient(135deg,#FF6B00,#FF8C00,#FFB347)",
+                WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                backgroundClip:"text",
+              }}>muốn đặt gì?</span>
+            </div>
+            <div style={{
+              display:"flex", alignItems:"center", gap:8,
+              background:"rgba(180,100,255,0.07)",
+              border:"1px solid rgba(180,100,255,0.2)",
+              borderRadius:10, padding:"7px 11px",
+            }}>
+              <span style={{ fontSize:14 }}>✨</span>
+              <div style={{ color:"#b464ff", fontSize: 11, lineHeight:1.4, flex:1 }}>
+                <strong style={{ color:"#c87aff" }}>Gợi ý AI:</strong>{" "}
+                {weatherTip ?? aiTip()}
+              </div>
+              <span style={{ color:"rgba(180,100,255,0.5)", fontSize:12 }}>›</span>
+            </div>
+          </div>
+
+          {/* --------------------------------------
+              S5 — ServiceGrid (4 dịch vụ nhanh)
+          -------------------------------------- */}
+          <SectionHeader title="Dịch vụ nhanh" />
+          <div style={{
+            display:"grid", gridTemplateColumns:"repeat(4,1fr)",
+            gap:7, padding:"0 16px", marginBottom:14,
+          }}>
+            {[
+              { icon:"📦", label:"Giao hộ", key:"giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00" },
+              { icon:"🛒", label:"Mua hộ",  key:"mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e" },
+              { icon:"🛵", label:"Xe ôm",   key:"xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5" },
+              { icon:"🚗", label:"Taxi",    key:"taxi",    bg:"rgba(180,100,255,0.10)",ic:"#b464ff" },
+            ].map((s, i) => {
+              const timeKeys   = SVC_GRID_TIME_KEYS[s.key]
+              const toggleKeys = SVC_GRID_TOGGLE_KEY[s.key]
+
+              const toggleKeyArr = Array.isArray(toggleKeys) ? toggleKeys : [toggleKeys]
+              const manualOff = toggleKeyArr.every(k => svcToggleMap[k] && svcToggleMap[k].enabled === false)
+              const disabledToggle = toggleKeyArr.find(k => svcToggleMap[k] && svcToggleMap[k].enabled === false)
+              const manualMsg = disabledToggle ? (svcToggleMap[disabledToggle].customerMsg || "Dịch vụ tạm ngừng phục vụ.") : ""
+
+              const checkOutside = (tk: string) => {
+                const hours = svcTimeMap[tk]
+                if (!hours || hours.allDay) return false
+                const now = new Date()
+                const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
+                const [oh, om] = hours.open.split(":").map(Number)
+                const [ch, cm] = hours.close.split(":").map(Number)
+                const oMin = (oh ?? 0) * 60 + (om ?? 0)
+                const cMin = (ch ?? 0) * 60 + (cm ?? 0)
+                return oMin <= cMin ? !(vnMin >= oMin && vnMin < cMin) : !(vnMin >= oMin || vnMin < cMin)
+              }
+              const timeKeyArr = Array.isArray(timeKeys) ? timeKeys : [timeKeys]
+              const outsideHours = timeKeyArr.every(tk => checkOutside(tk))
+              const firstHours = timeKeyArr.map(tk => svcTimeMap[tk]).find(h => h && !h.allDay)
+
+              const locked = manualOff || outsideHours
+              const lockMsg = manualOff
+                ? manualMsg
+                : outsideHours && firstHours
+                  ? `Dịch vụ hoạt động từ ${firstHours.open} – ${firstHours.close}. Vui lòng quay lại trong giờ phục vụ.`
+                  : ""
+              return (
+                <div key={i} onClick={() => {
+                  if (locked) { setLockedSvcMsg(lockMsg); setTimeout(() => setLockedSvcMsg(null), 4000); return }
+                  window.location.href = `/${s.key}`
+                }} style={{ textDecoration:"none", cursor: locked ? "not-allowed" : "pointer" }}>
+                  <div className="svc-card" style={{
+                    background: locked ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.04)",
+                    backdropFilter:"blur(10px)", WebkitBackdropFilter:"blur(10px)",
+                    border: locked ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(255,255,255,0.08)",
+                    borderRadius:14, padding:"10px 4px",
+                    display:"flex", flexDirection:"column", alignItems:"center", gap:4,
+                    position:"relative", opacity: locked ? 0.5 : 1,
+                    transition:"opacity .2s",
+                  }}>
+                    {locked && (
+                      <div style={{ position:"absolute", top:3, right:4, fontSize:9, color:"#ff4040" }}>🔒</div>
+                    )}
+                    <div style={{ width:38, height:38, borderRadius:11,
+                      background: locked ? "rgba(255,255,255,0.04)" : s.bg,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      fontSize:20, color: locked ? "#6a5a40" : s.ic }}>
+                      {s.icon}
+                    </div>
+                    <span style={{ color: locked ? "#6a5a40" : "#b0956a", fontSize:11, textAlign:"center",
+                      fontWeight:500, lineHeight:1.3 }}>{s.label}</span>
+                    {outsideHours && firstHours && (
+                      <span style={{ fontSize:8, color:"#ff6060", textAlign:"center", lineHeight:1.2 }}>
+                        {firstHours.open}–{firstHours.close}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
 
           {/* --------------------------------------
               S4 — AdminBanner (luôn hiển thị nếu có)
@@ -1150,220 +1230,61 @@ export default function HomePage() {
           </div>
 
           {/* --------------------------------------
-              S5 — ServiceGrid (4 dịch vụ nhanh)
+              S12 — ReorderSection
           -------------------------------------- */}
-          <SectionHeader title="Dịch vụ nhanh" />
-          <div style={{
-            display:"grid", gridTemplateColumns:"repeat(4,1fr)",
-            gap:7, padding:"0 16px", marginBottom:14,
-          }}>
-            {[
-              { icon:"📦", label:"Giao hộ", key:"giao-ho", bg:"rgba(255,107,0,0.12)",  ic:"#FF8C00" },
-              { icon:"🛒", label:"Mua hộ",  key:"mua-ho",  bg:"rgba(62,207,110,0.10)", ic:"#3ecf6e" },
-              { icon:"🛵", label:"Xe ôm",   key:"xe-om",   bg:"rgba(74,143,245,0.10)", ic:"#4a8ff5" },
-              { icon:"🚗", label:"Taxi",    key:"taxi",    bg:"rgba(180,100,255,0.10)",ic:"#b464ff" },
-            ].map((s, i) => {
-              const timeKeys   = SVC_GRID_TIME_KEYS[s.key]
-              const toggleKeys = SVC_GRID_TOGGLE_KEY[s.key]
-
-              // Manual disable: locked only when ALL keys are off
-              const toggleKeyArr = Array.isArray(toggleKeys) ? toggleKeys : [toggleKeys]
-              const manualOff = toggleKeyArr.every(k => svcToggleMap[k] && svcToggleMap[k].enabled === false)
-              const disabledToggle = toggleKeyArr.find(k => svcToggleMap[k] && svcToggleMap[k].enabled === false)
-              const manualMsg = disabledToggle ? (svcToggleMap[disabledToggle].customerMsg || "Dịch vụ tạm ngừng phục vụ.") : ""
-
-              // Hours check: locked only when ALL time keys are outside hours
-              const checkOutside = (tk: string) => {
-                const hours = svcTimeMap[tk]
-                if (!hours || hours.allDay) return false
-                const now = new Date()
-                const vnMin = ((now.getUTCHours() + 7) % 24) * 60 + now.getUTCMinutes()
-                const [oh, om] = hours.open.split(":").map(Number)
-                const [ch, cm] = hours.close.split(":").map(Number)
-                const oMin = (oh ?? 0) * 60 + (om ?? 0)
-                const cMin = (ch ?? 0) * 60 + (cm ?? 0)
-                return oMin <= cMin ? !(vnMin >= oMin && vnMin < cMin) : !(vnMin >= oMin || vnMin < cMin)
-              }
-              const timeKeyArr = Array.isArray(timeKeys) ? timeKeys : [timeKeys]
-              const outsideHours = timeKeyArr.every(tk => checkOutside(tk))
-              // For display: pick first available hours range
-              const firstHours = timeKeyArr.map(tk => svcTimeMap[tk]).find(h => h && !h.allDay)
-
-              const locked = manualOff || outsideHours
-              const lockMsg = manualOff
-                ? manualMsg
-                : outsideHours && firstHours
-                  ? `Dịch vụ hoạt động từ ${firstHours.open} – ${firstHours.close}. Vui lòng quay lại trong giờ phục vụ.`
-                  : ""
-              return (
-                <div key={i} onClick={() => {
-                  if (locked) { setLockedSvcMsg(lockMsg); setTimeout(() => setLockedSvcMsg(null), 4000); return }
-                  window.location.href = `/${s.key}`
-                }} style={{ textDecoration:"none", cursor: locked ? "not-allowed" : "pointer" }}>
-                  <div className="svc-card" style={{
-                    background: locked ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.04)",
-                    backdropFilter:"blur(10px)", WebkitBackdropFilter:"blur(10px)",
-                    border: locked ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(255,255,255,0.08)",
-                    borderRadius:14, padding:"10px 4px",
-                    display:"flex", flexDirection:"column", alignItems:"center", gap:4,
-                    position:"relative", opacity: locked ? 0.5 : 1,
-                    transition:"opacity .2s",
-                  }}>
-                    {locked && (
-                      <div style={{ position:"absolute", top:3, right:4, fontSize:9, color:"#ff4040" }}>🔒</div>
-                    )}
-                    <div style={{ width:38, height:38, borderRadius:11,
-                      background: locked ? "rgba(255,255,255,0.04)" : s.bg,
-                      display:"flex", alignItems:"center", justifyContent:"center",
-                      fontSize:20, color: locked ? "#6a5a40" : s.ic }}>
-                      {s.icon}
-                    </div>
-                    <span style={{ color: locked ? "#6a5a40" : "#b0956a", fontSize:11, textAlign:"center",
-                      fontWeight:500, lineHeight:1.3 }}>{s.label}</span>
-                    {outsideHours && firstHours && (
-                      <span style={{ fontSize:8, color:"#ff6060", textAlign:"center", lineHeight:1.2 }}>
-                        {firstHours.open}–{firstHours.close}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* --------------------------------------
-              S6 — Voucher (khám phá tất cả)
-          -------------------------------------- */}
-          <SectionHeader title="🎟️ Voucher" more="Xem tất cả →" href="/vouchers" />
-          {vouchers.length === 0 ? (
-            <div style={{ margin:"0 16px 14px",
-              background:"rgba(255,107,0,0.04)",
-              border:"1.5px dashed rgba(255,107,0,0.2)",
-              borderRadius:16, padding:"20px 16px",
-              display:"flex", flexDirection:"column", alignItems:"center", gap:10,
-            }}>
-              <div style={{ position:"relative" }}>
-                <div style={{ fontSize:44, lineHeight:1,
-                  filter:"drop-shadow(0 0 12px rgba(255,179,71,0.3))" }}>🎟️</div>
-                <motion.div
-                  animate={{ scale:[1,1.15,1], opacity:[0.5,1,0.5] }}
-                  transition={{ duration:2.5, repeat:Infinity, ease:"easeInOut" }}
-                  style={{ position:"absolute", inset:-8, borderRadius:"50%",
-                    background:"radial-gradient(circle,rgba(255,179,71,0.12) 0%,transparent 70%)" }} />
+          <SectionHeader title="🔄 Đặt lại nhanh" more="Lịch sử →" href="/orders" />
+          {reorders.length === 0 ? (
+            <div style={{ padding:"0 16px 14px" }}>
+              <div style={{ background:"rgba(255,255,255,0.03)", border:"1px dashed rgba(255,255,255,0.07)",
+                borderRadius:12, padding:"16px", textAlign:"center" }}>
+                <div style={{ fontSize:28, marginBottom:6 }}>🛒</div>
+                <div style={{ color:"#6a5a40", fontSize:10 }}>Đặt đơn đầu tiên để thấy<br/>lịch sử đặt lại nhanh ở đây</div>
               </div>
-              <div style={{ textAlign:"center" }}>
-                <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700, marginBottom:5 }}>
-                  Chua có voucher nào
-                </div>
-                <div style={{ color:"#6a5a40", fontSize:10, lineHeight:1.7 }}>
-                  Đặt đơn đầu tiên để nhận ngay<br/>
-                  <span style={{ color:"#FFB347", fontWeight:600 }}>ưu đãi hấp dẫn từ DakGo!</span>
-                </div>
-              </div>
-              <a href="/nearby-shops" style={{ textDecoration:"none" }}>
-                <div style={{ background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.25)",
-                  borderRadius:10, padding:"7px 18px",
-                  color:"#FF8C00", fontSize:10, fontWeight:700 }}>
-                  Khám phá quán ngay ?
-                </div>
-              </a>
             </div>
           ) : (
             <HScroll>
-              {vouchers.map(v => {
-                const saved = savedVoucherIds.includes(v.id)
-                const isShop = !!v.shop_id
-                const isFreeship = v.discount_type === "freeship"
-                const isPercent  = v.discount_type === "percent"
-                const clr   = isFreeship ? "#4a8ff5" : isPercent ? "#FF8C00" : "#3ecf6e"
-                const bg    = isFreeship ? "rgba(74,143,245,0.08)"  : isPercent ? "rgba(255,107,0,0.08)"  : "rgba(62,207,110,0.08)"
-                const bord  = isFreeship ? "rgba(74,143,245,0.25)"  : isPercent ? "rgba(255,107,0,0.25)"  : "rgba(62,207,110,0.25)"
-                const stripe= isFreeship ? "#4a8ff5" : isPercent ? "linear-gradient(180deg,#FF6B00,#FF8C00)" : "#3ecf6e"
-                const icon  = isFreeship ? "🚚" : isShop ? "🏪" : "🏷️"
-                const valueLabel = isPercent ? `-${v.discount_value}%`
-                  : isFreeship ? "Free ship"
-                  : `-${v.discount_value.toLocaleString("vi-VN")}đ`
-                const daysLeft   = Math.ceil((new Date(v.valid_to).getTime() - Date.now()) / 86400000)
-                const urgent     = daysLeft <= 1
-                const expiryLabel= daysLeft <= 0 ? "Hết hôm nay" : daysLeft === 1 ? "Còn 1 ngày" : `Còn ${daysLeft} ngày`
-                const href = isShop ? `/shop/${v.shop_id}` : "/vouchers"
+              {reorders.map(r => {
+                const shopName = (r.shops as {name:string}|null)?.name ?? "Quán"
+                const firstItem = (r.order_items as {name:string}[])?.[0]?.name ?? "Đơn hàng"
                 return (
-                  <a key={v.id} href={href} style={{ textDecoration:"none", display:"block" }}>
-                    <div style={{
-                      minWidth:172, flexShrink:0,
-                      background: bg,
-                      border: `1px solid ${bord}`,
-                      borderRadius:14, overflow:"hidden",
-                      display:"flex",
-                    }}>
-                      {/* Left colour stripe — dashed border style giống kho voucher */}
-                      <div style={{ width:5, background: stripe, borderRight:`2px dashed ${bord}`, flexShrink:0 }} />
-
-                      {/* Content */}
-                      <div style={{ flex:1, padding:"10px 10px 8px", display:"flex", flexDirection:"column", gap:5 }}>
-                        {/* Icon + value + shop chip */}
-                        <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-                          <div style={{ width:32, height:32, borderRadius:9,
-                            background:`${bg}`, border:`1px solid ${bord}`,
-                            display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
-                            {icon}
-                          </div>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ color:clr, fontSize:13, fontWeight:800, fontFamily:"Lexend" }}>{valueLabel}</div>
-                            {v.shopName && (
-                              <div style={{ fontSize:9, color:"#6a5a40", background:"rgba(255,255,255,0.04)",
-                                border:"1px solid rgba(255,255,255,0.07)", borderRadius:4,
-                                padding:"1px 5px", marginTop:2,
-                                overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                                {v.shopName}
-                              </div>
-                            )}
-                          </div>
+                  <div key={r.id} style={{
+                    minWidth:132, flexShrink:0,
+                    background:"rgba(255,255,255,0.04)", backdropFilter:"blur(10px)",
+                    border:"1px solid rgba(255,255,255,0.08)",
+                    borderRadius:12, padding:"10px 11px", cursor:"pointer",
+                  }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:7 }}>
+                      <span style={{ fontSize:20 }}>🍜</span>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ color:"#f8f0e0", fontSize: 11, fontWeight:600,
+                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                          {firstItem}
                         </div>
-
-                        {/* Title */}
-                        <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600, lineHeight:1.35,
-                          overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                          {v.title}
+                        <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
+                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                          {shopName}
                         </div>
-
-                        {/* Min order */}
-                        {v.min_order && v.min_order > 0 && (
-                          <div style={{ color:"#6a5a40", fontSize:9.5 }}>
-                            Đơn từ {v.min_order.toLocaleString("vi-VN")}đ
-                          </div>
-                        )}
-
-                        {/* Footer: code + expiry + save */}
-                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:2 }}>
-                          <span style={{ fontFamily:"'Courier New',monospace", background:"rgba(0,0,0,0.2)",
-                            border:`1px dashed ${bord}`, borderRadius:4, padding:"1px 6px",
-                            color:clr, fontSize:9.5, fontWeight:700,
-                            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:80 }}>
-                            {v.code}
-                          </span>
-                          <span style={{ fontSize:9, color: urgent ? "#ff6060" : "#6a5a40", fontWeight: urgent ? 700 : 400 }}>
-                            {urgent ? "⚠ " : ""}{expiryLabel}
-                          </span>
-                        </div>
-
-                        {/* Save button */}
-                        <button type="button"
-                          onClick={e => { e.preventDefault(); setSavedVoucherIds(prev =>
-                            saved ? prev.filter(x => x !== v.id) : [...prev, v.id]) }}
-                          style={{ alignSelf:"flex-end", height:20, padding:"0 8px", borderRadius:6, border:"none",
-                            cursor:"pointer", fontSize:9.5, fontWeight:700, fontFamily:"Lexend",
-                            background: saved ? "rgba(62,207,110,0.15)" : "rgba(255,255,255,0.06)",
-                            color: saved ? "#3ecf6e" : "#6a5a40", transition:"all .2s" }}>
-                          {saved ? "✓ Đã lưu" : "🔖 Lưu"}
-                        </button>
                       </div>
                     </div>
-                  </a>
+                    <a href={`/shop/${r.shop_id}`} style={{ textDecoration:"none" }}>
+                      <div className="reorder-btn" style={{
+                        width:"100%", height:28, borderRadius:8, border:"1px solid rgba(255,107,0,0.25)",
+                        background:"rgba(255,107,0,0.08)",
+                        color:"#FF8C00", fontSize: 11, fontWeight:600,
+                        cursor:"pointer", fontFamily:"Lexend",
+                        display:"flex", alignItems:"center", justifyContent:"center", gap:4,
+                        transition:"background .15s",
+                      }}>
+                        🔁 Đặt lại · {Math.round(r.total_amount/1000)}k
+                      </div>
+                    </a>
+                  </div>
                 )
               })}
             </HScroll>
           )}
+
+          {/* S11 — LoyaltyPoints removed: điểm chỉ hiển thị trong Profile cá nhân */}
 
           {/* --------------------------------------
               S7 — Danh mục theo loại món
@@ -1402,142 +1323,6 @@ export default function HomePage() {
               </motion.button>
             ))}
           </div>
-
-          {/* --------------------------------------
-              S8 — PromoSection
-          -------------------------------------- */}
-          {promos.length > 0 && (<>
-          <SectionHeader title="🏷️ Khuyến mãi hôm nay" more="Xem tất cả →" href="/promo-items" />
-            <HScroll>
-            {promos.map(p => {
-              const shopName = (p.shops as {name:string}|null)?.name ?? ""
-              const discountPct = p.original_price && p.original_price > p.price
-                ? Math.round((1 - p.price / p.original_price) * 100) : 0
-
-              // Badge theo loại khuyến mãi
-              const promoBadge =
-                p.promoTag === "combo"
-                  ? <span style={{ display:"inline-flex", alignItems:"center", gap:2,
-                      background:"rgba(168,85,247,0.18)", border:"1px solid rgba(168,85,247,0.4)",
-                      color:"#c084fc", fontSize:8, fontWeight:800, padding:"1px 5px",
-                      borderRadius:4, lineHeight:1.4 }}>COMBO</span>
-                : p.promoTag === "freeship"
-                  ? <span style={{ display:"inline-flex", alignItems:"center", gap:2,
-                      background:"rgba(62,207,110,0.15)", border:"1px solid rgba(62,207,110,0.35)",
-                      color:"#3ecf6e", fontSize:8, fontWeight:800, padding:"1px 5px",
-                      borderRadius:4, lineHeight:1.4 }}>FREE SHIP</span>
-                : discountPct > 0
-                  ? <Badge layer={2} variant="discount" size="sm" label={`-${discountPct}%`} />
-                  : null
-
-              return (
-                <a key={p.id} href={`/shop/${p.shop_id}`} style={{ textDecoration:"none" }}>
-                <div className="promo-card" style={{
-                  minWidth:120, flexShrink:0,
-                  background:"rgba(255,255,255,0.04)", backdropFilter:"blur(10px)",
-                  border: p.promoTag === "combo"   ? "1px solid rgba(168,85,247,0.18)"
-                        : p.promoTag === "freeship" ? "1px solid rgba(62,207,110,0.18)"
-                        : "1px solid rgba(255,255,255,0.08)",
-                  borderRadius:14, overflow:"hidden", cursor:"pointer",
-                }}>
-                  <div style={{ height:74, display:"flex", alignItems:"center",
-                    justifyContent:"center", fontSize:32, position:"relative",
-                    background:"rgba(255,107,0,0.04)", overflow:"hidden" }}>
-                    {p.image_url
-                      ? <Image src={p.image_url} alt={p.name} fill sizes="120px" style={{ objectFit:"cover" }} />
-                      : <span style={{ zIndex:1 }}>🍽️</span>}
-                  </div>
-                  <div style={{ padding:"7px 9px 8px" }}>
-                    <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600,
-                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
-                    {promoBadge && <div style={{ marginTop:3 }}>{promoBadge}</div>}
-                    <div style={{ color:"#6a5a40", fontSize:9, marginTop:2,
-                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
-                    <div style={{ marginTop:3 }}>
-                      <span style={{ background:"linear-gradient(135deg,#FF6B00,#FFB347)",
-                        WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
-                        backgroundClip:"text", fontSize:11, fontWeight:700 }}>{fmt(p.price)}</span>
-                      {p.original_price && p.original_price > p.price && (
-                        <span style={{ color:"#6a5a40", fontSize:9, textDecoration:"line-through", marginLeft:4 }}>
-                          {fmt(p.original_price)}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display:"flex", alignItems:"center",
-                      justifyContent:"space-between", marginTop:4 }}>
-                      <span style={{ color:"#6a5a40", fontSize:9 }}>🔥 {p.sold_count} đã bán</span>
-                      <button
-                        onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:p.id, name:p.name, price:p.price, shop:shopName, shopId:p.shop_id }) }}
-                        style={{ width:22, height:22, borderRadius:7,
-                          background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
-                          border:"none", color:"#fff", fontSize:14, fontWeight:700,
-                          cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
-                          boxShadow:"0 2px 6px rgba(255,107,0,0.4)", flexShrink:0 }}>+</button>
-                    </div>
-                  </div>
-                </div>
-                </a>
-              )
-            })}
-            </HScroll>
-          </>)}
-
-          {/* --------------------------------------
-              S8.5 — Cửa hàng yêu thích
-          -------------------------------------- */}
-          {favoriteShops.length > 0 && (
-            <>
-              <SectionHeader title="❤️ Cửa hàng yêu thích" />
-              <HScroll>
-                {favoriteShops.map(s => {
-                  const shopOpen = isShopInHours(s)
-                  return (
-                  <a key={s.id} href={`/shop/${s.id}`} style={{ textDecoration:"none", flexShrink:0 }}>
-                    <div style={{
-                      width:140, background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
-                      border:"1px solid rgba(255,107,0,0.18)", borderRadius:14, overflow:"hidden",
-                      opacity: shopOpen ? 1 : 0.6,
-                    }}>
-                      <div style={{ height:80, background:"rgba(255,107,0,0.06)",
-                        display:"flex", alignItems:"center", justifyContent:"center",
-                        position:"relative" }}>
-                        {/* Logo tròn */}
-                        <div style={{ width:58, height:58, borderRadius:"50%", overflow:"hidden",
-                          border:"2px solid rgba(255,107,0,0.25)", position:"relative",
-                          background:"rgba(255,255,255,0.06)", flexShrink:0,
-                          display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>
-                          {s.logo_url
-                            ? <Image src={s.logo_url} alt={s.name} fill sizes="58px" style={{ objectFit:"cover" }} />
-                            : "🏪"}
-                        </div>
-                        {!shopOpen && (
-                          <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.45)",
-                            display:"flex", alignItems:"center", justifyContent:"center" }}>
-                            <span style={{ fontSize:15 }}>🔒</span>
-                          </div>
-                        )}
-                        <button onClick={e => { e.preventDefault(); e.stopPropagation(); toggleFavorite(s.id) }}
-                          style={{ position:"absolute", top:5, right:5, width:24, height:24, borderRadius:7,
-                            background:"rgba(255,64,64,0.15)", border:"1px solid rgba(255,64,64,0.3)",
-                            color:"#ff6060", fontSize:12, cursor:"pointer", display:"flex",
-                            alignItems:"center", justifyContent:"center" }}>✕</button>
-                      </div>
-                      <div style={{ padding:"8px 9px" }}>
-                        <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600,
-                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</div>
-                        <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:3 }}>
-                          <Badge layer={3} variant={shopOpen ? "open" : "closed"} size="sm"
-                            label={shopOpen ? "Đang mở" : nextOpenLabel(s)} />
-                          <span style={{ color:"#6a5a40", fontSize: 11 }}>⭐ {s.rating_avg?.toFixed(1) ?? "Mới"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </a>
-                  )
-                })}
-              </HScroll>
-            </>
-          )}
 
           {/* --------------------------------------
               S9 — NearbyShops
@@ -1608,7 +1393,7 @@ export default function HomePage() {
               <div style={{ textAlign:"center", padding:"20px 0", color:"#6a5a40", fontSize:11 }}>
                 Chưa có quán nào{nearbyFilter !== "all" ? " trong danh mục này" : " trong khu vực"}
               </div>
-            ) : filteredShops.map(s => {
+            ) : filteredShops.slice(0, nearbyShowCount).map(s => {
               const isFav    = favoriteIds.includes(s.id)
               const sLat     = s.lat ?? s.location?.coordinates?.[1] ?? null
               const sLng     = s.lng ?? s.location?.coordinates?.[0] ?? null
@@ -1712,9 +1497,346 @@ export default function HomePage() {
                 </button>
               </div>
             )})}
+            {filteredShops.length > 0 && nearbyShowCount < filteredShops.length && (
+              <button
+                onClick={() => setNearbyShowCount(n => n + 10)}
+                style={{
+                  width:"100%", padding:"10px 0", borderRadius:12,
+                  border:"1px solid rgba(255,107,0,0.2)",
+                  background:"rgba(255,107,0,0.05)",
+                  color:"#FF8C00", fontSize:11, fontWeight:600,
+                  cursor:"pointer", fontFamily:"Lexend",
+                }}>
+                Xem thêm {Math.min(filteredShops.length - nearbyShowCount, 10)} quán →
+              </button>
+            )}
           </div>
             )
           })()}
+
+          {/* --------------------------------------
+              S8 — PromoSection
+          -------------------------------------- */}
+          {promos.length > 0 && (<>
+          <SectionHeader title="🏷️ Khuyến mãi hôm nay" more="Xem tất cả →" href="/promo-items" />
+            <HScroll>
+            {promos.map(p => {
+              const shopName = (p.shops as {name:string}|null)?.name ?? ""
+              const discountPct = p.original_price && p.original_price > p.price
+                ? Math.round((1 - p.price / p.original_price) * 100) : 0
+
+              // Badge theo loại khuyến mãi
+              const promoBadge =
+                p.promoTag === "combo"
+                  ? <span style={{ display:"inline-flex", alignItems:"center", gap:2,
+                      background:"rgba(168,85,247,0.18)", border:"1px solid rgba(168,85,247,0.4)",
+                      color:"#c084fc", fontSize:8, fontWeight:800, padding:"1px 5px",
+                      borderRadius:4, lineHeight:1.4 }}>COMBO</span>
+                : p.promoTag === "freeship"
+                  ? <span style={{ display:"inline-flex", alignItems:"center", gap:2,
+                      background:"rgba(62,207,110,0.15)", border:"1px solid rgba(62,207,110,0.35)",
+                      color:"#3ecf6e", fontSize:8, fontWeight:800, padding:"1px 5px",
+                      borderRadius:4, lineHeight:1.4 }}>FREE SHIP</span>
+                : discountPct > 0
+                  ? <Badge layer={2} variant="discount" size="sm" label={`-${discountPct}%`} />
+                  : null
+
+              return (
+                <a key={p.id} href={`/shop/${p.shop_id}`} style={{ textDecoration:"none" }}>
+                <div className="promo-card" style={{
+                  minWidth:120, flexShrink:0,
+                  background:"rgba(255,255,255,0.04)", backdropFilter:"blur(10px)",
+                  border: p.promoTag === "combo"   ? "1px solid rgba(168,85,247,0.18)"
+                        : p.promoTag === "freeship" ? "1px solid rgba(62,207,110,0.18)"
+                        : "1px solid rgba(255,255,255,0.08)",
+                  borderRadius:14, overflow:"hidden", cursor:"pointer",
+                }}>
+                  <div style={{ height:74, display:"flex", alignItems:"center",
+                    justifyContent:"center", fontSize:32, position:"relative",
+                    background:"rgba(255,107,0,0.04)", overflow:"hidden" }}>
+                    {p.image_url
+                      ? <Image src={p.image_url} alt={p.name} fill sizes="120px" style={{ objectFit:"cover" }} />
+                      : <span style={{ zIndex:1 }}>🍽️</span>}
+                  </div>
+                  <div style={{ padding:"7px 9px 8px" }}>
+                    <div style={{ color:"#f8f0e0", fontSize:10, fontWeight:600,
+                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
+                    {promoBadge && <div style={{ marginTop:3 }}>{promoBadge}</div>}
+                    <div style={{ color:"#6a5a40", fontSize:9, marginTop:2,
+                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
+                    <div style={{ marginTop:3 }}>
+                      <span style={{ background:"linear-gradient(135deg,#FF6B00,#FFB347)",
+                        WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                        backgroundClip:"text", fontSize:11, fontWeight:700 }}>{fmt(p.price)}</span>
+                      {p.original_price && p.original_price > p.price && (
+                        <span style={{ color:"#6a5a40", fontSize:9, textDecoration:"line-through", marginLeft:4 }}>
+                          {fmt(p.original_price)}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center",
+                      justifyContent:"space-between", marginTop:4 }}>
+                      <span style={{ color:"#6a5a40", fontSize:9 }}>🔥 {p.sold_count} đã bán</span>
+                      <button
+                        onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:p.id, name:p.name, price:p.price, shop:shopName, shopId:p.shop_id }) }}
+                        style={{ width:22, height:22, borderRadius:7,
+                          background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
+                          border:"none", color:"#fff", fontSize:14, fontWeight:700,
+                          cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+                          boxShadow:"0 2px 6px rgba(255,107,0,0.4)", flexShrink:0 }}>+</button>
+                    </div>
+                  </div>
+                </div>
+                </a>
+              )
+            })}
+            </HScroll>
+          </>)}
+
+          {/* --------------------------------------
+              S10 — BestSellers
+          -------------------------------------- */}
+          {bestSellers.length > 0 && (<>
+          <SectionHeader title="🔥 Bán chạy tuần này" more="Xem tất cả →" href="/bestsellers" />
+            <HScroll>
+              {bestSellers.map((b, idx) => {
+                const rank = idx + 1
+                const shopName = (b.shops as {name:string}|null)?.name ?? ""
+                return (
+                  <div key={b.id} style={{
+                    minWidth:110, flexShrink:0,
+                    background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
+                    border:"1px solid rgba(255,255,255,0.08)",
+                    borderRadius:13, overflow:"hidden", cursor:"pointer",
+                  }}>
+                    <div style={{ height:80, display:"flex", alignItems:"center",
+                      justifyContent:"center", fontSize:34, position:"relative",
+                      background:"rgba(255,255,255,0.02)", overflow:"hidden" }}>
+                      {b.image_url
+                        ? <Image src={b.image_url} alt={b.name} fill sizes="130px" style={{ objectFit:"cover" }} />
+                        : <>
+                            <div style={{ position:"absolute", inset:0,
+                              background:"radial-gradient(circle at 50% 60%,rgba(255,107,0,0.09) 0%,transparent 65%)" }} />
+                            <span style={{ position:"relative", zIndex:1 }}>🔥</span>
+                          </>
+                      }
+                      <div style={{ position:"absolute", top:6, left:6,
+                        width:20, height:20, borderRadius:6,
+                        background: rank<=3 ? "rgba(255,215,0,0.15)" : "rgba(255,107,0,0.1)",
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        fontSize:10, fontWeight:800,
+                        color: rank===1 ? "#FFD700" : rank===2 ? "#C0C0C0" : rank===3 ? "#CD7F32" : "#FF8C00" }}>
+                        {rank <= 3 ? RANK_ICON[rank-1] : rank}
+                      </div>
+                    </div>
+                    <div style={{ padding:"7px 9px 8px" }}>
+                      <div style={{ color:"#f8f0e0", fontSize: 11, fontWeight:600,
+                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{b.name}</div>
+                      <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
+                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
+                      <div style={{ color:"#3ecf6e", fontSize: 10, fontWeight:600, marginTop:3 }}>
+                        🔥 {b.sold_count.toLocaleString("vi-VN")} đã bán
+                      </div>
+                      <div style={{ display:"flex", justifyContent:"space-between",
+                        alignItems:"center", marginTop:4 }}>
+                        <div style={{ background:"linear-gradient(135deg,#FF6B00,#FFB347)",
+                          WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+                          backgroundClip:"text", fontSize:11, fontWeight:700 }}>
+                          {fmt(b.price)}
+                        </div>
+                        <button
+                          onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:b.id, name:b.name, price:b.price, shop:shopName, shopId:b.shop_id }) }}
+                          style={{ width:22, height:22, borderRadius:7,
+                            background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
+                            border:"none", color:"#fff", fontSize:14, fontWeight:700,
+                            cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+                            boxShadow:"0 2px 6px rgba(255,107,0,0.4)", flexShrink:0 }}>+</button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </HScroll>
+          </>)}
+
+          {/* --------------------------------------
+              S6 — Voucher (khám phá tất cả)
+          -------------------------------------- */}
+          <SectionHeader title="🎟️ Voucher" more="Xem tất cả →" href="/vouchers" />
+          {vouchers.length === 0 ? (
+            <div style={{ margin:"0 16px 14px",
+              background:"rgba(255,107,0,0.04)",
+              border:"1.5px dashed rgba(255,107,0,0.2)",
+              borderRadius:16, padding:"20px 16px",
+              display:"flex", flexDirection:"column", alignItems:"center", gap:10,
+            }}>
+              <div style={{ position:"relative" }}>
+                <div style={{ fontSize:44, lineHeight:1,
+                  filter:"drop-shadow(0 0 12px rgba(255,179,71,0.3))" }}>🎟️</div>
+                <motion.div
+                  animate={{ scale:[1,1.15,1], opacity:[0.5,1,0.5] }}
+                  transition={{ duration:2.5, repeat:Infinity, ease:"easeInOut" }}
+                  style={{ position:"absolute", inset:-8, borderRadius:"50%",
+                    background:"radial-gradient(circle,rgba(255,179,71,0.12) 0%,transparent 70%)" }} />
+              </div>
+              <div style={{ textAlign:"center" }}>
+                <div style={{ color:"#f8f0e0", fontSize:13, fontWeight:700, marginBottom:5 }}>
+                  Chưa có voucher nào
+                </div>
+                <div style={{ color:"#6a5a40", fontSize:10, lineHeight:1.7 }}>
+                  Đặt đơn đầu tiên để nhận ngay<br/>
+                  <span style={{ color:"#FFB347", fontWeight:600 }}>ưu đãi hấp dẫn từ DakGo!</span>
+                </div>
+              </div>
+              <a href="/nearby-shops" style={{ textDecoration:"none" }}>
+                <div style={{ background:"rgba(255,107,0,0.1)", border:"1px solid rgba(255,107,0,0.25)",
+                  borderRadius:10, padding:"7px 18px",
+                  color:"#FF8C00", fontSize:10, fontWeight:700 }}>
+                  Khám phá quán ngay 🍜
+                </div>
+              </a>
+            </div>
+          ) : (
+            <HScroll>
+              {vouchers.map(v => {
+                const saved = savedVoucherIds.includes(v.id)
+                const isShop = !!v.shop_id
+                const isFreeship = v.discount_type === "freeship"
+                const isPercent  = v.discount_type === "percent"
+                const clr   = isFreeship ? "#4a8ff5" : isPercent ? "#FF8C00" : "#3ecf6e"
+                const bg    = isFreeship ? "rgba(74,143,245,0.08)"  : isPercent ? "rgba(255,107,0,0.08)"  : "rgba(62,207,110,0.08)"
+                const bord  = isFreeship ? "rgba(74,143,245,0.25)"  : isPercent ? "rgba(255,107,0,0.25)"  : "rgba(62,207,110,0.25)"
+                const stripe= isFreeship ? "#4a8ff5" : isPercent ? "linear-gradient(180deg,#FF6B00,#FF8C00)" : "#3ecf6e"
+                const icon  = isFreeship ? "🚚" : isShop ? "🏪" : "🏷️"
+                const valueLabel = isPercent ? `-${v.discount_value}%`
+                  : isFreeship ? "Free ship"
+                  : `-${v.discount_value.toLocaleString("vi-VN")}đ`
+                const daysLeft   = Math.ceil((new Date(v.valid_to).getTime() - Date.now()) / 86400000)
+                const urgent     = daysLeft <= 1
+                const expiryLabel= daysLeft <= 0 ? "Hết hôm nay" : daysLeft === 1 ? "Còn 1 ngày" : `Còn ${daysLeft} ngày`
+                const href = isShop ? `/shop/${v.shop_id}` : "/vouchers"
+                return (
+                  <a key={v.id} href={href} style={{ textDecoration:"none", display:"block" }}>
+                    <div style={{
+                      minWidth:172, flexShrink:0,
+                      background: bg,
+                      border: `1px solid ${bord}`,
+                      borderRadius:14, overflow:"hidden",
+                      display:"flex",
+                    }}>
+                      <div style={{ width:5, background: stripe, borderRight:`2px dashed ${bord}`, flexShrink:0 }} />
+                      <div style={{ flex:1, padding:"10px 10px 8px", display:"flex", flexDirection:"column", gap:5 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+                          <div style={{ width:32, height:32, borderRadius:9,
+                            background:`${bg}`, border:`1px solid ${bord}`,
+                            display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
+                            {icon}
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ color:clr, fontSize:13, fontWeight:800, fontFamily:"Lexend" }}>{valueLabel}</div>
+                            {v.shopName && (
+                              <div style={{ fontSize:9, color:"#6a5a40", background:"rgba(255,255,255,0.04)",
+                                border:"1px solid rgba(255,255,255,0.07)", borderRadius:4,
+                                padding:"1px 5px", marginTop:2,
+                                overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                                {v.shopName}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600, lineHeight:1.35,
+                          overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {v.title}
+                        </div>
+                        {v.min_order && v.min_order > 0 && (
+                          <div style={{ color:"#6a5a40", fontSize:9.5 }}>
+                            Đơn từ {v.min_order.toLocaleString("vi-VN")}đ
+                          </div>
+                        )}
+                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:2 }}>
+                          <span style={{ fontFamily:"'Courier New',monospace", background:"rgba(0,0,0,0.2)",
+                            border:`1px dashed ${bord}`, borderRadius:4, padding:"1px 6px",
+                            color:clr, fontSize:9.5, fontWeight:700,
+                            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:80 }}>
+                            {v.code}
+                          </span>
+                          <span style={{ fontSize:9, color: urgent ? "#ff6060" : "#6a5a40", fontWeight: urgent ? 700 : 400 }}>
+                            {urgent ? "⚠ " : ""}{expiryLabel}
+                          </span>
+                        </div>
+                        <button type="button"
+                          onClick={e => { e.preventDefault(); setSavedVoucherIds(prev =>
+                            saved ? prev.filter(x => x !== v.id) : [...prev, v.id]) }}
+                          style={{ alignSelf:"flex-end", height:20, padding:"0 8px", borderRadius:6, border:"none",
+                            cursor:"pointer", fontSize:9.5, fontWeight:700, fontFamily:"Lexend",
+                            background: saved ? "rgba(62,207,110,0.15)" : "rgba(255,255,255,0.06)",
+                            color: saved ? "#3ecf6e" : "#6a5a40", transition:"all .2s" }}>
+                          {saved ? "✓ Đã lưu" : "🔖 Lưu"}
+                        </button>
+                      </div>
+                    </div>
+                  </a>
+                )
+              })}
+            </HScroll>
+          )}
+
+          {/* --------------------------------------
+              S8.5 — Cửa hàng yêu thích
+          -------------------------------------- */}
+          {favoriteShops.length > 0 && (
+            <>
+              <SectionHeader title="❤️ Cửa hàng yêu thích" />
+              <HScroll>
+                {favoriteShops.map(s => {
+                  const shopOpen = isShopInHours(s)
+                  return (
+                  <a key={s.id} href={`/shop/${s.id}`} style={{ textDecoration:"none", flexShrink:0 }}>
+                    <div style={{
+                      width:140, background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
+                      border:"1px solid rgba(255,107,0,0.18)", borderRadius:14, overflow:"hidden",
+                      opacity: shopOpen ? 1 : 0.6,
+                    }}>
+                      <div style={{ height:80, background:"rgba(255,107,0,0.06)",
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        position:"relative" }}>
+                        {/* Logo tròn */}
+                        <div style={{ width:58, height:58, borderRadius:"50%", overflow:"hidden",
+                          border:"2px solid rgba(255,107,0,0.25)", position:"relative",
+                          background:"rgba(255,255,255,0.06)", flexShrink:0,
+                          display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>
+                          {s.logo_url
+                            ? <Image src={s.logo_url} alt={s.name} fill sizes="58px" style={{ objectFit:"cover" }} />
+                            : "🏪"}
+                        </div>
+                        {!shopOpen && (
+                          <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.45)",
+                            display:"flex", alignItems:"center", justifyContent:"center" }}>
+                            <span style={{ fontSize:15 }}>🔒</span>
+                          </div>
+                        )}
+                        <button onClick={e => { e.preventDefault(); e.stopPropagation(); toggleFavorite(s.id) }}
+                          style={{ position:"absolute", top:5, right:5, width:24, height:24, borderRadius:7,
+                            background:"rgba(255,64,64,0.15)", border:"1px solid rgba(255,64,64,0.3)",
+                            color:"#ff6060", fontSize:12, cursor:"pointer", display:"flex",
+                            alignItems:"center", justifyContent:"center" }}>✕</button>
+                      </div>
+                      <div style={{ padding:"8px 9px" }}>
+                        <div style={{ color:"#f8f0e0", fontSize:10.5, fontWeight:600,
+                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</div>
+                        <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:3 }}>
+                          <Badge layer={3} variant={shopOpen ? "open" : "closed"} size="sm"
+                            label={shopOpen ? "Đang mở" : nextOpenLabel(s)} />
+                          <span style={{ color:"#6a5a40", fontSize: 11 }}>⭐ {s.rating_avg?.toFixed(1) ?? "Mới"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </a>
+                  )
+                })}
+              </HScroll>
+            </>
+          )}
 
           {/* --------------------------------------
               S9.5 — Vừa lên menu (sản phẩm mới nhất)
@@ -1866,130 +1988,7 @@ export default function HomePage() {
             </>
           )}
 
-          {/* --------------------------------------
-              S10 — BestSellers
-          -------------------------------------- */}
-          {bestSellers.length > 0 && (<>
-          <SectionHeader title="🔥 Bán chạy tuần này" more="Xem tất cả →" href="/bestsellers" />
-            <HScroll>
-              {bestSellers.map((b, idx) => {
-                const rank = idx + 1
-                const shopName = (b.shops as {name:string}|null)?.name ?? ""
-                return (
-                  <div key={b.id} style={{
-                    minWidth:110, flexShrink:0,
-                    background:"rgba(255,255,255,0.05)", backdropFilter:"blur(10px)",
-                    border:"1px solid rgba(255,255,255,0.08)",
-                    borderRadius:13, overflow:"hidden", cursor:"pointer",
-                  }}>
-                    <div style={{ height:80, display:"flex", alignItems:"center",
-                      justifyContent:"center", fontSize:34, position:"relative",
-                      background:"rgba(255,255,255,0.02)", overflow:"hidden" }}>
-                      {b.image_url
-                        ? <Image src={b.image_url} alt={b.name} fill sizes="130px" style={{ objectFit:"cover" }} />
-                        : <>
-                            <div style={{ position:"absolute", inset:0,
-                              background:"radial-gradient(circle at 50% 60%,rgba(255,107,0,0.09) 0%,transparent 65%)" }} />
-                            <span style={{ position:"relative", zIndex:1 }}>🔥</span>
-                          </>
-                      }
-                      <div style={{ position:"absolute", top:6, left:6,
-                        width:20, height:20, borderRadius:6,
-                        background: rank<=3 ? "rgba(255,215,0,0.15)" : "rgba(255,107,0,0.1)",
-                        display:"flex", alignItems:"center", justifyContent:"center",
-                        fontSize:10, fontWeight:800,
-                        color: rank===1 ? "#FFD700" : rank===2 ? "#C0C0C0" : rank===3 ? "#CD7F32" : "#FF8C00" }}>
-                        {rank <= 3 ? RANK_ICON[rank-1] : rank}
-                      </div>
-                    </div>
-                    <div style={{ padding:"7px 9px 8px" }}>
-                      <div style={{ color:"#f8f0e0", fontSize: 11, fontWeight:600,
-                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{b.name}</div>
-                      <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
-                        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{shopName}</div>
-                      <div style={{ color:"#3ecf6e", fontSize: 10, fontWeight:600, marginTop:3 }}>
-                        🔥 {b.sold_count.toLocaleString("vi-VN")} đã bán
-                      </div>
-                      <div style={{ display:"flex", justifyContent:"space-between",
-                        alignItems:"center", marginTop:4 }}>
-                        <div style={{ background:"linear-gradient(135deg,#FF6B00,#FFB347)",
-                          WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
-                          backgroundClip:"text", fontSize:11, fontWeight:700 }}>
-                          {fmt(b.price)}
-                        </div>
-                        <button
-                          onClick={e => { e.preventDefault(); e.stopPropagation(); handleAdd(e.currentTarget as HTMLElement, { id:b.id, name:b.name, price:b.price, shop:shopName, shopId:b.shop_id }) }}
-                          style={{ width:22, height:22, borderRadius:7,
-                            background:"linear-gradient(135deg,#FF6B00,#FF8C00)",
-                            border:"none", color:"#fff", fontSize:14, fontWeight:700,
-                            cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
-                            boxShadow:"0 2px 6px rgba(255,107,0,0.4)", flexShrink:0 }}>+</button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </HScroll>
-          </>)}
 
-          {/* S11 — LoyaltyPoints removed: điểm chỉ hiển thị trong Profile cá nhân */}
-
-          {/* S11 — Cửa hàng yêu thích: sẽ hiện khi có bảng favorites */}
-
-          {/* --------------------------------------
-              S12 — ReorderSection
-          -------------------------------------- */}
-          <SectionHeader title="🔄 Đặt lại nhanh" more="Lịch sử →" href="/orders" />
-          {reorders.length === 0 ? (
-            <div style={{ padding:"0 16px 14px" }}>
-              <div style={{ background:"rgba(255,255,255,0.03)", border:"1px dashed rgba(255,255,255,0.07)",
-                borderRadius:12, padding:"16px", textAlign:"center" }}>
-                <div style={{ fontSize:28, marginBottom:6 }}>🛒</div>
-                <div style={{ color:"#6a5a40", fontSize:10 }}>Đặt đơn đầu tiên để thấy<br/>lịch sử đặt lại nhanh ở đây</div>
-              </div>
-            </div>
-          ) : (
-            <HScroll>
-              {reorders.map(r => {
-                const shopName = (r.shops as {name:string}|null)?.name ?? "Quán"
-                const firstItem = (r.order_items as {name:string}[])?.[0]?.name ?? "Đơn hàng"
-                return (
-                  <div key={r.id} style={{
-                    minWidth:132, flexShrink:0,
-                    background:"rgba(255,255,255,0.04)", backdropFilter:"blur(10px)",
-                    border:"1px solid rgba(255,255,255,0.08)",
-                    borderRadius:12, padding:"10px 11px", cursor:"pointer",
-                  }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:7 }}>
-                      <span style={{ fontSize:20 }}>🍜</span>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ color:"#f8f0e0", fontSize: 11, fontWeight:600,
-                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                          {firstItem}
-                        </div>
-                        <div style={{ color:"#6a5a40", fontSize: 11, marginTop:1,
-                          whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                          {shopName}
-                        </div>
-                      </div>
-                    </div>
-                    <a href={`/shop/${r.shop_id}`} style={{ textDecoration:"none" }}>
-                      <div className="reorder-btn" style={{
-                        width:"100%", height:28, borderRadius:8, border:"1px solid rgba(255,107,0,0.25)",
-                        background:"rgba(255,107,0,0.08)",
-                        color:"#FF8C00", fontSize: 11, fontWeight:600,
-                        cursor:"pointer", fontFamily:"Lexend",
-                        display:"flex", alignItems:"center", justifyContent:"center", gap:4,
-                        transition:"background .15s",
-                      }}>
-                        🔁 Đặt lại · {Math.round(r.total_amount/1000)}k
-                      </div>
-                    </a>
-                  </div>
-                )
-              })}
-            </HScroll>
-          )}
 
           <div style={{ height:8 }} />
 
