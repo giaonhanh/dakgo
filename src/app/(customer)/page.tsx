@@ -698,7 +698,8 @@ export default function HomePage() {
     setReorderLoading(null)
 
     type LiveProduct = { id: string; name: string; price: number; is_available: boolean }
-    const availMap = new Map((liveProducts ?? []).map(p => [p.id, p as LiveProduct]))
+    const typed = (liveProducts ?? []) as unknown as LiveProduct[]
+    const availMap = new Map(typed.map(p => [p.id, p]))
     const items = r.order_items
       .filter(oi => availMap.has(oi.product_id))
       .map(oi => { const p = availMap.get(oi.product_id)!; return { id: oi.product_id, name: p.name, price: p.price, shop: shopName, shopId: r.shop_id, qty: oi.qty } })
