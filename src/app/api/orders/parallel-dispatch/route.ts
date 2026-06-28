@@ -82,6 +82,17 @@ export async function POST(req: NextRequest) {
     // ── 2. Dispatch tài xế gần nhất ──────────────────────────────────
     const dispatchResult = await dispatchOrder("orders", order_id, [])
 
+    // ── 3. Notify khách: đang tìm tài xế (chỉ khi có tài xế được gửi) ──
+    if (dispatchResult.dispatched) {
+      Promise.resolve(db.from("notifications").insert({
+        user_id: order.customer_id,
+        type:    "order",
+        title:   "🛵 Đang tìm tài xế",
+        body:    `Đơn #${shortId} đã tiếp nhận — đang tìm tài xế gần nhất cho bạn.`,
+        data:    { order_id, url: `/tracking/${order_id}` },
+      })).catch(() => {})
+    }
+
     return NextResponse.json({
       ok:         true,
       dispatched: dispatchResult.dispatched,

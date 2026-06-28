@@ -2,12 +2,48 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdmin } from "@supabase/supabase-js"
 import { getRouteKm } from "@/lib/vietmapRoute"
+import { dispatchOrder, getTriedDriverIds, type DispatchTable } from "@/lib/dispatch"
 
 function adminDb() {
   return createAdmin(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
+}
+
+const WAVE_TIMEOUT_MINUTES = 3
+
+async function expireStaleWaves(db: ReturnType<typeof adminDb>) {
+  try {
+    const cutoff = new Date(Date.now() - WAVE_TIMEOUT_MINUTES * 60 * 1000).toISOString()
+
+    // Tìm wave cũ hơn 3 phút
+    const { data: staleWaves } = await db
+      .from("dispatch_waves")
+      .select("order_table, order_id, driver_ids")
+      .lt("updated_at", cutoff)
+      .limit(3)
+
+    if (!staleWaves?.length) return
+
+    for (const wave of staleWaves) {
+      // Optimistic lock: update updated_at — chỉ thành công nếu wave vẫn còn stale
+      // (nếu instance khác đã lock trước, row sẽ không match lt("updated_at", cutoff))
+      const { data: locked } = await db
+        .from("dispatch_waves")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("order_table", wave.order_table)
+        .eq("order_id", wave.order_id)
+        .lt("updated_at", cutoff)
+        .select("order_id")
+
+      if (!locked?.length) continue // Đã bị instance khác xử lý
+
+      // Dispatch wave tiếp theo
+      const triedIds = await getTriedDriverIds(wave.order_table as DispatchTable, wave.order_id)
+      dispatchOrder(wave.order_table as DispatchTable, wave.order_id, triedIds).catch(() => {})
+    }
+  } catch { /* không block check-pending chính */ }
 }
 
 export async function GET(request: Request) {
@@ -33,6 +69,9 @@ export async function GET(request: Request) {
     if (!driver?.is_approved || driver.status !== "online") {
       return NextResponse.json({ order: null })
     }
+
+    // Kiểm tra + expire wave tài xế bỏ qua quá 3 phút (fire-and-forget)
+    expireStaleWaves(db)
 
     // Trả về đơn pending hoặc accepted (merchant đã xác nhận) chưa có tài xế, bỏ qua đơn tài xế đã từ chối
     let q = db

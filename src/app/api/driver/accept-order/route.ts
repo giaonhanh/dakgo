@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as adminClient } from "@supabase/supabase-js"
+import { sendPushToUser } from "@/lib/webpush"
 
 function adminDb() {
   return adminClient(
@@ -65,6 +66,26 @@ export async function POST(req: NextRequest) {
 
     if (updateErr) {
       return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    }
+
+    // Notify khách: tài xế đã nhận đơn (fallback path)
+    const { data: fullOrder } = await db
+      .from("orders").select("customer_id").eq("id", order_id).single()
+    if (fullOrder?.customer_id) {
+      const shortId = order_id.slice(0, 8).toUpperCase()
+      const cid = fullOrder.customer_id
+      Promise.resolve(db.from("notifications").insert({
+        user_id: cid, type: "order",
+        title:   "🛵 Tài xế đang đến lấy đơn!",
+        body:    `Tài xế đã nhận đơn #${shortId} và đang trên đường đến quán.`,
+        data:    { order_id, url: `/tracking/${order_id}` },
+      })).catch(() => {})
+      sendPushToUser(cid, {
+        title: "🛵 Tài xế đang đến lấy đơn!",
+        body:  `Đơn #${shortId} đang được giao.`,
+        url:   `/tracking/${order_id}`,
+        tag:   `driver-accepted-${order_id}`,
+      }).catch(() => {})
     }
 
     return NextResponse.json({ ok: true, fallback: true })
