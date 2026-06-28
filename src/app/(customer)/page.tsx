@@ -697,10 +697,11 @@ export default function HomePage() {
 
     setReorderLoading(null)
 
-    const availMap = new Map((liveProducts ?? []).map(p => [p.id, p]))
+    type LiveProduct = { id: string; name: string; price: number; is_available: boolean }
+    const availMap = new Map((liveProducts ?? []).map(p => [p.id, p as LiveProduct]))
     const items = r.order_items
       .filter(oi => availMap.has(oi.product_id))
-      .map(oi => ({ id: oi.product_id, name: availMap.get(oi.product_id)!.name, price: availMap.get(oi.product_id)!.price, shop: shopName, shopId: r.shop_id, qty: oi.qty }))
+      .map(oi => { const p = availMap.get(oi.product_id)!; return { id: oi.product_id, name: p.name, price: p.price, shop: shopName, shopId: r.shop_id, qty: oi.qty } })
 
     if (items.length === 0) {
       setReorderToast("Các món trong đơn này hiện không còn bán")
