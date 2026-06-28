@@ -90,7 +90,6 @@ export default function PrintPage() {
         createdAt:       o.created_at,
         customerName:    profile?.full_name ?? "Khách hàng",
         customerPhone:   profile?.phone ?? "",
-        deliveryAddress: o.delivery_address ?? "",
         items: (items ?? []).map(i => ({
           name:    i.name,
           qty:     i.qty ?? 1,
